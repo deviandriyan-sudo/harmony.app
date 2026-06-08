@@ -1,0 +1,636 @@
+@import "tailwindcss";
+
+/* =========================================================
+   HARMONY DESIGN SYSTEM
+   Apple-inspired · Clean · Soft · Modern · Professional
+========================================================= */
+
+:root {
+  --harmony-bg: #f5f5f7;
+  --harmony-surface: #ffffff;
+  --harmony-surface-soft: #fbfbfd;
+  --harmony-surface-glass: rgba(255, 255, 255, 0.72);
+
+  --harmony-text: #1d1d1f;
+  --harmony-muted: #6e6e73;
+  --harmony-subtle: #86868b;
+
+  --harmony-border: rgba(0, 0, 0, 0.08);
+  --harmony-border-strong: rgba(0, 0, 0, 0.12);
+
+  --harmony-blue: #007aff;
+  --harmony-blue-soft: #e8f2ff;
+
+  --harmony-green: #34c759;
+  --harmony-green-soft: #eaf8ee;
+
+  --harmony-orange: #ff9500;
+  --harmony-orange-soft: #fff4e5;
+
+  --harmony-red: #ff3b30;
+  --harmony-red-soft: #fff0ef;
+
+  --harmony-purple: #af52de;
+  --harmony-purple-soft: #f7edfc;
+
+  --harmony-radius-sm: 14px;
+  --harmony-radius-md: 20px;
+  --harmony-radius-lg: 28px;
+  --harmony-radius-xl: 36px;
+
+  --harmony-shadow-xs:
+    0 1px 2px rgba(0, 0, 0, 0.04);
+
+  --harmony-shadow-sm:
+    0 8px 24px rgba(0, 0, 0, 0.06);
+
+  --harmony-shadow-md:
+    0 18px 48px rgba(0, 0, 0, 0.08);
+
+  --harmony-shadow-lg:
+    0 30px 80px rgba(0, 0, 0, 0.12);
+}
+
+/* =========================================================
+   BASE
+========================================================= */
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at top left, rgba(0, 122, 255, 0.12), transparent 32%),
+    radial-gradient(circle at top right, rgba(175, 82, 222, 0.10), transparent 28%),
+    linear-gradient(180deg, #ffffff 0%, var(--harmony-bg) 42%, #f2f2f7 100%);
+  color: var(--harmony-text);
+  font-family:
+    Inter,
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "SF Pro Display",
+    "SF Pro Text",
+    "Segoe UI",
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: geometricPrecision;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+}
+
+::selection {
+  background: rgba(0, 122, 255, 0.16);
+  color: var(--harmony-text);
+}
+
+/* =========================================================
+   SCROLLBAR
+========================================================= */
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.14);
+  border: 3px solid transparent;
+  border-radius: 999px;
+  background-clip: content-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.24);
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+
+/* =========================================================
+   MAIN APP UTILITIES
+========================================================= */
+
+.harmony-card {
+  background: var(--harmony-surface-glass);
+  border: 1px solid var(--harmony-border);
+  border-radius: var(--harmony-radius-lg);
+  box-shadow: var(--harmony-shadow-sm);
+  backdrop-filter: blur(22px);
+  -webkit-backdrop-filter: blur(22px);
+}
+
+.harmony-card-solid {
+  background: var(--harmony-surface);
+  border: 1px solid var(--harmony-border);
+  border-radius: var(--harmony-radius-lg);
+  box-shadow: var(--harmony-shadow-sm);
+}
+
+.harmony-card-soft {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(251, 251, 253, 0.86));
+  border: 1px solid var(--harmony-border);
+  border-radius: var(--harmony-radius-lg);
+  box-shadow: var(--harmony-shadow-xs);
+}
+
+.harmony-glass {
+  background: rgba(255, 255, 255, 0.68);
+  border: 1px solid rgba(255, 255, 255, 0.64);
+  box-shadow: var(--harmony-shadow-sm);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+}
+
+.harmony-page {
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at 10% 10%, rgba(0, 122, 255, 0.10), transparent 30%),
+    radial-gradient(circle at 90% 0%, rgba(175, 82, 222, 0.08), transparent 28%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.78), rgba(245, 245, 247, 1));
+}
+
+.harmony-section {
+  padding: 24px;
+}
+
+.harmony-muted {
+  color: var(--harmony-muted);
+}
+
+.harmony-text {
+  color: var(--harmony-text);
+}
+
+/* =========================================================
+   BUTTONS
+========================================================= */
+
+.harmony-button-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  border-radius: 18px;
+  background: #1d1d1f;
+  padding: 0 18px;
+  color: white;
+  font-size: 14px;
+  font-weight: 700;
+  box-shadow: 0 10px 24px rgba(29, 29, 31, 0.16);
+  transition:
+    transform 180ms ease,
+    box-shadow 180ms ease,
+    background 180ms ease;
+}
+
+.harmony-button-primary:hover {
+  background: #000000;
+  transform: translateY(-1px);
+  box-shadow: 0 14px 30px rgba(29, 29, 31, 0.22);
+}
+
+.harmony-button-blue {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  border-radius: 18px;
+  background: var(--harmony-blue);
+  padding: 0 18px;
+  color: white;
+  font-size: 14px;
+  font-weight: 700;
+  box-shadow: 0 10px 24px rgba(0, 122, 255, 0.20);
+  transition:
+    transform 180ms ease,
+    box-shadow 180ms ease,
+    background 180ms ease;
+}
+
+.harmony-button-blue:hover {
+  background: #006fe6;
+  transform: translateY(-1px);
+  box-shadow: 0 14px 30px rgba(0, 122, 255, 0.26);
+}
+
+.harmony-button-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  border: 1px solid var(--harmony-border);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.82);
+  padding: 0 18px;
+  color: var(--harmony-text);
+  font-size: 14px;
+  font-weight: 700;
+  transition:
+    transform 180ms ease,
+    background 180ms ease,
+    box-shadow 180ms ease;
+}
+
+.harmony-button-secondary:hover {
+  background: white;
+  box-shadow: var(--harmony-shadow-xs);
+  transform: translateY(-1px);
+}
+
+/* =========================================================
+   FORMS
+========================================================= */
+
+.harmony-input,
+.harmony-select,
+.harmony-textarea {
+  width: 100%;
+  border: 1px solid var(--harmony-border);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.86);
+  color: var(--harmony-text);
+  font-size: 14px;
+  outline: none;
+  transition:
+    border-color 180ms ease,
+    box-shadow 180ms ease,
+    background 180ms ease;
+}
+
+.harmony-input,
+.harmony-select {
+  min-height: 48px;
+  padding: 0 16px;
+}
+
+.harmony-textarea {
+  min-height: 112px;
+  padding: 14px 16px;
+  resize: vertical;
+}
+
+.harmony-input:focus,
+.harmony-select:focus,
+.harmony-textarea:focus {
+  border-color: rgba(0, 122, 255, 0.72);
+  background: white;
+  box-shadow: 0 0 0 4px rgba(0, 122, 255, 0.12);
+}
+
+.harmony-label {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--harmony-text);
+  font-size: 14px;
+  font-weight: 650;
+}
+
+/* =========================================================
+   BADGES
+========================================================= */
+
+.harmony-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 999px;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.harmony-badge-blue {
+  background: var(--harmony-blue-soft);
+  color: #0059b8;
+}
+
+.harmony-badge-green {
+  background: var(--harmony-green-soft);
+  color: #168034;
+}
+
+.harmony-badge-orange {
+  background: var(--harmony-orange-soft);
+  color: #b35b00;
+}
+
+.harmony-badge-red {
+  background: var(--harmony-red-soft);
+  color: #c82117;
+}
+
+/* =========================================================
+   TABLES
+========================================================= */
+
+.harmony-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 14px;
+}
+
+.harmony-table thead {
+  background: rgba(245, 245, 247, 0.92);
+  color: var(--harmony-muted);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.harmony-table th {
+  padding: 16px 24px;
+  font-weight: 750;
+}
+
+.harmony-table td {
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
+  padding: 16px 24px;
+}
+
+.harmony-table tbody tr {
+  transition: background 160ms ease;
+}
+
+.harmony-table tbody tr:hover {
+  background: rgba(255, 255, 255, 0.58);
+}
+
+/* =========================================================
+   MICRO INTERACTIONS
+========================================================= */
+
+.harmony-hover-lift {
+  transition:
+    transform 180ms ease,
+    box-shadow 180ms ease,
+    border-color 180ms ease;
+}
+
+.harmony-hover-lift:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--harmony-shadow-md);
+  border-color: rgba(0, 0, 0, 0.12);
+}
+
+.harmony-fade-in {
+  animation: harmonyFadeIn 280ms ease both;
+}
+
+@keyframes harmonyFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* =========================================================
+   RESPONSIVE
+========================================================= */
+
+@media (max-width: 768px) {
+  .harmony-section {
+    padding: 16px;
+  }
+
+  .harmony-card,
+  .harmony-card-solid,
+  .harmony-card-soft {
+    border-radius: 22px;
+  }
+}
+/* ================================
+   HARMONY APPLE GLASS UI SYSTEM
+================================ */
+
+:root {
+  --harmony-bg: #f5f5f7;
+  --harmony-card: rgba(255, 255, 255, 0.72);
+  --harmony-card-strong: rgba(255, 255, 255, 0.88);
+  --harmony-border: rgba(0, 0, 0, 0.06);
+  --harmony-text: #1d1d1f;
+  --harmony-muted: #6e6e73;
+  --harmony-blue: #007aff;
+  --harmony-green: #34c759;
+  --harmony-orange: #ff9500;
+  --harmony-purple: #af52de;
+  --harmony-red: #ff3b30;
+  --harmony-cyan: #5ac8fa;
+}
+
+.harmony-page-bg {
+  background:
+    radial-gradient(circle at top left, rgba(0, 122, 255, 0.12), transparent 30%),
+    radial-gradient(circle at top right, rgba(175, 82, 222, 0.12), transparent 30%),
+    radial-gradient(circle at bottom left, rgba(52, 199, 89, 0.08), transparent 34%),
+    #f5f5f7;
+}
+
+.harmony-card {
+  border: 1px solid var(--harmony-border);
+  background: var(--harmony-card);
+  backdrop-filter: blur(26px);
+  -webkit-backdrop-filter: blur(26px);
+  box-shadow:
+    0 18px 55px rgba(0, 0, 0, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.72);
+  border-radius: 28px;
+}
+
+.harmony-card-solid {
+  border: 1px solid var(--harmony-border);
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow:
+    0 18px 55px rgba(0, 0, 0, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  border-radius: 28px;
+}
+
+.harmony-glass-dark {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background:
+    linear-gradient(135deg, rgba(29, 29, 31, 0.94), rgba(43, 43, 47, 0.88)),
+    radial-gradient(circle at top right, rgba(0, 122, 255, 0.28), transparent 34%);
+  backdrop-filter: blur(28px);
+  -webkit-backdrop-filter: blur(28px);
+  box-shadow:
+    0 28px 80px rgba(0, 0, 0, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+
+.harmony-hover-lift {
+  transition:
+    transform 220ms ease,
+    box-shadow 220ms ease,
+    background 220ms ease,
+    border-color 220ms ease;
+}
+
+.harmony-hover-lift:hover {
+  transform: translateY(-3px);
+  box-shadow:
+    0 22px 70px rgba(0, 0, 0, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+.harmony-soft-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 18px;
+  width: 42px;
+  height: 42px;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.75),
+    0 10px 24px rgba(0, 0, 0, 0.05);
+}
+
+.harmony-button-primary {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-radius: 18px;
+  background: #1d1d1f;
+  padding: 0 18px;
+  color: white;
+  font-size: 14px;
+  font-weight: 700;
+  transition:
+    transform 200ms ease,
+    box-shadow 200ms ease,
+    background 200ms ease;
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.16);
+}
+
+.harmony-button-primary:hover {
+  transform: translateY(-2px);
+  background: #000;
+  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.22);
+}
+
+.harmony-button-secondary {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-radius: 18px;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  background: rgba(255, 255, 255, 0.78);
+  padding: 0 18px;
+  color: #1d1d1f;
+  font-size: 14px;
+  font-weight: 700;
+  transition:
+    transform 200ms ease,
+    box-shadow 200ms ease,
+    background 200ms ease;
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.05);
+}
+
+.harmony-button-secondary:hover {
+  transform: translateY(-2px);
+  background: white;
+  box-shadow: 0 16px 38px rgba(0, 0, 0, 0.08);
+}
+
+.harmony-input,
+.harmony-select,
+.harmony-textarea {
+  width: 100%;
+  border-radius: 18px;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  background: rgba(245, 245, 247, 0.8);
+  padding: 12px 16px;
+  font-size: 14px;
+  color: #1d1d1f;
+  outline: none;
+  transition:
+    border-color 180ms ease,
+    background 180ms ease,
+    box-shadow 180ms ease;
+}
+
+.harmony-input:focus,
+.harmony-select:focus,
+.harmony-textarea:focus {
+  border-color: rgba(0, 122, 255, 0.45);
+  background: white;
+  box-shadow: 0 0 0 4px rgba(0, 122, 255, 0.09);
+}
+
+.harmony-textarea {
+  min-height: 120px;
+  resize: vertical;
+}
+
+.harmony-label {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #1d1d1f;
+}
+
+.harmony-fade-in {
+  animation: harmonyFadeIn 360ms ease both;
+}
+
+.harmony-slide-up {
+  animation: harmonySlideUp 420ms cubic-bezier(.2, .8, .2, 1) both;
+}
+
+@keyframes harmonyFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes harmonySlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
