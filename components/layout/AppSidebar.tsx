@@ -27,6 +27,7 @@ type AppSidebarProps = {
   userName?: string
   userRole?: string
   logoSrc?: string
+  onNavigate?: () => void
 }
 
 export function AppSidebar({
@@ -36,6 +37,7 @@ export function AppSidebar({
   userName = 'Devan Andriyan',
   userRole = 'HR Administrator',
   logoSrc = '/logo.png',
+  onNavigate,
 }: AppSidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
@@ -77,8 +79,8 @@ export function AppSidebar({
   }
 
   return (
-    <aside className="flex h-screen w-[280px] shrink-0 flex-col border-r border-black/5 bg-[#f7f7f8] px-4 py-4">
-      <div className="flex h-full flex-col overflow-hidden rounded-[28px] border border-black/5 bg-[#fbfbfc] shadow-[0_12px_40px_rgba(15,23,42,0.06)]">
+    <aside className="flex h-screen w-[280px] max-w-[86vw] shrink-0 flex-col border-r border-black/5 bg-[#f7f7f8] px-3 py-3 sm:px-4 sm:py-4">
+      <div className="flex h-full flex-col overflow-hidden rounded-[26px] border border-black/5 bg-[#fbfbfc] shadow-[0_12px_40px_rgba(15,23,42,0.08)] sm:rounded-[28px]">
         <div className="border-b border-black/5 px-4 py-4">
           <div className="flex items-start gap-3">
             <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-black/5 bg-white shadow-sm">
@@ -147,6 +149,7 @@ export function AppSidebar({
                 <Link
                   key={item.href}
                   href={item.href}
+                  onClick={onNavigate}
                   className={[
                     'group flex items-center gap-3 rounded-[22px] px-3 py-2.5 transition-all duration-200',
                     active

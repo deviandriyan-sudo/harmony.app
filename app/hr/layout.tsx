@@ -1,8 +1,14 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Image from 'next/image'
 import { useRouter } from 'next/navigation'
-import { Loader2, ShieldAlert } from 'lucide-react'
+import {
+  Loader2,
+  Menu,
+  ShieldAlert,
+  X,
+} from 'lucide-react'
 
 import { AppSidebar } from '@/components/layout/AppSidebar'
 import { hrMenu } from '@/lib/menu'
@@ -27,10 +33,21 @@ export default function HRLayout({
   const [allowed, setAllowed] = useState(false)
   const [userName, setUserName] = useState('HR Administrator')
   const [message, setMessage] = useState('Memeriksa akses akun...')
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
 
   useEffect(() => {
     checkAccess()
   }, [])
+
+  useEffect(() => {
+    if (!mobileSidebarOpen) return
+
+    document.body.style.overflow = 'hidden'
+
+    return () => {
+      document.body.style.overflow = ''
+    }
+  }, [mobileSidebarOpen])
 
   async function checkAccess() {
     setLoading(true)
@@ -133,19 +150,90 @@ export default function HRLayout({
   }
 
   return (
-    <div className="min-h-screen bg-[#f5f5f7]">
-      <div className="flex min-h-screen">
-        <AppSidebar
-          menu={hrMenu}
-          title="HARMONY"
-          subtitle="Human Attendance & Leave System"
-          userName={userName}
-          userRole="HR Administrator"
-          logoSrc="/logo.png"
-        />
+    <div className="min-h-screen overflow-x-hidden bg-[#f5f5f7]">
+      <div className="flex min-h-screen w-full overflow-x-hidden">
+        <div className="hidden lg:block">
+          <AppSidebar
+            menu={hrMenu}
+            title="HARMONY"
+            subtitle="Human Attendance & Leave System"
+            userName={userName}
+            userRole="HR Administrator"
+            logoSrc="/logo.png"
+          />
+        </div>
 
-        <main className="min-w-0 flex-1">
-          {children}
+        {mobileSidebarOpen && (
+          <div className="fixed inset-0 z-50 lg:hidden">
+            <button
+              type="button"
+              aria-label="Tutup menu"
+              onClick={() => setMobileSidebarOpen(false)}
+              className="absolute inset-0 bg-black/35 backdrop-blur-sm"
+            />
+
+            <div className="absolute left-0 top-0 h-full max-w-[86vw]">
+              <AppSidebar
+                menu={hrMenu}
+                title="HARMONY"
+                subtitle="Human Attendance & Leave System"
+                userName={userName}
+                userRole="HR Administrator"
+                logoSrc="/logo.png"
+                onNavigate={() => setMobileSidebarOpen(false)}
+              />
+
+              <button
+                type="button"
+                aria-label="Tutup menu"
+                onClick={() => setMobileSidebarOpen(false)}
+                className="absolute right-[-48px] top-4 flex h-10 w-10 items-center justify-center rounded-2xl bg-white text-[#1d1d1f] shadow-lg"
+              >
+                <X size={20} />
+              </button>
+            </div>
+          </div>
+        )}
+
+        <main className="min-w-0 flex-1 overflow-x-hidden">
+          <div className="sticky top-0 z-40 border-b border-black/5 bg-[#f5f5f7]/90 px-4 py-3 backdrop-blur-xl lg:hidden">
+            <div className="flex items-center justify-between gap-3">
+              <button
+                type="button"
+                onClick={() => setMobileSidebarOpen(true)}
+                className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white text-[#1d1d1f] shadow-sm"
+                aria-label="Buka menu"
+              >
+                <Menu size={22} />
+              </button>
+
+              <div className="flex min-w-0 flex-1 items-center gap-3 rounded-2xl bg-white px-3 py-2 shadow-sm">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-black/5 bg-white">
+                  <Image
+                    src="/logo.png"
+                    alt="HARMONY Logo"
+                    width={30}
+                    height={30}
+                    className="h-7 w-7 object-contain"
+                    priority
+                  />
+                </div>
+
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-bold text-[#1d1d1f]">
+                    HARMONY
+                  </p>
+                  <p className="truncate text-[11px] font-medium text-[#6e6e73]">
+                    HR Dashboard
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="w-full min-w-0">
+            {children}
+          </div>
         </main>
       </div>
     </div>
