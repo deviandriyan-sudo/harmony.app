@@ -970,7 +970,7 @@ export default function HRAttendanceDataPage() {
           </section>
         )}
 
-        <section className="grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-4">
+        <section className="grid grid-cols-[repeat(auto-fit,minmax(205px,1fr))] gap-4">
           <StatCard
             label="Karyawan"
             value={dashboardStats.totalEmployees}
@@ -1128,16 +1128,16 @@ function AttendanceSummaryList({
 }) {
   return (
     <>
-      <div className="hidden lg:block">
+      <div className="hidden 2xl:block">
         <table className="w-full table-fixed border-collapse text-left text-sm">
           <thead>
             <tr className="border-b border-slate-100 bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
-              <th className="w-[25%] px-4 py-4 font-bold">Karyawan</th>
-              <th className="w-[21%] px-4 py-4 font-bold">Unit / Jabatan</th>
-              <th className="w-[27%] px-4 py-4 font-bold">Ringkasan Absensi</th>
-              <th className="w-[15%] px-4 py-4 font-bold">Approval</th>
-              <th className="w-[8%] px-4 py-4 font-bold">Lock</th>
-              <th className="w-[4%] px-4 py-4 text-right font-bold">Aksi</th>
+              <th className="w-[24%] px-4 py-4 font-bold">Karyawan</th>
+              <th className="w-[19%] px-4 py-4 font-bold">Unit / Jabatan</th>
+              <th className="w-[25%] px-4 py-4 font-bold">Ringkasan Absensi</th>
+              <th className="w-[16%] px-4 py-4 font-bold">Approval</th>
+              <th className="w-[7%] px-4 py-4 font-bold">Lock</th>
+              <th className="w-[9%] px-3 py-4 text-center font-bold">Aksi</th>
             </tr>
           </thead>
 
@@ -1195,11 +1195,11 @@ function AttendanceSummaryList({
                   <LockBadge confirmation={summary.confirmation} />
                 </td>
 
-                <td className="px-4 py-4 text-right align-top">
+                <td className="px-3 py-4 text-center align-top">
                   <button
                     type="button"
                     onClick={() => onDetail(summary)}
-                    className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 transition hover:bg-slate-100"
+                    className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 transition hover:bg-slate-100"
                     title="Detail"
                   >
                     <Eye className="h-4 w-4" />
@@ -1211,7 +1211,7 @@ function AttendanceSummaryList({
         </table>
       </div>
 
-      <div className="grid gap-3 p-4 lg:hidden">
+      <div className="grid gap-3 p-4 2xl:hidden">
         {summaries.map((summary) => (
           <div
             key={summary.employee.id}

@@ -251,7 +251,7 @@ export default function AttendanceAuditPage() {
               </p>
             </div>
 
-            <div className="grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-2">
+            <div className="grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-4">
               <HeroMetric label="Total Log" value={String(summary.total)} />
               <HeroMetric label="Finalisasi" value={String(summary.finalize)} />
               <HeroMetric label="Lock" value={String(summary.lock)} />
@@ -295,8 +295,8 @@ export default function AttendanceAuditPage() {
         </section>
 
         <section className="harmony-card overflow-hidden">
-          <div className="grid min-w-0 gap-4 border-b border-black/5 p-4 sm:p-5 2xl:grid-cols-[minmax(0,1fr)_auto] 2xl:items-end">
-            <div className="grid min-w-0 gap-4 md:grid-cols-2 xl:grid-cols-[210px_260px_minmax(260px,1fr)]">
+          <div className="border-b border-black/5 p-4 sm:p-5">
+            <div className="grid min-w-0 gap-3 [grid-template-columns:repeat(auto-fit,minmax(210px,1fr))]">
               <label className="block min-w-0">
                 <span className="harmony-label">Periode Cutoff</span>
                 <input
@@ -325,7 +325,7 @@ export default function AttendanceAuditPage() {
                 </select>
               </label>
 
-              <div className="min-w-0 md:col-span-2 xl:col-span-1">
+              <div className="min-w-0">
                 <span className="harmony-label">Rentang Periode</span>
                 <div className="flex min-h-12 items-center rounded-2xl border border-black/5 bg-[#f5f5f7] px-4 text-sm font-semibold leading-6 text-[#1d1d1f]">
                   <span className="min-w-0 break-words">
@@ -334,10 +334,8 @@ export default function AttendanceAuditPage() {
                   </span>
                 </div>
               </div>
-            </div>
 
-            <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end 2xl:justify-end">
-              <label className="block min-w-0 sm:min-w-[260px] 2xl:w-[340px]">
+              <label className="block min-w-0 sm:col-span-2 xl:col-span-1">
                 <span className="harmony-label">Pencarian</span>
                 <div className="flex min-h-12 w-full items-center gap-3 rounded-[18px] border border-black/5 bg-[#f5f5f7]/85 px-4 shadow-sm transition focus-within:border-[#007aff]/40 focus-within:bg-white">
                   <Search size={18} className="shrink-0 text-[#86868b]" />
@@ -353,7 +351,7 @@ export default function AttendanceAuditPage() {
               <button
                 type="button"
                 onClick={exportCsv}
-                className="harmony-button-secondary min-w-0 justify-center"
+                className="harmony-button-secondary min-h-12 min-w-0 self-end justify-center"
               >
                 <Download size={18} />
                 Export CSV
@@ -362,7 +360,7 @@ export default function AttendanceAuditPage() {
               <button
                 type="button"
                 onClick={fetchAuditLogs}
-                className="harmony-button-secondary min-w-0 justify-center"
+                className="harmony-button-secondary min-h-12 min-w-0 self-end justify-center"
               >
                 <RefreshCcw size={18} />
                 Refresh
@@ -408,13 +406,13 @@ function AuditTable({ logs }: { logs: AuditLog[] }) {
 
   return (
     <>
-      <div className="grid gap-3 p-4 xl:hidden">
+      <div className="grid gap-3 p-4 2xl:hidden">
         {logs.map((item) => (
           <AuditMobileCard key={item.id} item={item} />
         ))}
       </div>
 
-      <div className="hidden overflow-hidden xl:block">
+      <div className="hidden overflow-hidden 2xl:block">
         <table className="w-full table-fixed border-collapse text-left text-[13px]">
           <thead>
             <tr className="border-b border-black/5 bg-[#f5f5f7]/90 text-xs uppercase tracking-wide text-[#6e6e73]">
