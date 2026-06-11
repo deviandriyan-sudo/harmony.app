@@ -1157,7 +1157,7 @@ export default function EmployeeAttendancePage() {
 
           {!loading && (
             <>
-              <div className="grid gap-5 border-b border-black/5 p-6 xl:grid-cols-[0.75fr_1fr]">
+              <div className="grid gap-5 border-b border-black/5 p-6">
                 <div className="rounded-[28px] border border-black/5 bg-[#1d1d1f] p-6 text-white">
                   <div className="flex items-center gap-4">
                     <div className="flex h-14 w-14 items-center justify-center rounded-3xl bg-white/10 text-white">
@@ -1176,7 +1176,7 @@ export default function EmployeeAttendancePage() {
                     </div>
                   </div>
 
-                  <div className="mt-5 grid gap-3">
+                  <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                     <ProfileRow
                       label="Machine PIN"
                       value={employee?.machine_pin || "-"}
@@ -1214,7 +1214,7 @@ export default function EmployeeAttendancePage() {
                   )}
 
                   {latestLog ? (
-                    <div className="mt-5 grid gap-4 md:grid-cols-4">
+                    <div className="mt-5 grid gap-4 sm:grid-cols-2 2xl:grid-cols-4">
                       <MiniInfoCard
                         title="Tanggal"
                         value={formatDisplayDate(latestLog.attendance_date)}
@@ -1303,7 +1303,7 @@ export default function EmployeeAttendancePage() {
                 </div>
               </div>
 
-              <div className="grid gap-3 p-4 min-[2200px]:hidden">
+              <div className="grid gap-3 p-4 lg:hidden">
                 {calendarRows.map((row) => {
                   const draft = getDraft(row);
                   const displayStatus = getDisplayStatus(row, draft);
@@ -1436,37 +1436,37 @@ export default function EmployeeAttendancePage() {
                 })}
               </div>
 
-              <div className="hidden overflow-x-auto min-[2200px]:block">
-                <table className="w-full min-w-[1560px] border-collapse text-left text-sm">
+              <div className="hidden overflow-hidden lg:block">
+                <table className="w-full table-fixed border-collapse text-left text-[12px]">
                   <thead>
                     <tr className="border-b border-black/5 bg-[#f5f5f7]/90 text-xs uppercase tracking-wide text-[#6e6e73]">
-                      <th className="w-[5%] px-5 py-4 text-center font-semibold">
+                      <th className="w-[58px] px-3 py-3 text-center font-semibold">
                         Cek
                       </th>
-                      <th className="w-[10%] px-5 py-4 font-semibold">
+                      <th className="w-[100px] px-3 py-3 font-semibold">
                         Tanggal
                       </th>
-                      <th className="w-[8%] px-5 py-4 font-semibold">Hari</th>
-                      <th className="w-[9%] px-5 py-4 font-semibold">
+                      <th className="w-[76px] px-3 py-3 font-semibold">Hari</th>
+                      <th className="w-[96px] px-3 py-3 font-semibold">
                         Clock In
                       </th>
-                      <th className="w-[9%] px-5 py-4 font-semibold">
+                      <th className="w-[96px] px-3 py-3 font-semibold">
                         Clock Out
                       </th>
-                      <th className="w-[8%] px-5 py-4 font-semibold">Durasi</th>
-                      <th className="w-[11%] px-5 py-4 font-semibold">
+                      <th className="w-[80px] px-3 py-3 font-semibold">Durasi</th>
+                      <th className="w-[105px] px-3 py-3 font-semibold">
                         Status
                       </th>
-                      <th className="w-[13%] px-5 py-4 font-semibold">
+                      <th className="w-[145px] px-3 py-3 font-semibold">
                         Keterangan
                       </th>
-                      <th className="w-[12%] px-5 py-4 font-semibold">
+                      <th className="w-[170px] px-3 py-3 font-semibold">
                         Validasi
                       </th>
-                      <th className="w-[8%] px-5 py-4 font-semibold">
+                      <th className="w-[105px] px-3 py-3 font-semibold">
                         Approval
                       </th>
-                      <th className="w-[12%] px-5 py-4 text-center font-semibold">
+                      <th className="w-[105px] px-3 py-3 text-center font-semibold">
                         Action
                       </th>
                     </tr>
@@ -1494,7 +1494,7 @@ export default function EmployeeAttendancePage() {
                                 : "hover:bg-white/70",
                           ].join(" ")}
                         >
-                          <td className="px-5 py-4 text-center">
+                          <td className="px-3 py-3 text-center">
                             <AttendanceCheckButton
                               row={row}
                               draft={draft}
@@ -1504,7 +1504,7 @@ export default function EmployeeAttendancePage() {
                             />
                           </td>
 
-                          <td className="px-5 py-4 font-semibold text-[#1d1d1f]">
+                          <td className="px-3 py-3 font-semibold text-[#1d1d1f]">
                             {formatDisplayDate(row.date)}
 
                             {row.holiday_name && (
@@ -1514,11 +1514,11 @@ export default function EmployeeAttendancePage() {
                             )}
                           </td>
 
-                          <td className="px-5 py-4 text-[#6e6e73]">
+                          <td className="px-3 py-3 text-[#6e6e73]">
                             {row.day_name}
                           </td>
 
-                          <td className="px-5 py-4">
+                          <td className="px-3 py-3 align-top">
                             <TimeCell
                               value={
                                 row.log?.check_in ||
@@ -1532,7 +1532,7 @@ export default function EmployeeAttendancePage() {
                             />
                           </td>
 
-                          <td className="px-5 py-4">
+                          <td className="px-3 py-3 align-top">
                             <TimeCell
                               value={
                                 row.log?.check_out ||
@@ -1546,11 +1546,11 @@ export default function EmployeeAttendancePage() {
                             />
                           </td>
 
-                          <td className="px-5 py-4 text-[#1d1d1f]">
+                          <td className="px-3 py-3 align-top text-[#1d1d1f]">
                             {formatDuration(row.log?.work_duration_minutes)}
                           </td>
 
-                          <td className="px-5 py-4">
+                          <td className="px-3 py-3 align-top">
                             {isOffDayNoAttendance ? (
                               <span className="text-xs font-semibold text-[#86868b]">
                                 -
@@ -1563,15 +1563,15 @@ export default function EmployeeAttendancePage() {
                             )}
                           </td>
 
-                          <td className="px-5 py-4">
+                          <td className="px-3 py-3 align-top">
                             <RequestLabelBadge row={row} draft={draft} />
                           </td>
 
-                          <td className="px-5 py-4">
+                          <td className="px-3 py-3 align-top">
                             <ValidationInfo row={row} draft={draft} />
                           </td>
 
-                          <td className="px-5 py-4">
+                          <td className="px-3 py-3 align-top">
                             <ApprovalBadge
                               status={
                                 row.log?.supervisor_approval_status || "none"
@@ -1579,12 +1579,12 @@ export default function EmployeeAttendancePage() {
                             />
                           </td>
 
-                          <td className="px-5 py-4 text-center">
+                          <td className="px-3 py-3 text-center">
                             <button
                               type="button"
                               disabled={isReadOnlyPeriod || submittingPeriod}
                               onClick={() => openEdit(row)}
-                              className="inline-flex min-h-9 items-center justify-center gap-2 rounded-2xl bg-[#e8f2ff] px-4 text-xs font-bold text-[#0059b8] transition hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
+                              className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-2xl bg-[#e8f2ff] px-3 text-[11px] font-bold text-[#0059b8] transition hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
                             >
                               <PencilLine size={15} />
                               Lengkapi
@@ -2122,10 +2122,14 @@ function MiniInfoCard({ title, value }: { title: string; value: string }) {
 
 function ProfileRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-center justify-between gap-4 rounded-2xl bg-white/10 px-4 py-3">
-      <span className="text-xs text-white/45">{label}</span>
+    <div className="min-w-0 rounded-2xl bg-white/10 px-4 py-3">
+      <span className="block text-[11px] font-semibold uppercase tracking-wide text-white/45">
+        {label}
+      </span>
 
-      <span className="truncate text-sm font-semibold text-white">{value}</span>
+      <span className="mt-1 block break-words text-sm font-semibold leading-5 text-white">
+        {value}
+      </span>
     </div>
   );
 }
