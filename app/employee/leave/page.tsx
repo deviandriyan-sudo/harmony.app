@@ -1,20 +1,26 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import type { FormEvent, ReactNode } from 'react'
+import Link from 'next/link'
 import {
   AlertTriangle,
+  ArrowRight,
   CalendarDays,
   CheckCircle2,
   Clock3,
   FileText,
   Loader2,
   Plane,
+  Plus,
   RefreshCcw,
+  RotateCcw,
   Send,
   Upload,
   UserCheck,
   UserRound,
   WalletCards,
+  X,
 } from 'lucide-react'
 
 import { Topbar } from '@/components/layout/Topbar'
@@ -159,6 +165,7 @@ export default function EmployeeLeavePage() {
   const [holidays, setHolidays] = useState<Holiday[]>([])
 
   const [form, setForm] = useState<FormState>(initialForm)
+  const [formOpen, setFormOpen] = useState(false)
 
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
@@ -176,11 +183,7 @@ export default function EmployeeLeavePage() {
 
   const pendingCount = useMemo(() => {
     return leaveRequests.filter((item) => {
-      return (
-        normalizeText(item.status) === 'pending' ||
-        normalizeText(item.supervisor_status) === 'pending' ||
-        normalizeText(item.hr_status) === 'pending'
-      )
+      return isPendingStatus(item.status) || isPendingStatus(item.supervisor_status) || isPendingStatus(item.hr_status)
     }).length
   }, [leaveRequests])
 
@@ -317,12 +320,6 @@ export default function EmployeeLeavePage() {
     const supervisorOneKey = normalizeText(employeeData.supervisor_1)
     const supervisorTwoKey = normalizeText(employeeData.supervisor_2)
 
-    if (!supervisorOneKey && !supervisorTwoKey) {
-      setSupervisorOne(null)
-      setSupervisorTwo(null)
-      return
-    }
-
     const foundOne = employeeList.find((item) => {
       return (
         normalizeText(item.id) === supervisorOneKey ||
@@ -406,6 +403,22 @@ export default function EmployeeLeavePage() {
     }))
   }
 
+  function resetForm() {
+    setForm(initialForm)
+  }
+
+  function openForm() {
+    setSuccessMessage('')
+    setErrorMessage('')
+    setFormOpen(true)
+  }
+
+  function closeForm() {
+    if (submitting) return
+
+    setFormOpen(false)
+  }
+
   async function uploadProofFile(file: File | null) {
     if (!file) {
       return {
@@ -466,7 +479,9 @@ export default function EmployeeLeavePage() {
     return Boolean(data)
   }
 
-  async function handleSubmit() {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+
     setSubmitting(true)
     setSuccessMessage('')
     setErrorMessage('')
@@ -508,7 +523,7 @@ export default function EmployeeLeavePage() {
     }
 
     if (!form.handover_to.trim()) {
-      setErrorMessage('Kolom ditujukan/dialihkan ke siapa wajib diisi.')
+      setErrorMessage('Kolom penerima job pending wajib diisi.')
       setSubmitting(false)
       return
     }
@@ -603,10 +618,10 @@ export default function EmployeeLeavePage() {
     const employeesForNotification =
       employeeDirectory.length > 0
         ? employeeDirectory
-        : [employee, supervisorOne, supervisorTwo].filter(Boolean) as Employee[]
+        : ([employee, supervisorOne, supervisorTwo].filter(Boolean) as Employee[])
 
-    const notificationResult = await notifyAbsenceRequestSubmitted({
-      employees: employeesForNotification,
+    const notificationResult: any = await notifyAbsenceRequestSubmitted({
+      employees: employeesForNotification as any[],
       requester: employee,
 
       requestId: insertedRequest?.id,
@@ -626,12 +641,13 @@ export default function EmployeeLeavePage() {
     })
 
     setSuccessMessage(
-      notificationResult.success
-        ? `${selectedRequestMeta.label} berhasil diajukan dan email notifikasi sudah dikirim ke atasan/penerima job pending.`
-        : `${selectedRequestMeta.label} berhasil diajukan, tetapi email notifikasi belum terkirim: ${notificationResult.message}`
+      notificationResult?.success
+        ? `${selectedRequestMeta.label} berhasil diajukan dan email notifikasi sudah dikirim.`
+        : `${selectedRequestMeta.label} berhasil diajukan, tetapi email notifikasi belum terkirim: ${notificationResult?.message || notificationResult?.error || 'Tidak diketahui.'}`
     )
 
-    setForm(initialForm)
+    resetForm()
+    setFormOpen(false)
     setSubmitting(false)
 
     await Promise.all([
@@ -646,10 +662,10 @@ export default function EmployeeLeavePage() {
     <>
       <Topbar
         title="Cuti & Izin"
-        description="Ajukan cuti, izin, sakit, tugas luar, dan klaim PHL dengan saldo yang tersinkron otomatis."
+        description="Ajukan cuti, izin, sakit, tugas luar, klaim PHL, dan postpone sisa cuti tahunan."
       />
 
-      <section className="space-y-6 p-6">
+      <section className="space-y-6 p-4 sm:p-6">
         {successMessage && (
           <AlertBox tone="green" title="Berhasil" icon={<CheckCircle2 size={18} />}>
             {successMessage}
@@ -662,11 +678,11 @@ export default function EmployeeLeavePage() {
           </AlertBox>
         )}
 
-        <div className="relative overflow-hidden rounded-[34px] border border-black/5 bg-[#1d1d1f] p-7 text-white shadow-[0_24px_80px_rgba(0,0,0,0.16)]">
+        <div className="relative overflow-hidden rounded-[34px] border border-black/5 bg-[#1d1d1f] p-5 text-white shadow-[0_24px_80px_rgba(0,0,0,0.16)] sm:p-7">
           <div className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-[#007aff]/35 blur-3xl" />
           <div className="pointer-events-none absolute -bottom-28 -left-20 h-72 w-72 rounded-full bg-[#34c759]/20 blur-3xl" />
 
-          <div className="relative flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
+          <div className="relative flex flex-col gap-7">
             <div>
               <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-4 py-2 text-xs font-semibold text-white/75 backdrop-blur-xl">
                 <CalendarDays size={15} className="text-[#5ac8fa]" />
@@ -677,13 +693,12 @@ export default function EmployeeLeavePage() {
                 Cuti, Izin & PHL
               </h1>
 
-              <p className="mt-5 max-w-2xl text-sm leading-7 text-white/62">
-                Sisa cuti tahunan dan saldo PHL sudah tersinkron dari database.
-                Hari libur, Sabtu, dan Minggu tidak dihitung sebagai jatah cuti.
+              <p className="mt-5 max-w-3xl text-sm leading-7 text-white/62">
+                Ajukan cuti, izin, sakit, tugas luar, klaim PHL, dan pantau status approval dalam satu dashboard.
               </p>
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-4 xl:min-w-[720px]">
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
               <HeroMetric label="Cuti Tahunan" value={`${annualRemaining} hari`} />
               <HeroMetric label="Saldo PHL" value={`${phlRemaining} hari`} />
               <HeroMetric label="Pending" value={String(pendingCount)} />
@@ -692,7 +707,7 @@ export default function EmployeeLeavePage() {
           </div>
         </div>
 
-        <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <SummaryCard
             title="Sisa Cuti Tahunan"
             value={`${annualRemaining} hari`}
@@ -730,228 +745,542 @@ export default function EmployeeLeavePage() {
           />
         </div>
 
-        <div className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
-          <div className="harmony-card overflow-hidden">
-            <div className="border-b border-black/5 p-6">
+        <div className="harmony-card overflow-hidden">
+          <div className="flex flex-col gap-4 border-b border-black/5 p-5 sm:p-6 lg:flex-row lg:items-center lg:justify-between">
+            <div>
               <h2 className="text-lg font-semibold text-[#1d1d1f]">
-                Form Pengajuan Cuti / Izin / PHL
+                Dashboard Pengajuan
               </h2>
 
               <p className="mt-1 text-sm leading-6 text-[#6e6e73]">
-                Isi form pengajuan. Tombol submit ada di bagian bawah form dan tidak hilang walaupun data saldo masih refresh.
+                Buka form pengajuan lewat modal, akses postpone cuti, atau refresh saldo dan riwayat.
               </p>
             </div>
 
-            <div className="space-y-5 p-6">
-              {loading && (
-                <div className="flex items-center gap-3 rounded-2xl border border-black/5 bg-[#f5f5f7]/70 p-4 text-sm text-[#6e6e73]">
-                  <Loader2 size={18} className="animate-spin" />
-                  Memuat data saldo, atasan, dan riwayat...
-                </div>
-              )}
-
-              <EmployeeIdentity
-                employee={employee}
-                supervisorOne={supervisorOne}
-                supervisorTwo={supervisorTwo}
-              />
-
-              <label className="block">
-                <span className="harmony-label">Jenis Pengajuan</span>
-                <select
-                  value={form.request_type}
-                  onChange={(event) => updateForm('request_type', event.target.value as RequestType)}
-                  className="harmony-select"
-                >
-                  <option value="annual_leave">Cuti Tahunan</option>
-                  <option value="marriage_leave">Cuti Menikah</option>
-                  <option value="maternity_leave">Cuti Melahirkan</option>
-                  <option value="miscarriage_leave">Cuti Keguguran</option>
-                  <option value="bereavement_leave">Cuti Duka</option>
-                  <option value="child_circumcision_leave">Cuti Khitan / Baptis Anak</option>
-                  <option value="worship_leave">Cuti Ibadah</option>
-                  <option value="menstrual_leave">Cuti Haid</option>
-                  <option value="pregnancy_check_leave">Pemeriksaan Kehamilan</option>
-                  <option value="sick">Sakit</option>
-                  <option value="permit">Izin</option>
-                  <option value="official_travel">Tugas Luar / Dinas</option>
-                  <option value="phl_claim">Klaim PHL</option>
-                  <option value="other_leave">Cuti Lainnya</option>
-                </select>
-              </label>
-
-              <div className="grid gap-4 md:grid-cols-2">
-                <label className="block">
-                  <span className="harmony-label">Tanggal Mulai</span>
-                  <input
-                    type="date"
-                    value={form.start_date}
-                    onChange={(event) => updateForm('start_date', event.target.value)}
-                    className="harmony-input"
-                  />
-                </label>
-
-                <label className="block">
-                  <span className="harmony-label">Tanggal Selesai</span>
-                  <input
-                    type="date"
-                    value={form.end_date}
-                    onChange={(event) => updateForm('end_date', event.target.value)}
-                    className="harmony-input"
-                  />
-                </label>
-              </div>
-
-              <div className="rounded-[24px] border border-black/5 bg-[#f5f5f7]/80 p-5">
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <p className="text-sm font-semibold text-[#1d1d1f]">
-                      Jumlah Hari Pengajuan
-                    </p>
-                    <p className="mt-1 text-xs leading-5 text-[#6e6e73]">
-                      Sabtu, Minggu, dan libur aktif HR tidak dihitung.
-                    </p>
-                  </div>
-
-                  <div className="rounded-2xl bg-white px-4 py-3 text-2xl font-semibold text-[#007aff] shadow-sm">
-                    {calculatedDays}
-                  </div>
-                </div>
-              </div>
-
-              <label className="block">
-                <span className="harmony-label">Alasan Pengajuan</span>
-                <textarea
-                  value={form.reason}
-                  onChange={(event) => updateForm('reason', event.target.value)}
-                  placeholder="Tuliskan alasan pengajuan secara singkat dan jelas."
-                  className="harmony-textarea"
-                />
-              </label>
-
-              <div className="rounded-[28px] border border-black/5 bg-[#f5f5f7]/75 p-5">
-                <div className="mb-4 flex items-center gap-2">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white text-[#007aff] shadow-sm">
-                    <UserRound size={18} />
-                  </div>
-
-                  <div>
-                    <h3 className="text-base font-semibold text-[#1d1d1f]">
-                      Job Pending & Handover
-                    </h3>
-                    <p className="text-xs leading-5 text-[#6e6e73]">
-                      Diisi agar fungsi kerja tetap berjalan selama karyawan tidak masuk.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="space-y-4">
-                  <label className="block">
-                    <span className="harmony-label">Job Pending</span>
-                    <textarea
-                      value={form.job_pending}
-                      onChange={(event) => updateForm('job_pending', event.target.value)}
-                      placeholder="Contoh: Rekap absensi periode berjalan, follow up dokumen vendor, update data karyawan."
-                      className="harmony-textarea"
-                    />
-                  </label>
-
-                  <label className="block">
-                    <span className="harmony-label">Dialihkan / Ditujukan Kepada</span>
-                    <select
-                      value={form.handover_to}
-                      onChange={(event) => updateForm('handover_to', event.target.value)}
-                      className="harmony-select"
-                    >
-                      <option value="">Pilih karyawan penerima handover</option>
-                      {handoverEmployeeOptions.map((item) => (
-                        <option key={item.id} value={item.id}>
-                          {formatEmployeeOption(item)}
-                        </option>
-                      ))}
-                    </select>
-
-                    <p className="mt-2 text-xs leading-5 text-[#6e6e73]">
-                      Email, NIP/employee number, dan data penerima handover akan terbaca otomatis dari master karyawan.
-                    </p>
-
-                    {selectedHandoverEmployee && (
-                      <div className="mt-3 grid gap-2 rounded-2xl border border-black/5 bg-white p-4 text-xs md:grid-cols-2">
-                        <AutoReadInfo label="Nama" value={selectedHandoverEmployee.full_name || '-'} />
-                        <AutoReadInfo label="Email" value={selectedHandoverEmployee.email || '-'} />
-                        <AutoReadInfo label="NIP / Employee No." value={selectedHandoverEmployee.employee_number || '-'} />
-                        <AutoReadInfo label="Unit" value={selectedHandoverEmployee.department || '-'} />
-                      </div>
-                    )}
-                  </label>
-
-                  <label className="block">
-                    <span className="harmony-label">Catatan Handover</span>
-                    <textarea
-                      value={form.handover_note}
-                      onChange={(event) => updateForm('handover_note', event.target.value)}
-                      placeholder="Instruksi tambahan untuk pekerjaan yang dialihkan."
-                      className="harmony-textarea"
-                    />
-                  </label>
-                </div>
-              </div>
-
-              <FileUploadBox
-                required={requiresProof}
-                file={form.proof_file}
-                onChange={(file) => updateForm('proof_file', file)}
-                title="Upload Bukti / Dokumen Pendukung"
-                description={
-                  requiresProof
-                    ? `${selectedRequestMeta.label} wajib melampirkan dokumen pendukung.`
-                    : 'Opsional untuk cuti tahunan, izin, cuti haid, atau kebutuhan tertentu.'
-                }
-              />
-
+            <div className="grid gap-3 sm:grid-cols-3 lg:min-w-[560px]">
               <button
                 type="button"
-                disabled={submitting}
-                onClick={handleSubmit}
-                className="harmony-button-primary w-full disabled:cursor-not-allowed disabled:opacity-60"
+                onClick={openForm}
+                className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-[#1d1d1f] px-4 text-sm font-bold text-white transition hover:bg-black"
               >
-                {submitting ? (
-                  <Loader2 size={18} className="animate-spin" />
-                ) : (
-                  <Send size={18} />
-                )}
-                {submitting ? 'Mengirim Pengajuan...' : 'Submit Pengajuan Cuti / Izin / PHL'}
+                <Plus size={18} />
+                Ajukan
               </button>
-            </div>
-          </div>
 
-          <div className="harmony-card overflow-hidden">
-            <div className="flex items-center justify-between gap-4 border-b border-black/5 p-6">
-              <div>
-                <h2 className="text-lg font-semibold text-[#1d1d1f]">
-                  Riwayat Pengajuan
-                </h2>
-
-                <p className="mt-1 text-sm leading-6 text-[#6e6e73]">
-                  Cuti, izin, sakit, tugas luar, dan klaim PHL yang pernah diajukan.
-                </p>
-              </div>
+              <Link
+                href="/employee/leave/postpone"
+                className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-[#e8f2ff] px-4 text-sm font-bold text-[#0059b8] transition hover:bg-blue-100"
+              >
+                <RotateCcw size={18} />
+                Postpone Cuti
+              </Link>
 
               <button
                 type="button"
                 onClick={fetchData}
-                className="harmony-button-secondary"
+                disabled={loading}
+                className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-black/5 bg-white px-4 text-sm font-bold text-[#1d1d1f] shadow-sm transition hover:bg-[#f5f5f7] disabled:opacity-60"
               >
-                <RefreshCcw size={18} />
+                {loading ? <Loader2 size={18} className="animate-spin" /> : <RefreshCcw size={18} />}
                 Refresh
               </button>
             </div>
+          </div>
 
-            <LeaveRequestList requests={leaveRequests} />
+          <div className="p-5 sm:p-6">
+            <EmployeeIdentity
+              employee={employee}
+              supervisorOne={supervisorOne}
+              supervisorTwo={supervisorTwo}
+            />
           </div>
         </div>
+
+        <HistorySection
+          loading={loading}
+          leaveRequests={leaveRequests}
+          phlRecords={phlRecords}
+        />
+
+        {formOpen && (
+          <LeaveRequestModal
+            form={form}
+            employee={employee}
+            supervisorOne={supervisorOne}
+            supervisorTwo={supervisorTwo}
+            loading={loading}
+            submitting={submitting}
+            calculatedDays={calculatedDays}
+            requiresProof={requiresProof}
+            selectedRequestMeta={selectedRequestMeta}
+            annualRemaining={annualRemaining}
+            phlRemaining={phlRemaining}
+            handoverEmployeeOptions={handoverEmployeeOptions}
+            selectedHandoverEmployee={selectedHandoverEmployee}
+            onUpdate={updateForm}
+            onSubmit={handleSubmit}
+            onClose={closeForm}
+          />
+        )}
       </section>
     </>
+  )
+}
+
+function LeaveRequestModal({
+  form,
+  employee,
+  supervisorOne,
+  supervisorTwo,
+  loading,
+  submitting,
+  calculatedDays,
+  requiresProof,
+  selectedRequestMeta,
+  annualRemaining,
+  phlRemaining,
+  handoverEmployeeOptions,
+  selectedHandoverEmployee,
+  onUpdate,
+  onSubmit,
+  onClose,
+}: {
+  form: FormState
+  employee: Employee | null
+  supervisorOne: Employee | null
+  supervisorTwo: Employee | null
+  loading: boolean
+  submitting: boolean
+  calculatedDays: number
+  requiresProof: boolean
+  selectedRequestMeta: ReturnType<typeof getRequestMeta>
+  annualRemaining: number
+  phlRemaining: number
+  handoverEmployeeOptions: Employee[]
+  selectedHandoverEmployee: Employee | null
+  onUpdate: <K extends keyof FormState>(key: K, value: FormState[K]) => void
+  onSubmit: (event: FormEvent<HTMLFormElement>) => void
+  onClose: () => void
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-3 backdrop-blur-sm sm:p-5">
+      <div className="flex max-h-[94vh] w-full max-w-4xl flex-col overflow-hidden rounded-[32px] bg-white shadow-[0_30px_90px_rgba(0,0,0,0.24)]">
+        <div className="flex items-start justify-between gap-4 border-b border-black/5 p-5 sm:p-6">
+          <div>
+            <h2 className="text-xl font-semibold text-[#1d1d1f]">
+              Form Pengajuan Cuti / Izin / PHL
+            </h2>
+
+            <p className="mt-1 text-sm leading-6 text-[#6e6e73]">
+              Isi data pengajuan. Sabtu, Minggu, dan hari libur aktif tidak dihitung sebagai jatah cuti.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={submitting}
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#f5f5f7] text-[#1d1d1f] transition hover:bg-[#e5e5ea] disabled:opacity-50"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        <form onSubmit={onSubmit} className="flex min-h-0 flex-1 flex-col">
+          <div className="min-h-0 flex-1 space-y-5 overflow-y-auto p-5 sm:p-6">
+            {loading && (
+              <div className="flex items-center gap-3 rounded-2xl border border-black/5 bg-[#f5f5f7]/70 p-4 text-sm text-[#6e6e73]">
+                <Loader2 size={18} className="animate-spin" />
+                Memuat data saldo, atasan, dan riwayat...
+              </div>
+            )}
+
+            <EmployeeIdentity
+              employee={employee}
+              supervisorOne={supervisorOne}
+              supervisorTwo={supervisorTwo}
+            />
+
+            <label className="block">
+              <span className="harmony-label">Jenis Pengajuan</span>
+
+              <select
+                value={form.request_type}
+                onChange={(event) => onUpdate('request_type', event.target.value as RequestType)}
+                className="harmony-select"
+              >
+                <option value="annual_leave">Cuti Tahunan</option>
+                <option value="marriage_leave">Cuti Menikah</option>
+                <option value="maternity_leave">Cuti Melahirkan</option>
+                <option value="miscarriage_leave">Cuti Keguguran</option>
+                <option value="bereavement_leave">Cuti Duka</option>
+                <option value="child_circumcision_leave">Cuti Khitan / Baptis Anak</option>
+                <option value="worship_leave">Cuti Ibadah</option>
+                <option value="menstrual_leave">Cuti Haid</option>
+                <option value="pregnancy_check_leave">Pemeriksaan Kehamilan</option>
+                <option value="sick">Sakit</option>
+                <option value="permit">Izin</option>
+                <option value="official_travel">Tugas Luar / Dinas</option>
+                <option value="phl_claim">Klaim PHL</option>
+                <option value="other_leave">Cuti Lainnya</option>
+              </select>
+            </label>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <label className="block">
+                <span className="harmony-label">Tanggal Mulai</span>
+
+                <input
+                  type="date"
+                  value={form.start_date}
+                  onChange={(event) => onUpdate('start_date', event.target.value)}
+                  className="harmony-input"
+                />
+              </label>
+
+              <label className="block">
+                <span className="harmony-label">Tanggal Selesai</span>
+
+                <input
+                  type="date"
+                  value={form.end_date}
+                  onChange={(event) => onUpdate('end_date', event.target.value)}
+                  className="harmony-input"
+                />
+              </label>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-3">
+              <InfoTile
+                label="Jumlah Hari"
+                value={`${calculatedDays} hari`}
+                description="Exclude weekend/libur"
+                tone="blue"
+              />
+
+              <InfoTile
+                label="Saldo Cuti"
+                value={`${annualRemaining} hari`}
+                description="Sisa cuti tahunan"
+                tone="green"
+              />
+
+              <InfoTile
+                label="Saldo PHL"
+                value={`${phlRemaining} hari`}
+                description="Saldo PHL aktif"
+                tone="purple"
+              />
+            </div>
+
+            <label className="block">
+              <span className="harmony-label">Alasan Pengajuan</span>
+
+              <textarea
+                value={form.reason}
+                onChange={(event) => onUpdate('reason', event.target.value)}
+                placeholder="Tuliskan alasan pengajuan secara singkat dan jelas."
+                className="harmony-textarea"
+              />
+            </label>
+
+            <div className="rounded-[28px] border border-black/5 bg-[#f5f5f7]/75 p-5">
+              <div className="mb-4 flex items-center gap-2">
+                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white text-[#007aff] shadow-sm">
+                  <UserRound size={18} />
+                </div>
+
+                <div>
+                  <h3 className="font-semibold text-[#1d1d1f]">
+                    Job Pending & Serah Terima
+                  </h3>
+
+                  <p className="text-xs leading-5 text-[#6e6e73]">
+                    Wajib diisi agar pekerjaan tetap terpantau selama karyawan tidak masuk.
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid gap-4">
+                <label className="block">
+                  <span className="harmony-label">Job Pending</span>
+
+                  <textarea
+                    value={form.job_pending}
+                    onChange={(event) => onUpdate('job_pending', event.target.value)}
+                    placeholder="Contoh: follow up dokumen, pekerjaan yang harus dicek, atau pekerjaan yang belum selesai."
+                    className="harmony-textarea"
+                  />
+                </label>
+
+                <label className="block">
+                  <span className="harmony-label">Penerima Job Pending</span>
+
+                  <select
+                    value={form.handover_to}
+                    onChange={(event) => onUpdate('handover_to', event.target.value)}
+                    className="harmony-select"
+                  >
+                    <option value="">Pilih karyawan penerima tugas</option>
+
+                    {handoverEmployeeOptions.map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {formatEmployeeOption(item)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                {selectedHandoverEmployee && (
+                  <div className="grid gap-3 rounded-2xl bg-white p-4 text-xs sm:grid-cols-4">
+                    <AutoReadInfo label="Nama" value={selectedHandoverEmployee.full_name || '-'} />
+                    <AutoReadInfo label="NIP" value={selectedHandoverEmployee.employee_number || '-'} />
+                    <AutoReadInfo label="Unit" value={selectedHandoverEmployee.department || '-'} />
+                    <AutoReadInfo label="Email" value={selectedHandoverEmployee.email || '-'} />
+                  </div>
+                )}
+
+                <label className="block">
+                  <span className="harmony-label">Catatan Serah Terima</span>
+
+                  <textarea
+                    value={form.handover_note}
+                    onChange={(event) => onUpdate('handover_note', event.target.value)}
+                    placeholder="Opsional: arahan tambahan untuk penerima job pending."
+                    className="harmony-textarea"
+                  />
+                </label>
+              </div>
+            </div>
+
+            <div className="rounded-[28px] border border-dashed border-black/10 bg-[#f5f5f7]/70 p-5">
+              <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                <div>
+                  <h3 className="font-semibold text-[#1d1d1f]">
+                    Lampiran Bukti
+                  </h3>
+
+                  <p className="mt-1 text-sm leading-6 text-[#6e6e73]">
+                    {requiresProof
+                      ? `${selectedRequestMeta.label} wajib melampirkan bukti/dokumen pendukung.`
+                      : 'Opsional untuk jenis pengajuan ini.'}
+                  </p>
+
+                  <p className="mt-1 text-xs font-bold text-[#007aff]">
+                    {form.proof_file?.name || 'Belum ada file dipilih'}
+                  </p>
+                </div>
+
+                <label className="inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-2xl bg-white px-5 text-sm font-bold text-[#007aff] shadow-sm transition hover:bg-[#e8f2ff]">
+                  <Upload size={17} />
+                  Pilih File
+
+                  <input
+                    type="file"
+                    accept=".pdf,.jpg,.jpeg,.png,.webp"
+                    className="hidden"
+                    onChange={(event) => onUpdate('proof_file', event.target.files?.[0] || null)}
+                  />
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-3 border-t border-black/5 bg-white p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
+            <p className="text-xs leading-5 text-[#6e6e73]">
+              Pengajuan akan dikirim ke atasan/HR dan tersinkron ke riwayat setelah berhasil submit.
+            </p>
+
+            <button
+              type="submit"
+              disabled={submitting || loading}
+              className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-[#1d1d1f] px-5 text-sm font-bold text-white transition hover:bg-black disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {submitting ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
+              {submitting ? 'Mengirim...' : `Ajukan ${selectedRequestMeta.label}`}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
+function HistorySection({
+  loading,
+  leaveRequests,
+  phlRecords,
+}: {
+  loading: boolean
+  leaveRequests: LeaveRequest[]
+  phlRecords: PHLRecord[]
+}) {
+  return (
+    <div className="grid gap-6 xl:grid-cols-[1fr_0.38fr]">
+      <div className="harmony-card overflow-hidden">
+        <div className="flex flex-col gap-3 border-b border-black/5 p-5 sm:p-6 md:flex-row md:items-center md:justify-between">
+          <div>
+            <h2 className="text-lg font-semibold text-[#1d1d1f]">
+              Riwayat Pengajuan Cuti / Izin / PHL
+            </h2>
+
+            <p className="mt-1 text-sm leading-6 text-[#6e6e73]">
+              Pantau status pengajuan, approval atasan, HR, dan periode cuti/izin/PHL yang sudah diajukan.
+            </p>
+          </div>
+
+          <div className="rounded-full bg-[#f5f5f7] px-4 py-2 text-xs font-bold text-[#6e6e73]">
+            {leaveRequests.length} pengajuan
+          </div>
+        </div>
+
+        <div className="p-4 sm:p-6">
+          {loading ? (
+            <LoadingState />
+          ) : leaveRequests.length > 0 ? (
+            <div className="space-y-3">
+              {leaveRequests.map((request) => (
+                <HistoryCard key={request.id} request={request} />
+              ))}
+            </div>
+          ) : (
+            <EmptyState
+              title="Belum ada pengajuan"
+              description="Klik tombol Ajukan untuk membuat pengajuan cuti, izin, sakit, tugas luar, atau klaim PHL."
+            />
+          )}
+        </div>
+      </div>
+
+      <div className="harmony-card overflow-hidden">
+        <div className="border-b border-black/5 p-5 sm:p-6">
+          <h3 className="text-lg font-semibold text-[#1d1d1f]">
+            Saldo PHL Aktif
+          </h3>
+
+          <p className="mt-1 text-sm leading-6 text-[#6e6e73]">
+            PHL berlaku maksimal 90 hari kalender dari tanggal PHL.
+          </p>
+        </div>
+
+        <div className="p-4 sm:p-6">
+          {loading ? (
+            <LoadingState />
+          ) : phlRecords.length > 0 ? (
+            <div className="space-y-3">
+              {phlRecords.map((record) => (
+                <PHLBalanceCard key={record.id} record={record} />
+              ))}
+            </div>
+          ) : (
+            <EmptyState
+              title="Belum ada saldo PHL"
+              description="Saldo PHL akan muncul setelah PHL disetujui dan belum expired."
+            />
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function HistoryCard({ request }: { request: LeaveRequest }) {
+  const label = request.leave_type || getRequestMeta((request.request_type || 'annual_leave') as RequestType).label
+  const statusValue = request.hr_status || request.supervisor_status || request.status || 'pending'
+  const tone = getStatusTone(statusValue)
+
+  return (
+    <article className="rounded-[26px] border border-black/5 bg-white p-4 shadow-sm transition hover:bg-[#fbfbfd] sm:p-5">
+      <div className="grid gap-4 xl:grid-cols-[1fr_auto] xl:items-start">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <StatusBadge label={formatStatus(statusValue)} tone={tone} />
+
+            <span className="rounded-full bg-[#f5f5f7] px-3 py-1 text-xs font-bold text-[#1d1d1f]">
+              {label}
+            </span>
+          </div>
+
+          <h3 className="mt-3 text-base font-bold text-[#1d1d1f]">
+            {formatDisplayDate(request.start_date || '')} - {formatDisplayDate(request.end_date || '')}
+          </h3>
+
+          <p className="mt-1 text-sm leading-6 text-[#6e6e73]">
+            {request.reason || 'Tidak ada alasan tertulis.'}
+          </p>
+
+          <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <SmallInfo label="Jumlah Hari" value={`${request.total_days || 0} hari`} />
+            <SmallInfo label="Atasan" value={request.supervisor_name || '-'} />
+            <SmallInfo label="Submit" value={formatDateTime(request.created_at || '')} />
+            <SmallInfo label="HR Status" value={formatStatus(request.hr_status || '-')} />
+          </div>
+
+          {(request.job_pending || request.handover_to || request.handover_note) && (
+            <div className="mt-4 rounded-2xl bg-[#f5f5f7]/80 p-4">
+              <p className="text-xs font-bold uppercase tracking-wide text-[#86868b]">
+                Job Pending
+              </p>
+
+              <p className="mt-2 text-sm leading-6 text-[#1d1d1f]">
+                {request.job_pending || '-'}
+              </p>
+
+              <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                <SmallInfo label="Dialihkan Kepada" value={request.handover_to || '-'} />
+                <SmallInfo label="Catatan" value={request.handover_note || '-'} />
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="flex flex-col gap-2 xl:min-w-[170px]">
+          {request.proof_file_url ? (
+            <a
+              href={request.proof_file_url}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex min-h-10 items-center justify-center gap-2 rounded-2xl bg-[#e8f2ff] px-4 text-xs font-bold text-[#0059b8] transition hover:bg-blue-100"
+            >
+              <FileText size={15} />
+              Lihat Bukti
+            </a>
+          ) : (
+            <span className="inline-flex min-h-10 items-center justify-center rounded-2xl bg-[#f5f5f7] px-4 text-xs font-bold text-[#86868b]">
+              Tidak ada bukti
+            </span>
+          )}
+        </div>
+      </div>
+    </article>
+  )
+}
+
+function PHLBalanceCard({ record }: { record: PHLRecord }) {
+  return (
+    <div className="rounded-[24px] border border-black/5 bg-[#f7edfc]/50 p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-sm font-bold text-[#1d1d1f]">
+            {formatDisplayDate(record.phl_date || '')}
+          </p>
+
+          <p className="mt-1 text-xs leading-5 text-[#6e6e73]">
+            Expired: {formatDisplayDate(record.expired_at || '')}
+          </p>
+        </div>
+
+        <span className="rounded-full bg-white px-3 py-1 text-xs font-bold text-[#7b2cbf]">
+          {record.remaining_days || 0} hari
+        </span>
+      </div>
+
+      {record.reason && (
+        <p className="mt-3 text-xs leading-5 text-[#6e6e73]">
+          {record.reason}
+        </p>
+      )}
+    </div>
   )
 }
 
@@ -965,224 +1294,27 @@ function EmployeeIdentity({
   supervisorTwo: Employee | null
 }) {
   return (
-    <div className="rounded-[28px] border border-black/5 bg-[#1d1d1f] p-5 text-white">
-      <div className="flex items-center gap-4">
-        <div className="flex h-14 w-14 items-center justify-center rounded-3xl bg-white/10">
-          <UserRound size={24} />
-        </div>
-
-        <div className="min-w-0">
-          <h3 className="truncate text-lg font-semibold">
-            {employee?.full_name || '-'}
-          </h3>
-
-          <p className="mt-1 text-sm text-white/55">
-            {employee?.employee_number || '-'} · {employee?.department || '-'}
-          </p>
-        </div>
-      </div>
-
-      <div className="mt-5 grid gap-3 md:grid-cols-2">
-        <div className="rounded-2xl bg-white/10 px-4 py-3">
-          <p className="text-[11px] font-bold uppercase tracking-wide text-white/40">
-            Atasan 1
-          </p>
-          <p className="mt-1 truncate text-sm font-semibold text-white">
-            {supervisorOne?.full_name || employee?.supervisor_1 || '-'}
-          </p>
-        </div>
-
-        <div className="rounded-2xl bg-white/10 px-4 py-3">
-          <p className="text-[11px] font-bold uppercase tracking-wide text-white/40">
-            Atasan 2
-          </p>
-          <p className="mt-1 truncate text-sm font-semibold text-white">
-            {supervisorTwo?.full_name || employee?.supervisor_2 || '-'}
-          </p>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function LeaveRequestList({
-  requests,
-}: {
-  requests: LeaveRequest[]
-}) {
-  if (requests.length === 0) {
-    return (
-      <div className="p-6">
-        <div className="rounded-[28px] border border-dashed border-black/10 bg-[#f5f5f7]/70 p-8 text-center">
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-3xl bg-white text-[#007aff] shadow-sm">
-            <FileText size={24} />
+    <div className="rounded-[26px] border border-black/5 bg-[#f5f5f7]/70 p-4">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex min-w-0 items-center gap-3">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white text-[#007aff] shadow-sm">
+            <UserRound size={20} />
           </div>
 
-          <h3 className="mt-5 text-lg font-semibold text-[#1d1d1f]">
-            Belum ada pengajuan
-          </h3>
+          <div className="min-w-0">
+            <h3 className="truncate text-sm font-bold text-[#1d1d1f]">
+              {employee?.full_name || employee?.email || 'Employee'}
+            </h3>
 
-          <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-[#6e6e73]">
-            Riwayat cuti, izin, sakit, tugas luar, dan klaim PHL akan muncul di sini.
-          </p>
-        </div>
-      </div>
-    )
-  }
-
-  return (
-    <div className="divide-y divide-black/5">
-      {requests.map((item) => (
-        <div
-          key={item.id}
-          className="p-5 transition hover:bg-[#f5f5f7]/65"
-        >
-          <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-            <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-2">
-                <StatusBadge
-                  label={item.leave_type || formatRequestType(item.request_type || '')}
-                  tone="blue"
-                />
-
-                <StatusBadge
-                  label={formatApprovalStatus(item.supervisor_status || item.status || '')}
-                  tone={getApprovalTone(item.supervisor_status || item.status || '')}
-                />
-
-                <StatusBadge
-                  label={formatHRStatus(item.hr_status || '')}
-                  tone={getHRTone(item.hr_status || '')}
-                />
-              </div>
-
-              <h3 className="mt-3 text-base font-semibold text-[#1d1d1f]">
-                {formatDisplayDate(item.start_date || '')} - {formatDisplayDate(item.end_date || '')}
-              </h3>
-
-              <p className="mt-1 text-sm leading-6 text-[#6e6e73]">
-                {Number(item.total_days || 0)} hari kerja · {item.reason || '-'}
-              </p>
-
-              <p className="mt-1 text-xs font-semibold text-[#007aff]">
-                Atasan approval: {item.supervisor_name || '-'}
-              </p>
-
-              {item.job_pending && (
-                <p className="mt-2 rounded-2xl bg-[#f5f5f7] px-4 py-3 text-xs leading-5 text-[#6e6e73]">
-                  <strong className="text-[#1d1d1f]">Job pending:</strong> {item.job_pending}
-                </p>
-              )}
-            </div>
-
-            <div className="flex shrink-0 flex-col gap-2 xl:items-end">
-              <p className="text-xs text-[#86868b]">
-                Diajukan: {formatDateTime(item.created_at || '')}
-              </p>
-
-              {item.proof_file_url && (
-                <a
-                  href={item.proof_file_url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex min-h-9 items-center justify-center gap-2 rounded-2xl bg-[#e8f2ff] px-4 text-xs font-bold text-[#0059b8]"
-                >
-                  <FileText size={15} />
-                  Lihat Bukti
-                </a>
-              )}
-            </div>
+            <p className="mt-1 truncate text-xs text-[#6e6e73]">
+              {employee?.employee_number || '-'} · {employee?.department || '-'} · {employee?.position || '-'}
+            </p>
           </div>
         </div>
-      ))}
-    </div>
-  )
-}
 
-function FileUploadBox({
-  required,
-  file,
-  title,
-  description,
-  onChange,
-}: {
-  required: boolean
-  file: File | null
-  title: string
-  description: string
-  onChange: (file: File | null) => void
-}) {
-  return (
-    <div className="rounded-[28px] border border-dashed border-black/10 bg-[#f5f5f7]/70 p-5">
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div>
-          <h3 className="font-semibold text-[#1d1d1f]">
-            {title} {required && <span className="text-red-600">*</span>}
-          </h3>
-
-          <p className="mt-1 text-sm leading-6 text-[#6e6e73]">
-            {description}
-          </p>
-
-          <p className="mt-1 text-xs font-bold text-[#007aff]">
-            {file?.name || 'Belum ada file dipilih'}
-          </p>
-        </div>
-
-        <label className="inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-2xl bg-white px-5 text-sm font-bold text-[#007aff] shadow-sm transition hover:bg-[#e8f2ff]">
-          <Upload size={17} />
-          Pilih File
-          <input
-            type="file"
-            accept=".pdf,.jpg,.jpeg,.png,.webp"
-            className="hidden"
-            onChange={(event) => onChange(event.target.files?.[0] || null)}
-          />
-        </label>
-      </div>
-    </div>
-  )
-}
-
-function SummaryCard({
-  title,
-  value,
-  description,
-  icon,
-  tone,
-}: {
-  title: string
-  value: string
-  description: string
-  icon: React.ReactNode
-  tone: 'blue' | 'green' | 'orange' | 'purple'
-}) {
-  const toneClass = {
-    blue: 'text-[#007aff] bg-[#e8f2ff]',
-    green: 'text-[#168034] bg-[#eaf8ee]',
-    orange: 'text-[#b35b00] bg-[#fff4e5]',
-    purple: 'text-[#7b2cbf] bg-[#f7edfc]',
-  }[tone]
-
-  return (
-    <div className="harmony-card harmony-hover-lift p-6">
-      <div className="flex items-center justify-between gap-4">
-        <div className="min-w-0">
-          <p className="truncate text-sm text-[#6e6e73]">
-            {title}
-          </p>
-
-          <h3 className="mt-2 truncate text-xl font-semibold tracking-tight text-[#1d1d1f]">
-            {value}
-          </h3>
-
-          <p className="mt-1 line-clamp-2 text-xs leading-5 text-[#86868b]">
-            {description}
-          </p>
-        </div>
-
-        <div className={`rounded-2xl p-3 ${toneClass}`}>
-          {icon}
+        <div className="grid gap-3 text-xs sm:grid-cols-2 lg:min-w-[420px]">
+          <AutoReadInfo label="Atasan 1" value={supervisorOne?.full_name || employee?.supervisor_1 || '-'} />
+          <AutoReadInfo label="Atasan 2" value={supervisorTwo?.full_name || employee?.supervisor_2 || '-'} />
         </div>
       </div>
     </div>
@@ -1197,8 +1329,8 @@ function AlertBox({
 }: {
   tone: 'green' | 'orange'
   title: string
-  icon: React.ReactNode
-  children: React.ReactNode
+  icon: ReactNode
+  children: ReactNode
 }) {
   const className =
     tone === 'green'
@@ -1211,7 +1343,49 @@ function AlertBox({
         {icon}
         {title}
       </div>
+
       {children}
+    </div>
+  )
+}
+
+function SummaryCard({
+  title,
+  value,
+  description,
+  icon,
+  tone,
+}: {
+  title: string
+  value: string
+  description: string
+  icon: ReactNode
+  tone: 'blue' | 'green' | 'orange' | 'purple'
+}) {
+  const toneClass = {
+    blue: 'bg-[#e8f2ff] text-[#007aff]',
+    green: 'bg-green-50 text-green-700',
+    orange: 'bg-orange-50 text-orange-700',
+    purple: 'bg-[#f7edfc] text-[#7b2cbf]',
+  }[tone]
+
+  return (
+    <div className="harmony-card harmony-hover-lift p-5 sm:p-6">
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0 flex-1">
+          <p className="text-sm text-[#6e6e73]">{title}</p>
+
+          <h3 className="mt-2 break-words text-2xl font-semibold leading-tight tracking-tight text-[#1d1d1f] sm:text-[28px]">
+            {value}
+          </h3>
+
+          <p className="mt-2 text-xs leading-5 text-[#86868b]">
+            {description}
+          </p>
+        </div>
+
+        <div className={`rounded-2xl p-3 ${toneClass}`}>{icon}</div>
+      </div>
     </div>
   )
 }
@@ -1224,14 +1398,9 @@ function HeroMetric({
   value: string
 }) {
   return (
-    <div className="rounded-[24px] border border-white/10 bg-white/10 p-4 backdrop-blur-xl">
-      <p className="text-xs font-semibold uppercase tracking-wide text-white/45">
-        {label}
-      </p>
-
-      <p className="mt-1 text-xl font-semibold text-white">
-        {value}
-      </p>
+    <div className="rounded-[22px] border border-white/10 bg-white/10 p-4 backdrop-blur-xl">
+      <p className="text-xs font-semibold text-white/50">{label}</p>
+      <p className="mt-1 break-words text-xl font-semibold text-white">{value}</p>
     </div>
   )
 }
@@ -1259,6 +1428,40 @@ function StatusBadge({
   )
 }
 
+function InfoTile({
+  label,
+  value,
+  description,
+  tone,
+}: {
+  label: string
+  value: string
+  description: string
+  tone: 'blue' | 'green' | 'purple'
+}) {
+  const className = {
+    blue: 'bg-[#e8f2ff] text-[#0059b8]',
+    green: 'bg-green-50 text-green-700',
+    purple: 'bg-[#f7edfc] text-[#7b2cbf]',
+  }[tone]
+
+  return (
+    <div className={`rounded-[22px] p-4 ${className}`}>
+      <p className="text-xs font-bold uppercase tracking-wide opacity-70">
+        {label}
+      </p>
+
+      <p className="mt-2 text-2xl font-bold">
+        {value}
+      </p>
+
+      <p className="mt-1 text-xs font-semibold opacity-75">
+        {description}
+      </p>
+    </div>
+  )
+}
+
 function AutoReadInfo({
   label,
   value,
@@ -1273,6 +1476,55 @@ function AutoReadInfo({
       </p>
       <p className="mt-1 truncate font-semibold text-[#1d1d1f]">
         {value}
+      </p>
+    </div>
+  )
+}
+
+function SmallInfo({
+  label,
+  value,
+}: {
+  label: string
+  value: string
+}) {
+  return (
+    <div className="min-w-0 rounded-2xl bg-[#f5f5f7]/75 px-3 py-2">
+      <p className="text-[11px] font-bold uppercase tracking-wide text-[#86868b]">
+        {label}
+      </p>
+
+      <p className="mt-1 truncate text-xs font-bold text-[#1d1d1f]">
+        {value}
+      </p>
+    </div>
+  )
+}
+
+function LoadingState() {
+  return (
+    <div className="flex items-center gap-3 rounded-[24px] border border-black/5 bg-[#f5f5f7]/70 p-5 text-sm text-[#6e6e73]">
+      <Loader2 size={18} className="animate-spin" />
+      Memuat data...
+    </div>
+  )
+}
+
+function EmptyState({
+  title,
+  description,
+}: {
+  title: string
+  description: string
+}) {
+  return (
+    <div className="rounded-[24px] border border-dashed border-black/10 bg-[#f5f5f7]/70 p-6 text-center">
+      <p className="text-sm font-bold text-[#1d1d1f]">
+        {title}
+      </p>
+
+      <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-[#6e6e73]">
+        {description}
       </p>
     </div>
   )
@@ -1380,67 +1632,50 @@ function formatDateTime(value: string) {
   })
 }
 
-function normalizeText(value: string | null | undefined) {
+function normalizeText(value?: string | null) {
   return String(value || '').trim().toLowerCase()
 }
 
-function formatRequestType(value: string) {
+function isPendingStatus(value?: string | null) {
   const normalized = normalizeText(value)
 
-  if (normalized === 'annual_leave') return 'Cuti Tahunan'
-  if (normalized === 'marriage_leave') return 'Cuti Menikah'
-  if (normalized === 'maternity_leave') return 'Cuti Melahirkan'
-  if (normalized === 'miscarriage_leave') return 'Cuti Keguguran'
-  if (normalized === 'bereavement_leave') return 'Cuti Duka'
-  if (normalized === 'child_circumcision_leave') return 'Cuti Khitan / Baptis Anak'
-  if (normalized === 'worship_leave') return 'Cuti Ibadah'
-  if (normalized === 'menstrual_leave') return 'Cuti Haid'
-  if (normalized === 'pregnancy_check_leave') return 'Pemeriksaan Kehamilan'
-  if (normalized === 'sick') return 'Sakit'
-  if (normalized === 'permit') return 'Izin'
-  if (normalized === 'official_travel') return 'Tugas Luar / Dinas'
-  if (normalized === 'phl_claim') return 'Klaim PHL'
-  if (normalized === 'other_leave') return 'Cuti Lainnya'
-
-  return value || '-'
+  return (
+    normalized === 'pending' ||
+    normalized === 'waiting_supervisor' ||
+    normalized === 'pending_supervisor' ||
+    normalized === 'pending_hr'
+  )
 }
 
-function formatApprovalStatus(value: string) {
+function formatStatus(value?: string | null) {
   const normalized = normalizeText(value)
 
-  if (normalized === 'approved') return 'Disetujui Atasan'
-  if (normalized === 'rejected') return 'Ditolak Atasan'
-  if (normalized === 'pending') return 'Menunggu Atasan'
+  const map: Record<string, string> = {
+    pending: 'Menunggu Approval',
+    waiting_supervisor: 'Menunggu Atasan',
+    pending_supervisor: 'Menunggu Atasan',
+    pending_hr: 'Menunggu HR',
+    approved: 'Disetujui',
+    rejected: 'Ditolak',
+    cancelled: 'Dibatalkan',
+    leave: 'Cuti',
+    sick: 'Sakit',
+    permit: 'Izin',
+    official_travel: 'Tugas Luar',
+    phl_claim: 'Klaim PHL',
+  }
 
-  return 'Menunggu'
+  return map[normalized] || value || '-'
 }
 
-function formatHRStatus(value: string) {
-  const normalized = normalizeText(value)
+function getStatusTone(status?: string | null): 'green' | 'orange' | 'red' | 'blue' | 'purple' | 'neutral' {
+  const value = normalizeText(status)
 
-  if (normalized === 'approved') return 'Approved HR'
-  if (normalized === 'rejected') return 'Rejected HR'
-  if (normalized === 'pending') return 'Menunggu HR'
-
-  return 'Menunggu HR'
-}
-
-function getApprovalTone(value: string): 'green' | 'orange' | 'red' | 'neutral' {
-  const normalized = normalizeText(value)
-
-  if (normalized === 'approved') return 'green'
-  if (normalized === 'rejected') return 'red'
-  if (normalized === 'pending') return 'orange'
-
-  return 'neutral'
-}
-
-function getHRTone(value: string): 'green' | 'orange' | 'red' | 'neutral' {
-  const normalized = normalizeText(value)
-
-  if (normalized === 'approved') return 'green'
-  if (normalized === 'rejected') return 'red'
-  if (normalized === 'pending') return 'orange'
+  if (value === 'approved') return 'green'
+  if (value === 'rejected' || value === 'cancelled') return 'red'
+  if (value === 'pending_hr') return 'blue'
+  if (value === 'phl_claim') return 'purple'
+  if (isPendingStatus(value)) return 'orange'
 
   return 'neutral'
 }

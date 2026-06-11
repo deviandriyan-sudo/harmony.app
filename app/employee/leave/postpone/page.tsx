@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import type { FormEvent } from 'react'
 import Link from 'next/link'
 import {
   ArrowLeft,
@@ -249,6 +250,8 @@ export default function EmployeeLeavePostponePage() {
     }
   }, [selectedCycle])
 
+  const lockedByDeadline = Boolean(selectedCycle && !computed.eligible)
+
   useEffect(() => {
     fetchData()
   }, [])
@@ -356,7 +359,7 @@ export default function EmployeeLeavePostponePage() {
     }
   }
 
-  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
 
     setSaving(true)
@@ -544,7 +547,8 @@ export default function EmployeeLeavePostponePage() {
             </h2>
 
             <p className="mt-1 text-sm text-[#6e6e73]">
-              Pilih cycle cuti tahunan yang masih memiliki sisa cuti.
+              Pilih cycle cuti tahunan yang masih memiliki sisa cuti. Jika sudah melewati H-7 sebelum cycle berakhir,
+              form employee otomatis terkunci dan hanya HR yang bisa input manual.
             </p>
 
             {loading ? (
@@ -589,10 +593,17 @@ export default function EmployeeLeavePostponePage() {
                   <InfoBox label="Berlaku Sampai" value={formatDate(computed.expiredAt)} />
                   <InfoBox
                     label="Status Eligibility"
-                    value={computed.eligible ? 'Masih bisa diajukan' : 'Lewat batas H-7'}
+                    value={computed.eligible ? 'Masih bisa diajukan' : 'Terkunci otomatis H-7'}
                     tone={computed.eligible ? 'green' : 'red'}
                   />
                 </div>
+
+                {lockedByDeadline && (
+                  <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm leading-6 text-red-700">
+                    Pengajuan postpone untuk employee sudah terkunci karena melewati batas H-7 sebelum akhir cycle.
+                    Untuk kondisi khusus, HR tetap dapat menginput atau mengubah data melalui halaman HR.
+                  </div>
+                )}
 
                 <label className="block">
                   <span className="text-sm font-bold text-[#1d1d1f]">
@@ -605,7 +616,8 @@ export default function EmployeeLeavePostponePage() {
                     max={Number(selectedCycle?.remaining_days || 0)}
                     value={requestedDays}
                     onChange={(event) => setRequestedDays(Number(event.target.value))}
-                    className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-blue-400"
+                    disabled={lockedByDeadline}
+                    className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-blue-400 disabled:cursor-not-allowed disabled:bg-slate-100"
                     required
                   />
                 </label>
@@ -618,8 +630,9 @@ export default function EmployeeLeavePostponePage() {
                   <textarea
                     value={reason}
                     onChange={(event) => setReason(event.target.value)}
+                    disabled={lockedByDeadline}
                     placeholder="Contoh: sisa cuti belum dapat digunakan karena kebutuhan operasional pekerjaan."
-                    className="mt-2 min-h-28 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-blue-400"
+                    className="mt-2 min-h-28 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-blue-400 disabled:cursor-not-allowed disabled:bg-slate-100"
                   />
                 </label>
 
@@ -629,7 +642,7 @@ export default function EmployeeLeavePostponePage() {
                   className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-[#1d1d1f] px-5 py-3 text-sm font-bold text-white transition hover:bg-black disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {saving ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
-                  Kirim Pengajuan Postpone
+                  {lockedByDeadline ? 'Terkunci H-7' : 'Kirim Pengajuan Postpone'}
                 </button>
               </form>
             )}
