@@ -12,11 +12,13 @@ import {
   Mail,
   MapPin,
   Pencil,
+  Plus,
   Power,
   RefreshCcw,
   Save,
   Search,
   Sparkles,
+  Trash2,
   UserPlus,
   UserRound,
   Users,
@@ -67,6 +69,15 @@ type ProfileUpdateLog = {
   created_at: string | null
 }
 
+type MasterOption = {
+  id: string
+  option_type: 'department' | 'position'
+  option_value: string
+  is_active: boolean | null
+  created_at?: string | null
+  updated_at?: string | null
+}
+
 type EmployeeForm = {
   employee_number: string
   machine_pin: string
@@ -114,6 +125,13 @@ const initialForm: EmployeeForm = {
 export default function HREmployeesPage() {
   const [employees, setEmployees] = useState<Employee[]>([])
   const [profileLogs, setProfileLogs] = useState<ProfileUpdateLog[]>([])
+  const [masterOptions, setMasterOptions] = useState<MasterOption[]>([])
+  const [masterOptionsEnabled, setMasterOptionsEnabled] = useState(false)
+  const [newDepartment, setNewDepartment] = useState('')
+  const [newPosition, setNewPosition] = useState('')
+  const [optionSaving, setOptionSaving] = useState(false)
+  const [optionMessage, setOptionMessage] = useState('')
+
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [departmentFilter, setDepartmentFilter] = useState('all')
@@ -130,6 +148,28 @@ export default function HREmployeesPage() {
   useEffect(() => {
     fetchEmployees()
   }, [])
+
+  async function fetchMasterOptions() {
+    const { data, error } = await supabase
+      .from('hr_master_options')
+      .select('*')
+      .eq('is_active', true)
+      .order('option_value', { ascending: true })
+
+    if (error) {
+      setMasterOptions([])
+      setMasterOptionsEnabled(false)
+      setOptionMessage('Tabel hr_master_options belum tersedia. Jalankan SQL master dropdown terlebih dahulu agar tambah/hapus pilihan bisa aktif.')
+      return
+    }
+
+    setMasterOptions((data || []) as MasterOption[])
+    setMasterOptionsEnabled(true)
+
+    if (optionMessage.includes('hr_master_options')) {
+      setOptionMessage('')
+    }
+  }
 
   async function fetchEmployees() {
     setLoading(true)
@@ -148,6 +188,8 @@ export default function HREmployeesPage() {
     }
 
     setEmployees((data || []) as Employee[])
+
+    await fetchMasterOptions()
 
     const { data: logsData, error: logsError } = await supabase
       .from('employee_profile_update_logs')
@@ -191,6 +233,26 @@ export default function HREmployeesPage() {
     setErrorMessage('')
   }
 
+  async function ensureMasterOption(type: 'department' | 'position', value?: string | null) {
+    const cleanValue = String(value || '').trim()
+
+    if (!masterOptionsEnabled || !cleanValue) return
+
+    await supabase
+      .from('hr_master_options')
+      .upsert(
+        {
+          option_type: type,
+          option_value: cleanValue,
+          is_active: true,
+          updated_at: new Date().toISOString(),
+        },
+        {
+          onConflict: 'option_type,option_value',
+        }
+      )
+  }
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setSaving(true)
@@ -215,8 +277,8 @@ export default function HREmployeesPage() {
       position: form.position.trim() || null,
       join_date: form.join_date || null,
       employment_status: form.employment_status || 'active',
-      supervisor_1: form.supervisor_1.trim() || null,
-      supervisor_2: form.supervisor_2.trim() || null,
+      supervisor_1: normalizeSupervisorStoredValue(form.supervisor_1, employees),
+      supervisor_2: normalizeSupervisorStoredValue(form.supervisor_2, employees),
       schedule_group: 'regular',
       auto_detect_schedule: true,
       annual_leave_balance: form.annual_leave_balance,
@@ -247,6 +309,9 @@ export default function HREmployeesPage() {
       setSuccessMessage('Data karyawan berhasil ditambahkan.')
     }
 
+    await ensureMasterOption('department', payload.department)
+    await ensureMasterOption('position', payload.position)
+
     setSaving(false)
     resetForm()
     await fetchEmployees()
@@ -271,13 +336,117 @@ export default function HREmployeesPage() {
     await fetchEmployees()
   }
 
-  const departments = useMemo(() => {
+  async function handleAddMasterOption(type: 'department' | 'position', value: string) {
+    const cleanValue = value.trim()
+    setOptionMessage('')
+    setSuccessMessage('')
+    setErrorMessage('')
+
+    if (!masterOptionsEnabled) {
+      setOptionMessage('Fitur tambah/hapus dropdown belum aktif. Jalankan SQL hr_master_options terlebih dahulu.')
+      return
+    }
+
+    if (!cleanValue) {
+      setOptionMessage(type === 'department' ? 'Nama departemen wajib diisi.' : 'Nama jabatan wajib diisi.')
+      return
+    }
+
+    setOptionSaving(true)
+
+    const { error } = await supabase
+      .from('hr_master_options')
+      .upsert(
+        {
+          option_type: type,
+          option_value: cleanValue,
+          is_active: true,
+          updated_at: new Date().toISOString(),
+        },
+        {
+          onConflict: 'option_type,option_value',
+        }
+      )
+
+    if (error) {
+      setOptionMessage(error.message)
+      setOptionSaving(false)
+      return
+    }
+
+    if (type === 'department') setNewDepartment('')
+    if (type === 'position') setNewPosition('')
+
+    setOptionMessage(type === 'department' ? 'Departemen berhasil ditambahkan ke dropdown.' : 'Jabatan berhasil ditambahkan ke dropdown.')
+    setOptionSaving(false)
+    await fetchMasterOptions()
+  }
+
+  async function handleDeleteMasterOption(type: 'department' | 'position', value: string) {
+    setOptionMessage('')
+    setSuccessMessage('')
+    setErrorMessage('')
+
+    if (!masterOptionsEnabled) {
+      setOptionMessage('Fitur tambah/hapus dropdown belum aktif. Jalankan SQL hr_master_options terlebih dahulu.')
+      return
+    }
+
+    const label = type === 'department' ? 'departemen' : 'jabatan'
+    const confirmed = window.confirm(`Hapus ${label} "${value}" dari pilihan dropdown? Data karyawan yang sudah memakai nilai ini tidak ikut diubah.`)
+
+    if (!confirmed) return
+
+    setOptionSaving(true)
+
+    const { error } = await supabase
+      .from('hr_master_options')
+      .update({ is_active: false, updated_at: new Date().toISOString() })
+      .eq('option_type', type)
+      .eq('option_value', value)
+
+    if (error) {
+      setOptionMessage(error.message)
+      setOptionSaving(false)
+      return
+    }
+
+    setOptionMessage(type === 'department' ? 'Departemen berhasil dihapus dari dropdown.' : 'Jabatan berhasil dihapus dari dropdown.')
+    setOptionSaving(false)
+    await fetchMasterOptions()
+  }
+
+  const departmentOptions = useMemo(() => {
     const unique = new Set<string>()
-    employees.forEach((employee) => {
-      if (employee.department) unique.add(employee.department)
-    })
-    return Array.from(unique).sort()
-  }, [employees])
+
+    if (masterOptionsEnabled) {
+      masterOptions
+        .filter((option) => option.option_type === 'department')
+        .forEach((option) => unique.add(option.option_value))
+    } else {
+      employees.forEach((employee) => {
+        if (employee.department) unique.add(employee.department)
+      })
+    }
+
+    return Array.from(unique).sort((a, b) => a.localeCompare(b))
+  }, [employees, masterOptions, masterOptionsEnabled])
+
+  const positionOptions = useMemo(() => {
+    const unique = new Set<string>()
+
+    if (masterOptionsEnabled) {
+      masterOptions
+        .filter((option) => option.option_type === 'position')
+        .forEach((option) => unique.add(option.option_value))
+    } else {
+      employees.forEach((employee) => {
+        if (employee.position) unique.add(employee.position)
+      })
+    }
+
+    return Array.from(unique).sort((a, b) => a.localeCompare(b))
+  }, [employees, masterOptions, masterOptionsEnabled])
 
   const filteredEmployees = useMemo(() => {
     const keyword = search.toLowerCase().trim()
@@ -357,6 +526,22 @@ export default function HREmployeesPage() {
 
         {successMessage && <AlertBox type="success" message={successMessage} />}
         {errorMessage && <AlertBox type="error" message={`Error: ${errorMessage}`} />}
+        {optionMessage && <AlertBox type={optionMessage.includes('berhasil') ? 'success' : 'error'} message={optionMessage} />}
+
+        <MasterOptionManager
+          departmentOptions={departmentOptions}
+          positionOptions={positionOptions}
+          newDepartment={newDepartment}
+          newPosition={newPosition}
+          disabled={optionSaving || !masterOptionsEnabled}
+          masterOptionsEnabled={masterOptionsEnabled}
+          onNewDepartmentChange={setNewDepartment}
+          onNewPositionChange={setNewPosition}
+          onAddDepartment={() => handleAddMasterOption('department', newDepartment)}
+          onAddPosition={() => handleAddMasterOption('position', newPosition)}
+          onDeleteDepartment={(value) => handleDeleteMasterOption('department', value)}
+          onDeletePosition={(value) => handleDeleteMasterOption('position', value)}
+        />
 
         <div className="harmony-card harmony-slide-up overflow-hidden">
           <div className="flex flex-col gap-4 border-b border-black/5 p-5 xl:flex-row xl:items-center xl:justify-between">
@@ -398,7 +583,7 @@ export default function HREmployeesPage() {
 
             <select value={departmentFilter} onChange={(event) => setDepartmentFilter(event.target.value)} className="harmony-select">
               <option value="all">Semua Departemen</option>
-              {departments.map((department) => <option key={department} value={department}>{department}</option>)}
+              {departmentOptions.map((department) => <option key={department} value={department}>{department}</option>)}
             </select>
 
             <select value={syncFilter} onChange={(event) => setSyncFilter(event.target.value)} className="harmony-select">
@@ -438,6 +623,7 @@ export default function HREmployeesPage() {
         {selectedEmployee && (
           <EmployeeDetailModal
             employee={selectedEmployee}
+            employees={employees}
             onClose={() => setSelectedEmployee(null)}
             onEdit={() => openEditModal(selectedEmployee)}
           />
@@ -448,6 +634,9 @@ export default function HREmployeesPage() {
             form={form}
             saving={saving}
             editingEmployeeId={editingEmployeeId}
+            departmentOptions={departmentOptions}
+            positionOptions={positionOptions}
+            employees={employees}
             onSubmit={handleSubmit}
             onClose={resetForm}
             onUpdate={updateForm}
@@ -455,6 +644,150 @@ export default function HREmployeesPage() {
         )}
       </section>
     </>
+  )
+}
+
+function MasterOptionManager({
+  departmentOptions,
+  positionOptions,
+  newDepartment,
+  newPosition,
+  disabled,
+  masterOptionsEnabled,
+  onNewDepartmentChange,
+  onNewPositionChange,
+  onAddDepartment,
+  onAddPosition,
+  onDeleteDepartment,
+  onDeletePosition,
+}: {
+  departmentOptions: string[]
+  positionOptions: string[]
+  newDepartment: string
+  newPosition: string
+  disabled: boolean
+  masterOptionsEnabled: boolean
+  onNewDepartmentChange: (value: string) => void
+  onNewPositionChange: (value: string) => void
+  onAddDepartment: () => void
+  onAddPosition: () => void
+  onDeleteDepartment: (value: string) => void
+  onDeletePosition: (value: string) => void
+}) {
+  return (
+    <div className="harmony-card overflow-hidden">
+      <div className="flex flex-col gap-2 border-b border-black/5 p-5 lg:flex-row lg:items-center lg:justify-between">
+        <div className="min-w-0">
+          <h2 className="text-lg font-semibold text-[#1d1d1f]">Master Dropdown Organisasi</h2>
+          <p className="mt-1 text-sm leading-6 text-[#6e6e73]">
+            Kelola pilihan departemen dan jabatan agar HR tidak perlu mengetik manual berulang kali.
+          </p>
+        </div>
+
+        <span className={['w-fit rounded-full px-3 py-1 text-xs font-bold', masterOptionsEnabled ? 'bg-green-50 text-green-700' : 'bg-orange-50 text-orange-700'].join(' ')}>
+          {masterOptionsEnabled ? 'Dropdown aktif' : 'Perlu setup SQL'}
+        </span>
+      </div>
+
+      <div className="grid gap-5 p-5 xl:grid-cols-2">
+        <OptionBox
+          title="Departemen"
+          placeholder="Tambah departemen manual"
+          value={newDepartment}
+          options={departmentOptions}
+          disabled={disabled}
+          onChange={onNewDepartmentChange}
+          onAdd={onAddDepartment}
+          onDelete={onDeleteDepartment}
+        />
+
+        <OptionBox
+          title="Jabatan"
+          placeholder="Tambah jabatan manual"
+          value={newPosition}
+          options={positionOptions}
+          disabled={disabled}
+          onChange={onNewPositionChange}
+          onAdd={onAddPosition}
+          onDelete={onDeletePosition}
+        />
+      </div>
+    </div>
+  )
+}
+
+function OptionBox({
+  title,
+  placeholder,
+  value,
+  options,
+  disabled,
+  onChange,
+  onAdd,
+  onDelete,
+}: {
+  title: string
+  placeholder: string
+  value: string
+  options: string[]
+  disabled: boolean
+  onChange: (value: string) => void
+  onAdd: () => void
+  onDelete: (value: string) => void
+}) {
+  return (
+    <div className="rounded-[28px] border border-black/5 bg-[#f5f5f7]/70 p-5">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h3 className="font-semibold text-[#1d1d1f]">{title}</h3>
+          <p className="mt-1 text-xs text-[#6e6e73]">{options.length} pilihan aktif</p>
+        </div>
+
+        <div className="flex min-w-0 flex-col gap-2 sm:min-w-[320px] sm:flex-row">
+          <input
+            value={value}
+            onChange={(event) => onChange(event.target.value)}
+            placeholder={placeholder}
+            className="harmony-input min-w-0 flex-1"
+          />
+          <button
+            type="button"
+            onClick={onAdd}
+            disabled={disabled}
+            className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-[18px] bg-[#007aff] px-4 text-sm font-bold text-white transition hover:bg-[#0067d8] disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <Plus size={16} />
+            Tambah
+          </button>
+        </div>
+      </div>
+
+      <div className="mt-4 flex max-h-48 flex-wrap gap-2 overflow-y-auto pr-1">
+        {options.map((option) => (
+          <span
+            key={option}
+            className="inline-flex max-w-full items-center gap-2 rounded-full border border-black/5 bg-white px-3 py-2 text-xs font-bold text-[#1d1d1f] shadow-sm"
+          >
+            <span className="max-w-[260px] truncate">{option}</span>
+            <button
+              type="button"
+              onClick={() => onDelete(option)}
+              disabled={disabled}
+              className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-red-50 text-red-700 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-40"
+              title={`Hapus ${option}`}
+            >
+              <Trash2 size={13} />
+            </button>
+          </span>
+        ))}
+
+        {options.length === 0 && (
+          <div className="w-full rounded-2xl border border-dashed border-black/10 bg-white/70 p-4 text-sm text-[#6e6e73]">
+            Belum ada pilihan. Tambahkan manual terlebih dahulu.
+          </div>
+        )}
+      </div>
+    </div>
   )
 }
 
@@ -513,7 +846,7 @@ function EmployeeCompactCard({ employee, onDetail, onEdit, onToggleActive }: { e
   )
 }
 
-function EmployeeDetailModal({ employee, onClose, onEdit }: { employee: Employee; onClose: () => void; onEdit: () => void }) {
+function EmployeeDetailModal({ employee, employees, onClose, onEdit }: { employee: Employee; employees: Employee[]; onClose: () => void; onEdit: () => void }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4 backdrop-blur-sm">
       <div className="flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-[34px] bg-white shadow-[0_30px_90px_rgba(0,0,0,0.24)]">
@@ -547,8 +880,8 @@ function EmployeeDetailModal({ employee, onClose, onEdit }: { employee: Employee
               <DetailItem label="Departemen" value={employee.department} />
               <DetailItem label="Jabatan" value={employee.position} />
               <DetailItem label="Join Date" value={formatDisplayDate(employee.join_date || '')} />
-              <DetailItem label="Atasan 1" value={employee.supervisor_1} />
-              <DetailItem label="Atasan 2" value={employee.supervisor_2} />
+              <DetailItem label="Atasan 1" value={formatSupervisorLabel(employee.supervisor_1, employees)} />
+              <DetailItem label="Atasan 2" value={formatSupervisorLabel(employee.supervisor_2, employees)} />
               <DetailItem label="Update Terakhir" value={formatDateTime(employee.updated_at || '')} />
             </DetailSection>
 
@@ -591,7 +924,27 @@ function EmployeeDetailModal({ employee, onClose, onEdit }: { employee: Employee
   )
 }
 
-function EmployeeFormModal({ form, saving, editingEmployeeId, onSubmit, onClose, onUpdate }: { form: EmployeeForm; saving: boolean; editingEmployeeId: string | null; onSubmit: (event: FormEvent<HTMLFormElement>) => void; onClose: () => void; onUpdate: (field: keyof EmployeeForm, value: string | number | boolean) => void }) {
+function EmployeeFormModal({
+  form,
+  saving,
+  editingEmployeeId,
+  departmentOptions,
+  positionOptions,
+  employees,
+  onSubmit,
+  onClose,
+  onUpdate,
+}: {
+  form: EmployeeForm
+  saving: boolean
+  editingEmployeeId: string | null
+  departmentOptions: string[]
+  positionOptions: string[]
+  employees: Employee[]
+  onSubmit: (event: FormEvent<HTMLFormElement>) => void
+  onClose: () => void
+  onUpdate: (field: keyof EmployeeForm, value: string | number | boolean) => void
+}) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4 backdrop-blur-sm">
       <div className="flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-[34px] bg-white shadow-[0_30px_90px_rgba(0,0,0,0.24)]">
@@ -602,7 +955,7 @@ function EmployeeFormModal({ form, saving, editingEmployeeId, onSubmit, onClose,
               Employee Master
             </div>
             <h2 className="truncate text-xl font-semibold text-[#1d1d1f]">{editingEmployeeId ? 'Edit Data Karyawan' : 'Tambah Karyawan Baru'}</h2>
-            <p className="mt-1 text-sm text-[#6e6e73]">Form dibuat dalam modal agar halaman utama tetap compact.</p>
+            <p className="mt-1 text-sm text-[#6e6e73]">Departemen, jabatan, dan atasan memakai dropdown agar data lebih konsisten.</p>
           </div>
           <button type="button" onClick={onClose} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#f5f5f7] text-[#1d1d1f]">
             <X size={18} />
@@ -620,13 +973,27 @@ function EmployeeFormModal({ form, saving, editingEmployeeId, onSubmit, onClose,
               <SelectField label="Gender" value={form.gender} onChange={(value) => onUpdate('gender', value)} options={[{ label: 'Semua / Tidak diset', value: 'all' }, { label: 'Laki-laki', value: 'male' }, { label: 'Perempuan', value: 'female' }]} />
             </FormSection>
 
-            <FormSection title="Organisasi & Status" description="Struktur unit, jabatan, tanggal masuk, dan status employment." icon={<Building2 size={18} />}>
-              <InputField label="Departemen" value={form.department} onChange={(value) => onUpdate('department', value)} placeholder="Contoh: PSDM" />
-              <InputField label="Jabatan" value={form.position} onChange={(value) => onUpdate('position', value)} placeholder="Contoh: Staff HR" />
+            <FormSection title="Organisasi & Status" description="Struktur unit, jabatan, tanggal masuk, status employment, dan relasi atasan." icon={<Building2 size={18} />}>
+              <DropdownWithOther
+                label="Departemen"
+                value={form.department}
+                options={departmentOptions}
+                onChange={(value) => onUpdate('department', value)}
+                manualPlaceholder="Isi departemen manual"
+              />
+
+              <DropdownWithOther
+                label="Jabatan"
+                value={form.position}
+                options={positionOptions}
+                onChange={(value) => onUpdate('position', value)}
+                manualPlaceholder="Isi jabatan manual"
+              />
+
               <InputField label="Join Date" type="date" value={form.join_date} onChange={(value) => onUpdate('join_date', value)} />
               <SelectField label="Employment Status" value={form.employment_status} onChange={(value) => onUpdate('employment_status', value)} options={[{ label: 'Active', value: 'active' }, { label: 'Probation', value: 'probation' }, { label: 'Contract', value: 'contract' }, { label: 'Permanent', value: 'permanent' }, { label: 'Resigned', value: 'resigned' }, { label: 'Inactive', value: 'inactive' }]} />
-              <InputField label="Atasan 1" value={form.supervisor_1} onChange={(value) => onUpdate('supervisor_1', value)} placeholder="Employee number / nama / email atasan" />
-              <InputField label="Atasan 2" value={form.supervisor_2} onChange={(value) => onUpdate('supervisor_2', value)} placeholder="Employee number / nama / email atasan" />
+              <SupervisorSelectField label="Atasan 1" value={form.supervisor_1} employees={employees} currentEmployeeId={editingEmployeeId} onChange={(value) => onUpdate('supervisor_1', value)} />
+              <SupervisorSelectField label="Atasan 2" value={form.supervisor_2} employees={employees} currentEmployeeId={editingEmployeeId} onChange={(value) => onUpdate('supervisor_2', value)} />
             </FormSection>
 
             <FormSection title="Data Pribadi Tersinkron" description="Data ini dapat diperbarui oleh employee dari Employee Settings, dan juga dapat dikoreksi oleh HR." icon={<HeartHandshake size={18} />}>
@@ -774,6 +1141,114 @@ function SelectField({ label, value, onChange, options }: { label: string; value
   )
 }
 
+function DropdownWithOther({
+  label,
+  value,
+  options,
+  onChange,
+  manualPlaceholder,
+}: {
+  label: string
+  value: string
+  options: string[]
+  onChange: (value: string) => void
+  manualPlaceholder: string
+}) {
+  const isKnownValue = Boolean(value && options.includes(value))
+  const selectValue = !value ? '' : isKnownValue ? value : '__other__'
+  const showManual = selectValue === '__other__'
+
+  return (
+    <div className="min-w-0 space-y-3">
+      <label className="block min-w-0">
+        <span className="harmony-label">{label}</span>
+        <select
+          value={selectValue}
+          onChange={(event) => {
+            const nextValue = event.target.value
+
+            if (nextValue === '__other__') {
+              onChange(isKnownValue ? '' : value)
+              return
+            }
+
+            onChange(nextValue)
+          }}
+          className="harmony-select"
+        >
+          <option value="">Pilih {label.toLowerCase()}</option>
+          {options.map((option) => (
+            <option key={option} value={option}>{option}</option>
+          ))}
+          <option value="__other__">Lainnya / Isi manual</option>
+        </select>
+      </label>
+
+      {showManual && (
+        <div className="rounded-2xl border border-blue-100 bg-blue-50/70 p-3">
+          <label className="block min-w-0">
+            <span className="text-xs font-bold text-[#0059b8]">{label} lainnya</span>
+            <input
+              value={value}
+              onChange={(event) => onChange(event.target.value)}
+              placeholder={manualPlaceholder}
+              className="mt-2 w-full rounded-2xl border border-blue-100 bg-white px-4 py-3 text-sm font-semibold text-[#1d1d1f] outline-none transition focus:border-[#007aff] focus:ring-4 focus:ring-blue-100"
+            />
+          </label>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function SupervisorSelectField({
+  label,
+  value,
+  employees,
+  currentEmployeeId,
+  onChange,
+}: {
+  label: string
+  value: string
+  employees: Employee[]
+  currentEmployeeId: string | null
+  onChange: (value: string) => void
+}) {
+  const selectedId = resolveSupervisorId(value, employees)
+  const hasUnknownValue = Boolean(value && !selectedId)
+  const selectValue = selectedId || (hasUnknownValue ? '__unknown__' : '')
+  const availableEmployees = employees.filter((employee) => employee.id !== currentEmployeeId && employee.is_active !== false)
+
+  return (
+    <label className="block min-w-0">
+      <span className="harmony-label">{label}</span>
+      <select
+        value={selectValue}
+        onChange={(event) => {
+          const nextValue = event.target.value
+
+          if (nextValue === '__unknown__') return
+
+          onChange(nextValue)
+        }}
+        className="harmony-select"
+      >
+        <option value="">Tidak ada / belum diset</option>
+        {hasUnknownValue && (
+          <option value="__unknown__" disabled>
+            Data lama tidak ditemukan: {value}
+          </option>
+        )}
+        {availableEmployees.map((employee) => (
+          <option key={employee.id} value={employee.id}>
+            {formatSupervisorOption(employee)}
+          </option>
+        ))}
+      </select>
+    </label>
+  )
+}
+
 function StatusBadge({ active }: { active: boolean }) {
   return <span className={['inline-flex shrink-0 rounded-full px-3 py-1 text-xs font-bold', active ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'].join(' ')}>{active ? 'Active' : 'Inactive'}</span>
 }
@@ -844,4 +1319,54 @@ function formatDateTime(value: string) {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return '-'
   return date.toLocaleString('id-ID', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+}
+
+function normalizeText(value: string | null | undefined) {
+  return String(value || '').trim().toLowerCase()
+}
+
+function resolveSupervisorId(value: string | null | undefined, employees: Employee[]) {
+  const normalized = normalizeText(value)
+
+  if (!normalized) return ''
+
+  const matched = employees.find((employee) => {
+    return (
+      normalizeText(employee.id) === normalized ||
+      normalizeText(employee.full_name) === normalized ||
+      normalizeText(employee.employee_number) === normalized ||
+      normalizeText(employee.email) === normalized ||
+      normalizeText(employee.machine_pin) === normalized
+    )
+  })
+
+  return matched?.id || ''
+}
+
+function normalizeSupervisorStoredValue(value: string, employees: Employee[]) {
+  const cleanValue = value.trim()
+  if (!cleanValue) return null
+
+  const employeeId = resolveSupervisorId(cleanValue, employees)
+
+  return employeeId || cleanValue
+}
+
+function formatSupervisorLabel(value: string | null | undefined, employees: Employee[]) {
+  if (!value) return '-'
+
+  const employeeId = resolveSupervisorId(value, employees)
+  const employee = employees.find((item) => item.id === employeeId)
+
+  if (!employee) return value
+
+  return `${employee.full_name || '-'}${employee.position ? ` · ${employee.position}` : ''}`
+}
+
+function formatSupervisorOption(employee: Employee) {
+  const name = employee.full_name || '-'
+  const number = employee.employee_number || employee.machine_pin || '-'
+  const meta = [employee.department, employee.position].filter(Boolean).join(' · ')
+
+  return `${name} — ${number}${meta ? ` — ${meta}` : ''}`
 }
