@@ -15,6 +15,7 @@ import {
   RefreshCcw,
   Search,
   ShieldCheck,
+  Trash2,
   UserRound,
   X,
   XCircle,
@@ -154,6 +155,14 @@ type PHLBalanceSummary = {
   pending_claim_count: number | null
 }
 
+type DeleteTarget = {
+  id: string
+  kind: 'leave' | 'phl'
+  title: string
+  employeeName: string
+  description: string
+}
+
 export default function HRLeavePage() {
   const [activeTab, setActiveTab] = useState<ActiveTab>('leave')
 
@@ -168,6 +177,7 @@ export default function HRLeavePage() {
 
   const [selectedLeaveRequest, setSelectedLeaveRequest] = useState<LeaveRequest | null>(null)
   const [selectedPHLRecord, setSelectedPHLRecord] = useState<PHLRecord | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null)
 
   const [rejectPHLRecord, setRejectPHLRecord] = useState<PHLRecord | null>(null)
   const [rejectPHLReason, setRejectPHLReason] = useState('')
@@ -302,6 +312,7 @@ export default function HRLeavePage() {
     setSuccessMessage('')
     setSelectedLeaveRequest(null)
     setSelectedPHLRecord(null)
+    setDeleteTarget(null)
     setRejectPHLRecord(null)
     setRejectPHLReason('')
     setRejectLeaveRecord(null)
@@ -529,6 +540,62 @@ export default function HRLeavePage() {
     await fetchData()
   }
 
+  function requestDeleteLeave(item: LeaveRequest) {
+    setDeleteTarget({
+      id: item.id,
+      kind: 'leave',
+      title: 'Hapus Pengajuan Cuti/Izin',
+      employeeName: item.full_name || 'Karyawan',
+      description:
+        'Data pengajuan cuti/izin ini akan dihapus permanen dari database. Gunakan hanya untuk membersihkan data dummy atau data testing.',
+    })
+  }
+
+  function requestDeletePHL(record: PHLRecord) {
+    setDeleteTarget({
+      id: record.id,
+      kind: 'phl',
+      title: 'Hapus Data PHL',
+      employeeName: record.full_name || 'Karyawan',
+      description:
+        'Data PHL ini akan dihapus permanen dari database. Gunakan hanya untuk membersihkan data dummy atau data testing.',
+    })
+  }
+
+  async function confirmDeleteTarget() {
+    if (!deleteTarget) return
+
+    setProcessingId(deleteTarget.id)
+    setErrorMessage('')
+    setSuccessMessage('')
+
+    const tableName = deleteTarget.kind === 'leave' ? 'leave_requests' : 'phl_records'
+
+    const { error } = await supabase
+      .from(tableName)
+      .delete()
+      .eq('id', deleteTarget.id)
+
+    if (error) {
+      setErrorMessage(error.message)
+      setProcessingId('')
+      return
+    }
+
+    setSuccessMessage(
+      deleteTarget.kind === 'leave'
+        ? 'Data pengajuan cuti/izin berhasil dihapus.'
+        : 'Data PHL berhasil dihapus.'
+    )
+
+    setProcessingId('')
+    setSelectedLeaveRequest(null)
+    setSelectedPHLRecord(null)
+    setDeleteTarget(null)
+
+    await fetchData()
+  }
+
   return (
     <>
       <Topbar
@@ -656,6 +723,7 @@ export default function HRLeavePage() {
                 setRejectLeaveRecord(item)
                 setRejectLeaveReason('')
               }}
+              onDelete={requestDeleteLeave}
               onDetail={setSelectedLeaveRequest}
             />
           )}
@@ -669,6 +737,7 @@ export default function HRLeavePage() {
                 setRejectPHLRecord(record)
                 setRejectPHLReason('')
               }}
+              onDelete={requestDeletePHL}
               onDetail={setSelectedPHLRecord}
             />
           )}
@@ -677,6 +746,7 @@ export default function HRLeavePage() {
             <PHLBalanceTab
               summaries={filteredBalanceSummary}
               balances={filteredPHLBalances}
+              onDelete={requestDeletePHL}
               onDetail={setSelectedPHLRecord}
             />
           )}
@@ -687,6 +757,8 @@ export default function HRLeavePage() {
               phlRecords={filteredPHLClaims}
               onLeaveDetail={setSelectedLeaveRequest}
               onPHLDetail={setSelectedPHLRecord}
+              onDeleteLeave={requestDeleteLeave}
+              onDeletePHL={requestDeletePHL}
             />
           )}
         </div>
@@ -732,6 +804,15 @@ export default function HRLeavePage() {
             onSubmit={rejectLeaveRequest}
           />
         )}
+
+        {deleteTarget && (
+          <DeleteConfirmModal
+            target={deleteTarget}
+            processing={processingId === deleteTarget.id}
+            onClose={() => setDeleteTarget(null)}
+            onConfirm={confirmDeleteTarget}
+          />
+        )}
       </section>
     </>
   )
@@ -742,12 +823,14 @@ function LeaveRequestTab({
   processingId,
   onApprove,
   onReject,
+  onDelete,
   onDetail,
 }: {
   requests: LeaveRequest[]
   processingId: string
   onApprove: (item: LeaveRequest) => void
   onReject: (item: LeaveRequest) => void
+  onDelete: (item: LeaveRequest) => void
   onDetail: (item: LeaveRequest) => void
 }) {
   return (
@@ -834,28 +917,38 @@ function LeaveRequestTab({
               </td>
 
               <td className="px-5 py-4">
-                {canProcess ? (
-                  <div className="flex items-center gap-2">
-                    <SmallActionButton
-                      label="Approve"
-                      icon={<CheckCircle2 size={14} />}
-                      tone="green"
-                      disabled={processingId === item.id}
-                      onClick={() => onApprove(item)}
-                    />
-                    <SmallActionButton
-                      label="Reject"
-                      icon={<XCircle size={14} />}
-                      tone="red"
-                      disabled={processingId === item.id}
-                      onClick={() => onReject(item)}
-                    />
-                  </div>
-                ) : (
-                  <span className="text-xs font-semibold text-[#86868b]">
-                    Selesai
-                  </span>
-                )}
+                <div className="flex items-center gap-2">
+                  {canProcess ? (
+                    <>
+                      <SmallActionButton
+                        label="Approve"
+                        icon={<CheckCircle2 size={14} />}
+                        tone="green"
+                        disabled={processingId === item.id}
+                        onClick={() => onApprove(item)}
+                      />
+                      <SmallActionButton
+                        label="Reject"
+                        icon={<XCircle size={14} />}
+                        tone="red"
+                        disabled={processingId === item.id}
+                        onClick={() => onReject(item)}
+                      />
+                    </>
+                  ) : (
+                    <span className="text-xs font-semibold text-[#86868b]">
+                      Selesai
+                    </span>
+                  )}
+
+                  <SmallActionButton
+                    label="Hapus"
+                    icon={<Trash2 size={14} />}
+                    tone="red"
+                    disabled={processingId === item.id}
+                    onClick={() => onDelete(item)}
+                  />
+                </div>
               </td>
             </tr>
           )
@@ -870,12 +963,14 @@ function PHLClaimApprovalTab({
   processingId,
   onApprove,
   onReject,
+  onDelete,
   onDetail,
 }: {
   claims: PHLRecord[]
   processingId: string
   onApprove: (record: PHLRecord) => void
   onReject: (record: PHLRecord) => void
+  onDelete: (record: PHLRecord) => void
   onDetail: (record: PHLRecord) => void
 }) {
   const pending = claims.filter((item) => {
@@ -975,28 +1070,38 @@ function PHLClaimApprovalTab({
               </td>
 
               <td className="px-5 py-4">
-                {canProcess ? (
-                  <div className="flex items-center gap-2">
-                    <SmallActionButton
-                      label="Approve"
-                      icon={<CheckCircle2 size={14} />}
-                      tone="green"
-                      disabled={processingId === item.id}
-                      onClick={() => onApprove(item)}
-                    />
-                    <SmallActionButton
-                      label="Reject"
-                      icon={<XCircle size={14} />}
-                      tone="red"
-                      disabled={processingId === item.id}
-                      onClick={() => onReject(item)}
-                    />
-                  </div>
-                ) : (
-                  <span className="text-xs font-semibold text-[#86868b]">
-                    Selesai
-                  </span>
-                )}
+                <div className="flex items-center gap-2">
+                  {canProcess ? (
+                    <>
+                      <SmallActionButton
+                        label="Approve"
+                        icon={<CheckCircle2 size={14} />}
+                        tone="green"
+                        disabled={processingId === item.id}
+                        onClick={() => onApprove(item)}
+                      />
+                      <SmallActionButton
+                        label="Reject"
+                        icon={<XCircle size={14} />}
+                        tone="red"
+                        disabled={processingId === item.id}
+                        onClick={() => onReject(item)}
+                      />
+                    </>
+                  ) : (
+                    <span className="text-xs font-semibold text-[#86868b]">
+                      Selesai
+                    </span>
+                  )}
+
+                  <SmallActionButton
+                    label="Hapus"
+                    icon={<Trash2 size={14} />}
+                    tone="red"
+                    disabled={processingId === item.id}
+                    onClick={() => onDelete(item)}
+                  />
+                </div>
               </td>
             </tr>
           )
@@ -1009,10 +1114,12 @@ function PHLClaimApprovalTab({
 function PHLBalanceTab({
   summaries,
   balances,
+  onDelete,
   onDetail,
 }: {
   summaries: PHLBalanceSummary[]
   balances: PHLRecord[]
+  onDelete: (record: PHLRecord) => void
   onDetail: (record: PHLRecord) => void
 }) {
   return (
@@ -1060,7 +1167,8 @@ function PHLBalanceTab({
           'Terpakai',
           'Sisa',
           'Status',
-          'Bukti',
+          'Detail',
+          'Action',
         ]}
       >
         {balances.map((item) => (
@@ -1098,6 +1206,16 @@ function PHLBalanceTab({
                 Detail
               </button>
             </td>
+
+            <td className="px-5 py-4">
+              <SmallActionButton
+                label="Hapus"
+                icon={<Trash2 size={14} />}
+                tone="red"
+                disabled={false}
+                onClick={() => onDelete(item)}
+              />
+            </td>
           </tr>
         ))}
       </DataTable>
@@ -1110,11 +1228,15 @@ function HistoryTab({
   phlRecords,
   onLeaveDetail,
   onPHLDetail,
+  onDeleteLeave,
+  onDeletePHL,
 }: {
   leaveRequests: LeaveRequest[]
   phlRecords: PHLRecord[]
   onLeaveDetail: (record: LeaveRequest) => void
   onPHLDetail: (record: PHLRecord) => void
+  onDeleteLeave: (record: LeaveRequest) => void
+  onDeletePHL: (record: PHLRecord) => void
 }) {
   return (
     <div>
@@ -1134,6 +1256,7 @@ function HistoryTab({
           'Hari',
           'Status',
           'Detail',
+          'Action',
         ]}
       >
         {leaveRequests.map((item) => (
@@ -1170,6 +1293,16 @@ function HistoryTab({
                 <FileText size={15} />
                 Detail
               </button>
+            </td>
+
+            <td className="px-5 py-4">
+              <SmallActionButton
+                label="Hapus"
+                icon={<Trash2 size={14} />}
+                tone="red"
+                disabled={false}
+                onClick={() => onDeleteLeave(item)}
+              />
             </td>
           </tr>
         ))}
@@ -1208,6 +1341,16 @@ function HistoryTab({
                 <FileText size={15} />
                 Detail
               </button>
+            </td>
+
+            <td className="px-5 py-4">
+              <SmallActionButton
+                label="Hapus"
+                icon={<Trash2 size={14} />}
+                tone="red"
+                disabled={false}
+                onClick={() => onDeletePHL(item)}
+              />
             </td>
           </tr>
         ))}
@@ -1326,6 +1469,90 @@ function PHLDetailModal({
         </a>
       )}
     </ModalShell>
+  )
+}
+
+function DeleteConfirmModal({
+  target,
+  processing,
+  onClose,
+  onConfirm,
+}: {
+  target: DeleteTarget
+  processing: boolean
+  onClose: () => void
+  onConfirm: () => void
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-5 backdrop-blur-sm">
+      <div className="w-full max-w-lg overflow-hidden rounded-[32px] bg-white shadow-[0_30px_90px_rgba(0,0,0,0.24)]">
+        <div className="relative overflow-hidden bg-[#1d1d1f] p-6 text-white">
+          <div className="pointer-events-none absolute -right-12 -top-14 h-40 w-40 rounded-full bg-red-500/30 blur-3xl" />
+          <div className="pointer-events-none absolute -bottom-16 -left-10 h-40 w-40 rounded-full bg-[#007aff]/20 blur-3xl" />
+
+          <div className="relative flex items-start gap-4">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-red-500/15 text-red-200 ring-1 ring-red-300/20">
+              <Trash2 size={22} />
+            </div>
+
+            <div className="min-w-0">
+              <p className="text-xs font-bold uppercase tracking-wide text-white/45">
+                Konfirmasi Penghapusan
+              </p>
+
+              <h2 className="mt-1 text-xl font-semibold tracking-tight">
+                {target.title}
+              </h2>
+
+              <p className="mt-2 text-sm leading-6 text-white/62">
+                {target.employeeName}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="space-y-5 p-6">
+          <div className="rounded-[24px] border border-red-100 bg-red-50 p-4 text-sm leading-6 text-red-700">
+            {target.description}
+          </div>
+
+          <div className="rounded-[24px] border border-black/5 bg-[#f5f5f7]/80 p-4">
+            <p className="text-xs font-bold uppercase tracking-wide text-[#86868b]">
+              Catatan
+            </p>
+
+            <p className="mt-2 text-sm leading-6 text-[#1d1d1f]">
+              Aksi ini tidak menggunakan pop-up browser, sehingga tampilan tetap profesional saat aplikasi sudah di-deploy.
+            </p>
+          </div>
+
+          <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={processing}
+              className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-black/5 bg-white px-5 text-sm font-bold text-[#1d1d1f] shadow-sm transition hover:bg-[#f5f5f7] disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              Batal
+            </button>
+
+            <button
+              type="button"
+              onClick={onConfirm}
+              disabled={processing}
+              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl bg-red-600 px-5 text-sm font-bold text-white shadow-[0_14px_30px_rgba(220,38,38,0.22)] transition hover:-translate-y-0.5 hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {processing ? (
+                <Loader2 size={17} className="animate-spin" />
+              ) : (
+                <Trash2 size={17} />
+              )}
+              {processing ? 'Menghapus...' : 'Ya, Hapus Data'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
   )
 }
 

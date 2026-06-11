@@ -19,6 +19,7 @@ import {
 
 import { Topbar } from '@/components/layout/Topbar'
 import { supabase } from '@/lib/supabase'
+import { notifyAbsenceRequestSubmitted } from '@/lib/absence-notifications'
 
 type AppUser = {
   id: string
@@ -150,6 +151,7 @@ export default function EmployeeLeavePage() {
   const [employee, setEmployee] = useState<Employee | null>(null)
   const [supervisorOne, setSupervisorOne] = useState<Employee | null>(null)
   const [supervisorTwo, setSupervisorTwo] = useState<Employee | null>(null)
+  const [employeeDirectory, setEmployeeDirectory] = useState<Employee[]>([])
 
   const [annualLeave, setAnnualLeave] = useState<AnnualLeaveSummary | null>(null)
   const [phlRecords, setPhlRecords] = useState<PHLRecord[]>([])
@@ -212,6 +214,27 @@ export default function EmployeeLeavePage() {
     form.request_type === 'child_circumcision_leave' ||
     form.request_type === 'worship_leave' ||
     form.request_type === 'pregnancy_check_leave'
+
+  const handoverEmployeeOptions = useMemo(() => {
+    return employeeDirectory
+      .filter((item) => item.is_active !== false)
+      .filter((item) => item.id !== employee?.id)
+      .sort((a, b) => String(a.full_name || '').localeCompare(String(b.full_name || '')))
+  }, [employeeDirectory, employee?.id])
+
+  const selectedHandoverEmployee = useMemo(() => {
+    return (
+      employeeDirectory.find((item) => {
+        return (
+          normalizeText(item.id) === normalizeText(form.handover_to) ||
+          normalizeText(item.employee_number) === normalizeText(form.handover_to) ||
+          normalizeText(item.machine_pin) === normalizeText(form.handover_to) ||
+          normalizeText(item.email) === normalizeText(form.handover_to) ||
+          normalizeText(item.full_name) === normalizeText(form.handover_to)
+        )
+      }) || null
+    )
+  }, [employeeDirectory, form.handover_to])
 
   useEffect(() => {
     fetchData()
@@ -282,6 +305,15 @@ export default function EmployeeLeavePage() {
   }
 
   async function fetchSupervisorData(employeeData: Employee) {
+    const { data } = await supabase
+      .from('employees')
+      .select('*')
+      .eq('is_active', true)
+
+    const employeeList = (data || []) as Employee[]
+
+    setEmployeeDirectory(employeeList)
+
     const supervisorOneKey = normalizeText(employeeData.supervisor_1)
     const supervisorTwoKey = normalizeText(employeeData.supervisor_2)
 
@@ -291,18 +323,12 @@ export default function EmployeeLeavePage() {
       return
     }
 
-    const { data } = await supabase
-      .from('employees')
-      .select('*')
-      .eq('is_active', true)
-
-    const employeeList = data || []
-
     const foundOne = employeeList.find((item) => {
       return (
         normalizeText(item.id) === supervisorOneKey ||
         normalizeText(item.full_name) === supervisorOneKey ||
         normalizeText(item.employee_number) === supervisorOneKey ||
+        normalizeText(item.machine_pin) === supervisorOneKey ||
         normalizeText(item.email) === supervisorOneKey
       )
     }) || null
@@ -312,6 +338,7 @@ export default function EmployeeLeavePage() {
         normalizeText(item.id) === supervisorTwoKey ||
         normalizeText(item.full_name) === supervisorTwoKey ||
         normalizeText(item.employee_number) === supervisorTwoKey ||
+        normalizeText(item.machine_pin) === supervisorTwoKey ||
         normalizeText(item.email) === supervisorTwoKey
       )
     }) || null
@@ -561,9 +588,11 @@ export default function EmployeeLeavePage() {
       created_at: now,
     }
 
-    const { error } = await supabase
+    const { data: insertedRequest, error } = await supabase
       .from('leave_requests')
       .insert(payload)
+      .select('*')
+      .single<LeaveRequest>()
 
     if (error) {
       setErrorMessage(error.message)
@@ -571,7 +600,37 @@ export default function EmployeeLeavePage() {
       return
     }
 
-    setSuccessMessage(`${selectedRequestMeta.label} berhasil diajukan dan menunggu approval atasan.`)
+    const employeesForNotification =
+      employeeDirectory.length > 0
+        ? employeeDirectory
+        : [employee, supervisorOne, supervisorTwo].filter(Boolean) as Employee[]
+
+    const notificationResult = await notifyAbsenceRequestSubmitted({
+      employees: employeesForNotification,
+      requester: employee,
+
+      requestId: insertedRequest?.id,
+      requestTypeLabel: selectedRequestMeta.label,
+      startDate: form.start_date,
+      endDate: form.end_date,
+      totalDays: calculatedDays,
+
+      reason: form.reason.trim(),
+      jobPending: form.job_pending.trim(),
+      handoverTo: form.handover_to.trim(),
+      handoverNote: form.handover_note.trim() || null,
+
+      relatedModule: 'leave',
+      relatedTable: 'leave_requests',
+      actionPath: '/employee/approvals/leave',
+    })
+
+    setSuccessMessage(
+      notificationResult.success
+        ? `${selectedRequestMeta.label} berhasil diajukan dan email notifikasi sudah dikirim ke atasan/penerima job pending.`
+        : `${selectedRequestMeta.label} berhasil diajukan, tetapi email notifikasi belum terkirim: ${notificationResult.message}`
+    )
+
     setForm(initialForm)
     setSubmitting(false)
 
@@ -799,12 +858,31 @@ export default function EmployeeLeavePage() {
 
                   <label className="block">
                     <span className="harmony-label">Dialihkan / Ditujukan Kepada</span>
-                    <input
+                    <select
                       value={form.handover_to}
                       onChange={(event) => updateForm('handover_to', event.target.value)}
-                      placeholder="Nama rekan kerja / atasan yang menerima handover."
-                      className="harmony-input"
-                    />
+                      className="harmony-select"
+                    >
+                      <option value="">Pilih karyawan penerima handover</option>
+                      {handoverEmployeeOptions.map((item) => (
+                        <option key={item.id} value={item.id}>
+                          {formatEmployeeOption(item)}
+                        </option>
+                      ))}
+                    </select>
+
+                    <p className="mt-2 text-xs leading-5 text-[#6e6e73]">
+                      Email, NIP/employee number, dan data penerima handover akan terbaca otomatis dari master karyawan.
+                    </p>
+
+                    {selectedHandoverEmployee && (
+                      <div className="mt-3 grid gap-2 rounded-2xl border border-black/5 bg-white p-4 text-xs md:grid-cols-2">
+                        <AutoReadInfo label="Nama" value={selectedHandoverEmployee.full_name || '-'} />
+                        <AutoReadInfo label="Email" value={selectedHandoverEmployee.email || '-'} />
+                        <AutoReadInfo label="NIP / Employee No." value={selectedHandoverEmployee.employee_number || '-'} />
+                        <AutoReadInfo label="Unit" value={selectedHandoverEmployee.department || '-'} />
+                      </div>
+                    )}
                   </label>
 
                   <label className="block">
@@ -1179,6 +1257,34 @@ function StatusBadge({
       {label}
     </span>
   )
+}
+
+function AutoReadInfo({
+  label,
+  value,
+}: {
+  label: string
+  value: string
+}) {
+  return (
+    <div className="min-w-0">
+      <p className="font-bold uppercase tracking-wide text-[#86868b]">
+        {label}
+      </p>
+      <p className="mt-1 truncate font-semibold text-[#1d1d1f]">
+        {value}
+      </p>
+    </div>
+  )
+}
+
+function formatEmployeeOption(employee: Employee) {
+  const name = employee.full_name || employee.email || 'Tanpa Nama'
+  const employeeNumber = employee.employee_number || employee.machine_pin || 'Tanpa NIP'
+  const department = employee.department || 'Tanpa Unit'
+  const email = employee.email || 'Tanpa Email'
+
+  return `${name} · ${employeeNumber} · ${department} · ${email}`
 }
 
 function getRequestMeta(type: RequestType) {

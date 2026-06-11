@@ -47,6 +47,8 @@ type EmployeeProfile = {
   address: string | null
   emergency_contact_name: string | null
   emergency_contact_phone: string | null
+  personal_updated_at?: string | null
+  personal_updated_by?: string | null
 
   is_active: boolean | null
 }
@@ -98,6 +100,18 @@ export default function EmployeeSettingsPage() {
   const passwordStrength = useMemo(() => {
     return getPasswordStrength(passwordForm.new_password)
   }, [passwordForm.new_password])
+
+  const hasProfileChanges = useMemo(() => {
+    if (!employee) return false
+
+    return (
+      normalize(profileForm.gender) !== normalize(employee.gender) ||
+      normalize(profileForm.personal_phone) !== normalize(employee.personal_phone) ||
+      normalize(profileForm.address) !== normalize(employee.address) ||
+      normalize(profileForm.emergency_contact_name) !== normalize(employee.emergency_contact_name) ||
+      normalize(profileForm.emergency_contact_phone) !== normalize(employee.emergency_contact_phone)
+    )
+  }, [profileForm, employee])
 
   useEffect(() => {
     fetchProfile()
@@ -159,6 +173,11 @@ export default function EmployeeSettingsPage() {
       return
     }
 
+    applyEmployeeToState(employeeData)
+    setLoading(false)
+  }
+
+  function applyEmployeeToState(employeeData: EmployeeProfile) {
     setEmployee(employeeData)
 
     setProfileForm({
@@ -168,8 +187,6 @@ export default function EmployeeSettingsPage() {
       emergency_contact_name: employeeData.emergency_contact_name || '',
       emergency_contact_phone: employeeData.emergency_contact_phone || '',
     })
-
-    setLoading(false)
   }
 
   function updateProfileForm(field: keyof ProfileForm, value: string) {
@@ -193,10 +210,18 @@ export default function EmployeeSettingsPage() {
     setErrorMessage('')
     setSuccessMessage('')
 
-    if (!employee) {
+    if (!employee || !appUser) {
       setErrorMessage('Data employee tidak ditemukan.')
       setSavingProfile(false)
       return
+    }
+
+    const oldData = {
+      gender: employee.gender,
+      personal_phone: employee.personal_phone,
+      address: employee.address,
+      emergency_contact_name: employee.emergency_contact_name,
+      emergency_contact_phone: employee.emergency_contact_phone,
     }
 
     const payload = {
@@ -206,6 +231,7 @@ export default function EmployeeSettingsPage() {
       emergency_contact_name: profileForm.emergency_contact_name.trim() || null,
       emergency_contact_phone: profileForm.emergency_contact_phone.trim() || null,
       personal_updated_at: new Date().toISOString(),
+      personal_updated_by: appUser.email,
       updated_at: new Date().toISOString(),
     }
 
@@ -228,7 +254,28 @@ export default function EmployeeSettingsPage() {
       return
     }
 
-    setEmployee(updatedEmployee)
+    const newData = {
+      gender: updatedEmployee.gender,
+      personal_phone: updatedEmployee.personal_phone,
+      address: updatedEmployee.address,
+      emergency_contact_name: updatedEmployee.emergency_contact_name,
+      emergency_contact_phone: updatedEmployee.emergency_contact_phone,
+    }
+
+    await supabase
+      .from('employee_profile_update_logs')
+      .insert({
+        employee_id: updatedEmployee.id,
+        employee_number: updatedEmployee.employee_number,
+        full_name: updatedEmployee.full_name,
+        email: updatedEmployee.email || appUser.email,
+        updated_by: appUser.email,
+        update_source: 'employee_self_service',
+        old_data: oldData,
+        new_data: newData,
+      })
+
+    applyEmployeeToState(updatedEmployee)
 
     const savedTime = new Date().toLocaleTimeString('id-ID', {
       hour: '2-digit',
@@ -236,9 +283,10 @@ export default function EmployeeSettingsPage() {
     })
 
     setLastSavedAt(savedTime)
-    setSuccessMessage(`Data pribadi berhasil disimpan dan diperbarui pada database HR pukul ${savedTime}.`)
+    setSuccessMessage(
+      `Data pribadi berhasil disimpan dan otomatis tersinkron ke database HR pukul ${savedTime}.`
+    )
 
-    setProfileForm(initialProfileForm)
     setSavingProfile(false)
 
     window.scrollTo({
@@ -301,7 +349,7 @@ export default function EmployeeSettingsPage() {
         description="Kelola data pribadi dan password akun employee."
       />
 
-      <section className="space-y-6 p-6">
+      <section className="space-y-6 p-4 sm:p-6">
         {successMessage && (
           <div className="sticky top-4 z-30 rounded-2xl border border-green-200 bg-green-50 p-4 text-sm leading-6 text-green-700 shadow-[0_18px_45px_rgba(22,128,52,0.12)]">
             <div className="flex items-start justify-between gap-4">
@@ -346,7 +394,7 @@ export default function EmployeeSettingsPage() {
           </div>
         )}
 
-        <div className="relative overflow-hidden rounded-[34px] border border-black/5 bg-[#1d1d1f] p-7 text-white shadow-[0_24px_80px_rgba(0,0,0,0.16)]">
+        <div className="relative overflow-hidden rounded-[34px] border border-black/5 bg-[#1d1d1f] p-6 text-white shadow-[0_24px_80px_rgba(0,0,0,0.16)] sm:p-7">
           <div className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-[#007aff]/35 blur-3xl" />
           <div className="pointer-events-none absolute -bottom-28 -left-20 h-72 w-72 rounded-full bg-[#34c759]/20 blur-3xl" />
 
@@ -362,7 +410,7 @@ export default function EmployeeSettingsPage() {
               </h2>
 
               <p className="mt-5 max-w-2xl text-sm leading-7 text-white/62">
-                Beberapa data organisasi seperti jabatan, departemen, NIP, dan machine PIN bersifat read-only dan hanya dapat diubah oleh HR.
+                Data pribadi yang diperbarui akan langsung tersimpan ke database HR dan dapat dilihat oleh HR melalui master data karyawan.
               </p>
             </div>
 
@@ -397,47 +445,13 @@ export default function EmployeeSettingsPage() {
                 </div>
 
                 <div className="grid gap-4 p-6">
-                  <ReadOnlyItem
-                    icon={<UserRound size={18} />}
-                    label="Nama"
-                    value={employee?.full_name || '-'}
-                  />
-
-                  <ReadOnlyItem
-                    icon={<IdCard size={18} />}
-                    label="NIP"
-                    value={employee?.employee_number || '-'}
-                  />
-
-                  <ReadOnlyItem
-                    icon={<KeyRound size={18} />}
-                    label="Machine PIN"
-                    value={employee?.machine_pin || '-'}
-                  />
-
-                  <ReadOnlyItem
-                    icon={<Building2 size={18} />}
-                    label="Departemen"
-                    value={employee?.department || '-'}
-                  />
-
-                  <ReadOnlyItem
-                    icon={<Users size={18} />}
-                    label="Jabatan"
-                    value={employee?.position || '-'}
-                  />
-
-                  <ReadOnlyItem
-                    icon={<ShieldCheck size={18} />}
-                    label="Atasan 1"
-                    value={employee?.supervisor_1 || '-'}
-                  />
-
-                  <ReadOnlyItem
-                    icon={<ShieldCheck size={18} />}
-                    label="Atasan 2"
-                    value={employee?.supervisor_2 || '-'}
-                  />
+                  <ReadOnlyItem icon={<UserRound size={18} />} label="Nama" value={employee?.full_name || '-'} />
+                  <ReadOnlyItem icon={<IdCard size={18} />} label="NIP" value={employee?.employee_number || '-'} />
+                  <ReadOnlyItem icon={<KeyRound size={18} />} label="Machine PIN" value={employee?.machine_pin || '-'} />
+                  <ReadOnlyItem icon={<Building2 size={18} />} label="Departemen" value={employee?.department || '-'} />
+                  <ReadOnlyItem icon={<Users size={18} />} label="Jabatan" value={employee?.position || '-'} />
+                  <ReadOnlyItem icon={<ShieldCheck size={18} />} label="Atasan 1" value={employee?.supervisor_1 || '-'} />
+                  <ReadOnlyItem icon={<ShieldCheck size={18} />} label="Atasan 2" value={employee?.supervisor_2 || '-'} />
                 </div>
               </div>
 
@@ -500,8 +514,8 @@ export default function EmployeeSettingsPage() {
 
               <form onSubmit={handleSaveProfile} className="space-y-5 p-6">
                 <div className="rounded-[24px] border border-blue-100 bg-[#e8f2ff]/65 p-4 text-sm leading-6 text-[#305b86]">
-                  Isi data yang ingin disimpan. Setelah berhasil, form akan dikosongkan.
-                  Data lama di database akan otomatis diganti dengan data terbaru.
+                  Data yang disimpan akan langsung memperbarui tabel employee.
+                  HR akan melihat data terbaru dari master data karyawan.
                   {lastSavedAt ? ` Terakhir disimpan pukul ${lastSavedAt}.` : ''}
                 </div>
 
@@ -553,10 +567,36 @@ export default function EmployeeSettingsPage() {
                   icon={<Phone size={17} />}
                 />
 
+                <div className="rounded-[24px] border border-black/5 bg-[#f5f5f7]/75 p-4">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <p className="text-sm font-semibold text-[#1d1d1f]">
+                        Status Sinkronisasi
+                      </p>
+                      <p className="mt-1 text-xs leading-5 text-[#6e6e73]">
+                        {hasProfileChanges
+                          ? 'Ada perubahan yang belum disimpan.'
+                          : 'Data form sudah sama dengan database.'}
+                      </p>
+                    </div>
+
+                    <span
+                      className={[
+                        'inline-flex w-fit rounded-full px-3 py-1 text-xs font-bold',
+                        hasProfileChanges
+                          ? 'bg-orange-50 text-orange-700'
+                          : 'bg-green-50 text-green-700',
+                      ].join(' ')}
+                    >
+                      {hasProfileChanges ? 'Belum Disimpan' : 'Tersinkron'}
+                    </span>
+                  </div>
+                </div>
+
                 <div className="flex flex-col gap-3 md:flex-row md:items-center">
                   <button
                     type="submit"
-                    disabled={savingProfile}
+                    disabled={savingProfile || !hasProfileChanges}
                     className="harmony-button-primary disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     <Save size={18} />
@@ -566,10 +606,10 @@ export default function EmployeeSettingsPage() {
                   <button
                     type="button"
                     disabled={savingProfile}
-                    onClick={() => setProfileForm(initialProfileForm)}
+                    onClick={() => employee && applyEmployeeToState(employee)}
                     className="harmony-button-secondary disabled:cursor-not-allowed disabled:opacity-60"
                   >
-                    Kosongkan Form
+                    Batalkan Perubahan
                   </button>
                 </div>
               </form>
@@ -804,4 +844,8 @@ function getPasswordStrength(password: string) {
     percent: 100,
     tone: 'green' as const,
   }
+}
+
+function normalize(value: string | null | undefined) {
+  return String(value || '').trim()
 }

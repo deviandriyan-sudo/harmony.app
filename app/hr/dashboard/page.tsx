@@ -1,25 +1,23 @@
 'use client'
 
 import Link from 'next/link'
+import type { ReactNode } from 'react'
 import {
+  Activity,
   ArrowUpRight,
   CalendarDays,
   CheckCircle2,
   Clock3,
-  FileText,
+  Database,
   Fingerprint,
   Landmark,
-  Plane,
+  Layers,
   ShieldCheck,
   Sparkles,
   Upload,
   UserCog,
   Users,
-  WalletCards,
-  Activity,
-  Layers,
   Zap,
-  Database,
 } from 'lucide-react'
 
 import { Topbar } from '@/components/layout/Topbar'
@@ -29,18 +27,18 @@ export default function HRDashboardPage() {
     <>
       <Topbar
         title="Beranda HR"
-        description="Control center untuk absensi, cuti, PHL, approval, user access, dan monitoring operasional HR."
+        description="Control center absensi, cuti, PHL, user access, dan monitoring operasional HR."
       />
 
-      <section className="harmony-page-bg min-h-screen space-y-6 p-6">
+      <section className="harmony-page-bg min-h-screen space-y-5 overflow-x-hidden p-4 sm:p-5">
         <HeroSection />
 
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <MetricCard
             title="Employee"
             value="Master"
-            description="Kelola data karyawan, machine PIN, struktur atasan, dan saldo."
-            icon={<Users size={20} />}
+            description="Data, PIN, atasan, dan saldo."
+            icon={<Users size={18} />}
             href="/hr/employees"
             tone="blue"
           />
@@ -48,8 +46,8 @@ export default function HRDashboardPage() {
           <MetricCard
             title="Attendance"
             value="Upload"
-            description="Import absensi fingerprint dan mapping otomatis."
-            icon={<Fingerprint size={20} />}
+            description="Import dan mapping absensi."
+            icon={<Fingerprint size={18} />}
             href="/hr/attendance/upload"
             tone="green"
           />
@@ -57,8 +55,8 @@ export default function HRDashboardPage() {
           <MetricCard
             title="Leave"
             value="Control"
-            description="Cuti, izin, sakit, postpone, bukti, dan approval."
-            icon={<CalendarDays size={20} />}
+            description="Cuti, izin, PHL, approval."
+            icon={<CalendarDays size={18} />}
             href="/hr/leave"
             tone="orange"
           />
@@ -66,19 +64,19 @@ export default function HRDashboardPage() {
           <MetricCard
             title="Users"
             value="Access"
-            description="Akun login HR/Employee dan reset password."
-            icon={<UserCog size={20} />}
+            description="Akun dan role sistem."
+            icon={<UserCog size={18} />}
             href="/hr/users"
             tone="purple"
           />
         </div>
 
-        <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
+        <div className="grid gap-5 xl:grid-cols-[1.05fr_0.95fr]">
           <QuickActionsPanel />
           <OperationalPanel />
         </div>
 
-        <div className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
+        <div className="grid gap-5 xl:grid-cols-[0.95fr_1.05fr]">
           <SystemModulesPanel />
           <WorkflowPanel />
         </div>
@@ -89,68 +87,65 @@ export default function HRDashboardPage() {
 
 function HeroSection() {
   return (
-    <div className="harmony-glass-dark harmony-slide-up relative overflow-hidden rounded-[34px] p-7 text-white">
-      <div className="pointer-events-none absolute -right-20 -top-24 h-72 w-72 rounded-full bg-[#007aff]/35 blur-3xl" />
-      <div className="pointer-events-none absolute -bottom-28 left-16 h-72 w-72 rounded-full bg-[#af52de]/30 blur-3xl" />
-      <div className="pointer-events-none absolute right-1/3 top-1/2 h-52 w-52 rounded-full bg-[#34c759]/20 blur-3xl" />
+    <div className="harmony-glass-dark harmony-slide-up relative overflow-hidden rounded-[28px] p-5 text-white sm:p-6">
+      <div className="pointer-events-none absolute -right-16 -top-20 h-52 w-52 rounded-full bg-[#007aff]/30 blur-3xl" />
+      <div className="pointer-events-none absolute -bottom-20 left-10 h-52 w-52 rounded-full bg-[#af52de]/25 blur-3xl" />
 
-      <div className="relative grid gap-8 xl:grid-cols-[1.25fr_0.75fr] xl:items-center">
-        <div>
-          <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-4 py-2 text-xs font-bold text-white/75 backdrop-blur-xl">
-            <Sparkles size={15} className="text-[#5ac8fa]" />
+      <div className="relative grid gap-5 xl:grid-cols-[1.2fr_0.8fr] xl:items-center">
+        <div className="min-w-0">
+          <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-3 py-1.5 text-[11px] font-bold text-white/75 backdrop-blur-xl">
+            <Sparkles size={13} className="text-[#5ac8fa]" />
             HARMONY · HR Command Center
           </div>
 
-          <h2 className="max-w-3xl text-4xl font-semibold tracking-tight md:text-5xl">
-            HR operation yang lebih clean, cepat, dan terkendali.
+          <h2 className="max-w-3xl text-2xl font-semibold tracking-[-0.035em] sm:text-3xl">
+            Operasional HR lebih ringkas, clean, dan terkendali.
           </h2>
 
-          <p className="mt-5 max-w-2xl text-sm leading-7 text-white/62">
-            Dashboard ini menjadi pusat kontrol untuk absensi fingerprint,
-            pengajuan cuti dan izin, validasi PHL, kalender libur, user access,
-            serta monitoring data karyawan.
+          <p className="mt-3 max-w-2xl text-sm leading-6 text-white/62">
+            Pusat kontrol untuk absensi fingerprint, cuti & izin, PHL, kalender libur, akses user, dan master karyawan.
           </p>
 
-          <div className="mt-7 flex flex-col gap-3 sm:flex-row">
+          <div className="mt-5 flex flex-col gap-2 sm:flex-row">
             <Link
               href="/hr/attendance/upload"
-              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl bg-white px-5 text-sm font-bold text-[#1d1d1f] transition hover:-translate-y-0.5 hover:bg-[#f5f5f7]"
+              className="inline-flex min-h-10 items-center justify-center gap-2 rounded-2xl bg-white px-4 text-xs font-bold text-[#1d1d1f] transition hover:-translate-y-0.5 hover:bg-[#f5f5f7]"
             >
-              <Upload size={17} />
+              <Upload size={15} />
               Upload Absensi
             </Link>
 
             <Link
               href="/hr/leave"
-              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/10 px-5 text-sm font-bold text-white backdrop-blur-xl transition hover:-translate-y-0.5 hover:bg-white/15"
+              className="inline-flex min-h-10 items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/10 px-4 text-xs font-bold text-white backdrop-blur-xl transition hover:-translate-y-0.5 hover:bg-white/15"
             >
-              <CalendarDays size={17} />
+              <CalendarDays size={15} />
               Kelola Cuti
             </Link>
           </div>
         </div>
 
-        <div className="rounded-[30px] border border-white/10 bg-white/10 p-5 backdrop-blur-2xl">
-          <div className="mb-5 flex items-center justify-between">
+        <div className="rounded-[24px] border border-white/10 bg-white/10 p-4 backdrop-blur-2xl">
+          <div className="mb-4 flex items-center justify-between">
             <div>
               <p className="text-sm font-semibold text-white/80">
                 System Status
               </p>
-              <p className="mt-1 text-xs text-white/45">
+              <p className="mt-0.5 text-[11px] text-white/45">
                 Core modules readiness
               </p>
             </div>
 
-            <div className="rounded-2xl bg-[#34c759]/15 p-3 text-[#9ff2b5]">
-              <Activity size={20} />
+            <div className="rounded-2xl bg-[#34c759]/15 p-2.5 text-[#9ff2b5]">
+              <Activity size={18} />
             </div>
           </div>
 
-          <div className="space-y-3">
-            <StatusRow label="Attendance Engine" value="Ready" />
-            <StatusRow label="Leave Workflow" value="Active" />
-            <StatusRow label="PHL Control" value="Online" />
-            <StatusRow label="User Access" value="Secured" />
+          <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-1">
+            <StatusRow label="Attendance" value="Ready" />
+            <StatusRow label="Leave" value="Active" />
+            <StatusRow label="PHL" value="Online" />
+            <StatusRow label="Access" value="Secured" />
           </div>
         </div>
       </div>
@@ -169,7 +164,7 @@ function MetricCard({
   title: string
   value: string
   description: string
-  icon: React.ReactNode
+  icon: ReactNode
   href: string
   tone: 'blue' | 'green' | 'orange' | 'purple'
 }) {
@@ -183,31 +178,31 @@ function MetricCard({
   return (
     <Link
       href={href}
-      className="harmony-card harmony-hover-lift harmony-slide-up block p-5"
+      className="harmony-card harmony-hover-lift harmony-slide-up block min-w-0 p-4"
     >
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex min-w-0 items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-sm font-medium text-[#6e6e73]">
+          <p className="truncate text-xs font-medium text-[#6e6e73]">
             {title}
           </p>
 
-          <h3 className="mt-2 text-2xl font-semibold tracking-tight text-[#1d1d1f]">
+          <h3 className="mt-1 truncate text-xl font-semibold tracking-tight text-[#1d1d1f]">
             {value}
           </h3>
 
-          <p className="mt-2 line-clamp-2 text-xs leading-5 text-[#86868b]">
+          <p className="mt-1.5 line-clamp-2 text-[11px] leading-5 text-[#86868b]">
             {description}
           </p>
         </div>
 
-        <div className={`rounded-2xl bg-gradient-to-br p-3 ${toneClass}`}>
+        <div className={`shrink-0 rounded-2xl bg-gradient-to-br p-2.5 ${toneClass}`}>
           {icon}
         </div>
       </div>
 
-      <div className="mt-5 flex items-center gap-2 text-xs font-bold text-[#007aff]">
+      <div className="mt-4 flex items-center gap-1.5 text-[11px] font-bold text-[#007aff]">
         Open module
-        <ArrowUpRight size={14} />
+        <ArrowUpRight size={13} />
       </div>
     </Link>
   )
@@ -218,43 +213,16 @@ function QuickActionsPanel() {
     <div className="harmony-card harmony-slide-up overflow-hidden">
       <PanelHeader
         title="Quick Actions"
-        description="Akses cepat untuk proses HR yang paling sering digunakan."
-        icon={<Zap size={18} />}
+        description="Akses cepat proses HR yang paling sering dipakai."
+        icon={<Zap size={17} />}
         tone="blue"
       />
 
-      <div className="grid gap-3 p-5 md:grid-cols-2">
-        <QuickAction
-          title="Upload Absensi"
-          description="Import Excel/CSV dari mesin fingerprint."
-          href="/hr/attendance/upload"
-          icon={<Upload size={19} />}
-          tone="blue"
-        />
-
-        <QuickAction
-          title="Data Absensi"
-          description="Lihat rekap cut-off dan print absensi."
-          href="/hr/attendance/data"
-          icon={<Clock3 size={19} />}
-          tone="green"
-        />
-
-        <QuickAction
-          title="Cuti & Izin"
-          description="Approval, bukti, jenis cuti, dan saldo."
-          href="/hr/leave"
-          icon={<FileText size={19} />}
-          tone="orange"
-        />
-
-        <QuickAction
-          title="User Management"
-          description="Create user, reset password, role akses."
-          href="/hr/users"
-          icon={<UserCog size={19} />}
-          tone="purple"
-        />
+      <div className="grid gap-3 p-4 md:grid-cols-2">
+        <QuickAction title="Upload Absensi" description="Import Excel/CSV mesin fingerprint." href="/hr/attendance/upload" icon={<Upload size={17} />} tone="blue" />
+        <QuickAction title="Data Absensi" description="Rekap cut-off dan print absensi." href="/hr/attendance/data" icon={<Clock3 size={17} />} tone="green" />
+        <QuickAction title="Cuti & Izin" description="Approval, bukti, jenis cuti, saldo." href="/hr/leave" icon={<CalendarDays size={17} />} tone="orange" />
+        <QuickAction title="User Management" description="Create user, reset password, role." href="/hr/users" icon={<UserCog size={17} />} tone="purple" />
       </div>
     </div>
   )
@@ -265,43 +233,15 @@ function OperationalPanel() {
     <div className="harmony-card harmony-slide-up overflow-hidden">
       <PanelHeader
         title="Operational Overview"
-        description="Ringkasan area yang perlu dipantau HR."
-        icon={<Activity size={18} />}
+        description="Area yang perlu dipantau HR."
+        icon={<Activity size={17} />}
         tone="green"
       />
 
-      <div className="space-y-3 p-5">
-        <OverviewItem
-          title="Attendance Data"
-          description="Pastikan upload fingerprint sudah diproses sesuai cut-off."
-          status="Ready"
-          icon={<Fingerprint size={17} />}
-          tone="blue"
-        />
-
-        <OverviewItem
-          title="Leave Requests"
-          description="Pantau pengajuan cuti, izin, sakit, dan bukti pendukung."
-          status="Open"
-          icon={<CalendarDays size={17} />}
-          tone="orange"
-        />
-
-        <OverviewItem
-          title="PHL Candidates"
-          description="Validasi checklock pada weekend atau hari libur aktif."
-          status="Monitor"
-          icon={<Plane size={17} />}
-          tone="purple"
-        />
-
-        <OverviewItem
-          title="Holiday Calendar"
-          description="Pastikan kalender libur aktif selalu diperbarui."
-          status="Active"
-          icon={<Landmark size={17} />}
-          tone="green"
-        />
+      <div className="space-y-2.5 p-4">
+        <OverviewItem title="Attendance Data" description="Upload fingerprint sesuai cut-off." status="Ready" icon={<Fingerprint size={16} />} tone="blue" />
+        <OverviewItem title="Leave Requests" description="Cuti, izin, sakit, bukti pendukung." status="Open" icon={<CalendarDays size={16} />} tone="orange" />
+        <OverviewItem title="Holiday Calendar" description="Kalender libur aktif diperbarui." status="Active" icon={<Landmark size={16} />} tone="green" />
       </div>
     </div>
   )
@@ -312,32 +252,15 @@ function SystemModulesPanel() {
     <div className="harmony-card harmony-slide-up overflow-hidden">
       <PanelHeader
         title="System Modules"
-        description="Modul inti HARMONY yang sudah tersedia."
-        icon={<Layers size={18} />}
+        description="Modul inti HARMONY."
+        icon={<Layers size={17} />}
         tone="purple"
       />
 
-      <div className="grid gap-3 p-5">
-        <ModuleRow
-          title="Employee Master"
-          description="Data karyawan, machine PIN, atasan, saldo cuti, saldo PHL."
-          icon={<Users size={18} />}
-          href="/hr/employees"
-        />
-
-        <ModuleRow
-          title="Attendance Engine"
-          description="Upload, mapping, rekap cut-off, print bukti absensi."
-          icon={<Database size={18} />}
-          href="/hr/attendance/data"
-        />
-
-        <ModuleRow
-          title="Access Control"
-          description="User HR/Employee, bulk create, reset password."
-          icon={<ShieldCheck size={18} />}
-          href="/hr/users"
-        />
+      <div className="grid gap-3 p-4">
+        <ModuleRow title="Employee Master" description="Data karyawan, machine PIN, atasan, saldo." icon={<Users size={17} />} href="/hr/employees" />
+        <ModuleRow title="Attendance Engine" description="Upload, mapping, rekap cut-off." icon={<Database size={17} />} href="/hr/attendance/data" />
+        <ModuleRow title="Access Control" description="User HR/Employee dan reset password." icon={<ShieldCheck size={17} />} href="/hr/users" />
       </div>
     </div>
   )
@@ -345,50 +268,24 @@ function SystemModulesPanel() {
 
 function WorkflowPanel() {
   const steps = [
-    {
-      number: '01',
-      title: 'Upload Absensi',
-      description: 'Data fingerprint diunggah dan dibaca berdasarkan machine_pin.',
-      tone: 'blue',
-    },
-    {
-      number: '02',
-      title: 'Mapping Employee',
-      description: 'Sistem hanya memproses data yang sesuai master karyawan.',
-      tone: 'green',
-    },
-    {
-      number: '03',
-      title: 'Validasi Cuti / PHL',
-      description: 'HR melakukan approval dan koreksi berdasarkan bukti.',
-      tone: 'orange',
-    },
-    {
-      number: '04',
-      title: 'Dashboard Record',
-      description: 'Record absensi, cuti, dan PHL tersimpan untuk monitoring.',
-      tone: 'purple',
-    },
+    { number: '01', title: 'Upload Absensi', description: 'Data fingerprint diunggah.', tone: 'blue' },
+    { number: '02', title: 'Mapping', description: 'Cocok dengan master employee.', tone: 'green' },
+    { number: '03', title: 'Validasi', description: 'Cuti, izin, PHL, bukti.', tone: 'orange' },
+    { number: '04', title: 'Monitoring', description: 'Record tersimpan untuk HR.', tone: 'purple' },
   ] as const
 
   return (
     <div className="harmony-card harmony-slide-up overflow-hidden">
       <PanelHeader
         title="Workflow HARMONY"
-        description="Alur utama sistem HR dari input data hingga monitoring."
-        icon={<CheckCircle2 size={18} />}
+        description="Alur utama input sampai monitoring."
+        icon={<CheckCircle2 size={17} />}
         tone="orange"
       />
 
-      <div className="grid gap-3 p-5 md:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-3 p-4 md:grid-cols-2 xl:grid-cols-4">
         {steps.map((step) => (
-          <WorkflowStep
-            key={step.number}
-            number={step.number}
-            title={step.title}
-            description={step.description}
-            tone={step.tone}
-          />
+          <WorkflowStep key={step.number} {...step} />
         ))}
       </div>
     </div>
@@ -403,7 +300,7 @@ function PanelHeader({
 }: {
   title: string
   description: string
-  icon: React.ReactNode
+  icon: ReactNode
   tone: 'blue' | 'green' | 'orange' | 'purple'
 }) {
   const toneClass = {
@@ -414,39 +311,33 @@ function PanelHeader({
   }[tone]
 
   return (
-    <div className="flex items-center justify-between gap-4 border-b border-black/5 p-5">
-      <div>
-        <h3 className="text-lg font-semibold text-[#1d1d1f]">
+    <div className="flex items-center justify-between gap-4 border-b border-black/5 p-4">
+      <div className="min-w-0">
+        <h3 className="truncate text-base font-semibold text-[#1d1d1f]">
           {title}
         </h3>
 
-        <p className="mt-1 text-sm text-[#6e6e73]">
+        <p className="mt-0.5 line-clamp-1 text-xs text-[#6e6e73]">
           {description}
         </p>
       </div>
 
-      <div className={`rounded-2xl p-3 ${toneClass}`}>
+      <div className={`shrink-0 rounded-2xl p-2.5 ${toneClass}`}>
         {icon}
       </div>
     </div>
   )
 }
 
-function StatusRow({
-  label,
-  value,
-}: {
-  label: string
-  value: string
-}) {
+function StatusRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-center justify-between rounded-2xl bg-white/10 px-4 py-3">
-      <span className="text-sm text-white/62">
+    <div className="flex items-center justify-between rounded-2xl bg-white/10 px-3 py-2.5">
+      <span className="text-xs text-white/62">
         {label}
       </span>
 
-      <span className="inline-flex items-center gap-1.5 rounded-full bg-[#34c759]/15 px-3 py-1 text-xs font-bold text-[#9ff2b5]">
-        <CheckCircle2 size={13} />
+      <span className="inline-flex items-center gap-1.5 rounded-full bg-[#34c759]/15 px-2.5 py-1 text-[11px] font-bold text-[#9ff2b5]">
+        <CheckCircle2 size={12} />
         {value}
       </span>
     </div>
@@ -463,7 +354,7 @@ function QuickAction({
   title: string
   description: string
   href: string
-  icon: React.ReactNode
+  icon: ReactNode
   tone: 'blue' | 'green' | 'orange' | 'purple'
 }) {
   const toneClass = {
@@ -476,26 +367,23 @@ function QuickAction({
   return (
     <Link
       href={href}
-      className="group rounded-[24px] border border-black/5 bg-white/60 p-4 shadow-sm transition hover:-translate-y-0.5 hover:bg-white hover:shadow-md"
+      className="group rounded-[22px] border border-black/5 bg-white/60 p-3.5 shadow-sm transition hover:-translate-y-0.5 hover:bg-white hover:shadow-md"
     >
-      <div className="flex items-start gap-3">
-        <div className={`rounded-2xl p-3 ${toneClass}`}>
+      <div className="flex min-w-0 items-start gap-3">
+        <div className={`shrink-0 rounded-2xl p-2.5 ${toneClass}`}>
           {icon}
         </div>
 
         <div className="min-w-0 flex-1">
-          <div className="flex items-center justify-between gap-3">
-            <h4 className="font-semibold text-[#1d1d1f]">
+          <div className="flex min-w-0 items-center justify-between gap-2">
+            <h4 className="truncate text-sm font-semibold text-[#1d1d1f]">
               {title}
             </h4>
 
-            <ArrowUpRight
-              size={16}
-              className="text-[#c7c7cc] transition group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:text-[#007aff]"
-            />
+            <ArrowUpRight size={15} className="shrink-0 text-[#c7c7cc] transition group-hover:text-[#007aff]" />
           </div>
 
-          <p className="mt-1.5 line-clamp-2 text-xs leading-5 text-[#6e6e73]">
+          <p className="mt-1 line-clamp-2 text-[11px] leading-5 text-[#6e6e73]">
             {description}
           </p>
         </div>
@@ -514,7 +402,7 @@ function OverviewItem({
   title: string
   description: string
   status: string
-  icon: React.ReactNode
+  icon: ReactNode
   tone: 'blue' | 'green' | 'orange' | 'purple'
 }) {
   const toneClass = {
@@ -525,24 +413,24 @@ function OverviewItem({
   }[tone]
 
   return (
-    <div className="rounded-[24px] border border-black/5 bg-white/60 p-4 shadow-sm">
+    <div className="rounded-[22px] border border-black/5 bg-white/60 p-3.5 shadow-sm">
       <div className="flex items-start gap-3">
-        <div className={`rounded-2xl p-3 ${toneClass}`}>
+        <div className={`shrink-0 rounded-2xl p-2.5 ${toneClass}`}>
           {icon}
         </div>
 
         <div className="min-w-0 flex-1">
           <div className="flex items-center justify-between gap-3">
-            <h4 className="text-sm font-semibold text-[#1d1d1f]">
+            <h4 className="truncate text-sm font-semibold text-[#1d1d1f]">
               {title}
             </h4>
 
-            <span className="rounded-full bg-[#eaf8ee] px-3 py-1 text-xs font-bold text-[#168034]">
+            <span className="shrink-0 rounded-full bg-[#eaf8ee] px-2.5 py-1 text-[11px] font-bold text-[#168034]">
               {status}
             </span>
           </div>
 
-          <p className="mt-1 text-xs leading-5 text-[#6e6e73]">
+          <p className="mt-1 line-clamp-2 text-[11px] leading-5 text-[#6e6e73]">
             {description}
           </p>
         </div>
@@ -551,39 +439,26 @@ function OverviewItem({
   )
 }
 
-function ModuleRow({
-  title,
-  description,
-  icon,
-  href,
-}: {
-  title: string
-  description: string
-  icon: React.ReactNode
-  href: string
-}) {
+function ModuleRow({ title, description, icon, href }: { title: string; description: string; icon: ReactNode; href: string }) {
   return (
     <Link
       href={href}
-      className="group flex items-center gap-4 rounded-[24px] border border-black/5 bg-white/60 p-4 shadow-sm transition hover:-translate-y-0.5 hover:bg-white hover:shadow-md"
+      className="group flex items-center gap-3 rounded-[22px] border border-black/5 bg-white/60 p-3.5 shadow-sm transition hover:-translate-y-0.5 hover:bg-white hover:shadow-md"
     >
-      <div className="rounded-2xl bg-[#e8f2ff] p-3 text-[#007aff]">
+      <div className="shrink-0 rounded-2xl bg-[#e8f2ff] p-2.5 text-[#007aff]">
         {icon}
       </div>
 
       <div className="min-w-0 flex-1">
-        <h4 className="font-semibold text-[#1d1d1f]">
+        <h4 className="truncate text-sm font-semibold text-[#1d1d1f]">
           {title}
         </h4>
-        <p className="mt-1 line-clamp-2 text-xs leading-5 text-[#6e6e73]">
+        <p className="mt-0.5 line-clamp-1 text-[11px] leading-5 text-[#6e6e73]">
           {description}
         </p>
       </div>
 
-      <ArrowUpRight
-        size={16}
-        className="text-[#c7c7cc] transition group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:text-[#007aff]"
-      />
+      <ArrowUpRight size={15} className="shrink-0 text-[#c7c7cc] transition group-hover:text-[#007aff]" />
     </Link>
   )
 }
@@ -607,16 +482,16 @@ function WorkflowStep({
   }[tone]
 
   return (
-    <div className="rounded-[24px] border border-black/5 bg-white/60 p-4 shadow-sm">
-      <div className={`mb-4 inline-flex h-10 w-10 items-center justify-center rounded-2xl text-sm font-bold ${toneClass}`}>
+    <div className="rounded-[22px] border border-black/5 bg-white/60 p-3.5 shadow-sm">
+      <div className={`mb-3 inline-flex h-9 w-9 items-center justify-center rounded-2xl text-xs font-bold ${toneClass}`}>
         {number}
       </div>
 
-      <h4 className="font-semibold text-[#1d1d1f]">
+      <h4 className="truncate text-sm font-semibold text-[#1d1d1f]">
         {title}
       </h4>
 
-      <p className="mt-2 text-xs leading-5 text-[#6e6e73]">
+      <p className="mt-1.5 line-clamp-2 text-[11px] leading-5 text-[#6e6e73]">
         {description}
       </p>
     </div>

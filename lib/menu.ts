@@ -1,6 +1,7 @@
 import {
   LayoutDashboard,
   Users,
+  UserCheck,
   Clock3,
   CalendarDays,
   Landmark,
@@ -30,7 +31,7 @@ export const hrMenu = [
     title: 'Cuti & Izin',
     href: '/hr/leave',
     icon: CalendarDays,
-    subtitle: 'Cuti, izin & PHL',
+    subtitle: 'Cuti, izin, PHL & postpone',
   },
   {
     title: 'Kalender Libur',
@@ -63,12 +64,12 @@ export const employeeMenu = [
     title: 'Cuti & Izin',
     href: '/employee/leave',
     icon: CalendarDays,
-    subtitle: 'Cuti, izin & PHL',
+    subtitle: 'Cuti, izin, PHL & postpone',
   },
   {
     title: 'Approval Tim',
     href: '/employee/approvals',
-    icon: Users,
+    icon: UserCheck,
     subtitle: 'Approval bawahan',
   },
   {
