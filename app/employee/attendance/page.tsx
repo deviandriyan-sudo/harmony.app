@@ -977,7 +977,7 @@ export default function EmployeeAttendancePage() {
         description="Cek absensi periode, lengkapi data manual, pilih keterangan kehadiran/ketidakhadiran, lalu submit ke atasan."
       />
 
-      <section className="space-y-6 p-6">
+      <section className="space-y-6 p-4 md:p-6">
         {successMessage && (
           <div className="rounded-2xl border border-green-200 bg-green-50 p-4 text-sm leading-6 text-green-700">
             <div className="mb-1 flex items-center gap-2 font-bold">
@@ -1303,7 +1303,140 @@ export default function EmployeeAttendancePage() {
                 </div>
               </div>
 
-              <div className="overflow-x-auto">
+              <div className="grid gap-3 p-4 xl:hidden">
+                {calendarRows.map((row) => {
+                  const draft = getDraft(row);
+                  const displayStatus = getDisplayStatus(row, draft);
+                  const isSelected = selectedDates.includes(row.date);
+                  const isOffDayNoAttendance = isOffDayWithoutAttendance(
+                    row,
+                    draft,
+                  );
+
+                  return (
+                    <div
+                      key={row.date}
+                      className={[
+                        "rounded-[28px] border border-black/5 p-4 shadow-sm",
+                        row.holiday_name
+                          ? "bg-[#fff7e6]"
+                          : row.is_weekend
+                            ? "bg-[#f3f8ff]"
+                            : "bg-white",
+                      ].join(" ")}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="text-sm font-bold text-[#1d1d1f]">
+                            {formatDisplayDate(row.date)}
+                          </p>
+
+                          <p className="mt-1 text-xs font-semibold text-[#6e6e73]">
+                            {row.day_name}
+                          </p>
+
+                          {row.holiday_name && (
+                            <p className="mt-1 line-clamp-2 text-[11px] font-bold text-orange-700">
+                              {row.holiday_name}
+                            </p>
+                          )}
+                        </div>
+
+                        <AttendanceCheckButton
+                          row={row}
+                          draft={draft}
+                          selected={isSelected}
+                          disabled={isReadOnlyPeriod || submittingPeriod}
+                          onClick={() => toggleAttendanceSelection(row)}
+                        />
+                      </div>
+
+                      <div className="mt-4 grid grid-cols-2 gap-3">
+                        <MobileInfoBox
+                          label="Clock In"
+                          value={
+                            row.log?.check_in || draft.manual_check_in || "-"
+                          }
+                          manual={Boolean(
+                            draft.manual_check_in || row.log?.manual_check_in,
+                          )}
+                        />
+
+                        <MobileInfoBox
+                          label="Clock Out"
+                          value={
+                            row.log?.check_out || draft.manual_check_out || "-"
+                          }
+                          manual={Boolean(
+                            draft.manual_check_out ||
+                              row.log?.manual_check_out,
+                          )}
+                        />
+
+                        <MobileInfoBox
+                          label="Durasi"
+                          value={formatDuration(row.log?.work_duration_minutes)}
+                        />
+
+                        <div className="rounded-2xl bg-[#f5f5f7]/80 p-3">
+                          <p className="mb-2 text-[11px] font-bold uppercase tracking-wide text-[#86868b]">
+                            Status
+                          </p>
+
+                          {isOffDayNoAttendance ? (
+                            <span className="text-xs font-semibold text-[#86868b]">
+                              -
+                            </span>
+                          ) : (
+                            <StatusBadge status={displayStatus} log={row.log} />
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="mt-4 space-y-3">
+                        <div className="rounded-2xl bg-[#f5f5f7]/80 p-3">
+                          <p className="mb-2 text-[11px] font-bold uppercase tracking-wide text-[#86868b]">
+                            Keterangan
+                          </p>
+                          <RequestLabelBadge row={row} draft={draft} />
+                        </div>
+
+                        <div className="rounded-2xl bg-[#f5f5f7]/80 p-3">
+                          <p className="mb-2 text-[11px] font-bold uppercase tracking-wide text-[#86868b]">
+                            Validasi
+                          </p>
+                          <ValidationInfo row={row} draft={draft} />
+                        </div>
+
+                        <div className="flex items-center justify-between gap-3 rounded-2xl bg-[#f5f5f7]/80 p-3">
+                          <div>
+                            <p className="mb-2 text-[11px] font-bold uppercase tracking-wide text-[#86868b]">
+                              Approval
+                            </p>
+                            <ApprovalBadge
+                              status={
+                                row.log?.supervisor_approval_status || "none"
+                              }
+                            />
+                          </div>
+
+                          <button
+                            type="button"
+                            disabled={isReadOnlyPeriod || submittingPeriod}
+                            onClick={() => openEdit(row)}
+                            className="inline-flex min-h-10 shrink-0 items-center justify-center gap-2 rounded-2xl bg-[#e8f2ff] px-4 text-xs font-bold text-[#0059b8] transition hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            <PencilLine size={15} />
+                            Lengkapi
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="hidden overflow-x-auto xl:block">
                 <table className="w-full min-w-[1560px] border-collapse text-left text-sm">
                   <thead>
                     <tr className="border-b border-black/5 bg-[#f5f5f7]/90 text-xs uppercase tracking-wide text-[#6e6e73]">
@@ -1871,6 +2004,36 @@ function TimeCell({ value, manual }: { value: string; manual: boolean }) {
           className={manual ? "text-[#007aff]" : "text-[#86868b]"}
         />
         {value}
+      </div>
+
+      {manual && (
+        <p className="mt-1 text-[11px] font-bold text-[#007aff]">Manual</p>
+      )}
+    </div>
+  );
+}
+
+function MobileInfoBox({
+  label,
+  value,
+  manual = false,
+}: {
+  label: string;
+  value: string;
+  manual?: boolean;
+}) {
+  return (
+    <div className="rounded-2xl bg-[#f5f5f7]/80 p-3">
+      <p className="text-[11px] font-bold uppercase tracking-wide text-[#86868b]">
+        {label}
+      </p>
+
+      <div className="mt-2 flex items-center gap-2 font-semibold text-[#1d1d1f]">
+        <Timer
+          size={14}
+          className={manual ? "text-[#007aff]" : "text-[#86868b]"}
+        />
+        <span className="truncate">{value}</span>
       </div>
 
       {manual && (
