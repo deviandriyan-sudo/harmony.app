@@ -2,13 +2,16 @@
 
 import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
+import type { ReactNode } from 'react'
 import {
   AlertTriangle,
   ArrowUpRight,
   CalendarCheck,
+  CalendarDays,
   CheckCircle2,
   Clock3,
   FileText,
+  Filter,
   Loader2,
   RefreshCcw,
   ShieldCheck,
@@ -105,6 +108,10 @@ type LeaveRequest = {
 
   created_at: string | null
 }
+
+type SummaryTone = 'blue' | 'green' | 'orange' | 'purple'
+
+type ModuleTone = 'blue' | 'purple'
 
 export default function EmployeeApprovalsPage() {
   const [appUser, setAppUser] = useState<AppUser | null>(null)
@@ -263,21 +270,32 @@ export default function EmployeeApprovalsPage() {
 
     const subordinateIds = subordinateList.map((item) => item.id)
 
-    const { data: attendanceData } = await supabase
+    const { data: attendanceData, error: attendanceError } = await supabase
       .from('attendance_period_confirmations')
       .select('*')
       .in('employee_id', subordinateIds)
       .eq('period_month', periodMonth)
       .order('employee_submitted_at', { ascending: false })
 
-    const { data: leaveData } = await supabase
+    if (attendanceError) {
+      setErrorMessage(attendanceError.message)
+      setAttendanceConfirmations([])
+    } else {
+      setAttendanceConfirmations(attendanceData || [])
+    }
+
+    const { data: leaveData, error: leaveError } = await supabase
       .from('leave_requests')
       .select('*')
       .in('employee_id', subordinateIds)
       .order('created_at', { ascending: false })
 
-    setAttendanceConfirmations(attendanceData || [])
-    setLeaveRequests(leaveData || [])
+    if (leaveError) {
+      setErrorMessage(leaveError.message)
+      setLeaveRequests([])
+    } else {
+      setLeaveRequests(leaveData || [])
+    }
 
     setLoading(false)
   }
@@ -289,7 +307,7 @@ export default function EmployeeApprovalsPage() {
         description="Pusat approval untuk absensi, cuti, izin, tugas luar, dan PHL bawahan."
       />
 
-      <section className="space-y-6 p-6">
+      <section className="space-y-6 p-4 sm:p-6">
         {errorMessage && (
           <div className="rounded-2xl border border-orange-200 bg-orange-50 p-4 text-sm leading-6 text-orange-700">
             <div className="mb-1 flex items-center gap-2 font-bold">
@@ -300,7 +318,7 @@ export default function EmployeeApprovalsPage() {
           </div>
         )}
 
-        <div className="relative overflow-hidden rounded-[34px] border border-black/5 bg-[#1d1d1f] p-7 text-white shadow-[0_24px_80px_rgba(0,0,0,0.16)]">
+        <div className="relative overflow-hidden rounded-[34px] border border-black/5 bg-[#1d1d1f] p-6 text-white shadow-[0_24px_80px_rgba(0,0,0,0.16)] sm:p-7">
           <div className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-[#007aff]/35 blur-3xl" />
           <div className="pointer-events-none absolute -bottom-28 -left-20 h-72 w-72 rounded-full bg-[#34c759]/20 blur-3xl" />
 
@@ -321,7 +339,7 @@ export default function EmployeeApprovalsPage() {
               </p>
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-4 xl:min-w-[720px]">
+            <div className="grid gap-3 sm:grid-cols-2 xl:min-w-[580px] 2xl:grid-cols-4">
               <HeroMetric label="Bawahan" value={String(subordinates.length)} />
               <HeroMetric label="Absensi Pending" value={String(attendanceSummary.pending)} />
               <HeroMetric label="Cuti Pending" value={String(leaveSummary.pending)} />
@@ -363,6 +381,17 @@ export default function EmployeeApprovalsPage() {
             tone="green"
           />
         </div>
+
+        <PeriodFilterBar
+          periodMonth={periodMonth}
+          periodStart={periodRange.start}
+          periodEnd={periodRange.end}
+          loading={loading}
+          attendanceTotal={attendanceSummary.total}
+          attendancePending={attendanceSummary.pending}
+          onMonthChange={setPeriodMonth}
+          onRefresh={fetchData}
+        />
 
         <div className="grid gap-6 xl:grid-cols-2">
           <ApprovalModuleCard
@@ -428,77 +457,263 @@ export default function EmployeeApprovalsPage() {
           />
         </div>
 
-        <div className="grid gap-6 xl:grid-cols-[0.85fr_1.15fr]">
-          <div className="harmony-card overflow-hidden">
-            <div className="border-b border-black/5 p-6">
-              <h2 className="text-lg font-semibold text-[#1d1d1f]">
-                Filter Periode Absensi
-              </h2>
-
-              <p className="mt-1 text-sm leading-6 text-[#6e6e73]">
-                Periode ini dipakai untuk ringkasan approval absensi.
-              </p>
-            </div>
-
-            <div className="space-y-5 p-6">
-              <label className="block">
-                <span className="harmony-label">Periode Cut-off</span>
-                <input
-                  type="month"
-                  value={periodMonth}
-                  onChange={(event) => setPeriodMonth(event.target.value)}
-                  className="harmony-input"
-                />
-              </label>
-
-              <div className="rounded-[24px] border border-black/5 bg-[#f5f5f7]/75 p-5">
-                <p className="text-xs font-bold uppercase tracking-wide text-[#6e6e73]">
-                  Rentang Periode
-                </p>
-
-                <p className="mt-2 text-lg font-semibold text-[#1d1d1f]">
-                  {formatDisplayDate(periodRange.start)} - {formatDisplayDate(periodRange.end)}
-                </p>
-              </div>
-
-              <button
-                type="button"
-                onClick={fetchData}
-                className="harmony-button-secondary w-full"
-              >
-                {loading ? (
-                  <Loader2 size={18} className="animate-spin" />
-                ) : (
-                  <RefreshCcw size={18} />
-                )}
-                Refresh Data
-              </button>
-            </div>
-          </div>
-
-          <div className="harmony-card overflow-hidden">
-            <div className="border-b border-black/5 p-6">
-              <h2 className="text-lg font-semibold text-[#1d1d1f]">
-                Bawahan Terhubung
-              </h2>
-
-              <p className="mt-1 text-sm leading-6 text-[#6e6e73]">
-                Data ini membaca relasi supervisor dari field supervisor_1 dan supervisor_2.
-              </p>
-            </div>
-
-            {loading ? (
-              <div className="flex items-center gap-3 p-6 text-sm text-[#6e6e73]">
-                <Loader2 size={18} className="animate-spin" />
-                Memuat data bawahan...
-              </div>
-            ) : (
-              <SubordinateList employees={subordinates} />
-            )}
-          </div>
-        </div>
+        <SubordinateOrgChart
+          supervisor={supervisor}
+          employees={subordinates}
+          loading={loading}
+        />
       </section>
     </>
+  )
+}
+
+function PeriodFilterBar({
+  periodMonth,
+  periodStart,
+  periodEnd,
+  loading,
+  attendanceTotal,
+  attendancePending,
+  onMonthChange,
+  onRefresh,
+}: {
+  periodMonth: string
+  periodStart: string
+  periodEnd: string
+  loading: boolean
+  attendanceTotal: number
+  attendancePending: number
+  onMonthChange: (value: string) => void
+  onRefresh: () => void
+}) {
+  return (
+    <div className="harmony-card overflow-hidden p-0">
+      <div className="flex flex-col gap-4 p-5 lg:flex-row lg:items-center lg:justify-between lg:p-6">
+        <div className="flex min-w-0 items-start gap-4">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#e8f2ff] text-[#007aff]">
+            <Filter size={20} />
+          </div>
+
+          <div className="min-w-0">
+            <h2 className="text-lg font-semibold text-[#1d1d1f]">
+              Filter Periode Absensi
+            </h2>
+
+            <p className="mt-1 text-sm leading-6 text-[#6e6e73]">
+              Periode ini dipakai untuk ringkasan dan akses approval absensi bawahan.
+            </p>
+          </div>
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-2 lg:flex lg:items-center lg:justify-end">
+          <label className="min-w-0 lg:w-[190px]">
+            <span className="sr-only">Periode Cut-off</span>
+            <input
+              type="month"
+              value={periodMonth}
+              onChange={(event) => onMonthChange(event.target.value)}
+              className="harmony-input h-12"
+            />
+          </label>
+
+          <div className="flex min-h-12 items-center gap-3 rounded-2xl border border-black/5 bg-[#f5f5f7]/80 px-4">
+            <CalendarDays size={17} className="shrink-0 text-[#007aff]" />
+            <div className="min-w-0">
+              <p className="text-[11px] font-bold uppercase tracking-wide text-[#86868b]">
+                Rentang
+              </p>
+              <p className="truncate text-xs font-bold text-[#1d1d1f] sm:text-sm">
+                {formatDisplayDate(periodStart)} - {formatDisplayDate(periodEnd)}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex min-h-12 items-center gap-3 rounded-2xl border border-black/5 bg-[#f5f5f7]/80 px-4">
+            <Clock3 size={17} className="shrink-0 text-orange-700" />
+            <div>
+              <p className="text-[11px] font-bold uppercase tracking-wide text-[#86868b]">
+                Pending / Submit
+              </p>
+              <p className="text-sm font-bold text-[#1d1d1f]">
+                {attendancePending} / {attendanceTotal}
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={onRefresh}
+            disabled={loading}
+            className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-black/5 bg-white px-5 text-sm font-bold text-[#1d1d1f] shadow-sm transition hover:bg-[#f5f5f7] disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {loading ? (
+              <Loader2 size={18} className="animate-spin" />
+            ) : (
+              <RefreshCcw size={18} />
+            )}
+            Refresh
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function SubordinateOrgChart({
+  supervisor,
+  employees,
+  loading,
+}: {
+  supervisor: Employee | null
+  employees: Employee[]
+  loading: boolean
+}) {
+  return (
+    <div className="harmony-card overflow-hidden p-0">
+      <div className="border-b border-black/5 p-5 lg:p-6">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <h2 className="text-lg font-semibold text-[#1d1d1f]">
+              Bawahan Terhubung
+            </h2>
+
+            <p className="mt-1 text-sm leading-6 text-[#6e6e73]">
+              Struktur ini membaca relasi dari field supervisor_1 dan supervisor_2 pada data karyawan.
+            </p>
+          </div>
+
+          <span className="inline-flex w-fit items-center gap-2 rounded-full bg-[#e8f2ff] px-3 py-1 text-xs font-bold text-[#007aff]">
+            <UsersRound size={14} />
+            {employees.length} bawahan aktif
+          </span>
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="flex items-center gap-3 p-6 text-sm text-[#6e6e73]">
+          <Loader2 size={18} className="animate-spin" />
+          Memuat struktur bawahan...
+        </div>
+      ) : employees.length === 0 ? (
+        <div className="p-6">
+          <div className="rounded-[28px] border border-dashed border-black/10 bg-[#f5f5f7]/70 p-8 text-center">
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-3xl bg-white text-[#007aff] shadow-sm">
+              <UsersRound size={24} />
+            </div>
+
+            <h3 className="mt-5 text-lg font-semibold text-[#1d1d1f]">
+              Belum ada bawahan terhubung
+            </h3>
+
+            <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-[#6e6e73]">
+              Pastikan field supervisor_1 atau supervisor_2 pada data karyawan bawahan
+              berisi nama, ID, NIP, atau email atasan yang sesuai.
+            </p>
+          </div>
+        </div>
+      ) : (
+        <div className="p-5 lg:p-6">
+          <div className="flex justify-center">
+            <OrgSupervisorNode supervisor={supervisor} />
+          </div>
+
+          <div className="mx-auto h-10 w-[4px] rounded-full bg-[#007aff]/35" />
+
+          <div className="relative mx-auto max-w-6xl">
+            <div className="absolute left-4 right-4 top-0 hidden h-[4px] rounded-full bg-[#007aff]/25 sm:block" />
+
+            <div className="grid gap-4 pt-6 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+              {employees.map((employee) => (
+                <div key={employee.id} className="relative">
+                  <div className="absolute left-1/2 top-[-24px] hidden h-6 w-[4px] -translate-x-1/2 rounded-full bg-[#007aff]/25 sm:block" />
+                  <OrgEmployeeNode
+                    employee={employee}
+                    supervisor={supervisor}
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function OrgSupervisorNode({
+  supervisor,
+}: {
+  supervisor: Employee | null
+}) {
+  return (
+    <div className="w-full max-w-xl rounded-[30px] border border-black/5 bg-[#1d1d1f] p-5 text-white shadow-[0_18px_50px_rgba(0,0,0,0.16)]">
+      <div className="flex items-start gap-4">
+        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white/10 text-white">
+          <ShieldCheck size={21} />
+        </div>
+
+        <div className="min-w-0">
+          <p className="text-xs font-bold uppercase tracking-wide text-white/45">
+            Atasan / Supervisor
+          </p>
+          <h3 className="mt-1 break-words text-lg font-semibold leading-6 text-white">
+            {supervisor?.full_name || supervisor?.email || '-'}
+          </h3>
+          <p className="mt-1 break-words text-xs leading-5 text-white/55">
+            {supervisor?.employee_number || '-'} · {supervisor?.department || '-'}
+          </p>
+          <p className="mt-1 break-words text-xs leading-5 text-white/45">
+            {supervisor?.position || '-'}
+          </p>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function OrgEmployeeNode({
+  employee,
+  supervisor,
+}: {
+  employee: Employee
+  supervisor: Employee | null
+}) {
+  const level = getSupervisorLevel(employee, supervisor)
+
+  return (
+    <div className="h-full rounded-[28px] border border-black/5 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
+      <div className="flex items-start gap-3">
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#e8f2ff] text-[#007aff]">
+          <UserRound size={18} />
+        </div>
+
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="inline-flex rounded-full bg-[#f5f5f7] px-2.5 py-1 text-[11px] font-bold text-[#6e6e73]">
+              {level}
+            </span>
+
+            {employee.is_active && (
+              <span className="inline-flex rounded-full bg-green-50 px-2.5 py-1 text-[11px] font-bold text-green-700">
+                Aktif
+              </span>
+            )}
+          </div>
+
+          <h3 className="mt-3 break-words text-sm font-bold leading-5 text-[#1d1d1f]">
+            {employee.full_name || '-'}
+          </h3>
+
+          <p className="mt-1 break-words text-xs leading-5 text-[#6e6e73]">
+            {employee.employee_number || '-'} · {employee.department || '-'}
+          </p>
+
+          <p className="mt-1 break-words text-xs leading-5 text-[#86868b]">
+            {employee.position || '-'}
+          </p>
+        </div>
+      </div>
+    </div>
   )
 }
 
@@ -514,8 +729,8 @@ function ApprovalModuleCard({
   title: string
   description: string
   href: string
-  icon: React.ReactNode
-  tone: 'blue' | 'purple'
+  icon: ReactNode
+  tone: ModuleTone
   metrics: {
     label: string
     value: number
@@ -590,62 +805,6 @@ function ApprovalModuleCard({
   )
 }
 
-function SubordinateList({
-  employees,
-}: {
-  employees: Employee[]
-}) {
-  if (employees.length === 0) {
-    return (
-      <div className="p-6">
-        <div className="rounded-[28px] border border-dashed border-black/10 bg-[#f5f5f7]/70 p-8 text-center">
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-3xl bg-white text-[#007aff] shadow-sm">
-            <UsersRound size={24} />
-          </div>
-
-          <h3 className="mt-5 text-lg font-semibold text-[#1d1d1f]">
-            Belum ada bawahan terhubung
-          </h3>
-
-          <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-[#6e6e73]">
-            Pastikan field supervisor_1 atau supervisor_2 pada data karyawan bawahan
-            berisi nama, ID, NIP, atau email atasan yang sesuai.
-          </p>
-        </div>
-      </div>
-    )
-  }
-
-  return (
-    <div className="divide-y divide-black/5">
-      {employees.map((employee) => (
-        <div
-          key={employee.id}
-          className="flex items-center gap-4 p-5 transition hover:bg-[#f5f5f7]/65"
-        >
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#e8f2ff] text-[#007aff]">
-            <UserRound size={18} />
-          </div>
-
-          <div className="min-w-0">
-            <p className="truncate font-semibold text-[#1d1d1f]">
-              {employee.full_name || '-'}
-            </p>
-
-            <p className="mt-1 line-clamp-1 text-xs text-[#6e6e73]">
-              {employee.employee_number || '-'} · {employee.department || '-'}
-            </p>
-
-            <p className="mt-1 line-clamp-1 text-xs text-[#86868b]">
-              {employee.position || '-'}
-            </p>
-          </div>
-        </div>
-      ))}
-    </div>
-  )
-}
-
 function SummaryCard({
   title,
   value,
@@ -656,8 +815,8 @@ function SummaryCard({
   title: string
   value: string
   description: string
-  icon: React.ReactNode
-  tone: 'blue' | 'green' | 'orange' | 'purple'
+  icon: ReactNode
+  tone: SummaryTone
 }) {
   const toneClass = {
     blue: 'text-[#007aff] bg-[#e8f2ff]',
@@ -709,6 +868,38 @@ function HeroMetric({
       </p>
     </div>
   )
+}
+
+function getSupervisorLevel(employee: Employee, supervisor: Employee | null) {
+  if (!supervisor) return 'Bawahan'
+
+  const supervisorName = normalizeText(supervisor.full_name)
+  const supervisorId = normalizeText(supervisor.id)
+  const supervisorEmployeeNumber = normalizeText(supervisor.employee_number)
+  const supervisorEmail = normalizeText(supervisor.email)
+
+  const supervisorOne = normalizeText(employee.supervisor_1)
+  const supervisorTwo = normalizeText(employee.supervisor_2)
+
+  const matchesOne = [
+    supervisorName,
+    supervisorId,
+    supervisorEmployeeNumber,
+    supervisorEmail,
+  ].includes(supervisorOne)
+
+  const matchesTwo = [
+    supervisorName,
+    supervisorId,
+    supervisorEmployeeNumber,
+    supervisorEmail,
+  ].includes(supervisorTwo)
+
+  if (matchesOne && matchesTwo) return 'Atasan 1 & 2'
+  if (matchesOne) return 'Atasan 1'
+  if (matchesTwo) return 'Atasan 2'
+
+  return 'Bawahan'
 }
 
 function getCurrentPeriodMonth() {
