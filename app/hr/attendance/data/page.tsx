@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import {
   CalendarDays,
   Search,
@@ -889,37 +889,35 @@ export default function HRAttendanceDataPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#f5f5f7] px-4 py-6 text-slate-950 sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-7xl space-y-6">
-        <section className="rounded-[2rem] border border-white/70 bg-white p-6 shadow-sm sm:p-8">
-          <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
-            <div>
-              <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600">
-                <CalendarDays className="h-3.5 w-3.5" />
-                Data Absensi HR
+    <main className="min-h-screen overflow-x-hidden bg-[#f5f5f7] px-4 py-5 text-slate-950 sm:px-6 lg:px-8">
+      <div className="mx-auto w-full max-w-[1500px] space-y-5">
+        <section className="overflow-hidden rounded-[2rem] border border-white/70 bg-white shadow-sm">
+          <div className="grid gap-6 p-5 sm:p-6 xl:grid-cols-[minmax(0,1fr)_minmax(360px,520px)] xl:items-end">
+            <div className="min-w-0">
+              <div className="mb-3 inline-flex max-w-full items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600">
+                <CalendarDays className="h-3.5 w-3.5 shrink-0" />
+                <span className="truncate">Data Absensi HR</span>
               </div>
 
               <h1 className="text-2xl font-bold tracking-tight text-slate-950 sm:text-3xl">
                 Data Absensi Periode
               </h1>
 
-              <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-                Monitoring rekap absensi karyawan berdasarkan periode cutoff 11
-                s.d. 10 bulan berikutnya. Approved request seperti cuti, izin,
-                sakit, tugas luar, dan klaim PHL akan tampil sebagai keterangan
-                yang mudah dibaca.
+              <p className="mt-2 max-w-4xl text-sm leading-6 text-slate-600">
+                Monitoring rekap absensi karyawan berdasarkan periode cutoff 11 s.d. 10 bulan berikutnya.
+                Approved request seperti cuti, izin, sakit, tugas luar, dan klaim PHL tampil sebagai keterangan yang mudah dibaca.
               </p>
             </div>
 
-            <div className="flex flex-col gap-3 sm:flex-row">
-              <div>
-                <label className="mb-1 block text-xs font-semibold text-slate-500">
+            <div className="grid min-w-0 gap-3 rounded-[1.5rem] border border-slate-100 bg-slate-50 p-3 sm:grid-cols-[1fr_1fr]">
+              <label className="block min-w-0">
+                <span className="mb-1 block text-xs font-semibold text-slate-500">
                   Tahun
-                </label>
+                </span>
                 <select
                   value={selectedYear}
                   onChange={(event) => updatePeriodYear(event.target.value)}
-                  className="h-11 rounded-2xl border border-slate-200 bg-white px-4 text-sm font-semibold outline-none transition focus:border-slate-400"
+                  className="h-11 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm font-semibold outline-none transition focus:border-slate-400"
                 >
                   {yearOptions.map((year) => (
                     <option key={year} value={String(year)}>
@@ -927,16 +925,16 @@ export default function HRAttendanceDataPage() {
                     </option>
                   ))}
                 </select>
-              </div>
+              </label>
 
-              <div>
-                <label className="mb-1 block text-xs font-semibold text-slate-500">
+              <label className="block min-w-0">
+                <span className="mb-1 block text-xs font-semibold text-slate-500">
                   Bulan Periode
-                </label>
+                </span>
                 <select
                   value={selectedMonth}
                   onChange={(event) => updatePeriodMonth(event.target.value)}
-                  className="h-11 rounded-2xl border border-slate-200 bg-white px-4 text-sm font-semibold outline-none transition focus:border-slate-400"
+                  className="h-11 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm font-semibold outline-none transition focus:border-slate-400"
                 >
                   {MONTHS.map((month) => (
                     <option key={month.value} value={month.value}>
@@ -944,19 +942,23 @@ export default function HRAttendanceDataPage() {
                     </option>
                   ))}
                 </select>
+              </label>
+
+              <div className="min-w-0 rounded-2xl border border-slate-200 bg-white px-4 py-3 sm:col-span-2">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Cutoff Periode
+                </p>
+                <p className="mt-1 break-words text-sm font-bold leading-6 text-slate-900">
+                  {periodRange.label}
+                </p>
               </div>
             </div>
-          </div>
-
-          <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
-            <span className="font-semibold">Cutoff periode:</span>{' '}
-            {periodRange.label}
           </div>
         </section>
 
         {message && (
           <section
-            className={`rounded-2xl border px-4 py-3 text-sm font-medium ${
+            className={`rounded-2xl border px-4 py-3 text-sm font-medium leading-6 ${
               message.type === 'success'
                 ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
                 : message.type === 'error'
@@ -968,7 +970,7 @@ export default function HRAttendanceDataPage() {
           </section>
         )}
 
-        <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-6">
+        <section className="grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-4">
           <StatCard
             label="Karyawan"
             value={dashboardStats.totalEmployees}
@@ -997,23 +999,23 @@ export default function HRAttendanceDataPage() {
           <StatCard label="Locked" value={dashboardStats.locked} icon={Lock} />
         </section>
 
-        <section className="rounded-[1.75rem] border border-white/70 bg-white p-5 shadow-sm">
-          <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-            <div className="flex flex-col gap-3 md:flex-row md:items-center">
-              <div className="relative">
+        <section className="rounded-[1.75rem] border border-white/70 bg-white p-4 shadow-sm sm:p-5">
+          <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-center">
+            <div className="grid min-w-0 gap-3 md:grid-cols-[minmax(220px,360px)_minmax(180px,240px)]">
+              <div className="relative min-w-0">
                 <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                 <input
                   value={search}
                   onChange={(event) => setSearch(event.target.value)}
                   placeholder="Cari nama, NIP, unit, jabatan..."
-                  className="h-11 w-full rounded-2xl border border-slate-200 bg-white pl-10 pr-4 text-sm outline-none transition focus:border-slate-400 md:w-80"
+                  className="h-11 w-full rounded-2xl border border-slate-200 bg-white pl-10 pr-4 text-sm outline-none transition focus:border-slate-400"
                 />
               </div>
 
               <select
                 value={statusFilter}
                 onChange={(event) => setStatusFilter(event.target.value)}
-                className="h-11 rounded-2xl border border-slate-200 bg-white px-4 text-sm font-semibold outline-none transition focus:border-slate-400"
+                className="h-11 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm font-semibold outline-none transition focus:border-slate-400"
               >
                 <option value="all">Semua Status</option>
                 <option value="submitted">Submitted Employee</option>
@@ -1025,63 +1027,63 @@ export default function HRAttendanceDataPage() {
               </select>
             </div>
 
-            <div className="flex flex-wrap gap-2">
+            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5 xl:flex xl:flex-wrap xl:justify-end">
               <button
                 type="button"
                 onClick={fetchData}
                 disabled={isLoading || isProcessing}
-                className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                className="inline-flex h-11 min-w-0 items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                <RefreshCw className="h-4 w-4" />
-                Refresh
+                <RefreshCw className="h-4 w-4 shrink-0" />
+                <span>Refresh</span>
               </button>
 
               <button
                 type="button"
                 onClick={handleSyncApprovedRequests}
                 disabled={isLoading || isProcessing}
-                className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl border border-indigo-200 bg-indigo-50 px-4 text-sm font-semibold text-indigo-700 transition hover:bg-indigo-100 disabled:cursor-not-allowed disabled:opacity-60"
+                className="inline-flex h-11 min-w-0 items-center justify-center gap-2 rounded-2xl border border-indigo-200 bg-indigo-50 px-4 text-sm font-semibold text-indigo-700 transition hover:bg-indigo-100 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {isProcessing ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
                 ) : (
-                  <RefreshCw className="h-4 w-4" />
+                  <RefreshCw className="h-4 w-4 shrink-0" />
                 )}
-                Sync Request
+                <span>Sync Request</span>
               </button>
 
               <button
                 type="button"
                 onClick={handleFinalizePeriod}
                 disabled={isLoading || isProcessing}
-                className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl bg-slate-950 px-4 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+                className="inline-flex h-11 min-w-0 items-center justify-center gap-2 rounded-2xl bg-slate-950 px-4 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {isProcessing ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
                 ) : (
-                  <ShieldCheck className="h-4 w-4" />
+                  <ShieldCheck className="h-4 w-4 shrink-0" />
                 )}
-                Finalisasi
+                <span>Finalisasi</span>
               </button>
 
               <button
                 type="button"
                 onClick={handleLockPeriod}
                 disabled={isLoading || isProcessing}
-                className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl border border-amber-200 bg-amber-50 px-4 text-sm font-semibold text-amber-700 transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60"
+                className="inline-flex h-11 min-w-0 items-center justify-center gap-2 rounded-2xl border border-amber-200 bg-amber-50 px-4 text-sm font-semibold text-amber-700 transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                <Lock className="h-4 w-4" />
-                Lock
+                <Lock className="h-4 w-4 shrink-0" />
+                <span>Lock</span>
               </button>
 
               <button
                 type="button"
                 onClick={handleUnlockPeriod}
                 disabled={isLoading || isProcessing}
-                className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl border border-red-200 bg-red-50 px-4 text-sm font-semibold text-red-700 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-60"
+                className="inline-flex h-11 min-w-0 items-center justify-center gap-2 rounded-2xl border border-red-200 bg-red-50 px-4 text-sm font-semibold text-red-700 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-60 sm:col-span-2 lg:col-span-1"
               >
-                <Unlock className="h-4 w-4" />
-                Unlock
+                <Unlock className="h-4 w-4 shrink-0" />
+                <span>Unlock</span>
               </button>
             </div>
           </div>
@@ -1096,138 +1098,12 @@ export default function HRAttendanceDataPage() {
               </div>
             </div>
           ) : filteredSummaries.length === 0 ? (
-            <div className="flex min-h-[320px] flex-col items-center justify-center px-6 text-center">
-              <AlertTriangle className="h-10 w-10 text-slate-400" />
-              <h2 className="mt-4 text-base font-bold text-slate-900">
-                Data tidak ditemukan
-              </h2>
-              <p className="mt-1 max-w-md text-sm text-slate-500">
-                Tidak ada data yang sesuai dengan periode atau filter yang
-                dipilih.
-              </p>
-            </div>
+            <EmptyState />
           ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-[1300px] w-full border-collapse text-left text-sm">
-                <thead>
-                  <tr className="border-b border-slate-100 bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
-                    <th className="px-5 py-4 font-bold">Karyawan</th>
-                    <th className="px-5 py-4 font-bold">Unit/Jabatan</th>
-                    <th className="px-5 py-4 text-center font-bold">Hadir</th>
-                    <th className="px-5 py-4 text-center font-bold">Cuti</th>
-                    <th className="px-5 py-4 text-center font-bold">Sakit</th>
-                    <th className="px-5 py-4 text-center font-bold">Izin</th>
-                    <th className="px-5 py-4 text-center font-bold">
-                      Tugas Luar
-                    </th>
-                    <th className="px-5 py-4 text-center font-bold">
-                      Klaim PHL
-                    </th>
-                    <th className="px-5 py-4 text-center font-bold">
-                      Koreksi
-                    </th>
-                    <th className="px-5 py-4 font-bold">Approval Atasan</th>
-                    <th className="px-5 py-4 font-bold">Final HR</th>
-                    <th className="px-5 py-4 font-bold">Lock</th>
-                    <th className="px-5 py-4 text-right font-bold">Aksi</th>
-                  </tr>
-                </thead>
-
-                <tbody>
-                  {filteredSummaries.map((summary) => {
-                    return (
-                      <tr
-                        key={summary.employee.id}
-                        className="border-b border-slate-100 transition hover:bg-slate-50/70"
-                      >
-                        <td className="px-5 py-4 align-top">
-                          <div className="font-bold text-slate-950">
-                            {getEmployeeName(summary.employee)}
-                          </div>
-                          <div className="mt-1 text-xs text-slate-500">
-                            NIP/Machine: {getEmployeeNumber(summary.employee)}
-                          </div>
-                          <div className="mt-1 text-xs text-slate-500">
-                            {summary.employee.email || '-'}
-                          </div>
-                        </td>
-
-                        <td className="px-5 py-4 align-top">
-                          <div className="font-semibold text-slate-800">
-                            {getEmployeeUnit(summary.employee)}
-                          </div>
-                          <div className="mt-1 text-xs text-slate-500">
-                            {getEmployeePosition(summary.employee)}
-                          </div>
-                        </td>
-
-                        <NumberCell value={summary.presentDays} />
-                        <NumberCell value={summary.leaveDays} />
-                        <NumberCell value={summary.sickDays} />
-                        <NumberCell value={summary.permitDays} />
-                        <NumberCell value={summary.officialTravelDays} />
-                        <NumberCell value={summary.phlClaimDays} />
-                        <NumberCell value={summary.manualCorrectionDays} />
-
-                        <td className="px-5 py-4 align-top">
-                          <StatusPill
-                            status={summary.confirmation?.supervisor_status}
-                          />
-                          {summary.confirmation?.supervisor_approved_by_name && (
-                            <div className="mt-1 text-[11px] text-slate-500">
-                              oleh{' '}
-                              {
-                                summary.confirmation
-                                  .supervisor_approved_by_name
-                              }
-                            </div>
-                          )}
-                        </td>
-
-                        <td className="px-5 py-4 align-top">
-                          <StatusPill status={summary.confirmation?.hr_status} />
-                          {summary.confirmation?.hr_finalized_by_name && (
-                            <div className="mt-1 text-[11px] text-slate-500">
-                              oleh {summary.confirmation.hr_finalized_by_name}
-                            </div>
-                          )}
-                        </td>
-
-                        <td className="px-5 py-4 align-top">
-                          {summary.confirmation?.is_locked ? (
-                            <div>
-                              <span className="inline-flex items-center gap-1 rounded-full border border-slate-300 bg-slate-900 px-2.5 py-1 text-[11px] font-semibold text-white">
-                                <Lock className="h-3 w-3" />
-                                Locked
-                              </span>
-                              <div className="mt-1 text-[11px] text-slate-500">
-                                {summary.confirmation.locked_by_name || '-'}
-                              </div>
-                            </div>
-                          ) : (
-                            <span className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold text-slate-500">
-                              <Unlock className="h-3 w-3" />
-                              Open
-                            </span>
-                          )}
-                        </td>
-
-                        <td className="px-5 py-4 text-right align-top">
-                          <button
-                            type="button"
-                            onClick={() => setSelectedSummary(summary)}
-                            className="inline-flex h-9 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 transition hover:bg-slate-100"
-                          >
-                            <Eye className="h-4 w-4" />
-                            Detail
-                          </button>
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
+            <AttendanceSummaryList
+              summaries={filteredSummaries}
+              onDetail={(summary) => setSelectedSummary(summary)}
+            />
           )}
         </section>
       </div>
@@ -1243,6 +1119,239 @@ export default function HRAttendanceDataPage() {
   )
 }
 
+function AttendanceSummaryList({
+  summaries,
+  onDetail,
+}: {
+  summaries: EmployeeAttendanceSummary[]
+  onDetail: (summary: EmployeeAttendanceSummary) => void
+}) {
+  return (
+    <>
+      <div className="hidden lg:block">
+        <table className="w-full table-fixed border-collapse text-left text-sm">
+          <thead>
+            <tr className="border-b border-slate-100 bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+              <th className="w-[25%] px-4 py-4 font-bold">Karyawan</th>
+              <th className="w-[21%] px-4 py-4 font-bold">Unit / Jabatan</th>
+              <th className="w-[27%] px-4 py-4 font-bold">Ringkasan Absensi</th>
+              <th className="w-[15%] px-4 py-4 font-bold">Approval</th>
+              <th className="w-[8%] px-4 py-4 font-bold">Lock</th>
+              <th className="w-[4%] px-4 py-4 text-right font-bold">Aksi</th>
+            </tr>
+          </thead>
+
+          <tbody>
+            {summaries.map((summary) => (
+              <tr
+                key={summary.employee.id}
+                className="border-b border-slate-100 transition hover:bg-slate-50/70"
+              >
+                <td className="px-4 py-4 align-top">
+                  <div className="min-w-0">
+                    <p className="break-words font-bold leading-5 text-slate-950">
+                      {getEmployeeName(summary.employee)}
+                    </p>
+                    <p className="mt-1 break-words text-xs leading-5 text-slate-500">
+                      NIP/Machine: {getEmployeeNumber(summary.employee)}
+                    </p>
+                    <p className="mt-1 break-words text-xs leading-5 text-slate-500">
+                      {summary.employee.email || '-'}
+                    </p>
+                  </div>
+                </td>
+
+                <td className="px-4 py-4 align-top">
+                  <p className="break-words font-semibold leading-5 text-slate-800">
+                    {getEmployeeUnit(summary.employee)}
+                  </p>
+                  <p className="mt-1 break-words text-xs leading-5 text-slate-500">
+                    {getEmployeePosition(summary.employee)}
+                  </p>
+                </td>
+
+                <td className="px-4 py-4 align-top">
+                  <MetricWrap summary={summary} />
+                </td>
+
+                <td className="px-4 py-4 align-top">
+                  <div className="space-y-2">
+                    <div>
+                      <p className="mb-1 text-[11px] font-bold uppercase tracking-wide text-slate-400">
+                        Atasan
+                      </p>
+                      <StatusPill status={summary.confirmation?.supervisor_status} />
+                    </div>
+                    <div>
+                      <p className="mb-1 text-[11px] font-bold uppercase tracking-wide text-slate-400">
+                        Final HR
+                      </p>
+                      <StatusPill status={summary.confirmation?.hr_status} />
+                    </div>
+                  </div>
+                </td>
+
+                <td className="px-4 py-4 align-top">
+                  <LockBadge confirmation={summary.confirmation} />
+                </td>
+
+                <td className="px-4 py-4 text-right align-top">
+                  <button
+                    type="button"
+                    onClick={() => onDetail(summary)}
+                    className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 transition hover:bg-slate-100"
+                    title="Detail"
+                  >
+                    <Eye className="h-4 w-4" />
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="grid gap-3 p-4 lg:hidden">
+        {summaries.map((summary) => (
+          <div
+            key={summary.employee.id}
+            className="rounded-[1.5rem] border border-slate-200 bg-white p-4 shadow-sm"
+          >
+            <div className="flex min-w-0 items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="break-words font-bold leading-5 text-slate-950">
+                  {getEmployeeName(summary.employee)}
+                </p>
+                <p className="mt-1 break-words text-xs leading-5 text-slate-500">
+                  {getEmployeeNumber(summary.employee)} · {summary.employee.email || '-'}
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => onDetail(summary)}
+                className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 transition hover:bg-slate-100"
+                title="Detail"
+              >
+                <Eye className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="mt-3 rounded-2xl bg-slate-50 p-3">
+              <p className="break-words text-sm font-semibold text-slate-800">
+                {getEmployeeUnit(summary.employee)}
+              </p>
+              <p className="mt-1 break-words text-xs leading-5 text-slate-500">
+                {getEmployeePosition(summary.employee)}
+              </p>
+            </div>
+
+            <div className="mt-3">
+              <MetricWrap summary={summary} />
+            </div>
+
+            <div className="mt-4 grid gap-3 sm:grid-cols-3">
+              <SmallStatusBox label="Approval Atasan">
+                <StatusPill status={summary.confirmation?.supervisor_status} />
+              </SmallStatusBox>
+              <SmallStatusBox label="Final HR">
+                <StatusPill status={summary.confirmation?.hr_status} />
+              </SmallStatusBox>
+              <SmallStatusBox label="Lock">
+                <LockBadge confirmation={summary.confirmation} />
+              </SmallStatusBox>
+            </div>
+          </div>
+        ))}
+      </div>
+    </>
+  )
+}
+
+function EmptyState() {
+  return (
+    <div className="flex min-h-[320px] flex-col items-center justify-center px-6 text-center">
+      <AlertTriangle className="h-10 w-10 text-slate-400" />
+      <h2 className="mt-4 text-base font-bold text-slate-900">
+        Data tidak ditemukan
+      </h2>
+      <p className="mt-1 max-w-md text-sm leading-6 text-slate-500">
+        Tidak ada data yang sesuai dengan periode atau filter yang dipilih.
+      </p>
+    </div>
+  )
+}
+
+function MetricWrap({ summary }: { summary: EmployeeAttendanceSummary }) {
+  const items = [
+    { label: 'Hadir', value: summary.presentDays },
+    { label: 'Cuti', value: summary.leaveDays },
+    { label: 'Sakit', value: summary.sickDays },
+    { label: 'Izin', value: summary.permitDays },
+    { label: 'Tugas Luar', value: summary.officialTravelDays },
+    { label: 'Klaim PHL', value: summary.phlClaimDays },
+    { label: 'Koreksi', value: summary.manualCorrectionDays },
+  ]
+
+  return (
+    <div className="flex flex-wrap gap-2">
+      {items.map((item) => (
+        <span
+          key={item.label}
+          className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold ${
+            item.value > 0
+              ? 'bg-slate-900 text-white'
+              : 'bg-slate-100 text-slate-500'
+          }`}
+        >
+          <span>{item.label}</span>
+          <span>{item.value}</span>
+        </span>
+      ))}
+    </div>
+  )
+}
+
+function SmallStatusBox({
+  label,
+  children,
+}: {
+  label: string
+  children: ReactNode
+}) {
+  return (
+    <div className="min-w-0 rounded-2xl border border-slate-100 bg-slate-50 p-3">
+      <p className="mb-2 text-[11px] font-bold uppercase tracking-wide text-slate-400">
+        {label}
+      </p>
+      <div className="min-w-0">{children}</div>
+    </div>
+  )
+}
+
+function LockBadge({ confirmation }: { confirmation?: PeriodConfirmation }) {
+  if (confirmation?.is_locked) {
+    return (
+      <div className="min-w-0">
+        <span className="inline-flex items-center gap-1 rounded-full border border-slate-300 bg-slate-900 px-2.5 py-1 text-[11px] font-semibold text-white">
+          <Lock className="h-3 w-3 shrink-0" />
+          Locked
+        </span>
+        <div className="mt-1 break-words text-[11px] leading-5 text-slate-500">
+          {confirmation.locked_by_name || '-'}
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold text-slate-500">
+      <Unlock className="h-3 w-3 shrink-0" />
+      Open
+    </span>
+  )
+}
+
 function StatCard({
   label,
   value,
@@ -1253,36 +1362,22 @@ function StatCard({
   icon: any
 }) {
   return (
-    <div className="rounded-[1.5rem] border border-white/70 bg-white p-5 shadow-sm">
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+    <div className="min-w-0 rounded-[1.5rem] border border-white/70 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
+      <div className="flex min-w-0 items-center justify-between gap-3">
+        <div className="min-w-0">
+          <p className="break-words text-xs font-semibold uppercase tracking-wide text-slate-500">
             {label}
           </p>
-          <p className="mt-2 text-2xl font-bold text-slate-950">{value}</p>
+          <p className="mt-2 break-words text-2xl font-bold text-slate-950">
+            {value}
+          </p>
         </div>
 
-        <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-100 text-slate-800">
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-slate-100 text-slate-800">
           <Icon className="h-5 w-5" />
         </div>
       </div>
     </div>
-  )
-}
-
-function NumberCell({ value }: { value: number }) {
-  return (
-    <td className="px-5 py-4 text-center align-top">
-      <span
-        className={`inline-flex min-w-8 items-center justify-center rounded-full px-2.5 py-1 text-xs font-bold ${
-          value > 0
-            ? 'bg-slate-900 text-white'
-            : 'bg-slate-100 text-slate-400'
-        }`}
-      >
-        {value}
-      </span>
-    </td>
   )
 }
 
@@ -1296,14 +1391,14 @@ function DetailModal({
   onClose: () => void
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4 backdrop-blur-sm">
-      <div className="max-h-[90vh] w-full max-w-6xl overflow-hidden rounded-[2rem] bg-white shadow-2xl">
-        <div className="flex items-start justify-between gap-4 border-b border-slate-100 p-5 sm:p-6">
-          <div>
-            <h2 className="text-xl font-bold text-slate-950">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-3 backdrop-blur-sm sm:p-4">
+      <div className="flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-[2rem] bg-white shadow-2xl">
+        <div className="flex min-w-0 items-start justify-between gap-4 border-b border-slate-100 p-5 sm:p-6">
+          <div className="min-w-0">
+            <h2 className="break-words text-xl font-bold leading-7 text-slate-950">
               Detail Absensi — {getEmployeeName(summary.employee)}
             </h2>
-            <p className="mt-1 text-sm text-slate-500">
+            <p className="mt-1 break-words text-sm leading-6 text-slate-500">
               Periode {periodLabel}
             </p>
           </div>
@@ -1311,13 +1406,13 @@ function DetailModal({
           <button
             type="button"
             onClick={onClose}
-            className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-slate-600 transition hover:bg-slate-200"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-600 transition hover:bg-slate-200"
           >
             <X className="h-5 w-5" />
           </button>
         </div>
 
-        <div className="max-h-[calc(90vh-100px)] overflow-y-auto p-5 sm:p-6">
+        <div className="min-h-0 overflow-y-auto p-5 sm:p-6">
           <div className="mb-5 grid gap-3 md:grid-cols-3">
             <InfoBox
               label="NIP / Machine"
@@ -1353,114 +1448,67 @@ function DetailModal({
           </div>
 
           {summary.confirmation?.lock_note && (
-            <div className="mb-5 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+            <div className="mb-5 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-800">
               <span className="font-bold">Catatan Lock:</span>{' '}
               {summary.confirmation.lock_note}
             </div>
           )}
 
-          <div className="overflow-x-auto rounded-2xl border border-slate-200">
-            <table className="min-w-[1200px] w-full border-collapse text-left text-sm">
-              <thead>
-                <tr className="border-b border-slate-100 bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
-                  <th className="px-4 py-3 font-bold">Tanggal</th>
-                  <th className="px-4 py-3 font-bold">Masuk</th>
-                  <th className="px-4 py-3 font-bold">Pulang</th>
-                  <th className="px-4 py-3 font-bold">Keterangan</th>
-                  <th className="px-4 py-3 font-bold">Status Request</th>
-                  <th className="px-4 py-3 font-bold">Approval Atasan</th>
-                  <th className="px-4 py-3 font-bold">Final HR</th>
-                  <th className="px-4 py-3 font-bold">Pending Job</th>
-                  <th className="px-4 py-3 font-bold">Handover</th>
-                  <th className="px-4 py-3 font-bold">Bukti</th>
-                </tr>
-              </thead>
+          <section className="rounded-[1.5rem] border border-slate-200 bg-slate-50 p-4">
+            <div className="mb-4 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <h3 className="text-base font-bold text-slate-950">
+                  Detail Harian
+                </h3>
+                <p className="mt-1 text-sm leading-6 text-slate-500">
+                  Ditampilkan sebagai card supaya tidak melebar atau terpotong di layar kecil.
+                </p>
+              </div>
+              <span className="w-fit rounded-full bg-white px-3 py-1 text-xs font-bold text-slate-600 ring-1 ring-slate-200">
+                {summary.logs.length} data
+              </span>
+            </div>
 
-              <tbody>
-                {summary.logs.length === 0 ? (
-                  <tr>
-                    <td
-                      colSpan={10}
-                      className="px-4 py-10 text-center text-sm text-slate-500"
+            {summary.logs.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-8 text-center text-sm text-slate-500">
+                Belum ada log absensi pada periode ini.
+              </div>
+            ) : (
+              <div className="grid gap-3 lg:grid-cols-2">
+                {summary.logs.map((log, index) => {
+                  const proofUrl =
+                    log.proof_file_url || log.proof_url || log.attachment_url
+
+                  return (
+                    <div
+                      key={log.id || `${log.attendance_date}-${index}`}
+                      className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
                     >
-                      Belum ada log absensi pada periode ini.
-                    </td>
-                  </tr>
-                ) : (
-                  summary.logs.map((log, index) => {
-                    const proofUrl =
-                      log.proof_file_url || log.proof_url || log.attachment_url
-
-                    return (
-                      <tr
-                        key={log.id || `${log.attendance_date}-${index}`}
-                        className="border-b border-slate-100 align-top last:border-b-0"
-                      >
-                        <td className="px-4 py-3">
-                          <div className="font-semibold text-slate-900">
+                      <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                        <div className="min-w-0">
+                          <p className="font-bold text-slate-950">
                             {formatShortDate(log.attendance_date)}
-                          </div>
-                          <div className="mt-1 text-[11px] text-slate-500">
+                          </p>
+                          <p className="mt-1 text-xs text-slate-500">
                             {log.attendance_date || '-'}
-                          </div>
-                        </td>
+                          </p>
+                        </div>
+                        <AttendancePill log={log} />
+                      </div>
 
-                        <td className="px-4 py-3 font-medium text-slate-700">
-                          {log.check_in || '-'}
-                        </td>
-
-                        <td className="px-4 py-3 font-medium text-slate-700">
-                          {log.check_out || '-'}
-                        </td>
-
-                        <td className="px-4 py-3">
-                          <AttendancePill log={log} />
-
-                          {log.absence_request_source && (
-                            <div className="mt-1 text-[11px] text-slate-500">
-                              Sumber: {log.absence_request_source}
-                            </div>
-                          )}
-                        </td>
-
-                        <td className="px-4 py-3">
+                      <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                        <InfoMini label="Masuk" value={log.check_in || '-'} />
+                        <InfoMini label="Pulang" value={log.check_out || '-'} />
+                        <InfoMini label="Status Request">
                           <StatusPill status={log.absence_request_status} />
-                        </td>
-
-                        <td className="px-4 py-3">
+                        </InfoMini>
+                        <InfoMini label="Approval Atasan">
                           <StatusPill status={log.supervisor_approval_status} />
-                        </td>
-
-                        <td className="px-4 py-3">
+                        </InfoMini>
+                        <InfoMini label="Final HR">
                           <StatusPill status={log.hr_final_status} />
-                          {log.hr_finalized_by_name && (
-                            <div className="mt-1 text-[11px] text-slate-500">
-                              oleh {log.hr_finalized_by_name}
-                            </div>
-                          )}
-                        </td>
-
-                        <td className="px-4 py-3">
-                          <div className="max-w-[220px] whitespace-pre-wrap text-xs leading-5 text-slate-600">
-                            {log.job_pending || '-'}
-                          </div>
-                        </td>
-
-                        <td className="px-4 py-3">
-                          <div className="max-w-[220px] text-xs leading-5 text-slate-600">
-                            <div>
-                              <span className="font-semibold">Ke:</span>{' '}
-                              {log.handover_to || '-'}
-                            </div>
-                            {log.handover_note && (
-                              <div className="mt-1 whitespace-pre-wrap">
-                                {log.handover_note}
-                              </div>
-                            )}
-                          </div>
-                        </td>
-
-                        <td className="px-4 py-3">
+                        </InfoMini>
+                        <InfoMini label="Bukti">
                           {proofUrl ? (
                             <a
                               href={proofUrl}
@@ -1474,14 +1522,50 @@ function DetailModal({
                           ) : (
                             <span className="text-xs text-slate-400">-</span>
                           )}
-                        </td>
-                      </tr>
-                    )
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
+                        </InfoMini>
+                      </div>
+
+                      {(log.absence_request_source || log.hr_finalized_by_name) && (
+                        <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                          <InfoMini
+                            label="Sumber"
+                            value={log.absence_request_source || '-'}
+                          />
+                          <InfoMini
+                            label="Finalized By"
+                            value={log.hr_finalized_by_name || '-'}
+                          />
+                        </div>
+                      )}
+
+                      {(log.job_pending || log.handover_to || log.handover_note) && (
+                        <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                          <InfoMini
+                            label="Pending Job"
+                            value={log.job_pending || '-'}
+                            long
+                          />
+                          <InfoMini label="Handover" long>
+                            <div className="space-y-1">
+                              <div>
+                                <span className="font-semibold">Ke:</span>{' '}
+                                {log.handover_to || '-'}
+                              </div>
+                              {log.handover_note && (
+                                <div className="whitespace-pre-wrap">
+                                  {log.handover_note}
+                                </div>
+                              )}
+                            </div>
+                          </InfoMini>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </section>
 
           <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-4">
             <h3 className="text-sm font-bold text-slate-900">
@@ -1511,13 +1595,38 @@ function DetailModal({
   )
 }
 
-function InfoBox({ label, value }: { label: string; value: string }) {
+function InfoMini({
+  label,
+  value,
+  children,
+  long = false,
+}: {
+  label: string
+  value?: string
+  children?: ReactNode
+  long?: boolean
+}) {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4">
-      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+    <div className={`min-w-0 rounded-xl bg-slate-50 p-3 ${long ? 'sm:col-span-1' : ''}`}>
+      <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400">
         {label}
       </p>
-      <p className="mt-1 text-sm font-bold text-slate-900">{value || '-'}</p>
+      <div className="mt-1 break-words text-xs font-semibold leading-5 text-slate-700">
+        {children || value || '-'}
+      </div>
+    </div>
+  )
+}
+
+function InfoBox({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4">
+      <p className="break-words text-xs font-semibold uppercase tracking-wide text-slate-500">
+        {label}
+      </p>
+      <p className="mt-1 break-words text-sm font-bold leading-6 text-slate-900">
+        {value || '-'}
+      </p>
     </div>
   )
 }

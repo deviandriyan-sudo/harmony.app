@@ -710,7 +710,7 @@ export default function HREmployeesPage() {
       />
 
       <section className="harmony-page-bg min-h-screen space-y-6 overflow-x-hidden p-4 sm:p-6">
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-7">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
           <SummaryCard title="Total Employee" value={String(totalEmployees)} description="Seluruh data" icon={<Users size={20} />} tone="blue" />
           <SummaryCard title="Active" value={String(activeEmployees)} description="Karyawan aktif" icon={<BadgeCheck size={20} />} tone="green" />
           <SummaryCard title="Machine PIN" value={String(withMachinePin)} description="Siap absensi" icon={<Fingerprint size={20} />} tone="purple" />
@@ -1720,13 +1720,24 @@ function SummaryCard({ title, value, description, icon, tone }: { title: string;
 
   return (
     <div className="harmony-card harmony-hover-lift harmony-slide-up min-w-0 p-5">
-      <div className="flex min-w-0 items-center justify-between gap-4">
-        <div className="min-w-0">
-          <p className="truncate text-sm text-[#6e6e73]">{title}</p>
-          <h3 className="mt-2 truncate text-2xl font-semibold tracking-tight text-[#1d1d1f]">{value}</h3>
-          <p className="mt-1 line-clamp-1 text-xs leading-5 text-[#86868b]">{description}</p>
+      <div className="flex min-w-0 items-start justify-between gap-4">
+        <div className="min-w-0 flex-1">
+          <p className="break-words text-sm font-semibold leading-5 text-[#6e6e73]">
+            {title}
+          </p>
+
+          <h3 className="mt-2 break-words text-3xl font-semibold tracking-tight text-[#1d1d1f]">
+            {value}
+          </h3>
+
+          <p className="mt-1 break-words text-xs leading-5 text-[#86868b]">
+            {description}
+          </p>
         </div>
-        <div className={`shrink-0 rounded-2xl p-3 ${toneClass}`}>{icon}</div>
+
+        <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${toneClass}`}>
+          {icon}
+        </div>
       </div>
     </div>
   )

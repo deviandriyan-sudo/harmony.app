@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import type { ReactNode } from 'react'
 import * as XLSX from 'xlsx'
 import {
   Upload,
@@ -22,6 +23,7 @@ import {
   Trash2,
   CalendarDays,
   Activity,
+  Plus,
 } from 'lucide-react'
 
 import { Topbar } from '@/components/layout/Topbar'
@@ -134,6 +136,7 @@ export default function HRAttendanceUploadPage() {
   const [loading, setLoading] = useState(true)
   const [uploading, setUploading] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [uploadModalOpen, setUploadModalOpen] = useState(false)
 
   const [errorMessage, setErrorMessage] = useState('')
   const [successMessage, setSuccessMessage] = useState('')
@@ -246,6 +249,16 @@ export default function HRAttendanceUploadPage() {
     setScheduleConfirmed(false)
     setErrorMessage('')
     setSuccessMessage('')
+  }
+
+  function openUploadModal() {
+    setUploadModalOpen(true)
+    setErrorMessage('')
+    setSuccessMessage('')
+  }
+
+  function closeUploadModal() {
+    setUploadModalOpen(false)
   }
 
   function validateFile(file: File) {
@@ -1051,6 +1064,7 @@ export default function HRAttendanceUploadPage() {
       setSkippedPreviewCount(0)
       setScheduleConfirmed(false)
       setUploading(false)
+      setUploadModalOpen(false)
 
       await fetchData()
       return
@@ -1081,6 +1095,7 @@ export default function HRAttendanceUploadPage() {
     setSkippedPreviewCount(0)
     setScheduleConfirmed(false)
     setUploading(false)
+    setUploadModalOpen(false)
 
     await fetchData()
   }
@@ -1153,8 +1168,8 @@ export default function HRAttendanceUploadPage() {
         description="Unggah berkas mesin absensi. Sistem hanya memproses NIP yang sesuai dengan machine_pin pada data karyawan Poltek."
       />
 
-      <section className="harmony-page-bg min-h-screen space-y-6 p-6">
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <section className="harmony-page-bg min-h-screen space-y-6 overflow-x-hidden p-4 sm:p-6">
+        <div className="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(220px,1fr))]">
           <SummaryCard
             title="Total Unggahan"
             value={String(totalUploads)}
@@ -1202,332 +1217,49 @@ export default function HRAttendanceUploadPage() {
           />
         )}
 
-        <div className="grid gap-6 xl:grid-cols-[1fr_0.78fr]">
-          <div className="harmony-card harmony-slide-up overflow-hidden">
-            <div className="border-b border-black/5 bg-white/55 p-5">
+        <div className="harmony-card harmony-slide-up overflow-hidden">
+          <div className="flex flex-col gap-5 border-b border-black/5 bg-white/55 p-5 lg:flex-row lg:items-center lg:justify-between">
+            <div className="min-w-0">
               <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-[#e8f2ff] px-3 py-1.5 text-xs font-bold text-[#0059b8]">
                 <Upload size={14} />
                 Attendance Import
               </div>
 
               <h2 className="text-lg font-semibold text-[#1d1d1f]">
-                Unggah & Proses Berkas Mesin Absensi
+                Unggah & Proses Berkas Absensi
               </h2>
 
-              <p className="mt-1 text-sm text-[#6e6e73]">
-                Sistem membaca NIP sebagai machine_pin, tanggal sebagai attendance_date, scan masuk sebagai check_in, dan scan pulang sebagai check_out.
+              <p className="mt-1 max-w-3xl text-sm leading-6 text-[#6e6e73]">
+                Proses import dibuat dalam modal supaya halaman utama tetap ringkas.
+                Sistem akan membaca NIP sebagai machine_pin dan hanya memproses data yang sesuai dengan master karyawan aktif.
               </p>
             </div>
 
-            <div className="space-y-5 p-5">
-              <div className="rounded-[28px] border border-black/5 bg-white/65 p-5 shadow-sm backdrop-blur-xl">
-                <div className="mb-4 flex items-center gap-2">
-                  <Settings2 size={18} className="text-[#007aff]" />
-                  <h3 className="font-semibold text-[#1d1d1f]">
-                    Konfirmasi Jam Kerja Reguler
-                  </h3>
-                </div>
-
-                <p className="mb-5 text-sm leading-6 text-[#6e6e73]">
-                  Sistem akan menggunakan jam kerja default yang aktif pada menu Pengaturan.
-                </p>
-
-                <div className="grid gap-4 md:grid-cols-3">
-                  <MiniInfoCard
-                    title="Nama Jadwal"
-                    value={workSchedule.schedule_name}
-                  />
-
-                  <MiniInfoCard
-                    title="Jam Kerja"
-                    value={`${workSchedule.expected_check_in} - ${workSchedule.expected_check_out}`}
-                  />
-
-                  <MiniInfoCard
-                    title="Toleransi"
-                    value={`${workSchedule.late_tolerance_minutes || 0} menit`}
-                  />
-                </div>
-
-                <label className="mt-5 flex cursor-pointer items-start gap-3 rounded-[22px] border border-black/5 bg-[#f5f5f7]/80 p-4 shadow-sm transition hover:bg-white">
-                  <input
-                    type="checkbox"
-                    checked={scheduleConfirmed}
-                    onChange={(event) =>
-                      setScheduleConfirmed(event.target.checked)
-                    }
-                    className="mt-1 h-4 w-4"
-                  />
-
-                  <div>
-                    <div className="font-semibold text-[#1d1d1f]">
-                      Saya mengonfirmasi bahwa jam kerja reguler sudah benar.
-                    </div>
-                    <p className="mt-1 text-sm leading-6 text-[#6e6e73]">
-                      Sistem akan memproses absensi menggunakan jam kerja {workSchedule.expected_check_in} - {workSchedule.expected_check_out}.
-                    </p>
-                  </div>
-                </label>
-              </div>
-
-              <label className="block">
-                <span className="harmony-label">
-                  Nama / Periode Upload
-                </span>
-
-                <div className="relative">
-                  <CalendarDays
-                    size={17}
-                    className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[#86868b]"
-                  />
-
-                  <input
-                    value={uploadPeriod}
-                    onChange={(event) => setUploadPeriod(event.target.value)}
-                    placeholder="Contoh: Absensi Mei 2026 / Absensi Minggu 1 Mei 2026"
-                    className="harmony-input pl-11"
-                  />
-                </div>
-              </label>
-
-              <label
-                htmlFor="attendance-file"
-                className={[
-                  'group flex min-h-64 cursor-pointer flex-col items-center justify-center rounded-[30px] border border-dashed p-7 text-center shadow-sm transition hover:-translate-y-0.5',
-                  selectedFile
-                    ? 'border-[#007aff]/40 bg-[#e8f2ff]/70'
-                    : 'border-black/10 bg-white/55 hover:border-[#007aff]/40 hover:bg-white',
-                ].join(' ')}
-              >
-                <input
-                  id="attendance-file"
-                  type="file"
-                  accept=".xls,.xlsx,.csv"
-                  className="hidden"
-                  onChange={(event) => {
-                    const file = event.target.files?.[0] || null
-                    handleFileChange(file)
-                  }}
-                />
-
-                <div
-                  className={[
-                    'mb-5 flex h-18 w-18 items-center justify-center rounded-[26px] transition',
-                    selectedFile
-                      ? 'bg-[#007aff] text-white'
-                      : 'bg-[#e8f2ff] text-[#007aff] group-hover:scale-105',
-                  ].join(' ')}
-                >
-                  {selectedFile ? (
-                    <FileSpreadsheet size={32} />
-                  ) : (
-                    <CloudUpload size={32} />
-                  )}
-                </div>
-
-                <h3 className="text-xl font-semibold text-[#1d1d1f]">
-                  {selectedFile ? selectedFile.name : 'Pilih berkas absensi'}
-                </h3>
-
-                <p className="mt-2 max-w-md text-sm leading-6 text-[#6e6e73]">
-                  {selectedFile
-                    ? `${formatFileSize(selectedFile.size)} · Berkas siap diproses setelah konfirmasi jam kerja.`
-                    : 'Unggah berkas hasil ekspor mesin absensi. Data dengan NIP yang tidak sesuai master karyawan tidak akan diproses.'}
-                </p>
-
-                <div className="mt-5 inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-xs font-bold text-[#007aff] shadow-sm">
-                  <FileText size={14} />
-                  XLS / XLSX / CSV · Maksimal 10 MB
-                </div>
-              </label>
-
-              {selectedFile && (
-                <div className="grid gap-4 md:grid-cols-5">
-                  <MiniInfoCard title="Baris terbaca" value={String(parsedTotalRows)} />
-                  <MiniInfoCard title="Sesuai DB" value={String(matchedPreviewCount)} />
-                  <MiniInfoCard title="Dilewati" value={String(skippedPreviewCount)} />
-                  <MiniInfoCard title="Late" value={String(latePreviewCount)} />
-                  <MiniInfoCard title="Incomplete" value={String(incompletePreviewCount)} />
-                </div>
-              )}
-
-              {parsePreview.length > 0 && (
-                <div className="rounded-[28px] border border-black/5 bg-white/70 p-5 shadow-sm backdrop-blur-xl">
-                  <div className="mb-4 flex items-center gap-2">
-                    <ScanLine size={18} className="text-[#007aff]" />
-                    <h3 className="font-semibold text-[#1d1d1f]">
-                      Pratinjau Data yang Akan Diproses
-                    </h3>
-                  </div>
-
-                  <div className="overflow-x-auto">
-                    <table className="w-full min-w-[950px] text-left text-sm">
-                      <thead>
-                        <tr className="border-b border-black/5 text-xs uppercase text-[#6e6e73]">
-                          <th className="py-2">Employee</th>
-                          <th className="py-2">Machine PIN</th>
-                          <th className="py-2">Tanggal</th>
-                          <th className="py-2">Check In</th>
-                          <th className="py-2">Check Out</th>
-                          <th className="py-2">Durasi</th>
-                          <th className="py-2">Status</th>
-                        </tr>
-                      </thead>
-
-                      <tbody>
-                        {parsePreview.map((row, index) => (
-                          <tr
-                            key={`${row.machine_pin}-${index}`}
-                            className="border-b border-black/5"
-                          >
-                            <td className="py-2">
-                              <div className="font-semibold text-[#1d1d1f]">
-                                {row.full_name || '-'}
-                              </div>
-                              <div className="text-xs text-[#6e6e73]">
-                                {row.department || '-'}
-                              </div>
-                            </td>
-
-                            <td className="py-2 font-semibold text-[#1d1d1f]">
-                              {row.machine_pin}
-                            </td>
-
-                            <td className="py-2 text-[#1d1d1f]">
-                              {row.attendance_date}
-                            </td>
-
-                            <td className="py-2 text-[#1d1d1f]">
-                              {row.check_in || '-'}
-                            </td>
-
-                            <td className="py-2 text-[#1d1d1f]">
-                              {row.check_out || '-'}
-                            </td>
-
-                            <td className="py-2 text-[#1d1d1f]">
-                              {formatDuration(row.work_duration_minutes)}
-                            </td>
-
-                            <td className="py-2">
-                              <StatusBadge status={row.attendance_status} />
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-
-                  <p className="mt-4 text-xs leading-5 text-[#6e6e73]">
-                    Pratinjau hanya menampilkan maksimal 5 data yang sesuai dengan database karyawan.
-                  </p>
-                </div>
-              )}
-
-              <label className="block">
-                <span className="harmony-label">
-                  Catatan Unggahan
-                </span>
-
-                <textarea
-                  value={notes}
-                  onChange={(event) => setNotes(event.target.value)}
-                  placeholder="Contoh: Data absensi periode Mei 2026, hasil ekspor langsung dari mesin fingerprint."
-                  className="harmony-textarea"
-                />
-              </label>
-
-              <div className="flex flex-col gap-3 md:flex-row md:justify-end">
-                <button
-                  type="button"
-                  onClick={resetUploadForm}
-                  className="harmony-button-secondary"
-                >
-                  <X size={18} />
-                  Reset
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleUpload}
-                  disabled={uploading || !selectedFile}
-                  className="harmony-button-primary"
-                >
-                  <Upload size={18} />
-                  {uploading ? 'Memproses...' : 'Unggah & Proses'}
-                </button>
-              </div>
-            </div>
+            <button
+              type="button"
+              onClick={openUploadModal}
+              className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-[18px] bg-[#007aff] px-5 text-sm font-bold text-white shadow-[0_14px_30px_rgba(0,122,255,0.22)] transition hover:-translate-y-0.5 hover:bg-[#0067d8]"
+            >
+              <Plus size={18} />
+              Upload Berkas
+            </button>
           </div>
 
-          <div className="harmony-card harmony-slide-up overflow-hidden">
-            <div className="border-b border-black/5 bg-white/55 p-5">
-              <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-[#f7edfc] px-3 py-1.5 text-xs font-bold text-[#7b2cbf]">
-                <Database size={14} />
-                Processing Logic
-              </div>
+          <div className="grid gap-4 p-5 md:grid-cols-3">
+            <MiniInfoCard
+              title="Jadwal Default"
+              value={workSchedule.schedule_name}
+            />
 
-              <h2 className="text-lg font-semibold text-[#1d1d1f]">
-                Logika Pemrosesan
-              </h2>
+            <MiniInfoCard
+              title="Jam Kerja"
+              value={`${workSchedule.expected_check_in} - ${workSchedule.expected_check_out}`}
+            />
 
-              <p className="mt-1 text-sm text-[#6e6e73]">
-                Sistem telah disederhanakan khusus untuk karyawan Poltek dengan jam kerja reguler.
-              </p>
-            </div>
-
-            <div className="space-y-4 p-5">
-              <ProcessItem
-                number="01"
-                title="Validasi Database Karyawan"
-                description="Sistem hanya memproses NIP yang sesuai dengan machine_pin pada master karyawan aktif."
-                icon={<ShieldCheck size={18} />}
-              />
-
-              <ProcessItem
-                number="02"
-                title="Membaca NIP"
-                description="Kolom NIP pada berkas digunakan sebagai machine_pin."
-                icon={<Fingerprint size={18} />}
-              />
-
-              <ProcessItem
-                number="03"
-                title="Membaca Tanggal & Scan"
-                description="Tanggal menjadi attendance_date, Scan masuk menjadi check_in, dan Scan pulang menjadi check_out."
-                icon={<Clock3 size={18} />}
-              />
-
-              <ProcessItem
-                number="04"
-                title="Status Otomatis"
-                description="Sistem menentukan present, late, atau incomplete berdasarkan jam kerja reguler."
-                icon={<Database size={18} />}
-              />
-
-              <ProcessItem
-                number="05"
-                title="Sinkron Cuti/Izin/PHL"
-                description="Setelah upload berhasil, sistem otomatis menarik pengajuan cuti, izin, sakit, tugas luar, dan klaim PHL yang sudah approved ke attendance_logs."
-                icon={<CalendarDays size={18} />}
-              />
-
-              <div className="rounded-[24px] border border-green-200 bg-green-50 p-4 text-sm leading-6 text-green-700">
-                <div className="mb-2 flex items-center gap-2 font-bold">
-                  <CheckCircle2 size={18} />
-                  Data otomatis difilter
-                </div>
-                Data dengan NIP yang tidak tersedia pada master karyawan tidak akan masuk ke attendance_logs.
-              </div>
-
-              <div className="rounded-[24px] border border-orange-200 bg-orange-50 p-4 text-sm leading-6 text-orange-700">
-                <div className="mb-2 flex items-center gap-2 font-bold">
-                  <AlertTriangle size={18} />
-                  Konfirmasi wajib
-                </div>
-                Proses upload tidak dapat dilakukan sebelum HR mengonfirmasi jam kerja reguler.
-              </div>
-            </div>
+            <MiniInfoCard
+              title="Toleransi Telat"
+              value={`${workSchedule.late_tolerance_minutes || 0} menit`}
+            />
           </div>
         </div>
 
@@ -1538,8 +1270,324 @@ export default function HRAttendanceUploadPage() {
           fetchData={fetchData}
           handleDeleteUpload={handleDeleteUpload}
         />
+
+        <ProcessingLogic />
+
+        {uploadModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4 backdrop-blur-sm">
+            <div className="flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-[34px] bg-white shadow-[0_30px_90px_rgba(0,0,0,0.24)]">
+              <div className="flex min-w-0 items-start justify-between gap-4 border-b border-black/5 p-5 sm:p-6">
+                <div className="min-w-0">
+                  <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-[#e8f2ff] px-3 py-1.5 text-xs font-bold text-[#0059b8]">
+                    <CloudUpload size={14} />
+                    Upload Absensi
+                  </div>
+
+                  <h2 className="text-xl font-semibold text-[#1d1d1f]">
+                    Unggah & Proses Berkas Mesin Absensi
+                  </h2>
+
+                  <p className="mt-1 max-w-3xl text-sm leading-6 text-[#6e6e73]">
+                    Pilih berkas XLS, XLSX, atau CSV, cek pratinjau, konfirmasi jam kerja,
+                    lalu proses data ke attendance_logs.
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={closeUploadModal}
+                  disabled={uploading}
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#f5f5f7] text-[#1d1d1f] disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              <div className="min-h-0 flex-1 overflow-y-auto p-5 sm:p-6">
+                <div className="space-y-5">
+                  <div className="rounded-[28px] border border-black/5 bg-white/65 p-5 shadow-sm backdrop-blur-xl">
+                    <div className="mb-4 flex items-center gap-2">
+                      <Settings2 size={18} className="text-[#007aff]" />
+                      <h3 className="font-semibold text-[#1d1d1f]">
+                        Konfirmasi Jam Kerja Reguler
+                      </h3>
+                    </div>
+
+                    <p className="mb-5 text-sm leading-6 text-[#6e6e73]">
+                      Sistem akan menggunakan jam kerja default yang aktif pada menu Pengaturan.
+                    </p>
+
+                    <div className="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(180px,1fr))]">
+                      <MiniInfoCard
+                        title="Nama Jadwal"
+                        value={workSchedule.schedule_name}
+                      />
+
+                      <MiniInfoCard
+                        title="Jam Kerja"
+                        value={`${workSchedule.expected_check_in} - ${workSchedule.expected_check_out}`}
+                      />
+
+                      <MiniInfoCard
+                        title="Toleransi"
+                        value={`${workSchedule.late_tolerance_minutes || 0} menit`}
+                      />
+                    </div>
+
+                    <label className="mt-5 flex cursor-pointer items-start gap-3 rounded-[22px] border border-black/5 bg-[#f5f5f7]/80 p-4 shadow-sm transition hover:bg-white">
+                      <input
+                        type="checkbox"
+                        checked={scheduleConfirmed}
+                        onChange={(event) =>
+                          setScheduleConfirmed(event.target.checked)
+                        }
+                        className="mt-1 h-4 w-4"
+                      />
+
+                      <div className="min-w-0">
+                        <div className="font-semibold text-[#1d1d1f]">
+                          Saya mengonfirmasi bahwa jam kerja reguler sudah benar.
+                        </div>
+                        <p className="mt-1 text-sm leading-6 text-[#6e6e73]">
+                          Sistem akan memproses absensi menggunakan jam kerja {workSchedule.expected_check_in} - {workSchedule.expected_check_out}.
+                        </p>
+                      </div>
+                    </label>
+                  </div>
+
+                  <label className="block">
+                    <span className="harmony-label">
+                      Nama / Periode Upload
+                    </span>
+
+                    <div className="relative">
+                      <CalendarDays
+                        size={17}
+                        className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[#86868b]"
+                      />
+
+                      <input
+                        value={uploadPeriod}
+                        onChange={(event) => setUploadPeriod(event.target.value)}
+                        placeholder="Contoh: Absensi Mei 2026 / Absensi Minggu 1 Mei 2026"
+                        className="harmony-input pl-11"
+                      />
+                    </div>
+                  </label>
+
+                  <label
+                    htmlFor="attendance-file"
+                    className={[
+                      'group flex min-h-56 cursor-pointer flex-col items-center justify-center rounded-[30px] border border-dashed p-6 text-center shadow-sm transition hover:-translate-y-0.5',
+                      selectedFile
+                        ? 'border-[#007aff]/40 bg-[#e8f2ff]/70'
+                        : 'border-black/10 bg-white/55 hover:border-[#007aff]/40 hover:bg-white',
+                    ].join(' ')}
+                  >
+                    <input
+                      id="attendance-file"
+                      type="file"
+                      accept=".xls,.xlsx,.csv"
+                      className="hidden"
+                      onChange={(event) => {
+                        const file = event.target.files?.[0] || null
+                        handleFileChange(file)
+                      }}
+                    />
+
+                    <div
+                      className={[
+                        'mb-5 flex h-16 w-16 items-center justify-center rounded-[26px] transition',
+                        selectedFile
+                          ? 'bg-[#007aff] text-white'
+                          : 'bg-[#e8f2ff] text-[#007aff] group-hover:scale-105',
+                      ].join(' ')}
+                    >
+                      {selectedFile ? (
+                        <FileSpreadsheet size={30} />
+                      ) : (
+                        <CloudUpload size={30} />
+                      )}
+                    </div>
+
+                    <h3 className="max-w-full break-words text-xl font-semibold text-[#1d1d1f]">
+                      {selectedFile ? selectedFile.name : 'Pilih berkas absensi'}
+                    </h3>
+
+                    <p className="mt-2 max-w-md text-sm leading-6 text-[#6e6e73]">
+                      {selectedFile
+                        ? `${formatFileSize(selectedFile.size)} · Berkas siap diproses setelah konfirmasi jam kerja.`
+                        : 'Unggah berkas hasil ekspor mesin absensi. Data dengan NIP yang tidak sesuai master karyawan tidak akan diproses.'}
+                    </p>
+
+                    <div className="mt-5 inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-xs font-bold text-[#007aff] shadow-sm">
+                      <FileText size={14} />
+                      XLS / XLSX / CSV · Maksimal 10 MB
+                    </div>
+                  </label>
+
+                  {selectedFile && (
+                    <div className="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(150px,1fr))]">
+                      <MiniInfoCard title="Baris terbaca" value={String(parsedTotalRows)} />
+                      <MiniInfoCard title="Sesuai DB" value={String(matchedPreviewCount)} />
+                      <MiniInfoCard title="Dilewati" value={String(skippedPreviewCount)} />
+                      <MiniInfoCard title="Late" value={String(latePreviewCount)} />
+                      <MiniInfoCard title="Incomplete" value={String(incompletePreviewCount)} />
+                    </div>
+                  )}
+
+                  {parsePreview.length > 0 && (
+                    <PreviewCard rows={parsePreview} />
+                  )}
+
+                  <label className="block">
+                    <span className="harmony-label">
+                      Catatan Unggahan
+                    </span>
+
+                    <textarea
+                      value={notes}
+                      onChange={(event) => setNotes(event.target.value)}
+                      placeholder="Contoh: Data absensi periode Mei 2026, hasil ekspor langsung dari mesin fingerprint."
+                      className="harmony-textarea"
+                    />
+                  </label>
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-3 border-t border-black/5 p-5 sm:p-6 md:flex-row md:justify-end">
+                <button
+                  type="button"
+                  onClick={resetUploadForm}
+                  disabled={uploading}
+                  className="harmony-button-secondary disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <X size={18} />
+                  Reset
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleUpload}
+                  disabled={uploading || !selectedFile}
+                  className="harmony-button-primary disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <Upload size={18} />
+                  {uploading ? 'Memproses...' : 'Unggah & Proses'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </section>
     </>
+  )
+}
+
+function PreviewCard({
+  rows,
+}: {
+  rows: MatchedPreviewRow[]
+}) {
+  return (
+    <div className="rounded-[28px] border border-black/5 bg-white/70 p-5 shadow-sm backdrop-blur-xl">
+      <div className="mb-4 flex items-center gap-2">
+        <ScanLine size={18} className="text-[#007aff]" />
+        <h3 className="font-semibold text-[#1d1d1f]">
+          Pratinjau Data yang Akan Diproses
+        </h3>
+      </div>
+
+      <div className="grid gap-3 md:hidden">
+        {rows.map((row, index) => (
+          <div
+            key={`${row.machine_pin}-${index}-mobile`}
+            className="rounded-[22px] border border-black/5 bg-[#f5f5f7]/70 p-4"
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="break-words font-semibold text-[#1d1d1f]">
+                  {row.full_name || '-'}
+                </p>
+                <p className="mt-1 break-words text-xs text-[#6e6e73]">
+                  {row.department || '-'} · PIN {row.machine_pin}
+                </p>
+              </div>
+              <StatusBadge status={row.attendance_status} />
+            </div>
+
+            <div className="mt-4 grid grid-cols-2 gap-3">
+              <MiniInfoCard title="Tanggal" value={row.attendance_date} />
+              <MiniInfoCard title="Durasi" value={formatDuration(row.work_duration_minutes)} />
+              <MiniInfoCard title="Check In" value={row.check_in || '-'} />
+              <MiniInfoCard title="Check Out" value={row.check_out || '-'} />
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="hidden overflow-hidden md:block">
+        <table className="w-full table-fixed text-left text-xs xl:text-sm">
+          <thead>
+            <tr className="border-b border-black/5 text-xs uppercase text-[#6e6e73]">
+              <th className="w-[28%] py-2 pr-3">Employee</th>
+              <th className="w-[14%] py-2 pr-3">Machine PIN</th>
+              <th className="w-[15%] py-2 pr-3">Tanggal</th>
+              <th className="w-[12%] py-2 pr-3">In</th>
+              <th className="w-[12%] py-2 pr-3">Out</th>
+              <th className="w-[10%] py-2 pr-3">Durasi</th>
+              <th className="w-[9%] py-2">Status</th>
+            </tr>
+          </thead>
+
+          <tbody>
+            {rows.map((row, index) => (
+              <tr
+                key={`${row.machine_pin}-${index}`}
+                className="border-b border-black/5"
+              >
+                <td className="py-2 pr-3 align-top">
+                  <div className="break-words font-semibold text-[#1d1d1f]">
+                    {row.full_name || '-'}
+                  </div>
+                  <div className="mt-1 break-words text-xs text-[#6e6e73]">
+                    {row.department || '-'}
+                  </div>
+                </td>
+
+                <td className="break-words py-2 pr-3 align-top font-semibold text-[#1d1d1f]">
+                  {row.machine_pin}
+                </td>
+
+                <td className="break-words py-2 pr-3 align-top text-[#1d1d1f]">
+                  {row.attendance_date}
+                </td>
+
+                <td className="break-words py-2 pr-3 align-top text-[#1d1d1f]">
+                  {row.check_in || '-'}
+                </td>
+
+                <td className="break-words py-2 pr-3 align-top text-[#1d1d1f]">
+                  {row.check_out || '-'}
+                </td>
+
+                <td className="break-words py-2 pr-3 align-top text-[#1d1d1f]">
+                  {formatDuration(row.work_duration_minutes)}
+                </td>
+
+                <td className="py-2 align-top">
+                  <StatusBadge status={row.attendance_status} />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <p className="mt-4 text-xs leading-5 text-[#6e6e73]">
+        Pratinjau hanya menampilkan maksimal 5 data yang sesuai dengan database karyawan.
+      </p>
+    </div>
   )
 }
 
@@ -1559,7 +1607,7 @@ function UploadHistory({
   return (
     <div className="harmony-card harmony-slide-up overflow-hidden">
       <div className="flex flex-col gap-4 border-b border-black/5 bg-white/55 p-5 lg:flex-row lg:items-center lg:justify-between">
-        <div>
+        <div className="min-w-0">
           <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-[#eaf8ee] px-3 py-1.5 text-xs font-bold text-[#168034]">
             <Activity size={14} />
             Upload Record
@@ -1569,7 +1617,7 @@ function UploadHistory({
             Riwayat Unggahan
           </h2>
 
-          <p className="mt-1 text-sm text-[#6e6e73]">
+          <p className="mt-1 text-sm leading-6 text-[#6e6e73]">
             Riwayat berkas absensi yang pernah diunggah dan diproses.
           </p>
         </div>
@@ -1590,111 +1638,279 @@ function UploadHistory({
         </div>
       )}
 
-      {!loading && (
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[1050px] border-collapse text-left text-sm">
-            <thead>
-              <tr className="border-b border-black/5 bg-[#f5f5f7]/90 text-xs uppercase tracking-wide text-[#6e6e73]">
-                <th className="w-[30%] px-5 py-4 font-semibold">Berkas</th>
-                <th className="w-[18%] px-5 py-4 font-semibold">Periode</th>
-                <th className="w-[12%] px-5 py-4 font-semibold">Ukuran</th>
-                <th className="w-[10%] px-5 py-4 font-semibold">Baris</th>
-                <th className="w-[12%] px-5 py-4 font-semibold">Status</th>
-                <th className="w-[12%] px-5 py-4 font-semibold">Tanggal Upload</th>
-                <th className="w-[6%] px-5 py-4 text-center font-semibold">Aksi</th>
-              </tr>
-            </thead>
+      {!loading && uploads.length === 0 && (
+        <div className="p-8 text-center">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-3xl bg-[#f5f5f7] text-[#007aff]">
+            <Upload size={24} />
+          </div>
 
-            <tbody>
-              {uploads.map((item) => (
-                <tr
-                  key={item.id}
-                  className="border-b border-black/5 transition hover:bg-white/55"
-                >
-                  <td className="px-5 py-3.5">
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#e8f2ff] text-[#007aff]">
-                        <FileSpreadsheet size={19} />
-                      </div>
+          <h3 className="mt-4 font-semibold text-[#1d1d1f]">
+            Belum ada berkas absensi
+          </h3>
 
-                      <div className="min-w-0">
-                        <div className="truncate font-semibold text-[#1d1d1f]">
-                          {item.file_name || '-'}
-                        </div>
-                        <div className="mt-1 truncate text-xs text-[#6e6e73]">
-                          {item.notes || 'Tidak ada catatan'}
-                        </div>
-                      </div>
-                    </div>
-                  </td>
-
-                  <td className="px-5 py-3.5 text-[#1d1d1f]">
-                    {item.upload_period || item.file_name || '-'}
-                  </td>
-
-                  <td className="px-5 py-3.5 text-[#1d1d1f]">
-                    {formatFileSize(Number(item.file_size || 0))}
-                  </td>
-
-                  <td className="px-5 py-3.5 font-semibold text-[#1d1d1f]">
-                    {item.total_rows || 0}
-                  </td>
-
-                  <td className="px-5 py-3.5">
-                    <UploadStatusBadge status={item.status || 'uploaded'} />
-                  </td>
-
-                  <td className="px-5 py-3.5 text-[#6e6e73]">
-                    {formatDateTime(item.created_at)}
-                  </td>
-
-                  <td className="px-5 py-3.5">
-                    <div className="flex justify-center gap-2">
-                      {item.file_url ? (
-                        <a
-                          href={item.file_url}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="inline-flex h-9 w-9 items-center justify-center rounded-2xl border border-black/5 bg-white text-[#007aff] shadow-sm transition hover:-translate-y-0.5 hover:bg-[#f5f5f7] hover:shadow-md"
-                          title="Unduh / pratinjau berkas"
-                        >
-                          <Download size={15} />
-                        </a>
-                      ) : null}
-
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteUpload(item)}
-                        disabled={deletingId === item.id}
-                        title="Hapus upload dan data absensi terkait"
-                        className="inline-flex h-9 w-9 items-center justify-center rounded-2xl bg-red-50 text-red-700 transition hover:-translate-y-0.5 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-60"
-                      >
-                        <Trash2 size={15} />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-
-          {uploads.length === 0 && (
-            <div className="p-8 text-center">
-              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-3xl bg-[#f5f5f7] text-[#007aff]">
-                <Upload size={24} />
-              </div>
-
-              <h3 className="mt-4 font-semibold text-[#1d1d1f]">
-                Belum ada berkas absensi
-              </h3>
-
-              <p className="mt-1 text-sm text-[#6e6e73]">
-                Unggah berkas absensi pertama untuk memulai proses import data.
-              </p>
-            </div>
-          )}
+          <p className="mt-1 text-sm text-[#6e6e73]">
+            Unggah berkas absensi pertama untuk memulai proses import data.
+          </p>
         </div>
       )}
+
+      {!loading && uploads.length > 0 && (
+        <>
+          <div className="grid gap-3 p-4 lg:hidden">
+            {uploads.map((item) => (
+              <UploadHistoryCard
+                key={item.id}
+                item={item}
+                deletingId={deletingId}
+                handleDeleteUpload={handleDeleteUpload}
+              />
+            ))}
+          </div>
+
+          <div className="hidden overflow-hidden lg:block">
+            <table className="w-full table-fixed border-collapse text-left text-xs xl:text-sm">
+              <thead>
+                <tr className="border-b border-black/5 bg-[#f5f5f7]/90 text-xs uppercase tracking-wide text-[#6e6e73]">
+                  <th className="w-[30%] px-4 py-4 font-semibold">Berkas</th>
+                  <th className="w-[19%] px-4 py-4 font-semibold">Periode</th>
+                  <th className="w-[10%] px-4 py-4 font-semibold">Ukuran</th>
+                  <th className="w-[9%] px-4 py-4 font-semibold">Baris</th>
+                  <th className="w-[12%] px-4 py-4 font-semibold">Status</th>
+                  <th className="w-[14%] px-4 py-4 font-semibold">Tanggal</th>
+                  <th className="w-[6%] px-4 py-4 text-center font-semibold">Aksi</th>
+                </tr>
+              </thead>
+
+              <tbody>
+                {uploads.map((item) => (
+                  <tr
+                    key={item.id}
+                    className="border-b border-black/5 transition hover:bg-white/55"
+                  >
+                    <td className="px-4 py-3.5 align-top">
+                      <div className="flex min-w-0 items-start gap-3">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#e8f2ff] text-[#007aff]">
+                          <FileSpreadsheet size={19} />
+                        </div>
+
+                        <div className="min-w-0">
+                          <div className="break-words font-semibold leading-5 text-[#1d1d1f]">
+                            {item.file_name || '-'}
+                          </div>
+                          <div className="mt-1 line-clamp-2 break-words text-xs leading-5 text-[#6e6e73]">
+                            {item.notes || 'Tidak ada catatan'}
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+
+                    <td className="break-words px-4 py-3.5 align-top text-[#1d1d1f]">
+                      {item.upload_period || item.file_name || '-'}
+                    </td>
+
+                    <td className="break-words px-4 py-3.5 align-top text-[#1d1d1f]">
+                      {formatFileSize(Number(item.file_size || 0))}
+                    </td>
+
+                    <td className="break-words px-4 py-3.5 align-top font-semibold text-[#1d1d1f]">
+                      {item.total_rows || 0}
+                    </td>
+
+                    <td className="px-4 py-3.5 align-top">
+                      <UploadStatusBadge status={item.status || 'uploaded'} />
+                    </td>
+
+                    <td className="break-words px-4 py-3.5 align-top text-[#6e6e73]">
+                      {formatDateTime(item.created_at)}
+                    </td>
+
+                    <td className="px-4 py-3.5 align-top">
+                      <UploadActions
+                        item={item}
+                        deletingId={deletingId}
+                        handleDeleteUpload={handleDeleteUpload}
+                      />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
+function UploadHistoryCard({
+  item,
+  deletingId,
+  handleDeleteUpload,
+}: {
+  item: AttendanceUpload
+  deletingId: string | null
+  handleDeleteUpload: (upload: AttendanceUpload) => void
+}) {
+  return (
+    <div className="rounded-[26px] border border-black/5 bg-white/75 p-4 shadow-sm">
+      <div className="flex items-start gap-3">
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#e8f2ff] text-[#007aff]">
+          <FileSpreadsheet size={19} />
+        </div>
+
+        <div className="min-w-0 flex-1">
+          <p className="break-words font-semibold leading-5 text-[#1d1d1f]">
+            {item.file_name || '-'}
+          </p>
+
+          <p className="mt-1 break-words text-xs leading-5 text-[#6e6e73]">
+            {item.notes || 'Tidak ada catatan'}
+          </p>
+
+          <div className="mt-3 flex flex-wrap gap-2">
+            <UploadStatusBadge status={item.status || 'uploaded'} />
+            <span className="inline-flex rounded-full bg-[#f5f5f7] px-3 py-1 text-xs font-bold text-[#1d1d1f]">
+              {item.total_rows || 0} baris
+            </span>
+            <span className="inline-flex rounded-full bg-[#f5f5f7] px-3 py-1 text-xs font-bold text-[#1d1d1f]">
+              {formatFileSize(Number(item.file_size || 0))}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+        <MobileInfoBox
+          title="Periode"
+          value={item.upload_period || item.file_name || '-'}
+        />
+        <MobileInfoBox
+          title="Tanggal Upload"
+          value={formatDateTime(item.created_at)}
+        />
+      </div>
+
+      <div className="mt-4 flex justify-end">
+        <UploadActions
+          item={item}
+          deletingId={deletingId}
+          handleDeleteUpload={handleDeleteUpload}
+        />
+      </div>
+    </div>
+  )
+}
+
+function UploadActions({
+  item,
+  deletingId,
+  handleDeleteUpload,
+}: {
+  item: AttendanceUpload
+  deletingId: string | null
+  handleDeleteUpload: (upload: AttendanceUpload) => void
+}) {
+  return (
+    <div className="flex justify-center gap-2">
+      {item.file_url ? (
+        <a
+          href={item.file_url}
+          target="_blank"
+          rel="noreferrer"
+          className="inline-flex h-9 w-9 items-center justify-center rounded-2xl border border-black/5 bg-white text-[#007aff] shadow-sm transition hover:-translate-y-0.5 hover:bg-[#f5f5f7] hover:shadow-md"
+          title="Unduh / pratinjau berkas"
+        >
+          <Download size={15} />
+        </a>
+      ) : null}
+
+      <button
+        type="button"
+        onClick={() => handleDeleteUpload(item)}
+        disabled={deletingId === item.id}
+        title="Hapus upload dan data absensi terkait"
+        className="inline-flex h-9 w-9 items-center justify-center rounded-2xl bg-red-50 text-red-700 transition hover:-translate-y-0.5 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-60"
+      >
+        <Trash2 size={15} />
+      </button>
+    </div>
+  )
+}
+
+function ProcessingLogic() {
+  return (
+    <div className="harmony-card harmony-slide-up overflow-hidden">
+      <div className="flex flex-col gap-3 border-b border-black/5 bg-white/55 p-5 lg:flex-row lg:items-center lg:justify-between">
+        <div className="min-w-0">
+          <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-[#f7edfc] px-3 py-1.5 text-xs font-bold text-[#7b2cbf]">
+            <Database size={14} />
+            Processing Logic
+          </div>
+
+          <h2 className="text-lg font-semibold text-[#1d1d1f]">
+            Logika Pemrosesan
+          </h2>
+
+          <p className="mt-1 text-sm leading-6 text-[#6e6e73]">
+            Alur pemrosesan dibuat menyamping agar ringkas dan mudah dicek oleh HR.
+          </p>
+        </div>
+      </div>
+
+      <div className="grid gap-4 p-5 lg:grid-cols-5">
+        <ProcessItem
+          number="01"
+          title="Validasi Database"
+          description="Hanya NIP yang sesuai dengan machine_pin karyawan aktif yang diproses."
+          icon={<ShieldCheck size={18} />}
+        />
+
+        <ProcessItem
+          number="02"
+          title="Membaca NIP"
+          description="Kolom NIP pada berkas digunakan sebagai machine_pin."
+          icon={<Fingerprint size={18} />}
+        />
+
+        <ProcessItem
+          number="03"
+          title="Tanggal & Scan"
+          description="Tanggal menjadi attendance_date, scan masuk menjadi check_in, scan pulang menjadi check_out."
+          icon={<Clock3 size={18} />}
+        />
+
+        <ProcessItem
+          number="04"
+          title="Status Otomatis"
+          description="Sistem menentukan present, late, atau incomplete berdasarkan jam kerja reguler."
+          icon={<Database size={18} />}
+        />
+
+        <ProcessItem
+          number="05"
+          title="Sync Cuti/PHL"
+          description="Pengajuan approved otomatis ditarik ke attendance_logs setelah upload."
+          icon={<CalendarDays size={18} />}
+        />
+      </div>
+
+      <div className="grid gap-4 border-t border-black/5 p-5 md:grid-cols-2">
+        <div className="rounded-[24px] border border-green-200 bg-green-50 p-4 text-sm leading-6 text-green-700">
+          <div className="mb-2 flex items-center gap-2 font-bold">
+            <CheckCircle2 size={18} />
+            Data otomatis difilter
+          </div>
+          Data dengan NIP yang tidak tersedia pada master karyawan tidak akan masuk ke attendance_logs.
+        </div>
+
+        <div className="rounded-[24px] border border-orange-200 bg-orange-50 p-4 text-sm leading-6 text-orange-700">
+          <div className="mb-2 flex items-center gap-2 font-bold">
+            <AlertTriangle size={18} />
+            Konfirmasi wajib
+          </div>
+          Proses upload tidak dapat dilakukan sebelum HR mengonfirmasi jam kerja reguler.
+        </div>
+      </div>
     </div>
   )
 }
@@ -1709,7 +1925,7 @@ function SummaryCard({
   title: string
   value: string
   description: string
-  icon: React.ReactNode
+  icon: ReactNode
   tone: 'blue' | 'green' | 'orange' | 'purple'
 }) {
   const toneClass = {
@@ -1720,23 +1936,23 @@ function SummaryCard({
   }[tone]
 
   return (
-    <div className="harmony-card harmony-hover-lift harmony-slide-up p-5">
-      <div className="flex items-center justify-between gap-4">
-        <div className="min-w-0">
-          <p className="truncate text-sm text-[#6e6e73]">
+    <div className="harmony-card harmony-hover-lift harmony-slide-up min-w-0 p-5">
+      <div className="flex min-w-0 items-start justify-between gap-4">
+        <div className="min-w-0 flex-1">
+          <p className="break-words text-sm leading-5 text-[#6e6e73]">
             {title}
           </p>
 
-          <h3 className="mt-2 truncate text-2xl font-semibold tracking-tight text-[#1d1d1f]">
+          <h3 className="mt-2 break-words text-2xl font-semibold tracking-tight text-[#1d1d1f]">
             {value}
           </h3>
 
-          <p className="mt-1 line-clamp-1 text-xs leading-5 text-[#86868b]">
+          <p className="mt-1 break-words text-xs leading-5 text-[#86868b]">
             {description}
           </p>
         </div>
 
-        <div className={`rounded-2xl p-3 ${toneClass}`}>
+        <div className={`shrink-0 rounded-2xl p-3 ${toneClass}`}>
           {icon}
         </div>
       </div>
@@ -1752,12 +1968,32 @@ function MiniInfoCard({
   value: string
 }) {
   return (
-    <div className="rounded-[22px] border border-black/5 bg-white/70 p-4 shadow-sm backdrop-blur-xl transition hover:-translate-y-0.5 hover:bg-white hover:shadow-md">
-      <p className="truncate text-xs font-semibold text-[#6e6e73]">
+    <div className="min-w-0 rounded-[22px] border border-black/5 bg-white/70 p-4 shadow-sm backdrop-blur-xl transition hover:-translate-y-0.5 hover:bg-white hover:shadow-md">
+      <p className="break-words text-xs font-semibold leading-5 text-[#6e6e73]">
         {title}
       </p>
 
-      <p className="mt-2 truncate text-xl font-semibold text-[#1d1d1f]">
+      <p className="mt-2 break-words text-lg font-semibold leading-6 text-[#1d1d1f]">
+        {value}
+      </p>
+    </div>
+  )
+}
+
+function MobileInfoBox({
+  title,
+  value,
+}: {
+  title: string
+  value: string
+}) {
+  return (
+    <div className="rounded-2xl bg-[#f5f5f7]/80 p-3">
+      <p className="text-[11px] font-bold uppercase tracking-wide text-[#86868b]">
+        {title}
+      </p>
+
+      <p className="mt-1 break-words text-sm font-semibold leading-5 text-[#1d1d1f]">
         {value}
       </p>
     </div>
@@ -1773,27 +2009,27 @@ function ProcessItem({
   number: string
   title: string
   description: string
-  icon: React.ReactNode
+  icon: ReactNode
 }) {
   return (
-    <div className="rounded-[24px] border border-black/5 bg-white/65 p-4 shadow-sm backdrop-blur-xl transition hover:-translate-y-0.5 hover:bg-white hover:shadow-md">
-      <div className="flex items-start gap-4">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#1d1d1f] text-xs font-bold text-white">
-          {number}
-        </div>
-
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <div className="text-[#007aff]">
-              {icon}
-            </div>
-
-            <h3 className="font-semibold text-[#1d1d1f]">
-              {title}
-            </h3>
+    <div className="min-w-0 rounded-[24px] border border-black/5 bg-white/65 p-4 shadow-sm backdrop-blur-xl transition hover:-translate-y-0.5 hover:bg-white hover:shadow-md">
+      <div className="flex h-full flex-col gap-4">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#1d1d1f] text-xs font-bold text-white">
+            {number}
           </div>
 
-          <p className="mt-1 text-sm leading-6 text-[#6e6e73]">
+          <div className="shrink-0 text-[#007aff]">
+            {icon}
+          </div>
+        </div>
+
+        <div className="min-w-0">
+          <h3 className="break-words font-semibold leading-5 text-[#1d1d1f]">
+            {title}
+          </h3>
+
+          <p className="mt-2 break-words text-sm leading-6 text-[#6e6e73]">
             {description}
           </p>
         </div>
@@ -1817,8 +2053,8 @@ function StatusBadge({
           : 'bg-[#e8f2ff] text-[#0059b8]'
 
   return (
-    <span className={`inline-flex rounded-full px-3 py-1 text-xs font-bold capitalize ${className}`}>
-      {formatAttendanceStatus(status)}
+    <span className={`inline-flex max-w-full rounded-full px-3 py-1 text-xs font-bold capitalize ${className}`}>
+      <span className="break-words">{formatAttendanceStatus(status)}</span>
     </span>
   )
 }
@@ -1838,8 +2074,8 @@ function UploadStatusBadge({
           : 'bg-orange-50 text-orange-700'
 
   return (
-    <span className={`inline-flex rounded-full px-3 py-1 text-xs font-bold capitalize ${className}`}>
-      {status.replaceAll('_', ' ')}
+    <span className={`inline-flex max-w-full rounded-full px-3 py-1 text-xs font-bold capitalize ${className}`}>
+      <span className="break-words">{status.replaceAll('_', ' ')}</span>
     </span>
   )
 }
@@ -1857,7 +2093,7 @@ function AlertBox({
       : 'border-red-200 bg-red-50 text-red-600'
 
   return (
-    <div className={`rounded-2xl border p-4 text-sm ${className}`}>
+    <div className={`rounded-2xl border p-4 text-sm leading-6 ${className}`}>
       {message}
     </div>
   )
