@@ -1303,7 +1303,7 @@ export default function EmployeeAttendancePage() {
                 </div>
               </div>
 
-              <div className="grid gap-3 p-4 xl:hidden">
+              <div className="grid gap-3 p-4 min-[2200px]:hidden">
                 {calendarRows.map((row) => {
                   const draft = getDraft(row);
                   const displayStatus = getDisplayStatus(row, draft);
@@ -1436,7 +1436,7 @@ export default function EmployeeAttendancePage() {
                 })}
               </div>
 
-              <div className="hidden overflow-x-auto xl:block">
+              <div className="hidden overflow-x-auto min-[2200px]:block">
                 <table className="w-full min-w-[1560px] border-collapse text-left text-sm">
                   <thead>
                     <tr className="border-b border-black/5 bg-[#f5f5f7]/90 text-xs uppercase tracking-wide text-[#6e6e73]">
