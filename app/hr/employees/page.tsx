@@ -210,59 +210,213 @@ export default function HREmployeesPage() {
     fetchEmployees()
   }, [])
 
+  function normalizeMasterType(value: unknown): 'department' | 'position' | null {
+    const text = normalizeText(value)
+
+    if (!text) return null
+
+    if (
+      text === 'department' ||
+      text === 'departemen' ||
+      text === 'unit' ||
+      text.includes('department') ||
+      text.includes('departemen')
+    ) {
+      return 'department'
+    }
+
+    if (
+      text === 'position' ||
+      text === 'jabatan' ||
+      text.includes('position') ||
+      text.includes('jabatan') ||
+      text.includes('job')
+    ) {
+      return 'position'
+    }
+
+    return null
+  }
+
+  function getMasterName(row: any) {
+    return String(
+      row?.name ||
+        row?.option_value ||
+        row?.department_name ||
+        row?.department ||
+        row?.unit_name ||
+        row?.unit ||
+        row?.position_name ||
+        row?.position ||
+        row?.job_title ||
+        row?.job_position ||
+        row?.label ||
+        row?.value ||
+        ''
+    ).trim()
+  }
+
+  function buildMergedMasterOptions({
+    masterRows,
+    departmentRows,
+    positionRows,
+    employeesRows,
+    assignmentRows,
+  }: {
+    masterRows: any[]
+    departmentRows: any[]
+    positionRows: any[]
+    employeesRows: Employee[]
+    assignmentRows: EmployeeAssignment[]
+  }) {
+    const map = new Map<string, MasterOption>()
+
+    function addOption(
+      optionType: 'department' | 'position',
+      value: string,
+      idPrefix: string,
+      isActive: boolean | null | undefined = true
+    ) {
+      const cleanValue = value.trim()
+
+      if (!cleanValue || isActive === false) return
+
+      const key = `${optionType}:${normalizeText(cleanValue)}`
+
+      if (map.has(key)) return
+
+      map.set(key, {
+        id: `${idPrefix}:${key}`,
+        option_type: optionType,
+        option_value: cleanValue,
+        is_active: true,
+      })
+    }
+
+    masterRows.forEach((row) => {
+      const optionType = normalizeMasterType(row?.option_type)
+      const value = getMasterName(row)
+
+      if (!optionType || !value) return
+
+      addOption(optionType, value, `master:${row?.id || value}`, row?.is_active)
+    })
+
+    departmentRows.forEach((row) => {
+      addOption('department', getMasterName(row), `department:${row?.id || getMasterName(row)}`, row?.is_active)
+    })
+
+    positionRows.forEach((row) => {
+      addOption('position', getMasterName(row), `position:${row?.id || getMasterName(row)}`, row?.is_active)
+    })
+
+    employeesRows.forEach((employee) => {
+      if (employee.department) addOption('department', employee.department, 'employee-department')
+      if (employee.position) addOption('position', employee.position, 'employee-position')
+    })
+
+    assignmentRows.forEach((assignment) => {
+      if (assignment.assignment_department) {
+        addOption('department', assignment.assignment_department, 'assignment-department')
+      }
+
+      if (assignment.assignment_position) {
+        addOption('position', assignment.assignment_position, 'assignment-position')
+      }
+    })
+
+    return Array.from(map.values()).sort((a, b) => {
+      if (a.option_type !== b.option_type) return a.option_type.localeCompare(b.option_type)
+      return a.option_value.localeCompare(b.option_value)
+    })
+  }
+
   async function fetchEmployees() {
     setLoading(true)
     setErrorMessage('')
 
-    const { data, error } = await supabase
-      .from('employees')
-      .select('*')
-      .order('full_name', { ascending: true })
+    try {
+      const { data: employeeData, error: employeeError } = await supabase
+        .from('employees')
+        .select('*')
+        .order('full_name', { ascending: true })
 
-    if (error) {
-      setErrorMessage(error.message)
+      if (employeeError) throw employeeError
+
+      const employeesRows = (employeeData || []) as Employee[]
+      setEmployees(employeesRows)
+
+      const { data: logsData, error: logsError } = await supabase
+        .from('employee_profile_update_logs')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(6)
+
+      if (!logsError) {
+        setProfileLogs((logsData || []) as ProfileUpdateLog[])
+      } else {
+        console.warn('employee_profile_update_logs gagal dibaca:', logsError.message)
+        setProfileLogs([])
+      }
+
+      const { data: optionData, error: optionError } = await supabase
+        .from('hr_master_options')
+        .select('*')
+        .order('option_value', { ascending: true })
+
+      if (optionError) {
+        console.warn('hr_master_options gagal dibaca:', optionError.message)
+      }
+
+      const { data: departmentData, error: departmentError } = await supabase
+        .from('hr_employee_departments')
+        .select('*')
+        .order('name', { ascending: true })
+
+      if (departmentError) {
+        console.warn('hr_employee_departments gagal dibaca:', departmentError.message)
+      }
+
+      const { data: positionData, error: positionError } = await supabase
+        .from('hr_employee_positions')
+        .select('*')
+        .order('name', { ascending: true })
+
+      if (positionError) {
+        console.warn('hr_employee_positions gagal dibaca:', positionError.message)
+      }
+
+      const { data: assignmentData, error: assignmentError } = await supabase
+        .from('employee_assignments')
+        .select('*')
+        .order('created_at', { ascending: false })
+
+      const assignmentRows = assignmentError
+        ? []
+        : ((assignmentData || []) as EmployeeAssignment[])
+
+      if (assignmentError) {
+        console.warn('employee_assignments gagal dibaca:', assignmentError.message)
+      }
+
+      setAssignments(assignmentRows)
+      setMasterOptions(
+        buildMergedMasterOptions({
+          masterRows: optionData || [],
+          departmentRows: departmentData || [],
+          positionRows: positionData || [],
+          employeesRows,
+          assignmentRows,
+        })
+      )
+    } catch (error: any) {
+      setErrorMessage(error?.message || 'Gagal memuat data karyawan.')
       setEmployees([])
-      setLoading(false)
-      return
-    }
-
-    setEmployees((data || []) as Employee[])
-
-    const { data: logsData, error: logsError } = await supabase
-      .from('employee_profile_update_logs')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .limit(6)
-
-    if (!logsError) {
-      setProfileLogs((logsData || []) as ProfileUpdateLog[])
-    }
-
-    const { data: optionData, error: optionError } = await supabase
-      .from('hr_master_options')
-      .select('*')
-      .order('option_value', { ascending: true })
-
-    if (optionError) {
       setMasterOptions([])
-      console.warn('hr_master_options belum tersedia atau gagal dibaca:', optionError.message)
-    } else {
-      setMasterOptions((optionData || []) as MasterOption[])
-    }
-
-    const { data: assignmentData, error: assignmentError } = await supabase
-      .from('employee_assignments')
-      .select('*')
-      .order('created_at', { ascending: false })
-
-    if (assignmentError) {
       setAssignments([])
-      console.warn('employee_assignments belum tersedia atau gagal dibaca:', assignmentError.message)
-    } else {
-      setAssignments((assignmentData || []) as EmployeeAssignment[])
+    } finally {
+      setLoading(false)
     }
-
-    setLoading(false)
   }
 
   function updateForm(field: keyof EmployeeForm, value: string | number | boolean) {
@@ -395,32 +549,143 @@ export default function HREmployeesPage() {
   const updatedPersonalData = employees.filter((employee) => Boolean(employee.personal_updated_at)).length
   const activeAssignments = assignments.filter((assignment) => assignment.is_active !== false).length
 
+  function isMissingTableError(error: any) {
+    const message = String(
+      error?.message || error?.details || error?.hint || error?.code || ''
+    ).toLowerCase()
+
+    return (
+      message.includes('could not find the table') ||
+      message.includes('relation') && message.includes('does not exist') ||
+      message.includes('does not exist') ||
+      message.includes('schema cache')
+    )
+  }
+
+  async function activateNameInTable(tableName: string, value: string) {
+    const now = new Date().toISOString()
+
+    const { data: existingRows, error: findError } = await supabase
+      .from(tableName)
+      .select('id,name,is_active')
+      .ilike('name', value)
+      .limit(1)
+
+    if (findError) {
+      if (isMissingTableError(findError)) {
+        console.warn(`${tableName} tidak tersedia, dilewati.`)
+        return
+      }
+
+      throw findError
+    }
+
+    const existing = existingRows?.[0]
+
+    if (existing?.id) {
+      const { error: updateError } = await supabase
+        .from(tableName)
+        .update({ name: value, is_active: true, updated_at: now })
+        .eq('id', existing.id)
+
+      if (updateError) throw updateError
+      return
+    }
+
+    const { error: insertError } = await supabase
+      .from(tableName)
+      .insert({ name: value, is_active: true, created_at: now, updated_at: now })
+
+    if (insertError) throw insertError
+  }
+
+  async function activateLegacyMasterOption(optionType: 'department' | 'position', value: string) {
+    const now = new Date().toISOString()
+
+    const { data: existingRows, error: findError } = await supabase
+      .from('hr_master_options')
+      .select('id,option_type,option_value,is_active')
+      .eq('option_type', optionType)
+      .ilike('option_value', value)
+      .limit(1)
+
+    if (findError) {
+      if (isMissingTableError(findError)) {
+        console.warn('hr_master_options tidak tersedia, dilewati.')
+        return
+      }
+
+      throw findError
+    }
+
+    const existing = existingRows?.[0]
+
+    if (existing?.id) {
+      const { error: updateError } = await supabase
+        .from('hr_master_options')
+        .update({ option_value: value, is_active: true, updated_at: now })
+        .eq('id', existing.id)
+
+      if (updateError) throw updateError
+      return
+    }
+
+    const { error: insertError } = await supabase
+      .from('hr_master_options')
+      .insert({
+        option_type: optionType,
+        option_value: value,
+        is_active: true,
+        created_at: now,
+        updated_at: now,
+      })
+
+    if (insertError) throw insertError
+  }
+
   async function ensureMasterOption(optionType: 'department' | 'position', rawValue: string) {
     const value = rawValue.trim()
 
     if (!value) return
 
-    const existing = masterOptions.find((option) => {
-      return option.option_type === optionType && normalizeText(option.option_value) === normalizeText(value)
-    })
+    const tableName =
+      optionType === 'department'
+        ? 'hr_employee_departments'
+        : 'hr_employee_positions'
 
-    if (existing?.is_active !== false) return
+    await activateNameInTable(tableName, value)
+    await activateLegacyMasterOption(optionType, value)
+  }
 
-    const { error } = await supabase
+  async function deactivateMasterOptionEverywhere(option: MasterOption) {
+    const now = new Date().toISOString()
+    const value = option.option_value.trim()
+
+    if (!value) return
+
+    const canonicalTable =
+      option.option_type === 'department'
+        ? 'hr_employee_departments'
+        : 'hr_employee_positions'
+
+    const { error: canonicalError } = await supabase
+      .from(canonicalTable)
+      .update({ is_active: false, updated_at: now })
+      .ilike('name', value)
+
+    if (canonicalError && !isMissingTableError(canonicalError)) {
+      throw canonicalError
+    }
+
+    const { error: legacyError } = await supabase
       .from('hr_master_options')
-      .upsert(
-        {
-          option_type: optionType,
-          option_value: value,
-          is_active: true,
-          updated_at: new Date().toISOString(),
-        },
-        {
-          onConflict: 'option_type,option_value',
-        }
-      )
+      .update({ is_active: false, updated_at: now })
+      .eq('option_type', option.option_type)
+      .ilike('option_value', value)
 
-    if (error) throw error
+    if (legacyError && !isMissingTableError(legacyError)) {
+      throw legacyError
+    }
   }
 
   async function handleAddMasterOption(optionType: 'department' | 'position') {
@@ -462,13 +727,9 @@ export default function HREmployeesPage() {
     setDeletingOptionId(option.id)
 
     try {
-      const { error } = await supabase
-        .from('hr_master_options')
-        .update({ is_active: false, updated_at: new Date().toISOString() })
-        .eq('id', option.id)
+      await deactivateMasterOptionEverywhere(option)
 
-      if (error) throw error
-
+      setSelectedMasterOptionIds((current) => current.filter((id) => id !== option.id))
       setSuccessMessage(`${option.option_value} berhasil dihapus dari dropdown.`)
       await fetchEmployees()
     } catch (error: any) {
@@ -520,12 +781,9 @@ export default function HREmployeesPage() {
     setBulkDeletingOptions(true)
 
     try {
-      const { error } = await supabase
-        .from('hr_master_options')
-        .update({ is_active: false, updated_at: new Date().toISOString() })
-        .in('id', uniqueIds)
-
-      if (error) throw error
+      for (const option of selectedOptions) {
+        await deactivateMasterOptionEverywhere(option)
+      }
 
       setSelectedMasterOptionIds([])
       setSuccessMessage(`${selectedOptions.length} pilihan berhasil dihapus dari dropdown.`)
@@ -1916,7 +2174,7 @@ function getSupervisorLabel(value: string | null | undefined, employees: Employe
   return `${supervisor.full_name || supervisor.email || supervisor.employee_number || '-'}${supervisor.department ? ` · ${supervisor.department}` : ''}`
 }
 
-function normalizeText(value: string | null | undefined) {
+function normalizeText(value: unknown) {
   return String(value || '').trim().toLowerCase()
 }
 

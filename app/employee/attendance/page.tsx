@@ -111,6 +111,15 @@ type AttendanceLog = {
   absence_request_status: string | null;
   absence_request_source: string | null;
 
+  is_locked?: boolean | null;
+  locked_at?: string | null;
+  locked_by?: string | null;
+  locked_by_name?: string | null;
+  unlocked_at?: string | null;
+  unlocked_by?: string | null;
+  unlocked_by_name?: string | null;
+  lock_note?: string | null;
+
   created_at: string | null;
   updated_at: string | null;
   deleted_at: string | null;
@@ -160,8 +169,10 @@ type AttendancePeriodConfirmation = {
 
   is_locked?: boolean | null;
   locked_by?: string | null;
+  locked_by_name?: string | null;
   locked_at?: string | null;
   unlocked_by?: string | null;
+  unlocked_by_name?: string | null;
   unlocked_at?: string | null;
   lock_note?: string | null;
 };
@@ -252,7 +263,43 @@ export default function EmployeeAttendancePage() {
 
   const periodRange = useMemo(() => getCutoffRange(periodMonth), [periodMonth]);
 
-  const isPeriodLocked = Boolean(periodConfirmation?.is_locked);
+  const lockedLog = logs.find((item) => Boolean(item.is_locked)) || null;
+  const unlockedLog =
+    logs.find((item) => Boolean(item.unlocked_at || item.unlocked_by)) || null;
+
+  const isFinalizedByHR =
+    periodConfirmation?.hr_status === "finalized" ||
+    logs.some((item) => item.hr_final_status === "finalized");
+
+  const periodLockInfo = {
+    isLocked: Boolean(
+      periodConfirmation?.is_locked ||
+        lockedLog?.is_locked ||
+        isFinalizedByHR,
+    ),
+    lockedBy:
+      periodConfirmation?.locked_by_name ||
+      periodConfirmation?.locked_by ||
+      lockedLog?.locked_by_name ||
+      lockedLog?.locked_by ||
+      "-",
+    lockedAt: periodConfirmation?.locked_at || lockedLog?.locked_at || "",
+    unlockedBy:
+      periodConfirmation?.unlocked_by_name ||
+      periodConfirmation?.unlocked_by ||
+      unlockedLog?.unlocked_by_name ||
+      unlockedLog?.unlocked_by ||
+      "-",
+    unlockedAt:
+      periodConfirmation?.unlocked_at || unlockedLog?.unlocked_at || "",
+    note:
+      periodConfirmation?.lock_note ||
+      lockedLog?.lock_note ||
+      unlockedLog?.lock_note ||
+      "-",
+  };
+
+  const isPeriodLocked = periodLockInfo.isLocked;
 
   const submittedPeriod =
     periodConfirmation?.employee_status === "submitted" ||
@@ -261,6 +308,7 @@ export default function EmployeeAttendancePage() {
     periodConfirmation?.hr_status === "ready_for_hr" ||
     periodConfirmation?.hr_status === "finalized";
 
+  const isProcessReadOnly = submittedPeriod && !isPeriodLocked;
   const isReadOnlyPeriod = submittedPeriod || isPeriodLocked;
 
   const calendarRows = useMemo(() => {
@@ -938,7 +986,7 @@ export default function EmployeeAttendancePage() {
         hr_final_status: row.log?.hr_final_status || "",
         phl_candidate: isPotentialPHL(row, draft) ? "YES" : "NO",
         holiday: row.holiday_name || (row.is_weekend ? "Weekend" : ""),
-        period_locked: isPeriodLocked ? "YES" : "NO",
+        period_locked: isPeriodLocked ? "YES" : isProcessReadOnly ? "READ_ONLY" : "NO",
       };
     });
 
@@ -1014,25 +1062,26 @@ export default function EmployeeAttendancePage() {
             <div className="mt-4 grid gap-3 md:grid-cols-3">
               <LockInfo
                 label="Dikunci oleh"
-                value={periodConfirmation?.locked_by || "-"}
+                value={periodLockInfo.lockedBy}
               />
               <LockInfo
                 label="Tanggal lock"
-                value={formatDateTime(periodConfirmation?.locked_at || "")}
+                value={formatDateTime(periodLockInfo.lockedAt)}
               />
               <LockInfo
                 label="Catatan HR"
-                value={periodConfirmation?.lock_note || "-"}
+                value={periodLockInfo.note}
               />
             </div>
           </div>
         )}
 
-        {!isPeriodLocked && periodConfirmation?.unlocked_at && (
-          <div className="rounded-[28px] border border-orange-200 bg-orange-50 p-5 text-sm leading-6 text-orange-700">
+
+        {!isPeriodLocked && !isProcessReadOnly && periodLockInfo.unlockedAt && (
+          <div className="rounded-[28px] border border-green-200 bg-green-50 p-5 text-sm leading-6 text-green-700">
             <div className="mb-2 flex items-center gap-2 font-bold">
               <LockOpen size={18} />
-              Lock periode sedang dibuka HR
+              Periode masih bisa direvisi
             </div>
 
             <p>
@@ -1043,15 +1092,15 @@ export default function EmployeeAttendancePage() {
             <div className="mt-4 grid gap-3 md:grid-cols-3">
               <LockInfo
                 label="Dibuka oleh"
-                value={periodConfirmation?.unlocked_by || "-"}
+                value={periodLockInfo.unlockedBy}
               />
               <LockInfo
                 label="Tanggal unlock"
-                value={formatDateTime(periodConfirmation?.unlocked_at || "")}
+                value={formatDateTime(periodLockInfo.unlockedAt)}
               />
               <LockInfo
                 label="Catatan HR"
-                value={periodConfirmation?.lock_note || "-"}
+                value={periodLockInfo.note}
               />
             </div>
           </div>
@@ -1103,21 +1152,6 @@ export default function EmployeeAttendancePage() {
                 {formatDisplayDate(periodRange.end)}.
               </p>
 
-              <div className="mt-2 flex flex-wrap items-center gap-2">
-                <PeriodStatusBadge period={periodConfirmation} />
-
-                {isPeriodLocked ? (
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-red-50 px-3 py-1 text-xs font-bold text-red-700">
-                    <Lock size={13} />
-                    Locked
-                  </span>
-                ) : (
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-green-50 px-3 py-1 text-xs font-bold text-green-700">
-                    <LockOpen size={13} />
-                    Unlocked
-                  </span>
-                )}
-              </div>
             </div>
 
             <div className="flex flex-col gap-3 md:flex-row md:items-center">
@@ -1190,8 +1224,14 @@ export default function EmployeeAttendancePage() {
                       value={getPeriodLabel(periodMonth)}
                     />
                     <ProfileRow
-                      label="Status Lock"
-                      value={isPeriodLocked ? "Locked by HR" : "Unlocked"}
+                      label="Status Akses"
+                      value={
+                        isPeriodLocked
+                          ? "Locked by HR"
+                          : isProcessReadOnly
+                            ? "Read Only"
+                            : "Unlocked"
+                      }
                     />
                   </div>
                 </div>
@@ -1201,17 +1241,6 @@ export default function EmployeeAttendancePage() {
                     Ringkasan Terakhir
                   </h3>
 
-                  <p className="mt-1 text-sm leading-6 text-[#6e6e73]">
-                    Klik tombol <strong>Lengkapi</strong> untuk menambahkan jam
-                    manual, keterangan ketidakhadiran, jenis cuti, klaim PHL,
-                    bukti, atau catatan lainnya.
-                  </p>
-
-                  {isPeriodLocked && (
-                    <div className="mt-4 rounded-2xl bg-red-50 px-4 py-3 text-xs font-bold text-red-700">
-                      Mode read-only aktif karena periode sudah dikunci HR.
-                    </div>
-                  )}
 
                   {latestLog ? (
                     <div className="mt-5 grid gap-4 sm:grid-cols-2 2xl:grid-cols-4">

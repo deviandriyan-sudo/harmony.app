@@ -2,20 +2,20 @@
 
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import {
-  CalendarDays,
-  Search,
-  RefreshCw,
-  Eye,
-  Lock,
-  Unlock,
-  ShieldCheck,
-  CheckCircle2,
   AlertTriangle,
-  Loader2,
-  X,
+  CalendarDays,
+  CheckCircle2,
+  Eye,
   FileText,
-  Clock3,
+  Loader2,
+  Lock,
+  RefreshCw,
+  Search,
+  ShieldCheck,
+  Trash2,
+  Unlock,
   UserCheck,
+  X,
 } from 'lucide-react'
 
 import { supabase } from '@/lib/supabase'
@@ -35,6 +35,7 @@ type Employee = {
   unit?: string | null
   work_unit?: string | null
   email?: string | null
+  is_active?: boolean | null
 }
 
 type AttendanceLog = {
@@ -43,6 +44,10 @@ type AttendanceLog = {
   attendance_date?: string | null
   check_in?: string | null
   check_out?: string | null
+  manual_check_in?: string | null
+  manual_check_out?: string | null
+  requested_check_in?: string | null
+  requested_check_out?: string | null
   machine_pin?: string | null
 
   status?: string | null
@@ -50,55 +55,106 @@ type AttendanceLog = {
 
   employee_confirmation_status?: string | null
   supervisor_approval_status?: string | null
+  supervisor_approved_at?: string | null
+  supervisor_approved_by?: string | null
+  supervisor_note?: string | null
+
+  hr_approval_status?: string | null
+  hr_approved_at?: string | null
+  hr_approved_by?: string | null
   hr_final_status?: string | null
   hr_finalized_at?: string | null
   hr_finalized_by?: string | null
   hr_finalized_by_name?: string | null
+  hr_note?: string | null
 
   absence_request_type?: string | null
   absence_request_label?: string | null
   absence_request_status?: string | null
   absence_request_source?: string | null
 
-  job_pending?: string | null
-  handover_to?: string | null
-  handover_note?: string | null
+  employee_daily_note?: string | null
+  correction_reason?: string | null
+  correction_notes?: string | null
+  correction_status?: string | null
+  correction_type?: string | null
 
-  proof_file_url?: string | null
-  proof_url?: string | null
-  attachment_url?: string | null
+  is_phl_candidate?: boolean | null
+  phl_proof_url?: string | null
+  absence_proof_url?: string | null
 
   is_locked?: boolean | null
   locked_at?: string | null
   locked_by?: string | null
   locked_by_name?: string | null
+  unlocked_at?: string | null
+  unlocked_by?: string | null
+  unlocked_by_name?: string | null
   lock_note?: string | null
 
   created_at?: string | null
   updated_at?: string | null
+  deleted_at?: string | null
 }
 
 type PeriodConfirmation = {
   id?: string
   employee_id?: string | null
+
+  employee_number?: string | null
+  machine_pin?: string | null
+  full_name?: string | null
+  department?: string | null
+  position?: string | null
+
   period_month?: string | null
+  period_start?: string | null
+  period_end?: string | null
 
   employee_status?: string | null
-  supervisor_status?: string | null
-  hr_status?: string | null
-
+  employee_submitted_at?: string | null
+  employee_submitted_by?: string | null
   submitted_at?: string | null
-  supervisor_approved_at?: string | null
-  supervisor_approved_by_name?: string | null
 
+  supervisor_status?: string | null
+  supervisor_id?: string | null
+  supervisor_name?: string | null
+  supervisor_approved_at?: string | null
+  supervisor_rejected_at?: string | null
+  supervisor_approved_by_name?: string | null
+  supervisor_note?: string | null
+
+  hr_status?: string | null
   hr_finalized_at?: string | null
+  hr_finalized_by?: string | null
   hr_finalized_by_name?: string | null
+  hr_note?: string | null
+
+  total_work_days?: number | null
+  total_present_days?: number | null
+  total_late_days?: number | null
+  total_incomplete_days?: number | null
+  total_absent_days?: number | null
+  total_sick_days?: number | null
+  total_permit_days?: number | null
+  total_leave_days?: number | null
+  total_phl_days?: number | null
+  total_holiday_work_days?: number | null
+
+  annual_leave_matured?: boolean | null
+  annual_leave_matured_date?: string | null
+  leave_allowance_eligible?: boolean | null
 
   is_locked?: boolean | null
   locked_at?: string | null
+  locked_by?: string | null
   locked_by_name?: string | null
+  unlocked_at?: string | null
+  unlocked_by?: string | null
+  unlocked_by_name?: string | null
   lock_note?: string | null
 
+  created_at?: string | null
   updated_at?: string | null
 }
 
@@ -106,6 +162,7 @@ type EmployeeAttendanceSummary = {
   employee: Employee
   confirmation?: PeriodConfirmation
   logs: AttendanceLog[]
+  rowLocked: boolean
   totalDays: number
   presentDays: number
   leaveDays: number
@@ -135,11 +192,15 @@ const MONTHS = [
 ]
 
 function getCurrentPeriodMonth() {
-  const now = new Date()
-  const year = now.getFullYear()
-  const month = String(now.getMonth() + 1).padStart(2, '0')
+  const today = new Date()
+  const day = today.getDate()
+  const period = new Date(today)
 
-  return `${year}-${month}`
+  if (day <= 10) {
+    period.setMonth(period.getMonth() - 1)
+  }
+
+  return `${period.getFullYear()}-${String(period.getMonth() + 1).padStart(2, '0')}`
 }
 
 function getPeriodRange(periodMonth: string) {
@@ -184,7 +245,7 @@ function formatLongDate(date: Date | string | null | undefined) {
 function formatShortDate(date: string | null | undefined) {
   if (!date) return '-'
 
-  const parsed = new Date(date)
+  const parsed = new Date(`${date}T00:00:00`)
 
   if (Number.isNaN(parsed.getTime())) return '-'
 
@@ -232,8 +293,47 @@ function getEmployeeUnit(employee: Employee) {
   return employee.department || employee.unit || employee.work_unit || '-'
 }
 
+function normalizeText(value: unknown) {
+  return String(value || '').trim().toLowerCase()
+}
+
 function normalizeStatus(log: AttendanceLog) {
-  return log.absence_request_type || log.status || log.attendance_status || 'unknown'
+  return (
+    log.absence_request_type ||
+    log.status ||
+    log.attendance_status ||
+    'unknown'
+  )
+}
+
+function isPresentStatus(status: string) {
+  return [
+    'present',
+    'hadir',
+    'normal',
+    'manual',
+    'manual_correction',
+    'official_travel',
+    'business_trip',
+  ].includes(status)
+}
+
+function isLeaveStatus(status: string) {
+  return (
+    [
+      'leave',
+      'annual_leave',
+      'marriage_leave',
+      'maternity_leave',
+      'miscarriage_leave',
+      'bereavement_leave',
+      'child_circumcision_leave',
+      'worship_leave',
+      'menstrual_leave',
+      'pregnancy_check_leave',
+      'other_leave',
+    ].includes(status) || status.includes('leave')
+  )
 }
 
 function getReadableAttendanceLabel(log: AttendanceLog) {
@@ -267,6 +367,7 @@ function getReadableAttendanceLabel(log: AttendanceLog) {
     sick: 'Sakit',
     permit: 'Izin',
     izin: 'Izin',
+    permission: 'Izin',
     official_travel: 'Tugas Luar / Dinas',
     business_trip: 'Tugas Luar / Dinas',
 
@@ -285,27 +386,11 @@ function getReadableAttendanceLabel(log: AttendanceLog) {
 function getAttendanceBadgeClass(log: AttendanceLog) {
   const status = normalizeStatus(log)
 
-  if (
-    ['present', 'hadir', 'normal', 'manual', 'manual_correction'].includes(status)
-  ) {
+  if (isPresentStatus(status)) {
     return 'border-emerald-200 bg-emerald-50 text-emerald-700'
   }
 
-  if (
-    [
-      'leave',
-      'annual_leave',
-      'marriage_leave',
-      'maternity_leave',
-      'miscarriage_leave',
-      'bereavement_leave',
-      'child_circumcision_leave',
-      'worship_leave',
-      'menstrual_leave',
-      'pregnancy_check_leave',
-      'other_leave',
-    ].includes(status)
-  ) {
+  if (isLeaveStatus(status)) {
     return 'border-blue-200 bg-blue-50 text-blue-700'
   }
 
@@ -313,12 +398,8 @@ function getAttendanceBadgeClass(log: AttendanceLog) {
     return 'border-purple-200 bg-purple-50 text-purple-700'
   }
 
-  if (status === 'permit' || status === 'izin') {
+  if (status === 'permit' || status === 'izin' || status === 'permission') {
     return 'border-sky-200 bg-sky-50 text-sky-700'
-  }
-
-  if (status === 'official_travel' || status === 'business_trip') {
-    return 'border-indigo-200 bg-indigo-50 text-indigo-700'
   }
 
   if (status === 'phl' || status === 'phl_claim' || status === 'claim_phl') {
@@ -423,10 +504,6 @@ function AttendancePill({ log }: { log: AttendanceLog }) {
   )
 }
 
-function safeLower(value: unknown) {
-  return String(value || '').toLowerCase()
-}
-
 function countBy(summary: AttendanceLog[], checker: (log: AttendanceLog) => boolean) {
   return summary.filter(checker).length
 }
@@ -462,52 +539,91 @@ export default function HRAttendanceDataPage() {
   const selectedYear = periodMonth.split('-')[0]
   const selectedMonth = periodMonth.split('-')[1]
 
-  const summaries = useMemo<EmployeeAttendanceSummary[]>(() => {
-    const logsByEmployee = new Map<string, AttendanceLog[]>()
-
-    logs.forEach((log) => {
-      if (!log.employee_id) return
-
-      const existing = logsByEmployee.get(log.employee_id) || []
-      existing.push(log)
-      logsByEmployee.set(log.employee_id, existing)
-    })
-
-    const confirmationByEmployee = new Map<string, PeriodConfirmation>()
+  const confirmationByEmployee = useMemo(() => {
+    const map = new Map<string, PeriodConfirmation>()
 
     confirmations.forEach((confirmation) => {
       if (!confirmation.employee_id) return
-      confirmationByEmployee.set(confirmation.employee_id, confirmation)
+      map.set(confirmation.employee_id, confirmation)
     })
 
+    return map
+  }, [confirmations])
+
+  const logsByEmployee = useMemo(() => {
+    const map = new Map<string, AttendanceLog[]>()
+
+    logs.forEach((log) => {
+      if (!log.employee_id) return
+      const existing = map.get(log.employee_id) || []
+      existing.push(log)
+      map.set(log.employee_id, existing)
+    })
+
+    return map
+  }, [logs])
+
+  const periodLockState = useMemo(() => {
+    const employeeCount = employees.length
+    const confirmationLockedCount = confirmations.filter((item) => item.is_locked).length
+    const logLockedCount = logs.filter((item) => item.is_locked).length
+
+    const isFullyLockedByConfirmation =
+      employeeCount > 0 &&
+      confirmations.length >= employeeCount &&
+      employees.every((employee) => confirmationByEmployee.get(employee.id)?.is_locked)
+
+    const isFullyLockedByLogs =
+      logs.length > 0 && logs.every((item) => Boolean(item.is_locked))
+
+    const latestLockSource =
+      confirmations.find((item) => item.is_locked && item.locked_at) ||
+      logs.find((item) => item.is_locked && item.locked_at)
+
+    const latestUnlockSource =
+      confirmations.find((item) => !item.is_locked && item.unlocked_at) ||
+      logs.find((item) => !item.is_locked && item.unlocked_at)
+
+    const isFullyLocked = isFullyLockedByConfirmation || isFullyLockedByLogs
+    const isPartiallyLocked =
+      !isFullyLocked &&
+      (confirmationLockedCount > 0 || logLockedCount > 0)
+
+    return {
+      isFullyLocked,
+      isPartiallyLocked,
+      confirmationLockedCount,
+      logLockedCount,
+      lockedAt: latestLockSource?.locked_at || '',
+      lockedBy:
+        latestLockSource?.locked_by_name ||
+        latestLockSource?.locked_by ||
+        '-',
+      unlockedAt: latestUnlockSource?.unlocked_at || '',
+      unlockedBy:
+        latestUnlockSource?.unlocked_by_name ||
+        latestUnlockSource?.unlocked_by ||
+        '-',
+      note:
+        latestLockSource?.lock_note ||
+        latestUnlockSource?.lock_note ||
+        '-',
+    }
+  }, [employees, confirmations, logs, confirmationByEmployee])
+
+  const summaries = useMemo<EmployeeAttendanceSummary[]>(() => {
     return employees.map((employee) => {
       const employeeLogs = logsByEmployee.get(employee.id) || []
       const confirmation = confirmationByEmployee.get(employee.id)
 
       const presentDays = countBy(employeeLogs, (log) => {
         const status = normalizeStatus(log)
-
-        return ['present', 'hadir', 'normal', 'manual', 'manual_correction'].includes(
-          status
-        )
+        return isPresentStatus(status)
       })
 
       const leaveDays = countBy(employeeLogs, (log) => {
         const status = normalizeStatus(log)
-
-        return [
-          'leave',
-          'annual_leave',
-          'marriage_leave',
-          'maternity_leave',
-          'miscarriage_leave',
-          'bereavement_leave',
-          'child_circumcision_leave',
-          'worship_leave',
-          'menstrual_leave',
-          'pregnancy_check_leave',
-          'other_leave',
-        ].includes(status)
+        return isLeaveStatus(status)
       })
 
       const sickDays = countBy(
@@ -516,7 +632,7 @@ export default function HRAttendanceDataPage() {
       )
 
       const permitDays = countBy(employeeLogs, (log) =>
-        ['permit', 'izin'].includes(normalizeStatus(log))
+        ['permit', 'izin', 'permission'].includes(normalizeStatus(log))
       )
 
       const officialTravelDays = countBy(employeeLogs, (log) =>
@@ -524,7 +640,7 @@ export default function HRAttendanceDataPage() {
       )
 
       const phlClaimDays = countBy(employeeLogs, (log) =>
-        ['phl_claim', 'claim_phl'].includes(normalizeStatus(log))
+        ['phl', 'phl_claim', 'claim_phl'].includes(normalizeStatus(log))
       )
 
       const absentDays = countBy(employeeLogs, (log) =>
@@ -541,6 +657,11 @@ export default function HRAttendanceDataPage() {
 
       const lockedDays = countBy(employeeLogs, (log) => Boolean(log.is_locked))
 
+      const rowLocked =
+        periodLockState.isFullyLocked ||
+        Boolean(confirmation?.is_locked) ||
+        employeeLogs.some((item) => item.is_locked)
+
       return {
         employee,
         confirmation,
@@ -549,6 +670,7 @@ export default function HRAttendanceDataPage() {
             String(b.attendance_date || '')
           )
         ),
+        rowLocked,
         totalDays: employeeLogs.length,
         presentDays,
         leaveDays,
@@ -562,11 +684,11 @@ export default function HRAttendanceDataPage() {
         lockedDays,
       }
     })
-  }, [employees, logs, confirmations])
+  }, [employees, logsByEmployee, confirmationByEmployee, periodLockState.isFullyLocked])
 
   const filteredSummaries = useMemo(() => {
     return summaries.filter((summary) => {
-      const keyword = safeLower(search)
+      const keyword = normalizeText(search)
 
       const employeeText = [
         getEmployeeName(summary.employee),
@@ -604,7 +726,7 @@ export default function HRAttendanceDataPage() {
       }
 
       if (statusFilter === 'locked') {
-        return Boolean(summary.confirmation?.is_locked)
+        return summary.rowLocked
       }
 
       if (statusFilter === 'has_request') {
@@ -626,7 +748,7 @@ export default function HRAttendanceDataPage() {
     const finalized = summaries.filter(
       (item) => item.confirmation?.hr_status === 'finalized'
     ).length
-    const locked = summaries.filter((item) => item.confirmation?.is_locked).length
+    const locked = summaries.filter((item) => item.rowLocked).length
     const hasRequest = summaries.filter((item) =>
       item.logs.some((log) => Boolean(log.absence_request_type))
     ).length
@@ -685,7 +807,7 @@ export default function HRAttendanceDataPage() {
       setLogs((attendanceData || []) as AttendanceLog[])
       setConfirmations((confirmationData || []) as PeriodConfirmation[])
     } catch (error: any) {
-      console.error(error)
+      console.warn('Attendance data fetch warning:', error)
 
       setMessage({
         type: 'error',
@@ -720,6 +842,160 @@ export default function HRAttendanceDataPage() {
     }
   }
 
+  function getActionErrorMessage(error: any, fallback: string) {
+    if (!error) return fallback
+
+    if (typeof error === 'string') return error
+
+    return (
+      error.message ||
+      error.details ||
+      error.hint ||
+      error.code ||
+      fallback
+    )
+  }
+
+  async function writeAttendanceAuditLog({
+    actionType,
+    actionLabel,
+    actor,
+    totalAffected,
+    note,
+    metadata,
+  }: {
+    actionType: string
+    actionLabel: string
+    actor: Awaited<ReturnType<typeof getActor>>
+    totalAffected: number
+    note: string
+    metadata: Record<string, unknown>
+  }) {
+    const { error } = await supabase.from('attendance_audit_logs').insert({
+      action_type: actionType,
+      action_label: actionLabel,
+      period_month: periodMonth,
+      period_start: periodRange.startText,
+      period_end: periodRange.endText,
+      actor_id: actor.id,
+      actor_name: actor.name,
+      actor_role: 'hr',
+      total_affected: totalAffected,
+      note,
+      metadata,
+      created_at: new Date().toISOString(),
+    })
+
+    if (error) {
+      console.warn('Attendance audit log warning:', error)
+    }
+  }
+
+  function buildConfirmationPayload({
+    actor,
+    note,
+    now,
+    locked,
+    finalized,
+  }: {
+    actor: Awaited<ReturnType<typeof getActor>>
+    note: string
+    now: string
+    locked: boolean
+    finalized: boolean
+  }) {
+    return employees.map((employee) => {
+      const existing = confirmationByEmployee.get(employee.id)
+
+      return {
+        employee_id: employee.id,
+        employee_number: getEmployeeNumber(employee),
+        machine_pin: employee.machine_pin || null,
+        full_name: getEmployeeName(employee),
+        department: getEmployeeUnit(employee),
+        position: getEmployeePosition(employee),
+
+        period_month: periodMonth,
+        period_start: periodRange.startText,
+        period_end: periodRange.endText,
+
+        employee_status: existing?.employee_status || 'belum_ada',
+        employee_submitted_at:
+          existing?.employee_submitted_at || existing?.submitted_at || null,
+        employee_submitted_by: existing?.employee_submitted_by || null,
+
+        supervisor_status: existing?.supervisor_status || 'belum_ada',
+        supervisor_id: existing?.supervisor_id || null,
+        supervisor_name: existing?.supervisor_name || null,
+        supervisor_approved_at: existing?.supervisor_approved_at || null,
+        supervisor_rejected_at: existing?.supervisor_rejected_at || null,
+        supervisor_note: existing?.supervisor_note || null,
+
+        hr_status: finalized ? 'finalized' : existing?.hr_status || 'waiting_hr',
+        hr_finalized_at: finalized ? now : existing?.hr_finalized_at || null,
+        hr_finalized_by: finalized ? actor.name : existing?.hr_finalized_by || null,
+        hr_note: finalized
+          ? 'Finalisasi periode absensi HR.'
+          : existing?.hr_note || null,
+
+        total_work_days: existing?.total_work_days || 0,
+        total_present_days: existing?.total_present_days || 0,
+        total_late_days: existing?.total_late_days || 0,
+        total_incomplete_days: existing?.total_incomplete_days || 0,
+        total_absent_days: existing?.total_absent_days || 0,
+        total_sick_days: existing?.total_sick_days || 0,
+        total_permit_days: existing?.total_permit_days || 0,
+        total_leave_days: existing?.total_leave_days || 0,
+        total_phl_days: existing?.total_phl_days || 0,
+        total_holiday_work_days: existing?.total_holiday_work_days || 0,
+
+        annual_leave_matured: existing?.annual_leave_matured || false,
+        annual_leave_matured_date: existing?.annual_leave_matured_date || null,
+        leave_allowance_eligible: existing?.leave_allowance_eligible || false,
+
+        is_locked: locked,
+        locked_at: locked ? now : existing?.locked_at || null,
+        locked_by: locked ? actor.id : existing?.locked_by || null,
+        locked_by_name: locked ? actor.name : existing?.locked_by_name || null,
+        unlocked_at: locked ? null : now,
+        unlocked_by: locked ? null : actor.id,
+        unlocked_by_name: locked ? null : actor.name,
+        lock_note: note,
+
+        updated_at: now,
+      }
+    })
+  }
+
+  async function upsertConfirmations(payload: Record<string, unknown>[]) {
+    if (payload.length === 0) return 0
+
+    const { data, error } = await supabase
+      .from('attendance_period_confirmations')
+      .upsert(payload, {
+        onConflict: 'employee_id,period_month',
+      })
+      .select('id')
+
+    if (error) throw error
+
+    return data?.length || 0
+  }
+
+  async function updateLogsForPeriod(payload: Record<string, unknown>) {
+    const { data, error } = await supabase
+      .from('attendance_logs')
+      .update(payload)
+      .gte('attendance_date', periodRange.startText)
+      .lte('attendance_date', periodRange.endText)
+      .is('deleted_at', null)
+      .select('id')
+
+    if (error) throw error
+
+    return data?.length || 0
+  }
+
   async function handleSyncApprovedRequests() {
     setIsProcessing(true)
     setMessage(null)
@@ -741,7 +1017,7 @@ export default function HRAttendanceDataPage() {
 
       await fetchData()
     } catch (error: any) {
-      console.error(error)
+      console.warn('Attendance sync warning:', error)
 
       setMessage({
         type: 'error',
@@ -756,7 +1032,7 @@ export default function HRAttendanceDataPage() {
 
   async function handleFinalizePeriod() {
     const confirmed = window.confirm(
-      `Finalisasi periode ${periodMonth}?\n\nSistem akan otomatis sync approved request terlebih dahulu, lalu mengunci periode absensi.`
+      `Finalisasi dan lock penuh periode ${periodMonth}?\n\nSemua karyawan pada periode ini akan masuk Final HR dan terkunci. Employee tidak bisa revisi lagi sampai HR membuka lock.`
     )
 
     if (!confirmed) return
@@ -766,36 +1042,77 @@ export default function HRAttendanceDataPage() {
 
     try {
       const actor = await getActor()
+      const now = new Date().toISOString()
+      const note =
+        'Finalisasi dan lock penuh periode absensi HR. Seluruh employee menjadi read-only.'
 
-      const { data, error } = await supabase.rpc(
-        'hr_finalize_attendance_period',
-        {
+      try {
+        await supabase.rpc('sync_approved_leave_requests_to_attendance', {
           p_period_month: periodMonth,
-          p_actor_id: actor.id,
-          p_actor_name: actor.name,
-          p_note:
-            'Finalisasi periode absensi HR. Approved request otomatis disinkronkan sebelum finalisasi.',
-        }
-      )
+        })
+      } catch (syncError) {
+        console.warn('Sync approved request warning before finalize:', syncError)
+      }
 
-      if (error) throw error
+      const confirmationPayload = buildConfirmationPayload({
+        actor,
+        note,
+        now,
+        locked: true,
+        finalized: true,
+      })
+
+      const confirmationCount = await upsertConfirmations(confirmationPayload)
+
+      const attendanceLogCount = await updateLogsForPeriod({
+        hr_final_status: 'finalized',
+        hr_finalized_at: now,
+        hr_finalized_by: actor.name,
+        hr_finalized_by_name: actor.name,
+        hr_approval_status: 'approved',
+        hr_approved_by: actor.name,
+        hr_approved_at: now,
+
+        is_locked: true,
+        locked_at: now,
+        locked_by: actor.id,
+        locked_by_name: actor.name,
+        unlocked_at: null,
+        unlocked_by: null,
+        unlocked_by_name: null,
+        lock_note: note,
+
+        updated_at: now,
+      })
+
+      await writeAttendanceAuditLog({
+        actionType: 'hr_finalize_period',
+        actionLabel: 'Finalisasi dan Lock Penuh Periode',
+        actor,
+        totalAffected: attendanceLogCount,
+        note,
+        metadata: {
+          source: 'client_full_period_lock',
+          confirmation_count: confirmationCount,
+          attendance_log_count: attendanceLogCount,
+        },
+      })
 
       setMessage({
         type: 'success',
-        text:
-          data?.message ||
-          'Finalisasi berhasil. Approved request sudah otomatis disinkronkan.',
+        text: `Finalisasi berhasil. ${confirmationCount} data karyawan dan ${attendanceLogCount} data absensi harian dikunci penuh.`,
       })
 
       await fetchData()
     } catch (error: any) {
-      console.error(error)
+      console.warn('Attendance finalize period warning:', error)
 
       setMessage({
         type: 'error',
-        text:
-          error?.message ||
-          'Gagal finalisasi periode. Cek function hr_finalize_attendance_period.',
+        text: getActionErrorMessage(
+          error,
+          'Gagal finalisasi dan lock penuh periode.'
+        ),
       })
     } finally {
       setIsProcessing(false)
@@ -805,7 +1122,7 @@ export default function HRAttendanceDataPage() {
   async function handleLockPeriod() {
     const note = window.prompt(
       'Masukkan catatan lock periode:',
-      'Periode absensi dikunci oleh HR.'
+      'Periode absensi dikunci penuh oleh HR.'
     )
 
     if (note === null) return
@@ -815,30 +1132,56 @@ export default function HRAttendanceDataPage() {
 
     try {
       const actor = await getActor()
+      const now = new Date().toISOString()
+      const lockNote = note || 'Periode absensi dikunci penuh oleh HR.'
 
-      const { error } = await supabase.rpc('hr_lock_attendance_period', {
-        p_period_month: periodMonth,
-        p_actor_id: actor.id,
-        p_actor_name: actor.name,
-        p_note: note || 'Periode absensi dikunci oleh HR.',
+      const confirmationPayload = buildConfirmationPayload({
+        actor,
+        note: lockNote,
+        now,
+        locked: true,
+        finalized: false,
       })
 
-      if (error) throw error
+      const confirmationCount = await upsertConfirmations(confirmationPayload)
+
+      const attendanceLogCount = await updateLogsForPeriod({
+        is_locked: true,
+        locked_at: now,
+        locked_by: actor.id,
+        locked_by_name: actor.name,
+        unlocked_at: null,
+        unlocked_by: null,
+        unlocked_by_name: null,
+        lock_note: lockNote,
+        updated_at: now,
+      })
+
+      await writeAttendanceAuditLog({
+        actionType: 'hr_lock_period',
+        actionLabel: 'Lock Penuh Periode',
+        actor,
+        totalAffected: attendanceLogCount,
+        note: lockNote,
+        metadata: {
+          source: 'client_full_period_lock',
+          confirmation_count: confirmationCount,
+          attendance_log_count: attendanceLogCount,
+        },
+      })
 
       setMessage({
         type: 'success',
-        text: 'Periode berhasil dikunci.',
+        text: `Periode berhasil dikunci penuh. ${confirmationCount} data karyawan dan ${attendanceLogCount} data absensi harian ikut terkunci.`,
       })
 
       await fetchData()
     } catch (error: any) {
-      console.error(error)
+      console.warn('Attendance lock period warning:', error)
 
       setMessage({
         type: 'error',
-        text:
-          error?.message ||
-          'Gagal lock periode. Pastikan function hr_lock_attendance_period tersedia.',
+        text: getActionErrorMessage(error, 'Gagal lock penuh periode.'),
       })
     } finally {
       setIsProcessing(false)
@@ -858,30 +1201,176 @@ export default function HRAttendanceDataPage() {
 
     try {
       const actor = await getActor()
+      const now = new Date().toISOString()
+      const unlockNote = note || 'Periode absensi dibuka kembali oleh HR.'
 
-      const { error } = await supabase.rpc('hr_unlock_attendance_period', {
-        p_period_month: periodMonth,
-        p_actor_id: actor.id,
-        p_actor_name: actor.name,
-        p_note: note || 'Periode absensi dibuka kembali oleh HR.',
+      const { data: updatedConfirmations, error: confirmationError } =
+        await supabase
+          .from('attendance_period_confirmations')
+          .update({
+            is_locked: false,
+            unlocked_at: now,
+            unlocked_by: actor.id,
+            unlocked_by_name: actor.name,
+            lock_note: unlockNote,
+            updated_at: now,
+          })
+          .eq('period_month', periodMonth)
+          .select('id')
+
+      if (confirmationError) throw confirmationError
+
+      const attendanceLogCount = await updateLogsForPeriod({
+        is_locked: false,
+        unlocked_at: now,
+        unlocked_by: actor.id,
+        unlocked_by_name: actor.name,
+        lock_note: unlockNote,
+        updated_at: now,
       })
 
-      if (error) throw error
+      await writeAttendanceAuditLog({
+        actionType: 'hr_unlock_period',
+        actionLabel: 'Unlock Penuh Periode',
+        actor,
+        totalAffected: attendanceLogCount,
+        note: unlockNote,
+        metadata: {
+          source: 'client_full_period_unlock',
+          confirmation_count: updatedConfirmations?.length || 0,
+          attendance_log_count: attendanceLogCount,
+        },
+      })
 
       setMessage({
         type: 'success',
-        text: 'Periode berhasil dibuka kembali.',
+        text: `Periode berhasil dibuka kembali. ${updatedConfirmations?.length || 0} data karyawan dan ${attendanceLogCount} data absensi harian ikut terbuka.`,
       })
 
       await fetchData()
     } catch (error: any) {
-      console.error(error)
+      console.warn('Attendance unlock period warning:', error)
 
       setMessage({
         type: 'error',
-        text:
-          error?.message ||
-          'Gagal unlock periode. Pastikan function hr_unlock_attendance_period tersedia.',
+        text: getActionErrorMessage(error, 'Gagal unlock penuh periode.'),
+      })
+    } finally {
+      setIsProcessing(false)
+    }
+  }
+
+
+  async function deleteAllRowsFromAttendanceTable(tableName: string) {
+    const { count, error } = await supabase
+      .from(tableName)
+      .delete({
+        count: 'exact',
+      })
+      .not('id', 'is', null)
+
+    if (error) {
+      throw new Error(`${tableName}: ${error.message}`)
+    }
+
+    return count || 0
+  }
+
+  async function handleDeleteAllAttendanceData() {
+    const firstConfirm = window.confirm(
+      [
+        'PERINGATAN: Ini akan menghapus seluruh data proses Attendance HR.',
+        '',
+        'Data yang DIHAPUS:',
+        '- attendance_logs',
+        '- attendance_period_confirmations',
+        '- attendance_uploads',
+        '- attendance_audit_logs',
+        '- attendance_records jika masih ada',
+        '',
+        'Data yang TIDAK dihapus:',
+        '- employees / data karyawan',
+        '- app_users / akun user',
+        '- holidays / kalender libur',
+        '- leave_requests / data cuti & izin',
+        '- phl_records / saldo PHL',
+        '',
+        'Lanjutkan?'
+      ].join('\n')
+    )
+
+    if (!firstConfirm) return
+
+    const typed = window.prompt(
+      'Ketik persis: HAPUS ATTENDANCE\n\nTindakan ini tidak bisa dibatalkan dari aplikasi.'
+    )
+
+    if (typed !== 'HAPUS ATTENDANCE') {
+      setMessage({
+        type: 'info',
+        text: 'Reset attendance dibatalkan. Kalimat konfirmasi tidak sesuai.',
+      })
+      return
+    }
+
+    const finalConfirm = window.confirm(
+      'Konfirmasi terakhir: semua data proses Attendance HR akan dihapus. Data karyawan tetap aman. Eksekusi sekarang?'
+    )
+
+    if (!finalConfirm) return
+
+    setIsProcessing(true)
+    setMessage(null)
+    setSelectedSummary(null)
+
+    const deleteResults: Record<string, number> = {}
+
+    try {
+      const tables = [
+        'attendance_audit_logs',
+        'attendance_period_confirmations',
+        'attendance_logs',
+        'attendance_uploads',
+        'attendance_records',
+      ]
+
+      for (const table of tables) {
+        try {
+          deleteResults[table] = await deleteAllRowsFromAttendanceTable(table)
+        } catch (error: any) {
+          const message = String(error?.message || '')
+
+          if (
+            message.toLowerCase().includes('does not exist') ||
+            message.toLowerCase().includes('could not find the table') ||
+            message.toLowerCase().includes('relation') && message.toLowerCase().includes('does not exist')
+          ) {
+            deleteResults[table] = 0
+            continue
+          }
+
+          throw error
+        }
+      }
+
+      setLogs([])
+      setConfirmations([])
+
+      setMessage({
+        type: 'success',
+        text: `Reset Attendance HR berhasil. Terhapus: attendance_logs ${deleteResults.attendance_logs || 0}, attendance_period_confirmations ${deleteResults.attendance_period_confirmations || 0}, attendance_uploads ${deleteResults.attendance_uploads || 0}, attendance_audit_logs ${deleteResults.attendance_audit_logs || 0}, attendance_records ${deleteResults.attendance_records || 0}. Data karyawan tidak dihapus.`,
+      })
+
+      await fetchData()
+    } catch (error: any) {
+      console.warn('Delete all attendance data warning:', error)
+
+      setMessage({
+        type: 'error',
+        text: getActionErrorMessage(
+          error,
+          'Gagal menghapus seluruh data Attendance HR.'
+        ),
       })
     } finally {
       setIsProcessing(false)
@@ -895,60 +1384,63 @@ export default function HRAttendanceDataPage() {
           <div className="grid gap-6 p-5 sm:p-6 xl:grid-cols-[minmax(0,1fr)_minmax(360px,520px)] xl:items-end">
             <div className="min-w-0">
               <div className="mb-3 inline-flex max-w-full items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600">
-                <CalendarDays className="h-3.5 w-3.5 shrink-0" />
-                <span className="truncate">Data Absensi HR</span>
+                <CalendarDays className="h-3.5 w-3.5 text-blue-600" />
+                Data Absensi HR
               </div>
 
-              <h1 className="text-2xl font-bold tracking-tight text-slate-950 sm:text-3xl">
+              <h1 className="text-2xl font-bold tracking-[-0.04em] text-slate-950 sm:text-4xl">
                 Data Absensi Periode
               </h1>
 
-              <p className="mt-2 max-w-4xl text-sm leading-6 text-slate-600">
-                Monitoring rekap absensi karyawan berdasarkan periode cutoff 11 s.d. 10 bulan berikutnya.
-                Approved request seperti cuti, izin, sakit, tugas luar, dan klaim PHL tampil sebagai keterangan yang mudah dibaca.
+              <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">
+                Monitoring rekap absensi karyawan berdasarkan periode cutoff 11 s.d. 10
+                bulan berikutnya. Kontrol lock di halaman ini berlaku penuh untuk
+                seluruh karyawan pada periode terpilih.
               </p>
             </div>
 
-            <div className="grid min-w-0 gap-3 rounded-[1.5rem] border border-slate-100 bg-slate-50 p-3 sm:grid-cols-[1fr_1fr]">
-              <label className="block min-w-0">
-                <span className="mb-1 block text-xs font-semibold text-slate-500">
-                  Tahun
-                </span>
-                <select
-                  value={selectedYear}
-                  onChange={(event) => updatePeriodYear(event.target.value)}
-                  className="h-11 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm font-semibold outline-none transition focus:border-slate-400"
-                >
-                  {yearOptions.map((year) => (
-                    <option key={year} value={String(year)}>
-                      {year}
-                    </option>
-                  ))}
-                </select>
-              </label>
+            <div className="rounded-[1.5rem] border border-slate-200 bg-slate-50 p-4">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="block">
+                  <span className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-slate-500">
+                    Tahun
+                  </span>
+                  <select
+                    value={selectedYear}
+                    onChange={(event) => updatePeriodYear(event.target.value)}
+                    className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm font-semibold outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-100"
+                  >
+                    {yearOptions.map((year) => (
+                      <option key={year} value={String(year)}>
+                        {year}
+                      </option>
+                    ))}
+                  </select>
+                </label>
 
-              <label className="block min-w-0">
-                <span className="mb-1 block text-xs font-semibold text-slate-500">
-                  Bulan Periode
-                </span>
-                <select
-                  value={selectedMonth}
-                  onChange={(event) => updatePeriodMonth(event.target.value)}
-                  className="h-11 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm font-semibold outline-none transition focus:border-slate-400"
-                >
-                  {MONTHS.map((month) => (
-                    <option key={month.value} value={month.value}>
-                      {month.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
+                <label className="block">
+                  <span className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-slate-500">
+                    Bulan Periode
+                  </span>
+                  <select
+                    value={selectedMonth}
+                    onChange={(event) => updatePeriodMonth(event.target.value)}
+                    className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm font-semibold outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-100"
+                  >
+                    {MONTHS.map((month) => (
+                      <option key={month.value} value={month.value}>
+                        {month.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
 
-              <div className="min-w-0 rounded-2xl border border-slate-200 bg-white px-4 py-3 sm:col-span-2">
-                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              <div className="mt-3 rounded-2xl border border-slate-200 bg-white p-4">
+                <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">
                   Cutoff Periode
                 </p>
-                <p className="mt-1 break-words text-sm font-bold leading-6 text-slate-900">
+                <p className="mt-1 text-sm font-bold text-slate-950">
                   {periodRange.label}
                 </p>
               </div>
@@ -957,153 +1449,322 @@ export default function HRAttendanceDataPage() {
         </section>
 
         {message && (
-          <section
-            className={`rounded-2xl border px-4 py-3 text-sm font-medium leading-6 ${
+          <div
+            className={`rounded-2xl border px-4 py-3 text-sm font-semibold leading-6 ${
               message.type === 'success'
                 ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-                : message.type === 'error'
-                  ? 'border-red-200 bg-red-50 text-red-700'
-                  : 'border-blue-200 bg-blue-50 text-blue-700'
+                : message.type === 'info'
+                  ? 'border-blue-200 bg-blue-50 text-blue-700'
+                  : 'border-red-200 bg-red-50 text-red-700'
             }`}
           >
             {message.text}
-          </section>
+          </div>
         )}
 
-        <section className="grid grid-cols-[repeat(auto-fit,minmax(205px,1fr))] gap-4">
+        {periodLockState.isFullyLocked && (
+          <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold leading-6 text-red-700">
+            <div className="flex items-center gap-2">
+              <Lock className="h-4 w-4" />
+              Periode absensi ini sudah dikunci penuh HR. Semua employee pada periode ini tidak dapat mengubah data.
+            </div>
+          </div>
+        )}
+
+        {!periodLockState.isFullyLocked &&
+          !periodLockState.isPartiallyLocked &&
+          !periodLockState.unlockedAt && (
+            <div className="rounded-2xl border border-green-200 bg-green-50 px-4 py-3 text-sm font-semibold leading-6 text-green-700">
+              <div className="flex items-center gap-2">
+                <Unlock className="h-4 w-4" />
+                Periode masih bisa direvisi. Klik <strong>Lock</strong> untuk mengunci seluruh karyawan pada periode ini.
+              </div>
+            </div>
+          )}
+
+        {!periodLockState.isFullyLocked && periodLockState.isPartiallyLocked && (
+          <div className="rounded-2xl border border-green-200 bg-green-50 px-4 py-3 text-sm font-semibold leading-6 text-green-700">
+            <div className="flex items-center gap-2">
+              <Unlock className="h-4 w-4" />
+              Periode ini masih bisa direvisi sebagian. Klik <strong>Lock</strong> untuk mengunci seluruh karyawan pada periode ini.
+            </div>
+          </div>
+        )}
+
+        {!periodLockState.isFullyLocked && periodLockState.unlockedAt && (
+          <div className="rounded-2xl border border-green-200 bg-green-50 px-4 py-3 text-sm font-semibold leading-6 text-green-700">
+            <div className="flex items-center gap-2">
+              <Unlock className="h-4 w-4" />
+              Periode masih bisa direvisi. Employee dapat melakukan perubahan jika status periodenya masih memungkinkan.
+            </div>
+          </div>
+        )}
+
+        <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
           <StatCard
-            label="Karyawan"
+            title="Karyawan"
             value={dashboardStats.totalEmployees}
-            icon={UserCheck}
+            icon={<UserCheck className="h-5 w-5" />}
           />
           <StatCard
-            label="Submitted"
+            title="Submitted"
             value={dashboardStats.submitted}
-            icon={Clock3}
+            icon={<ClockIcon />}
           />
           <StatCard
-            label="Approved Atasan"
+            title="Approved Atasan"
             value={dashboardStats.approved}
-            icon={CheckCircle2}
+            icon={<CheckCircle2 className="h-5 w-5" />}
           />
           <StatCard
-            label="Ada Request"
+            title="Ada Request"
             value={dashboardStats.hasRequest}
-            icon={FileText}
+            icon={<FileText className="h-5 w-5" />}
           />
           <StatCard
-            label="Final HR"
+            title="Final HR"
             value={dashboardStats.finalized}
-            icon={ShieldCheck}
+            icon={<ShieldCheck className="h-5 w-5" />}
           />
-          <StatCard label="Locked" value={dashboardStats.locked} icon={Lock} />
+          <StatCard
+            title="Locked"
+            value={dashboardStats.locked}
+            icon={<Lock className="h-5 w-5" />}
+          />
         </section>
 
-        <section className="rounded-[1.75rem] border border-white/70 bg-white p-4 shadow-sm sm:p-5">
-          <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-center">
-            <div className="grid min-w-0 gap-3 md:grid-cols-[minmax(220px,360px)_minmax(180px,240px)]">
-              <div className="relative min-w-0">
-                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+        <section className="overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-sm">
+          <div className="flex flex-col gap-3 border-b border-slate-100 p-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex flex-col gap-3 md:flex-row md:items-center">
+              <div className="flex h-12 w-full items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 md:w-[340px]">
+                <Search className="h-4 w-4 shrink-0 text-slate-400" />
                 <input
                   value={search}
                   onChange={(event) => setSearch(event.target.value)}
                   placeholder="Cari nama, NIP, unit, jabatan..."
-                  className="h-11 w-full rounded-2xl border border-slate-200 bg-white pl-10 pr-4 text-sm outline-none transition focus:border-slate-400"
+                  className="h-full w-full bg-transparent text-sm outline-none placeholder:text-slate-400"
                 />
               </div>
 
               <select
                 value={statusFilter}
                 onChange={(event) => setStatusFilter(event.target.value)}
-                className="h-11 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm font-semibold outline-none transition focus:border-slate-400"
+                className="h-12 rounded-2xl border border-slate-200 bg-white px-4 text-sm font-semibold outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-100"
               >
                 <option value="all">Semua Status</option>
-                <option value="submitted">Submitted Employee</option>
+                <option value="submitted">Submitted</option>
                 <option value="approved">Approved Atasan</option>
                 <option value="ready_for_hr">Ready for HR</option>
-                <option value="finalized">Final HR</option>
+                <option value="finalized">Finalized</option>
                 <option value="locked">Locked</option>
-                <option value="has_request">Ada Cuti/Izin/PHL</option>
+                <option value="has_request">Ada Request</option>
               </select>
             </div>
 
-            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5 xl:flex xl:flex-wrap xl:justify-end">
-              <button
+            <div className="flex flex-wrap items-center gap-2">
+              <ActionButton
                 type="button"
                 onClick={fetchData}
-                disabled={isLoading || isProcessing}
-                className="inline-flex h-11 min-w-0 items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={isProcessing || isLoading}
+                tone="light"
+                icon={<RefreshCw className="h-4 w-4" />}
               >
-                <RefreshCw className="h-4 w-4 shrink-0" />
-                <span>Refresh</span>
-              </button>
+                Refresh
+              </ActionButton>
 
-              <button
+              <ActionButton
                 type="button"
                 onClick={handleSyncApprovedRequests}
-                disabled={isLoading || isProcessing}
-                className="inline-flex h-11 min-w-0 items-center justify-center gap-2 rounded-2xl border border-indigo-200 bg-indigo-50 px-4 text-sm font-semibold text-indigo-700 transition hover:bg-indigo-100 disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={isProcessing || isLoading}
+                tone="blue"
+                icon={<RefreshCw className="h-4 w-4" />}
               >
-                {isProcessing ? (
-                  <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
-                ) : (
-                  <RefreshCw className="h-4 w-4 shrink-0" />
-                )}
-                <span>Sync Request</span>
-              </button>
+                Sync Request
+              </ActionButton>
 
-              <button
+              <ActionButton
                 type="button"
                 onClick={handleFinalizePeriod}
-                disabled={isLoading || isProcessing}
-                className="inline-flex h-11 min-w-0 items-center justify-center gap-2 rounded-2xl bg-slate-950 px-4 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={isProcessing || isLoading}
+                tone="dark"
+                icon={<ShieldCheck className="h-4 w-4" />}
               >
-                {isProcessing ? (
-                  <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
-                ) : (
-                  <ShieldCheck className="h-4 w-4 shrink-0" />
-                )}
-                <span>Finalisasi</span>
-              </button>
+                Finalisasi
+              </ActionButton>
 
-              <button
+              <ActionButton
                 type="button"
                 onClick={handleLockPeriod}
-                disabled={isLoading || isProcessing}
-                className="inline-flex h-11 min-w-0 items-center justify-center gap-2 rounded-2xl border border-amber-200 bg-amber-50 px-4 text-sm font-semibold text-amber-700 transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={isProcessing || isLoading || periodLockState.isFullyLocked}
+                tone="amber"
+                icon={<Lock className="h-4 w-4" />}
               >
-                <Lock className="h-4 w-4 shrink-0" />
-                <span>Lock</span>
-              </button>
+                Lock
+              </ActionButton>
 
-              <button
+              <ActionButton
                 type="button"
                 onClick={handleUnlockPeriod}
-                disabled={isLoading || isProcessing}
-                className="inline-flex h-11 min-w-0 items-center justify-center gap-2 rounded-2xl border border-red-200 bg-red-50 px-4 text-sm font-semibold text-red-700 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-60 sm:col-span-2 lg:col-span-1"
+                disabled={isProcessing || isLoading || (!periodLockState.isFullyLocked && !periodLockState.isPartiallyLocked)}
+                tone="red"
+                icon={<Unlock className="h-4 w-4" />}
               >
-                <Unlock className="h-4 w-4 shrink-0" />
-                <span>Unlock</span>
-              </button>
+                Unlock
+              </ActionButton>
+
+              <ActionButton
+                type="button"
+                onClick={handleDeleteAllAttendanceData}
+                disabled={isProcessing || isLoading}
+                tone="danger"
+                icon={<Trash2 className="h-4 w-4" />}
+              >
+                Reset Attendance
+              </ActionButton>
             </div>
           </div>
-        </section>
 
-        <section className="overflow-hidden rounded-[1.75rem] border border-white/70 bg-white shadow-sm">
-          {isLoading ? (
-            <div className="flex min-h-[360px] items-center justify-center">
-              <div className="flex items-center gap-3 text-sm font-semibold text-slate-600">
-                <Loader2 className="h-5 w-5 animate-spin" />
-                Memuat data absensi...
-              </div>
+          {isProcessing && (
+            <div className="border-b border-slate-100 bg-blue-50 px-4 py-3 text-sm font-semibold text-blue-700">
+              <span className="inline-flex items-center gap-2">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Memproses data periode...
+              </span>
             </div>
-          ) : filteredSummaries.length === 0 ? (
-            <EmptyState />
+          )}
+
+          {isLoading ? (
+            <div className="p-8 text-sm font-semibold text-slate-500">
+              <span className="inline-flex items-center gap-2">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Memuat data absensi...
+              </span>
+            </div>
           ) : (
-            <AttendanceSummaryList
-              summaries={filteredSummaries}
-              onDetail={(summary) => setSelectedSummary(summary)}
-            />
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[1260px] border-collapse text-left">
+                <thead>
+                  <tr className="border-b border-slate-100 bg-slate-50 text-[11px] uppercase tracking-wide text-slate-500">
+                    <th className="px-4 py-3 font-bold">Karyawan</th>
+                    <th className="px-4 py-3 font-bold">Unit / Jabatan</th>
+                    <th className="px-4 py-3 font-bold">Ringkasan Absensi</th>
+                    <th className="px-4 py-3 font-bold">Approval</th>
+                    <th className="px-4 py-3 font-bold">Lock</th>
+                    <th className="px-4 py-3 text-center font-bold">Aksi</th>
+                  </tr>
+                </thead>
+
+                <tbody>
+                  {filteredSummaries.length === 0 && (
+                    <tr>
+                      <td
+                        colSpan={6}
+                        className="px-4 py-10 text-center text-sm font-semibold text-slate-500"
+                      >
+                        Tidak ada data sesuai filter.
+                      </td>
+                    </tr>
+                  )}
+
+                  {filteredSummaries.map((summary) => (
+                    <tr
+                      key={summary.employee.id}
+                      className="border-b border-slate-100 transition hover:bg-slate-50/80"
+                    >
+                      <td className="px-4 py-4 align-top">
+                        <p className="font-bold text-slate-950">
+                          {getEmployeeName(summary.employee)}
+                        </p>
+                        <p className="mt-1 text-xs text-slate-500">
+                          NIP/Machine: {getEmployeeNumber(summary.employee)}
+                        </p>
+                        <p className="mt-1 text-xs text-slate-500">
+                          {summary.employee.email || '-'}
+                        </p>
+                      </td>
+
+                      <td className="px-4 py-4 align-top">
+                        <p className="text-sm font-semibold text-slate-900">
+                          {getEmployeeUnit(summary.employee)}
+                        </p>
+                        <p className="mt-1 text-xs text-slate-500">
+                          {getEmployeePosition(summary.employee)}
+                        </p>
+                      </td>
+
+                      <td className="px-4 py-4 align-top">
+                        <div className="flex flex-wrap gap-1.5">
+                          <MiniBadge label="Hadir" value={summary.presentDays} tone="dark" />
+                          <MiniBadge label="Cuti" value={summary.leaveDays} />
+                          <MiniBadge label="Sakit" value={summary.sickDays} />
+                          <MiniBadge label="Izin" value={summary.permitDays} />
+                          <MiniBadge label="Tugas Luar" value={summary.officialTravelDays} />
+                          <MiniBadge label="Klaim PHL" value={summary.phlClaimDays} />
+                          <MiniBadge label="Koreksi" value={summary.manualCorrectionDays} />
+                          {summary.absentDays > 0 && (
+                            <MiniBadge label="Alpa" value={summary.absentDays} tone="red" />
+                          )}
+                          {summary.incompleteDays > 0 && (
+                            <MiniBadge label="Incomplete" value={summary.incompleteDays} tone="red" />
+                          )}
+                        </div>
+                      </td>
+
+                      <td className="px-4 py-4 align-top">
+                        <div className="space-y-2">
+                          <div>
+                            <p className="mb-1 text-[11px] font-bold uppercase tracking-wide text-slate-400">
+                              Atasan
+                            </p>
+                            <StatusPill status={summary.confirmation?.supervisor_status} />
+                          </div>
+                          <div>
+                            <p className="mb-1 text-[11px] font-bold uppercase tracking-wide text-slate-400">
+                              Final HR
+                            </p>
+                            <StatusPill status={summary.confirmation?.hr_status} />
+                          </div>
+                        </div>
+                      </td>
+
+                      <td className="px-4 py-4 align-top">
+                        {summary.rowLocked ? (
+                          <div className="inline-flex flex-col rounded-2xl bg-slate-950 px-3 py-2 text-xs font-bold text-white">
+                            <span className="inline-flex items-center gap-1.5">
+                              <Lock className="h-3.5 w-3.5" />
+                              Locked
+                            </span>
+                            <span className="mt-1 text-[10px] font-semibold text-white/60">
+                              {formatDateTime(
+                                summary.confirmation?.locked_at ||
+                                  summary.logs.find((log) => log.locked_at)?.locked_at ||
+                                  periodLockState.lockedAt
+                              )}
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-bold text-slate-600">
+                            <Unlock className="h-3.5 w-3.5" />
+                            Open
+                          </span>
+                        )}
+                      </td>
+
+                      <td className="px-4 py-4 text-center align-top">
+                        <button
+                          type="button"
+                          onClick={() => setSelectedSummary(summary)}
+                          className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-700 transition hover:bg-slate-50"
+                          title="Lihat detail"
+                        >
+                          <Eye className="h-4 w-4" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </section>
       </div>
@@ -1119,265 +1780,117 @@ export default function HRAttendanceDataPage() {
   )
 }
 
-function AttendanceSummaryList({
-  summaries,
-  onDetail,
-}: {
-  summaries: EmployeeAttendanceSummary[]
-  onDetail: (summary: EmployeeAttendanceSummary) => void
-}) {
+function ClockIcon() {
   return (
-    <>
-      <div className="hidden 2xl:block">
-        <table className="w-full table-fixed border-collapse text-left text-sm">
-          <thead>
-            <tr className="border-b border-slate-100 bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
-              <th className="w-[24%] px-4 py-4 font-bold">Karyawan</th>
-              <th className="w-[19%] px-4 py-4 font-bold">Unit / Jabatan</th>
-              <th className="w-[25%] px-4 py-4 font-bold">Ringkasan Absensi</th>
-              <th className="w-[16%] px-4 py-4 font-bold">Approval</th>
-              <th className="w-[7%] px-4 py-4 font-bold">Lock</th>
-              <th className="w-[9%] px-3 py-4 text-center font-bold">Aksi</th>
-            </tr>
-          </thead>
-
-          <tbody>
-            {summaries.map((summary) => (
-              <tr
-                key={summary.employee.id}
-                className="border-b border-slate-100 transition hover:bg-slate-50/70"
-              >
-                <td className="px-4 py-4 align-top">
-                  <div className="min-w-0">
-                    <p className="break-words font-bold leading-5 text-slate-950">
-                      {getEmployeeName(summary.employee)}
-                    </p>
-                    <p className="mt-1 break-words text-xs leading-5 text-slate-500">
-                      NIP/Machine: {getEmployeeNumber(summary.employee)}
-                    </p>
-                    <p className="mt-1 break-words text-xs leading-5 text-slate-500">
-                      {summary.employee.email || '-'}
-                    </p>
-                  </div>
-                </td>
-
-                <td className="px-4 py-4 align-top">
-                  <p className="break-words font-semibold leading-5 text-slate-800">
-                    {getEmployeeUnit(summary.employee)}
-                  </p>
-                  <p className="mt-1 break-words text-xs leading-5 text-slate-500">
-                    {getEmployeePosition(summary.employee)}
-                  </p>
-                </td>
-
-                <td className="px-4 py-4 align-top">
-                  <MetricWrap summary={summary} />
-                </td>
-
-                <td className="px-4 py-4 align-top">
-                  <div className="space-y-2">
-                    <div>
-                      <p className="mb-1 text-[11px] font-bold uppercase tracking-wide text-slate-400">
-                        Atasan
-                      </p>
-                      <StatusPill status={summary.confirmation?.supervisor_status} />
-                    </div>
-                    <div>
-                      <p className="mb-1 text-[11px] font-bold uppercase tracking-wide text-slate-400">
-                        Final HR
-                      </p>
-                      <StatusPill status={summary.confirmation?.hr_status} />
-                    </div>
-                  </div>
-                </td>
-
-                <td className="px-4 py-4 align-top">
-                  <LockBadge confirmation={summary.confirmation} />
-                </td>
-
-                <td className="px-3 py-4 text-center align-top">
-                  <button
-                    type="button"
-                    onClick={() => onDetail(summary)}
-                    className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 transition hover:bg-slate-100"
-                    title="Detail"
-                  >
-                    <Eye className="h-4 w-4" />
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      <div className="grid gap-3 p-4 2xl:hidden">
-        {summaries.map((summary) => (
-          <div
-            key={summary.employee.id}
-            className="rounded-[1.5rem] border border-slate-200 bg-white p-4 shadow-sm"
-          >
-            <div className="flex min-w-0 items-start justify-between gap-3">
-              <div className="min-w-0">
-                <p className="break-words font-bold leading-5 text-slate-950">
-                  {getEmployeeName(summary.employee)}
-                </p>
-                <p className="mt-1 break-words text-xs leading-5 text-slate-500">
-                  {getEmployeeNumber(summary.employee)} · {summary.employee.email || '-'}
-                </p>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => onDetail(summary)}
-                className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 transition hover:bg-slate-100"
-                title="Detail"
-              >
-                <Eye className="h-4 w-4" />
-              </button>
-            </div>
-
-            <div className="mt-3 rounded-2xl bg-slate-50 p-3">
-              <p className="break-words text-sm font-semibold text-slate-800">
-                {getEmployeeUnit(summary.employee)}
-              </p>
-              <p className="mt-1 break-words text-xs leading-5 text-slate-500">
-                {getEmployeePosition(summary.employee)}
-              </p>
-            </div>
-
-            <div className="mt-3">
-              <MetricWrap summary={summary} />
-            </div>
-
-            <div className="mt-4 grid gap-3 sm:grid-cols-3">
-              <SmallStatusBox label="Approval Atasan">
-                <StatusPill status={summary.confirmation?.supervisor_status} />
-              </SmallStatusBox>
-              <SmallStatusBox label="Final HR">
-                <StatusPill status={summary.confirmation?.hr_status} />
-              </SmallStatusBox>
-              <SmallStatusBox label="Lock">
-                <LockBadge confirmation={summary.confirmation} />
-              </SmallStatusBox>
-            </div>
-          </div>
-        ))}
-      </div>
-    </>
-  )
-}
-
-function EmptyState() {
-  return (
-    <div className="flex min-h-[320px] flex-col items-center justify-center px-6 text-center">
-      <AlertTriangle className="h-10 w-10 text-slate-400" />
-      <h2 className="mt-4 text-base font-bold text-slate-900">
-        Data tidak ditemukan
-      </h2>
-      <p className="mt-1 max-w-md text-sm leading-6 text-slate-500">
-        Tidak ada data yang sesuai dengan periode atau filter yang dipilih.
-      </p>
-    </div>
-  )
-}
-
-function MetricWrap({ summary }: { summary: EmployeeAttendanceSummary }) {
-  const items = [
-    { label: 'Hadir', value: summary.presentDays },
-    { label: 'Cuti', value: summary.leaveDays },
-    { label: 'Sakit', value: summary.sickDays },
-    { label: 'Izin', value: summary.permitDays },
-    { label: 'Tugas Luar', value: summary.officialTravelDays },
-    { label: 'Klaim PHL', value: summary.phlClaimDays },
-    { label: 'Koreksi', value: summary.manualCorrectionDays },
-  ]
-
-  return (
-    <div className="flex flex-wrap gap-2">
-      {items.map((item) => (
-        <span
-          key={item.label}
-          className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold ${
-            item.value > 0
-              ? 'bg-slate-900 text-white'
-              : 'bg-slate-100 text-slate-500'
-          }`}
-        >
-          <span>{item.label}</span>
-          <span>{item.value}</span>
-        </span>
-      ))}
-    </div>
-  )
-}
-
-function SmallStatusBox({
-  label,
-  children,
-}: {
-  label: string
-  children: ReactNode
-}) {
-  return (
-    <div className="min-w-0 rounded-2xl border border-slate-100 bg-slate-50 p-3">
-      <p className="mb-2 text-[11px] font-bold uppercase tracking-wide text-slate-400">
-        {label}
-      </p>
-      <div className="min-w-0">{children}</div>
-    </div>
-  )
-}
-
-function LockBadge({ confirmation }: { confirmation?: PeriodConfirmation }) {
-  if (confirmation?.is_locked) {
-    return (
-      <div className="min-w-0">
-        <span className="inline-flex items-center gap-1 rounded-full border border-slate-300 bg-slate-900 px-2.5 py-1 text-[11px] font-semibold text-white">
-          <Lock className="h-3 w-3 shrink-0" />
-          Locked
-        </span>
-        <div className="mt-1 break-words text-[11px] leading-5 text-slate-500">
-          {confirmation.locked_by_name || '-'}
-        </div>
-      </div>
-    )
-  }
-
-  return (
-    <span className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold text-slate-500">
-      <Unlock className="h-3 w-3 shrink-0" />
-      Open
-    </span>
+    <svg
+      className="h-5 w-5"
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden="true"
+    >
+      <path
+        d="M12 7v5l3 2"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z"
+        stroke="currentColor"
+        strokeWidth="1.8"
+      />
+    </svg>
   )
 }
 
 function StatCard({
-  label,
+  title,
   value,
-  icon: Icon,
+  icon,
 }: {
-  label: string
+  title: string
   value: number
-  icon: any
+  icon: ReactNode
 }) {
   return (
-    <div className="min-w-0 rounded-[1.5rem] border border-white/70 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
-      <div className="flex min-w-0 items-center justify-between gap-3">
-        <div className="min-w-0">
-          <p className="break-words text-xs font-semibold uppercase tracking-wide text-slate-500">
-            {label}
+    <div className="rounded-[1.5rem] border border-white/70 bg-white p-4 shadow-sm">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">
+            {title}
           </p>
-          <p className="mt-2 break-words text-2xl font-bold text-slate-950">
+          <p className="mt-2 text-2xl font-bold tracking-tight text-slate-950">
             {value}
           </p>
         </div>
 
-        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-slate-100 text-slate-800">
-          <Icon className="h-5 w-5" />
+        <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-100 text-slate-700">
+          {icon}
         </div>
       </div>
     </div>
+  )
+}
+
+function MiniBadge({
+  label,
+  value,
+  tone = 'light',
+}: {
+  label: string
+  value: number
+  tone?: 'light' | 'dark' | 'red'
+}) {
+  const className =
+    tone === 'dark'
+      ? 'bg-slate-950 text-white'
+      : tone === 'red'
+        ? 'bg-red-50 text-red-700'
+        : 'bg-slate-100 text-slate-700'
+
+  return (
+    <span
+      className={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-bold ${className}`}
+    >
+      {label} <span className="ml-1">{value}</span>
+    </span>
+  )
+}
+
+function ActionButton({
+  children,
+  icon,
+  tone,
+  ...props
+}: React.ButtonHTMLAttributes<HTMLButtonElement> & {
+  children: ReactNode
+  icon: ReactNode
+  tone: 'light' | 'blue' | 'dark' | 'amber' | 'red' | 'danger'
+}) {
+  const className = {
+    light:
+      'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 disabled:bg-white',
+    blue:
+      'border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 disabled:bg-blue-50',
+    dark:
+      'border-slate-950 bg-slate-950 text-white hover:bg-slate-800 disabled:bg-slate-950',
+    amber:
+      'border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100 disabled:bg-amber-50',
+    red:
+      'border-red-200 bg-red-50 text-red-700 hover:bg-red-100 disabled:bg-red-50',
+    danger:
+      'border-red-700 bg-red-600 text-white hover:bg-red-700 disabled:bg-red-600',
+  }[tone]
+
+  return (
+    <button
+      {...props}
+      className={`inline-flex h-11 items-center justify-center gap-2 rounded-2xl border px-4 text-sm font-bold transition disabled:cursor-not-allowed disabled:opacity-50 ${className}`}
+    >
+      {icon}
+      {children}
+    </button>
   )
 }
 
@@ -1391,242 +1904,104 @@ function DetailModal({
   onClose: () => void
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-3 backdrop-blur-sm sm:p-4">
-      <div className="flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-[2rem] bg-white shadow-2xl">
-        <div className="flex min-w-0 items-start justify-between gap-4 border-b border-slate-100 p-5 sm:p-6">
-          <div className="min-w-0">
-            <h2 className="break-words text-xl font-bold leading-7 text-slate-950">
-              Detail Absensi — {getEmployeeName(summary.employee)}
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4 backdrop-blur-sm">
+      <div className="max-h-[90vh] w-full max-w-6xl overflow-hidden rounded-[2rem] bg-white shadow-2xl">
+        <div className="flex items-start justify-between gap-4 border-b border-slate-100 p-5">
+          <div>
+            <h2 className="text-xl font-bold tracking-tight text-slate-950">
+              Detail Absensi
             </h2>
-            <p className="mt-1 break-words text-sm leading-6 text-slate-500">
-              Periode {periodLabel}
+            <p className="mt-1 text-sm text-slate-500">
+              {getEmployeeName(summary.employee)} · {periodLabel}
             </p>
           </div>
 
           <button
             type="button"
             onClick={onClose}
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-600 transition hover:bg-slate-200"
+            className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-slate-100 text-slate-700 transition hover:bg-slate-200"
           >
-            <X className="h-5 w-5" />
+            <X className="h-4 w-4" />
           </button>
         </div>
 
-        <div className="min-h-0 overflow-y-auto p-5 sm:p-6">
-          <div className="mb-5 grid gap-3 md:grid-cols-3">
-            <InfoBox
-              label="NIP / Machine"
-              value={getEmployeeNumber(summary.employee)}
-            />
-            <InfoBox label="Unit" value={getEmployeeUnit(summary.employee)} />
-            <InfoBox
-              label="Jabatan"
-              value={getEmployeePosition(summary.employee)}
-            />
-          </div>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[980px] border-collapse text-left text-xs">
+            <thead>
+              <tr className="border-b border-slate-100 bg-slate-50 uppercase tracking-wide text-slate-500">
+                <th className="px-4 py-3 font-bold">Tanggal</th>
+                <th className="px-4 py-3 font-bold">Check In</th>
+                <th className="px-4 py-3 font-bold">Check Out</th>
+                <th className="px-4 py-3 font-bold">Manual In</th>
+                <th className="px-4 py-3 font-bold">Manual Out</th>
+                <th className="px-4 py-3 font-bold">Status</th>
+                <th className="px-4 py-3 font-bold">Approval Atasan</th>
+                <th className="px-4 py-3 font-bold">Final HR</th>
+                <th className="px-4 py-3 font-bold">Lock</th>
+                <th className="px-4 py-3 font-bold">Catatan</th>
+              </tr>
+            </thead>
 
-          <div className="mb-5 grid gap-3 md:grid-cols-4">
-            <InfoBox
-              label="Approval Atasan"
-              value={
-                getSimpleStatusBadge(summary.confirmation?.supervisor_status)
-                  .label
-              }
-            />
-            <InfoBox
-              label="Final HR"
-              value={getSimpleStatusBadge(summary.confirmation?.hr_status).label}
-            />
-            <InfoBox
-              label="Lock Status"
-              value={summary.confirmation?.is_locked ? 'Locked' : 'Open'}
-            />
-            <InfoBox
-              label="Locked By"
-              value={summary.confirmation?.locked_by_name || '-'}
-            />
-          </div>
+            <tbody>
+              {summary.logs.length === 0 && (
+                <tr>
+                  <td
+                    colSpan={10}
+                    className="px-4 py-10 text-center text-sm font-semibold text-slate-500"
+                  >
+                    Belum ada data absensi harian.
+                  </td>
+                </tr>
+              )}
 
-          {summary.confirmation?.lock_note && (
-            <div className="mb-5 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-800">
-              <span className="font-bold">Catatan Lock:</span>{' '}
-              {summary.confirmation.lock_note}
-            </div>
-          )}
+              {summary.logs.map((log) => (
+                <tr key={log.id || log.attendance_date} className="border-b border-slate-100">
+                  <td className="px-4 py-3 font-bold text-slate-900">
+                    {formatShortDate(log.attendance_date)}
+                  </td>
+                  <td className="px-4 py-3">{log.check_in || '-'}</td>
+                  <td className="px-4 py-3">{log.check_out || '-'}</td>
+                  <td className="px-4 py-3">{log.manual_check_in || log.requested_check_in || '-'}</td>
+                  <td className="px-4 py-3">{log.manual_check_out || log.requested_check_out || '-'}</td>
+                  <td className="px-4 py-3">
+                    <AttendancePill log={log} />
+                  </td>
+                  <td className="px-4 py-3">
+                    <StatusPill status={log.supervisor_approval_status} />
+                  </td>
+                  <td className="px-4 py-3">
+                    <StatusPill status={log.hr_final_status} />
+                  </td>
+                  <td className="px-4 py-3">
+                    {log.is_locked ? (
+                      <span className="inline-flex rounded-full bg-slate-950 px-3 py-1 text-[11px] font-bold text-white">
+                        Locked
+                      </span>
+                    ) : (
+                      <span className="inline-flex rounded-full bg-slate-100 px-3 py-1 text-[11px] font-bold text-slate-600">
+                        Open
+                      </span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3">
+                    {log.employee_daily_note || log.correction_reason || log.lock_note || '-'}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
 
-          <section className="rounded-[1.5rem] border border-slate-200 bg-slate-50 p-4">
-            <div className="mb-4 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
-              <div>
-                <h3 className="text-base font-bold text-slate-950">
-                  Detail Harian
-                </h3>
-                <p className="mt-1 text-sm leading-6 text-slate-500">
-                  Ditampilkan sebagai card supaya tidak melebar atau terpotong di layar kecil.
-                </p>
-              </div>
-              <span className="w-fit rounded-full bg-white px-3 py-1 text-xs font-bold text-slate-600 ring-1 ring-slate-200">
-                {summary.logs.length} data
-              </span>
-            </div>
-
-            {summary.logs.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-8 text-center text-sm text-slate-500">
-                Belum ada log absensi pada periode ini.
-              </div>
-            ) : (
-              <div className="grid gap-3 lg:grid-cols-2">
-                {summary.logs.map((log, index) => {
-                  const proofUrl =
-                    log.proof_file_url || log.proof_url || log.attachment_url
-
-                  return (
-                    <div
-                      key={log.id || `${log.attendance_date}-${index}`}
-                      className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
-                    >
-                      <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                        <div className="min-w-0">
-                          <p className="font-bold text-slate-950">
-                            {formatShortDate(log.attendance_date)}
-                          </p>
-                          <p className="mt-1 text-xs text-slate-500">
-                            {log.attendance_date || '-'}
-                          </p>
-                        </div>
-                        <AttendancePill log={log} />
-                      </div>
-
-                      <div className="mt-4 grid gap-2 sm:grid-cols-2">
-                        <InfoMini label="Masuk" value={log.check_in || '-'} />
-                        <InfoMini label="Pulang" value={log.check_out || '-'} />
-                        <InfoMini label="Status Request">
-                          <StatusPill status={log.absence_request_status} />
-                        </InfoMini>
-                        <InfoMini label="Approval Atasan">
-                          <StatusPill status={log.supervisor_approval_status} />
-                        </InfoMini>
-                        <InfoMini label="Final HR">
-                          <StatusPill status={log.hr_final_status} />
-                        </InfoMini>
-                        <InfoMini label="Bukti">
-                          {proofUrl ? (
-                            <a
-                              href={proofUrl}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-700 transition hover:bg-slate-50"
-                            >
-                              <FileText className="h-3.5 w-3.5" />
-                              Buka
-                            </a>
-                          ) : (
-                            <span className="text-xs text-slate-400">-</span>
-                          )}
-                        </InfoMini>
-                      </div>
-
-                      {(log.absence_request_source || log.hr_finalized_by_name) && (
-                        <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                          <InfoMini
-                            label="Sumber"
-                            value={log.absence_request_source || '-'}
-                          />
-                          <InfoMini
-                            label="Finalized By"
-                            value={log.hr_finalized_by_name || '-'}
-                          />
-                        </div>
-                      )}
-
-                      {(log.job_pending || log.handover_to || log.handover_note) && (
-                        <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                          <InfoMini
-                            label="Pending Job"
-                            value={log.job_pending || '-'}
-                            long
-                          />
-                          <InfoMini label="Handover" long>
-                            <div className="space-y-1">
-                              <div>
-                                <span className="font-semibold">Ke:</span>{' '}
-                                {log.handover_to || '-'}
-                              </div>
-                              {log.handover_note && (
-                                <div className="whitespace-pre-wrap">
-                                  {log.handover_note}
-                                </div>
-                              )}
-                            </div>
-                          </InfoMini>
-                        </div>
-                      )}
-                    </div>
-                  )
-                })}
-              </div>
-            )}
-          </section>
-
-          <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-            <h3 className="text-sm font-bold text-slate-900">
-              Ringkasan Timestamp
-            </h3>
-
-            <div className="mt-3 grid gap-3 md:grid-cols-3">
-              <InfoBox
-                label="Submitted"
-                value={formatDateTime(summary.confirmation?.submitted_at)}
-              />
-              <InfoBox
-                label="Approved Atasan"
-                value={formatDateTime(
-                  summary.confirmation?.supervisor_approved_at
-                )}
-              />
-              <InfoBox
-                label="Final HR"
-                value={formatDateTime(summary.confirmation?.hr_finalized_at)}
-              />
-            </div>
-          </div>
+        <div className="flex justify-end border-t border-slate-100 p-5">
+          <button
+            type="button"
+            onClick={onClose}
+            className="inline-flex h-11 items-center justify-center rounded-2xl bg-slate-950 px-5 text-sm font-bold text-white transition hover:bg-slate-800"
+          >
+            Tutup
+          </button>
         </div>
       </div>
-    </div>
-  )
-}
-
-function InfoMini({
-  label,
-  value,
-  children,
-  long = false,
-}: {
-  label: string
-  value?: string
-  children?: ReactNode
-  long?: boolean
-}) {
-  return (
-    <div className={`min-w-0 rounded-xl bg-slate-50 p-3 ${long ? 'sm:col-span-1' : ''}`}>
-      <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400">
-        {label}
-      </p>
-      <div className="mt-1 break-words text-xs font-semibold leading-5 text-slate-700">
-        {children || value || '-'}
-      </div>
-    </div>
-  )
-}
-
-function InfoBox({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4">
-      <p className="break-words text-xs font-semibold uppercase tracking-wide text-slate-500">
-        {label}
-      </p>
-      <p className="mt-1 break-words text-sm font-bold leading-6 text-slate-900">
-        {value || '-'}
-      </p>
     </div>
   )
 }

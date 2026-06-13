@@ -7,11 +7,10 @@ import {
   Download,
   Eye,
   FileSpreadsheet,
+  Lock,
   RefreshCcw,
   Search,
   ShieldCheck,
-  Timer,
-  UserRound,
   X,
 } from 'lucide-react'
 
@@ -63,6 +62,15 @@ type PeriodConfirmation = {
   annual_leave_matured_date: string | null
   leave_allowance_eligible: boolean | null
 
+  is_locked: boolean | null
+  locked_at: string | null
+  locked_by: string | null
+  locked_by_name: string | null
+  unlocked_at: string | null
+  unlocked_by: string | null
+  unlocked_by_name: string | null
+  lock_note: string | null
+
   created_at: string | null
   updated_at: string | null
 }
@@ -83,6 +91,16 @@ type AttendanceLog = {
   is_phl_candidate: boolean | null
   phl_proof_url: string | null
   absence_proof_url: string | null
+
+  is_locked: boolean | null
+  locked_at: string | null
+  locked_by: string | null
+  locked_by_name: string | null
+  unlocked_at: string | null
+  unlocked_by: string | null
+  unlocked_by_name: string | null
+  lock_note: string | null
+
   deleted_at: string | null
 }
 
@@ -95,12 +113,15 @@ export default function HRFinalAttendanceReportPage() {
   const [loading, setLoading] = useState(true)
   const [loadingDetail, setLoadingDetail] = useState(false)
   const [finalizingId, setFinalizingId] = useState('')
+  const [periodLocking, setPeriodLocking] = useState(false)
 
   const [searchKeyword, setSearchKeyword] = useState('')
   const [statusFilter, setStatusFilter] = useState('ready_for_hr')
 
   const [errorMessage, setErrorMessage] = useState('')
   const [successMessage, setSuccessMessage] = useState('')
+
+  const periodRange = useMemo(() => getCutoffRange(periodMonth), [periodMonth])
 
   const filteredReports = useMemo(() => {
     const keyword = searchKeyword.trim().toLowerCase()
@@ -124,7 +145,12 @@ export default function HRFinalAttendanceReportPage() {
   const readyCount = reports.filter((item) => item.hr_status === 'ready_for_hr').length
   const finalizedCount = reports.filter((item) => item.hr_status === 'finalized').length
   const rejectedCount = reports.filter((item) => item.hr_status === 'rejected_by_supervisor').length
+  const lockedCount = reports.filter((item) => item.is_locked).length
+  const openCount = reports.filter((item) => !item.is_locked).length
   const leaveMaturedCount = reports.filter((item) => item.annual_leave_matured).length
+
+  const allReportsLocked =
+    reports.length > 0 && reports.every((item) => Boolean(item.is_locked))
 
   useEffect(() => {
     fetchReports()
@@ -180,17 +206,44 @@ export default function HRFinalAttendanceReportPage() {
     setLoadingDetail(false)
   }
 
+  async function getHRIdentity() {
+    const { data: authData, error: authError } = await supabase.auth.getUser()
+
+    if (authError) {
+      return {
+        name: '',
+        error: authError.message,
+      }
+    }
+
+    return {
+      name: authData.user?.email || 'HR Administrator',
+      error: '',
+    }
+  }
+
   async function finalizeReport(report: PeriodConfirmation) {
     setFinalizingId(report.id)
     setErrorMessage('')
     setSuccessMessage('')
 
-    const { data: authData } = await supabase.auth.getUser()
+    if (report.hr_status !== 'ready_for_hr') {
+      setErrorMessage('Laporan hanya bisa difinalisasi jika status masih Ready for HR.')
+      setFinalizingId('')
+      return
+    }
 
-    const finalizedBy =
-      authData.user?.email || 'HR Administrator'
+    const identity = await getHRIdentity()
 
+    if (identity.error) {
+      setErrorMessage(identity.error)
+      setFinalizingId('')
+      return
+    }
+
+    const finalizedBy = identity.name
     const now = new Date().toISOString()
+    const lockNote = 'Periode karyawan dikunci setelah finalisasi HR.'
 
     const { error: headerError } = await supabase
       .from('attendance_period_confirmations')
@@ -199,6 +252,16 @@ export default function HRFinalAttendanceReportPage() {
         hr_finalized_at: now,
         hr_finalized_by: finalizedBy,
         hr_note: 'Laporan absensi periode telah difinalisasi HR.',
+
+        is_locked: true,
+        locked_at: now,
+        locked_by: finalizedBy,
+        locked_by_name: finalizedBy,
+        unlocked_at: null,
+        unlocked_by: null,
+        unlocked_by_name: null,
+        lock_note: lockNote,
+
         updated_at: now,
       })
       .eq('id', report.id)
@@ -218,6 +281,16 @@ export default function HRFinalAttendanceReportPage() {
         hr_approval_status: 'approved',
         hr_approved_by: finalizedBy,
         hr_approved_at: now,
+
+        is_locked: true,
+        locked_at: now,
+        locked_by: finalizedBy,
+        locked_by_name: finalizedBy,
+        unlocked_at: null,
+        unlocked_by: null,
+        unlocked_by_name: null,
+        lock_note: lockNote,
+
         updated_at: now,
       })
       .eq('employee_id', report.employee_id)
@@ -230,8 +303,132 @@ export default function HRFinalAttendanceReportPage() {
       return
     }
 
-    setSuccessMessage(`Laporan absensi ${report.full_name || '-'} berhasil difinalisasi HR.`)
+    setSuccessMessage(
+      `Laporan absensi ${report.full_name || '-'} berhasil difinalisasi dan dikunci.`
+    )
+
     setFinalizingId('')
+    await fetchReports()
+  }
+
+  async function finalizeAndLockFullPeriod() {
+    setPeriodLocking(true)
+    setErrorMessage('')
+    setSuccessMessage('')
+
+    if (reports.length === 0) {
+      setErrorMessage('Belum ada data laporan pada periode ini.')
+      setPeriodLocking(false)
+      return
+    }
+
+    const identity = await getHRIdentity()
+
+    if (identity.error) {
+      setErrorMessage(identity.error)
+      setPeriodLocking(false)
+      return
+    }
+
+    const finalizedBy = identity.name
+    const now = new Date().toISOString()
+    const lockNote = 'Seluruh periode dikunci oleh HR.'
+
+    const readyReports = reports.filter((item) => item.hr_status === 'ready_for_hr')
+    const readyEmployeeIds = readyReports
+      .map((item) => item.employee_id)
+      .filter(Boolean)
+
+    if (readyEmployeeIds.length > 0) {
+      const { error: readyHeaderError } = await supabase
+        .from('attendance_period_confirmations')
+        .update({
+          hr_status: 'finalized',
+          hr_finalized_at: now,
+          hr_finalized_by: finalizedBy,
+          hr_note: 'Laporan absensi periode telah difinalisasi HR.',
+          updated_at: now,
+        })
+        .eq('period_month', periodMonth)
+        .in('employee_id', readyEmployeeIds)
+
+      if (readyHeaderError) {
+        setErrorMessage(readyHeaderError.message)
+        setPeriodLocking(false)
+        return
+      }
+
+      const { error: readyLogError } = await supabase
+        .from('attendance_logs')
+        .update({
+          hr_final_status: 'finalized',
+          hr_finalized_at: now,
+          hr_finalized_by: finalizedBy,
+          hr_approval_status: 'approved',
+          hr_approved_by: finalizedBy,
+          hr_approved_at: now,
+          updated_at: now,
+        })
+        .in('employee_id', readyEmployeeIds)
+        .gte('attendance_date', periodRange.start)
+        .lte('attendance_date', periodRange.end)
+
+      if (readyLogError) {
+        setErrorMessage(readyLogError.message)
+        setPeriodLocking(false)
+        return
+      }
+    }
+
+    const { error: lockHeaderError } = await supabase
+      .from('attendance_period_confirmations')
+      .update({
+        is_locked: true,
+        locked_at: now,
+        locked_by: finalizedBy,
+        locked_by_name: finalizedBy,
+        unlocked_at: null,
+        unlocked_by: null,
+        unlocked_by_name: null,
+        lock_note: lockNote,
+        updated_at: now,
+      })
+      .eq('period_month', periodMonth)
+
+    if (lockHeaderError) {
+      setErrorMessage(lockHeaderError.message)
+      setPeriodLocking(false)
+      return
+    }
+
+    const { error: lockLogError } = await supabase
+      .from('attendance_logs')
+      .update({
+        is_locked: true,
+        locked_at: now,
+        locked_by: finalizedBy,
+        locked_by_name: finalizedBy,
+        unlocked_at: null,
+        unlocked_by: null,
+        unlocked_by_name: null,
+        lock_note: lockNote,
+        updated_at: now,
+      })
+      .is('deleted_at', null)
+      .gte('attendance_date', periodRange.start)
+      .lte('attendance_date', periodRange.end)
+
+    if (lockLogError) {
+      setErrorMessage(lockLogError.message)
+      setPeriodLocking(false)
+      return
+    }
+
+    setSuccessMessage(
+      `Periode ${getPeriodApprovalLabel(periodMonth)} berhasil dikunci penuh. ${readyReports.length} laporan Ready for HR otomatis difinalisasi, dan seluruh data periode ini menjadi read-only.`
+    )
+
+    setPeriodLocking(false)
     await fetchReports()
   }
 
@@ -264,6 +461,10 @@ export default function HRFinalAttendanceReportPage() {
       nama_atasan: item.supervisor_name || '',
       tanggal_approval_atasan: item.supervisor_approved_at || item.supervisor_rejected_at || '',
       status_hr: item.hr_status || '',
+      is_locked: item.is_locked ? 'YA' : 'TIDAK',
+      locked_by: item.locked_by_name || item.locked_by || '',
+      locked_at: item.locked_at || '',
+      lock_note: item.lock_note || '',
       finalized_by: item.hr_finalized_by || '',
       finalized_at: item.hr_finalized_at || '',
 
@@ -297,6 +498,10 @@ export default function HRFinalAttendanceReportPage() {
         nama_atasan: '',
         tanggal_approval_atasan: '',
         status_hr: '',
+        is_locked: '',
+        locked_by: '',
+        locked_at: '',
+        lock_note: '',
         finalized_by: '',
         finalized_at: '',
         matang_cuti: '',
@@ -338,7 +543,7 @@ export default function HRFinalAttendanceReportPage() {
         description="Rekap absensi final setelah employee submit dan atasan melakukan approval."
       />
 
-      <section className="space-y-6 p-6">
+      <section className="space-y-6 p-4 md:p-6">
         {successMessage && (
           <div className="rounded-2xl border border-green-200 bg-green-50 p-4 text-sm leading-6 text-green-700">
             <div className="mb-1 flex items-center gap-2 font-bold">
@@ -359,7 +564,7 @@ export default function HRFinalAttendanceReportPage() {
           </div>
         )}
 
-        <div className="relative overflow-hidden rounded-[34px] border border-black/5 bg-[#1d1d1f] p-7 text-white shadow-[0_24px_80px_rgba(0,0,0,0.16)]">
+        <div className="relative overflow-hidden rounded-[34px] border border-black/5 bg-[#1d1d1f] p-5 text-white shadow-[0_24px_80px_rgba(0,0,0,0.16)] md:p-7">
           <div className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-[#007aff]/35 blur-3xl" />
           <div className="pointer-events-none absolute -bottom-28 -left-20 h-72 w-72 rounded-full bg-[#34c759]/20 blur-3xl" />
 
@@ -376,13 +581,15 @@ export default function HRFinalAttendanceReportPage() {
 
               <p className="mt-5 max-w-2xl text-sm leading-7 text-white/62">
                 Laporan ini berisi total kehadiran, PHL, sakit, izin, cuti, alpa,
-                serta informasi matang cuti untuk kebutuhan HR.
+                serta kontrol lock untuk menutup seluruh periode absensi.
               </p>
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-4 xl:min-w-[620px]">
+            <div className="grid gap-3 sm:grid-cols-2 xl:min-w-[720px] xl:grid-cols-6">
               <HeroMetric label="Ready" value={String(readyCount)} tone="blue" />
               <HeroMetric label="Final" value={String(finalizedCount)} tone="green" />
+              <HeroMetric label="Locked" value={String(lockedCount)} tone="green" />
+              <HeroMetric label="Open" value={String(openCount)} tone="blue" />
               <HeroMetric label="Rejected" value={String(rejectedCount)} tone="red" />
               <HeroMetric label="Matang Cuti" value={String(leaveMaturedCount)} tone="purple" />
             </div>
@@ -390,18 +597,18 @@ export default function HRFinalAttendanceReportPage() {
         </div>
 
         <div className="harmony-card overflow-hidden">
-          <div className="flex flex-col gap-4 border-b border-black/5 p-6 xl:flex-row xl:items-center xl:justify-between">
+          <div className="flex flex-col gap-4 border-b border-black/5 p-5 md:p-6 xl:flex-row xl:items-center xl:justify-between">
             <div>
               <h2 className="text-lg font-semibold text-[#1d1d1f]">
                 Data Laporan Periode
               </h2>
 
               <p className="mt-1 text-sm leading-6 text-[#6e6e73]">
-                Pilih periode, filter status, lalu export data final absensi.
+                Pilih periode, finalisasi laporan Ready for HR, lalu lock seluruh periode agar semua employee menjadi read-only.
               </p>
             </div>
 
-            <div className="flex flex-col gap-3 md:flex-row md:items-center">
+            <div className="flex flex-col gap-3 md:flex-row md:flex-wrap md:items-center md:justify-end">
               <input
                 type="month"
                 value={periodMonth}
@@ -448,8 +655,36 @@ export default function HRFinalAttendanceReportPage() {
                 <Download size={18} />
                 Export CSV
               </button>
+
+              <button
+                type="button"
+                onClick={finalizeAndLockFullPeriod}
+                disabled={reports.length === 0 || periodLocking || allReportsLocked}
+                className="inline-flex min-h-12 items-center justify-center gap-2 rounded-[18px] bg-slate-950 px-5 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+                title="Finalisasi Ready for HR dan Lock Semua Karyawan pada Periode Ini"
+              >
+                <Lock size={18} />
+                {periodLocking
+                  ? 'Memproses...'
+                  : allReportsLocked
+                    ? 'Periode Locked'
+                    : 'Lock 1 Periode'}
+              </button>
             </div>
           </div>
+
+          {!allReportsLocked && reports.length > 0 && (
+            <div className="border-b border-black/5 bg-amber-50 px-5 py-4 text-sm leading-6 text-amber-800 md:px-6">
+              <div className="flex items-start gap-3">
+                <AlertTriangle size={18} className="mt-0.5 shrink-0" />
+                <p>
+                  Tombol <strong>Lock 1 Periode</strong> akan mengunci semua karyawan pada periode ini.
+                  Laporan dengan status <strong>Ready for HR</strong> akan otomatis difinalisasi.
+                  Data yang masih status lain tetap dikunci, tetapi status HR-nya tidak dipaksa menjadi finalized.
+                </p>
+              </div>
+            </div>
+          )}
 
           {loading && (
             <div className="p-6 text-sm text-[#6e6e73]">
@@ -477,7 +712,7 @@ export default function HRFinalAttendanceReportPage() {
 
           {!loading && filteredReports.length > 0 && (
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[1680px] border-collapse text-left text-xs">
+              <table className="w-full min-w-[1780px] border-collapse text-left text-xs">
                 <thead>
                   <tr className="border-b border-black/5 bg-[#f5f5f7]/90 uppercase tracking-wide text-[#6e6e73]">
                     <th className="px-4 py-3 font-semibold">Karyawan</th>
@@ -492,6 +727,7 @@ export default function HRFinalAttendanceReportPage() {
                     <th className="px-4 py-3 text-center font-semibold">Alpa</th>
                     <th className="px-4 py-3 font-semibold">Atasan</th>
                     <th className="px-4 py-3 font-semibold">HR Status</th>
+                    <th className="px-4 py-3 font-semibold">Lock</th>
                     <th className="px-4 py-3 font-semibold">Matang Cuti</th>
                     <th className="px-4 py-3 text-center font-semibold">Action</th>
                   </tr>
@@ -544,6 +780,10 @@ export default function HRFinalAttendanceReportPage() {
                       </td>
 
                       <td className="px-4 py-3">
+                        <LockBadge report={item} />
+                      </td>
+
+                      <td className="px-4 py-3">
                         {item.annual_leave_matured ? (
                           <div className="rounded-2xl bg-green-50 px-3 py-2 text-xs font-bold text-green-700">
                             Ya
@@ -574,7 +814,7 @@ export default function HRFinalAttendanceReportPage() {
                             onClick={() => finalizeReport(item)}
                             disabled={item.hr_status !== 'ready_for_hr' || finalizingId === item.id}
                             className="flex h-9 w-9 items-center justify-center rounded-xl bg-green-50 text-green-700 transition hover:bg-green-100 disabled:cursor-not-allowed disabled:opacity-50"
-                            title="Finalisasi HR"
+                            title="Finalisasi HR Karyawan Ini"
                           >
                             <ShieldCheck size={15} />
                           </button>
@@ -626,6 +866,10 @@ function DetailModal({
             <p className="mt-1 text-sm leading-6 text-[#6e6e73]">
               {report.full_name || '-'} · {getPeriodApprovalLabel(report.period_month)}
             </p>
+
+            <div className="mt-3">
+              <LockBadge report={report} />
+            </div>
           </div>
 
           <button
@@ -645,7 +889,7 @@ function DetailModal({
 
         {!loading && (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[1050px] border-collapse text-left text-xs">
+            <table className="w-full min-w-[1120px] border-collapse text-left text-xs">
               <thead>
                 <tr className="border-b border-black/5 bg-[#f5f5f7]/90 uppercase tracking-wide text-[#6e6e73]">
                   <th className="px-4 py-3 font-semibold">Tanggal</th>
@@ -654,12 +898,26 @@ function DetailModal({
                   <th className="px-4 py-3 font-semibold">Manual In</th>
                   <th className="px-4 py-3 font-semibold">Manual Out</th>
                   <th className="px-4 py-3 font-semibold">Status</th>
+                  <th className="px-4 py-3 font-semibold">Approval Atasan</th>
+                  <th className="px-4 py-3 font-semibold">Final HR</th>
+                  <th className="px-4 py-3 font-semibold">Lock</th>
                   <th className="px-4 py-3 font-semibold">PHL</th>
                   <th className="px-4 py-3 font-semibold">Catatan</th>
                 </tr>
               </thead>
 
               <tbody>
+                {logs.length === 0 && (
+                  <tr>
+                    <td
+                      colSpan={11}
+                      className="px-4 py-8 text-center text-sm text-[#6e6e73]"
+                    >
+                      Belum ada detail absensi harian pada periode ini.
+                    </td>
+                  </tr>
+                )}
+
                 {logs.map((log) => (
                   <tr key={log.id} className="border-b border-black/5">
                     <td className="px-4 py-3 font-semibold text-[#1d1d1f]">
@@ -669,7 +927,20 @@ function DetailModal({
                     <td className="px-4 py-3">{log.check_out || '-'}</td>
                     <td className="px-4 py-3">{log.manual_check_in || '-'}</td>
                     <td className="px-4 py-3">{log.manual_check_out || '-'}</td>
-                    <td className="px-4 py-3">{log.status || '-'}</td>
+                    <td className="px-4 py-3">{formatReadableText(log.status || '-')}</td>
+                    <td className="px-4 py-3">{formatReadableText(log.supervisor_approval_status || '-')}</td>
+                    <td className="px-4 py-3">{formatReadableText(log.hr_final_status || '-')}</td>
+                    <td className="px-4 py-3">
+                      {log.is_locked ? (
+                        <span className="inline-flex rounded-full bg-slate-900 px-3 py-1 text-[11px] font-bold text-white">
+                          Locked
+                        </span>
+                      ) : (
+                        <span className="inline-flex rounded-full bg-[#f5f5f7] px-3 py-1 text-[11px] font-bold text-[#6e6e73]">
+                          Open
+                        </span>
+                      )}
+                    </td>
                     <td className="px-4 py-3">
                       {log.is_phl_candidate ? 'Ya' : '-'}
                     </td>
@@ -761,11 +1032,36 @@ function StatusBadge({
         ? 'bg-[#e8f2ff] text-[#0059b8]'
         : status === 'rejected_by_supervisor'
           ? 'bg-red-50 text-red-700'
-          : 'bg-[#f5f5f7] text-[#6e6e73]'
+          : status === 'waiting_supervisor'
+            ? 'bg-amber-50 text-amber-700'
+            : 'bg-[#f5f5f7] text-[#6e6e73]'
 
   return (
     <span className={`inline-flex rounded-full px-3 py-1 text-xs font-bold ${className}`}>
       {formatHRStatus(status)}
+    </span>
+  )
+}
+
+function LockBadge({
+  report,
+}: {
+  report: PeriodConfirmation
+}) {
+  if (report.is_locked) {
+    return (
+      <div className="inline-flex max-w-[280px] flex-col rounded-2xl bg-slate-900 px-3 py-2 text-xs font-bold text-white">
+        <span>Locked</span>
+        <span className="mt-1 text-[11px] font-semibold text-white/60">
+          {formatDateTime(report.locked_at)} · {report.locked_by_name || report.locked_by || '-'}
+        </span>
+      </div>
+    )
+  }
+
+  return (
+    <span className="inline-flex rounded-full bg-[#f5f5f7] px-3 py-1 text-xs font-bold text-[#6e6e73]">
+      Open
     </span>
   )
 }
@@ -852,4 +1148,12 @@ function formatDateTime(value: string | null | undefined) {
     hour: '2-digit',
     minute: '2-digit',
   })
+}
+
+function formatReadableText(value: string) {
+  if (!value || value === '-') return '-'
+
+  return value
+    .replaceAll('_', ' ')
+    .replace(/\b\w/g, (character) => character.toUpperCase())
 }

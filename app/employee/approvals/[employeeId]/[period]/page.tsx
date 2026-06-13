@@ -210,8 +210,20 @@ type DailyAction = 'approve' | 'reject'
 export default function EmployeeApprovalDetailPage() {
   const params = useParams()
 
-  const employeeId = String(params?.employeeId || '')
-  const periodMonth = String(params?.periodMonth || '')
+  const employeeId = getRouteParamValue(params, [
+    'employeeId',
+    'employee_id',
+    'id',
+  ])
+
+  const periodMonth = normalizePeriodMonthParam(
+    getRouteParamValue(params, [
+      'periodMonth',
+      'period',
+      'month',
+      'periode',
+    ])
+  )
 
   const [appUser, setAppUser] = useState<AppUser | null>(null)
   const [currentSupervisor, setCurrentSupervisor] = useState<EmployeeProfile | null>(null)
@@ -222,6 +234,7 @@ export default function EmployeeApprovalDetailPage() {
   const [periodConfirmation, setPeriodConfirmation] = useState<PeriodConfirmation | null>(null)
 
   const [selectedLog, setSelectedLog] = useState<AttendanceLog | null>(null)
+  const [selectedLogIds, setSelectedLogIds] = useState<string[]>([])
   const [rejectTarget, setRejectTarget] = useState<RejectTarget | null>(null)
   const [rejectReason, setRejectReason] = useState('')
 
@@ -301,6 +314,23 @@ export default function EmployeeApprovalDetailPage() {
     return getDisplayStatus(row) === 'absent' || getDisplayStatus(row) === 'no_record'
   }).length
 
+  const actionableLogs = useMemo(() => {
+    return logs.filter((item) => {
+      return normalizeStatus(item.employee_confirmation_status) === 'submitted' &&
+        normalizeStatus(item.supervisor_approval_status) === 'pending'
+    })
+  }, [logs])
+
+  const selectedActionableLogs = useMemo(() => {
+    const selected = new Set(selectedLogIds)
+
+    return actionableLogs.filter((item) => selected.has(item.id))
+  }, [actionableLogs, selectedLogIds])
+
+  const allActionableSelected =
+    actionableLogs.length > 0 &&
+    actionableLogs.every((item) => selectedLogIds.includes(item.id))
+
   useEffect(() => {
     fetchData()
   }, [employeeId, periodMonth])
@@ -310,8 +340,20 @@ export default function EmployeeApprovalDetailPage() {
     setErrorMessage('')
     setSuccessMessage('')
     setSelectedLog(null)
+    setSelectedLogIds([])
     setRejectTarget(null)
     setRejectReason('')
+
+    if (!employeeId || !isValidPeriodMonth(periodMonth)) {
+      setErrorMessage(
+        'Parameter halaman tidak valid. Pastikan URL detail approval berformat /employee/approvals/[employeeId]/[periode], contoh /employee/approvals/ID-KARYAWAN/2026-01.'
+      )
+      setLogs([])
+      setHolidays([])
+      setPeriodConfirmation(null)
+      setLoading(false)
+      return
+    }
 
     const { data: authData, error: authError } = await supabase.auth.getUser()
 
@@ -493,6 +535,79 @@ export default function EmployeeApprovalDetailPage() {
     await fetchData()
   }
 
+  function toggleDailySelection(log: AttendanceLog | null) {
+    if (!log?.id || isReadOnly) return
+
+    const canSelect =
+      normalizeStatus(log.employee_confirmation_status) === 'submitted' &&
+      normalizeStatus(log.supervisor_approval_status) === 'pending'
+
+    if (!canSelect) return
+
+    setSelectedLogIds((prev) => {
+      if (prev.includes(log.id)) {
+        return prev.filter((id) => id !== log.id)
+      }
+
+      return [...prev, log.id]
+    })
+  }
+
+  function toggleSelectAllDaily() {
+    if (isReadOnly || actionableLogs.length === 0) return
+
+    if (allActionableSelected) {
+      setSelectedLogIds([])
+      return
+    }
+
+    setSelectedLogIds(actionableLogs.map((item) => item.id))
+  }
+
+  async function handleApproveSelectedLogs() {
+    if (!ensureCanProcess()) return
+
+    if (selectedActionableLogs.length === 0) {
+      setErrorMessage('Pilih minimal satu tanggal pending sebelum approve terpilih.')
+      return
+    }
+
+    setProcessingPeriod(true)
+    setErrorMessage('')
+    setSuccessMessage('')
+
+    const now = new Date().toISOString()
+    const supervisorName = getSupervisorName()
+
+    for (const log of selectedActionableLogs) {
+      const { error } = await supabase
+        .from('attendance_logs')
+        .update({
+          supervisor_approval_status: 'approved',
+          supervisor_approved_by: supervisorName,
+          supervisor_approved_at: now,
+          supervisor_reviewed_by: supervisorName,
+          supervisor_reviewed_at: now,
+          supervisor_note: 'Disetujui oleh atasan dari pilihan manual.',
+          hr_final_status: 'ready_for_hr',
+          absence_request_status: log.absence_request_type ? 'approved_supervisor' : log.absence_request_status,
+          updated_at: now,
+        })
+        .eq('id', log.id)
+
+      if (error) {
+        setErrorMessage(error.message)
+        setProcessingPeriod(false)
+        return
+      }
+    }
+
+    setSuccessMessage(`${selectedActionableLogs.length} tanggal absensi berhasil disetujui.`)
+    setSelectedLogIds([])
+    setProcessingPeriod(false)
+    await fetchData()
+  }
+
   async function handleApprovePeriod() {
     if (!ensureCanProcess()) return
 
@@ -511,7 +626,7 @@ export default function EmployeeApprovalDetailPage() {
 
     const pendingLogs = logs.filter((item) => {
       return normalizeStatus(item.employee_confirmation_status) === 'submitted' &&
-        normalizeStatus(item.supervisor_approval_status) !== 'approved'
+        normalizeStatus(item.supervisor_approval_status) === 'pending'
     })
 
     for (const log of pendingLogs) {
@@ -687,7 +802,7 @@ export default function EmployeeApprovalDetailPage() {
         description="Review detail absensi bawahan per periode sebelum approve atau reject."
       />
 
-      <section className="space-y-6 p-6">
+      <section className="space-y-5 p-4 sm:p-5 xl:p-6">
         {successMessage && (
           <div className="rounded-2xl border border-green-200 bg-green-50 p-4 text-sm leading-6 text-green-700">
             <div className="mb-1 flex items-center gap-2 font-bold">
@@ -749,11 +864,11 @@ export default function EmployeeApprovalDetailPage() {
           </div>
         )}
 
-        <div className="relative overflow-hidden rounded-[34px] border border-black/5 bg-[#1d1d1f] p-7 text-white shadow-[0_24px_80px_rgba(0,0,0,0.16)]">
+        <div className="relative overflow-hidden rounded-[30px] border border-black/5 bg-[#1d1d1f] p-5 sm:p-6 text-white shadow-[0_24px_80px_rgba(0,0,0,0.16)]">
           <div className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-[#007aff]/35 blur-3xl" />
           <div className="pointer-events-none absolute -bottom-28 -left-20 h-72 w-72 rounded-full bg-[#34c759]/20 blur-3xl" />
 
-          <div className="relative flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
+          <div className="relative flex flex-col gap-5 2xl:flex-row 2xl:items-end 2xl:justify-between">
             <div className="min-w-0">
               <Link
                 href="/employee/approvals"
@@ -768,17 +883,17 @@ export default function EmployeeApprovalDetailPage() {
                 Supervisor Review
               </div>
 
-              <h1 className="max-w-4xl text-3xl font-semibold tracking-[-0.045em] md:text-5xl">
+              <h1 className="max-w-4xl text-2xl font-semibold tracking-[-0.04em] sm:text-3xl xl:text-4xl">
                 {employee?.full_name || '-'}
               </h1>
 
-              <p className="mt-5 max-w-2xl text-sm leading-7 text-white/62">
+              <p className="mt-4 max-w-3xl text-sm leading-7 text-white/62">
                 Periode {formatDisplayDate(periodRange.start)} s.d. {formatDisplayDate(periodRange.end)}.
                 Review data harian, bukti ketidakhadiran, cuti khusus, klaim PHL, dan potensi PHL sebelum approve.
               </p>
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-5 xl:min-w-[850px]">
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5 2xl:min-w-[650px]">
               <HeroMetric label="Pending" value={String(pendingDailyCount)} />
               <HeroMetric label="Approved" value={String(approvedDailyCount)} />
               <HeroMetric label="Rejected" value={String(rejectedDailyCount)} />
@@ -788,7 +903,7 @@ export default function EmployeeApprovalDetailPage() {
           </div>
         </div>
 
-        <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
+        <div className="grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-4">
           <SummaryCard
             title="Hadir"
             value={String(presentCount)}
@@ -823,7 +938,7 @@ export default function EmployeeApprovalDetailPage() {
         </div>
 
         <div className="harmony-card overflow-hidden">
-          <div className="flex flex-col gap-4 border-b border-black/5 p-6 xl:flex-row xl:items-center xl:justify-between">
+          <div className="flex flex-col gap-4 border-b border-black/5 p-5 sm:p-6 xl:flex-row xl:items-center xl:justify-between">
             <div>
               <h2 className="text-lg font-semibold text-[#1d1d1f]">
                 Detail Absensi Periode
@@ -850,28 +965,52 @@ export default function EmployeeApprovalDetailPage() {
               </div>
             </div>
 
-            <div className="flex flex-col gap-3 md:flex-row md:items-center">
+            <div className="grid gap-2 sm:grid-cols-2 xl:flex xl:flex-wrap xl:items-center xl:justify-end">
               <button
                 type="button"
                 onClick={fetchData}
-                className="harmony-button-secondary"
+                className="inline-flex min-h-10 items-center justify-center gap-2 rounded-2xl border border-black/10 bg-white px-4 text-xs font-bold text-[#1d1d1f] transition hover:bg-[#f5f5f7]"
               >
-                <RefreshCcw size={18} />
+                <RefreshCcw size={16} />
                 Refresh
+              </button>
+
+              <button
+                type="button"
+                disabled={isReadOnly || processingPeriod || actionableLogs.length === 0}
+                onClick={toggleSelectAllDaily}
+                className="inline-flex min-h-10 items-center justify-center gap-2 rounded-2xl border border-blue-100 bg-blue-50 px-4 text-xs font-bold text-[#0059b8] transition hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <CheckCircle2 size={16} />
+                {allActionableSelected ? 'Batal Pilih' : 'Centang Pending'}
+              </button>
+
+              <button
+                type="button"
+                disabled={isReadOnly || processingPeriod || selectedActionableLogs.length === 0}
+                onClick={handleApproveSelectedLogs}
+                className="inline-flex min-h-10 items-center justify-center gap-2 rounded-2xl bg-green-50 px-4 text-xs font-bold text-green-700 transition hover:bg-green-100 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {processingPeriod && selectedActionableLogs.length > 0 ? (
+                  <Loader2 size={16} className="animate-spin" />
+                ) : (
+                  <CheckCircle2 size={16} />
+                )}
+                Approve Terpilih ({selectedActionableLogs.length})
               </button>
 
               <button
                 type="button"
                 disabled={isReadOnly || processingPeriod || pendingDailyCount === 0}
                 onClick={handleApprovePeriod}
-                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl bg-green-600 px-5 text-sm font-bold text-white transition hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-60"
+                className="inline-flex min-h-10 items-center justify-center gap-2 rounded-2xl bg-green-600 px-4 text-xs font-bold text-white transition hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {processingPeriod ? (
-                  <Loader2 size={18} className="animate-spin" />
+                  <Loader2 size={16} className="animate-spin" />
                 ) : (
-                  <CheckCircle2 size={18} />
+                  <CheckCircle2 size={16} />
                 )}
-                Approve Periode
+                Approve Semua
               </button>
 
               <button
@@ -885,9 +1024,9 @@ export default function EmployeeApprovalDetailPage() {
                   })
                   setRejectReason('')
                 }}
-                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl bg-red-600 px-5 text-sm font-bold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+                className="inline-flex min-h-10 items-center justify-center gap-2 rounded-2xl bg-red-600 px-4 text-xs font-bold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                <XCircle size={18} />
+                <XCircle size={16} />
                 Reject Periode
               </button>
             </div>
@@ -901,158 +1040,241 @@ export default function EmployeeApprovalDetailPage() {
           )}
 
           {!loading && (
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[1900px] border-collapse text-left text-sm">
-                <thead>
-                  <tr className="border-b border-black/5 bg-[#f5f5f7]/90 text-xs uppercase tracking-wide text-[#6e6e73]">
-                    <th className="px-5 py-4 font-semibold">Tanggal</th>
-                    <th className="px-5 py-4 font-semibold">Hari</th>
-                    <th className="px-5 py-4 font-semibold">Clock In</th>
-                    <th className="px-5 py-4 font-semibold">Clock Out</th>
-                    <th className="px-5 py-4 font-semibold">Manual</th>
-                    <th className="px-5 py-4 font-semibold">Status</th>
-                    <th className="px-5 py-4 font-semibold">Keterangan</th>
-                    <th className="px-5 py-4 font-semibold">Catatan</th>
-                    <th className="px-5 py-4 font-semibold">Bukti</th>
-                    <th className="px-5 py-4 font-semibold">Approval</th>
-                    <th className="px-5 py-4 text-center font-semibold">Action</th>
-                  </tr>
-                </thead>
+            <div className="space-y-4 p-4 sm:p-5">
+              <div className="rounded-[24px] border border-blue-100 bg-blue-50 px-4 py-3 text-xs leading-6 text-blue-700">
+                <span className="font-bold">Catatan:</span> Centang baris pending untuk approve manual, gunakan Approve Semua untuk menyetujui seluruh tanggal pending, atau buka icon Detail untuk melihat bukti/evidence PHL dan keterangan.
+              </div>
 
-                <tbody>
-                  {calendarRows.map((row) => {
-                    const log = row.log
-                    const displayStatus = getDisplayStatus(row)
-                    const isOffday = row.is_weekend || Boolean(row.holiday_name)
-                    const canProcessDaily =
-                      Boolean(log?.id) &&
-                      normalizeStatus(log?.employee_confirmation_status) === 'submitted' &&
-                      normalizeStatus(log?.supervisor_approval_status) === 'pending' &&
-                      !isReadOnly
+              {calendarRows.length === 0 ? (
+                <div className="rounded-[28px] border border-dashed border-black/10 bg-[#f5f5f7]/70 p-8 text-center text-sm leading-6 text-[#6e6e73]">
+                  Belum ada data kalender absensi pada periode ini.
+                </div>
+              ) : (
+                <>
+                  <div className="hidden overflow-hidden rounded-[28px] border border-black/5 lg:block">
+                    <table className="w-full table-fixed border-collapse text-left text-xs xl:text-sm">
+                      <colgroup>
+                        <col className="w-[4%]" />
+                        <col className="w-[11%]" />
+                        <col className="w-[12%]" />
+                        <col className="w-[11%]" />
+                        <col className="w-[15%]" />
+                        <col className="w-[21%]" />
+                        <col className="w-[10%]" />
+                        <col className="w-[8%]" />
+                        <col className="w-[8%]" />
+                      </colgroup>
 
-                    return (
-                      <tr
-                        key={row.date}
-                        className={[
-                          'border-b border-black/5 transition',
-                          row.holiday_name
-                            ? 'bg-[#fff7e6] hover:bg-[#fff1cc]'
-                            : row.is_weekend
-                              ? 'bg-[#f3f8ff] hover:bg-[#e8f2ff]'
-                              : 'hover:bg-white/70',
-                        ].join(' ')}
-                      >
-                        <td className="px-5 py-4">
-                          <p className="font-semibold text-[#1d1d1f]">
-                            {formatDisplayDate(row.date)}
-                          </p>
+                      <thead>
+                        <tr className="border-b border-black/5 bg-[#f5f5f7]/90 text-[10px] uppercase tracking-wide text-[#6e6e73]">
+                          <th className="px-3 py-3 text-center font-semibold">
+                            <input
+                              type="checkbox"
+                              checked={allActionableSelected}
+                              disabled={isReadOnly || actionableLogs.length === 0}
+                              onChange={toggleSelectAllDaily}
+                              className="h-4 w-4 rounded border-black/20"
+                              aria-label="Pilih semua tanggal pending"
+                            />
+                          </th>
+                          <th className="px-3 py-3 font-semibold">Tanggal</th>
+                          <th className="px-3 py-3 font-semibold">Jam Mesin</th>
+                          <th className="px-3 py-3 font-semibold">Manual</th>
+                          <th className="px-3 py-3 font-semibold">Status</th>
+                          <th className="px-3 py-3 font-semibold">Catatan</th>
+                          <th className="px-3 py-3 font-semibold">Bukti</th>
+                          <th className="px-3 py-3 font-semibold">Approval</th>
+                          <th className="px-3 py-3 text-center font-semibold">Aksi</th>
+                        </tr>
+                      </thead>
 
-                          {row.holiday_name && (
-                            <p className="mt-1 line-clamp-1 text-[11px] font-bold text-orange-700">
-                              {row.holiday_name}
-                            </p>
-                          )}
-                        </td>
+                      <tbody>
+                        {calendarRows.map((row) => {
+                          const log = row.log
+                          const displayStatus = getDisplayStatus(row)
+                          const isOffday = row.is_weekend || Boolean(row.holiday_name)
+                          const canProcessDaily =
+                            Boolean(log?.id) &&
+                            normalizeStatus(log?.employee_confirmation_status) === 'submitted' &&
+                            normalizeStatus(log?.supervisor_approval_status) === 'pending' &&
+                            !isReadOnly
+                          const proofCount = getProofCount(log)
 
-                        <td className="px-5 py-4 text-[#6e6e73]">
-                          {row.day_name}
-                        </td>
+                          return (
+                            <tr
+                              key={row.date}
+                              className={[
+                                'border-b border-black/5 transition last:border-b-0',
+                                row.holiday_name
+                                  ? 'bg-[#fff7e6] hover:bg-[#fff1cc]'
+                                  : row.is_weekend
+                                    ? 'bg-[#f3f8ff] hover:bg-[#e8f2ff]'
+                                    : 'hover:bg-white/70',
+                              ].join(' ')}
+                            >
+                              <td className="px-3 py-3 text-center align-top">
+                                <input
+                                  type="checkbox"
+                                  checked={Boolean(log?.id && selectedLogIds.includes(log.id))}
+                                  disabled={!canProcessDaily}
+                                  onChange={() => toggleDailySelection(log)}
+                                  className="h-4 w-4 rounded border-black/20 disabled:opacity-40"
+                                  aria-label={`Pilih ${formatDisplayDate(row.date)}`}
+                                />
+                              </td>
 
-                        <td className="px-5 py-4">
-                          <TimeCell value={log?.check_in || '-'} />
-                        </td>
+                              <td className="px-3 py-3 align-top">
+                                <p className="break-words font-bold leading-5 text-[#1d1d1f]">
+                                  {formatDisplayDate(row.date)}
+                                </p>
+                                <p className="mt-1 text-[11px] font-semibold leading-4 text-[#6e6e73]">
+                                  {row.day_name}
+                                </p>
+                                {row.holiday_name && (
+                                  <p className="mt-1 line-clamp-2 text-[10px] font-bold leading-4 text-orange-700">
+                                    {row.holiday_name}
+                                  </p>
+                                )}
+                              </td>
 
-                        <td className="px-5 py-4">
-                          <TimeCell value={log?.check_out || '-'} />
-                        </td>
+                              <td className="px-3 py-3 align-top">
+                                <CompactTime label="In" value={log?.check_in || '-'} />
+                                <CompactTime label="Out" value={log?.check_out || '-'} />
+                              </td>
 
-                        <td className="px-5 py-4">
-                          <div className="space-y-1">
-                            <ManualTime label="In" value={log?.manual_check_in || log?.requested_check_in || '-'} />
-                            <ManualTime label="Out" value={log?.manual_check_out || log?.requested_check_out || '-'} />
-                          </div>
-                        </td>
+                              <td className="px-3 py-3 align-top">
+                                <CompactTime label="In" value={log?.manual_check_in || log?.requested_check_in || '-'} />
+                                <CompactTime label="Out" value={log?.manual_check_out || log?.requested_check_out || '-'} />
+                              </td>
 
-                        <td className="px-5 py-4">
-                          {isOffday && !log ? (
-                            <span className="text-xs font-semibold text-[#86868b]">-</span>
-                          ) : (
-                            <StatusBadge status={displayStatus} log={log} />
-                          )}
-                        </td>
+                              <td className="px-3 py-3 align-top">
+                                {isOffday && !log ? (
+                                  <span className="text-xs font-semibold text-[#86868b]">-</span>
+                                ) : (
+                                  <div className="space-y-2">
+                                    <StatusBadge status={displayStatus} log={log} />
+                                    <RequestLabelBadge log={log} status={displayStatus} />
+                                  </div>
+                                )}
+                              </td>
 
-                        <td className="px-5 py-4">
-                          <RequestLabelBadge log={log} status={displayStatus} />
-                        </td>
+                              <td className="px-3 py-3 align-top">
+                                <p className="line-clamp-3 break-words text-xs leading-5 text-[#6e6e73]">
+                                  {log?.employee_daily_note ||
+                                    log?.correction_reason ||
+                                    log?.notes ||
+                                    '-'}
+                                </p>
+                              </td>
 
-                        <td className="px-5 py-4">
-                          <p className="line-clamp-3 max-w-[250px] text-sm leading-6 text-[#6e6e73]">
-                            {log?.employee_daily_note ||
-                              log?.correction_reason ||
-                              log?.notes ||
-                              '-'}
-                          </p>
-                        </td>
+                              <td className="px-3 py-3 align-top">
+                                {proofCount > 0 ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => log && setSelectedLog(log)}
+                                    className="inline-flex items-center gap-1.5 rounded-2xl bg-[#e8f2ff] px-3 py-1.5 text-[11px] font-bold text-[#0059b8] transition hover:bg-blue-100"
+                                  >
+                                    <FileText size={13} />
+                                    {proofCount} bukti
+                                  </button>
+                                ) : (
+                                  <span className="text-xs font-semibold text-[#86868b]">-</span>
+                                )}
+                              </td>
 
-                        <td className="px-5 py-4">
-                          <ProofLinks log={log} />
-                        </td>
+                              <td className="px-3 py-3 align-top">
+                                <ApprovalBadge status={log?.supervisor_approval_status || 'none'} />
+                              </td>
 
-                        <td className="px-5 py-4">
-                          <ApprovalBadge status={log?.supervisor_approval_status || 'none'} />
-                        </td>
+                              <td className="px-3 py-3 align-top">
+                                {log ? (
+                                  <div className="flex items-center justify-center gap-1.5">
+                                    <IconActionButton
+                                      label="Detail"
+                                      tone="blue"
+                                      onClick={() => setSelectedLog(log)}
+                                    >
+                                      <Eye size={15} />
+                                    </IconActionButton>
 
-                        <td className="px-5 py-4">
-                          {log ? (
-                            <div className="flex items-center justify-center gap-2">
-                              <button
-                                type="button"
-                                onClick={() => setSelectedLog(log)}
-                                className="inline-flex min-h-9 items-center justify-center gap-2 rounded-2xl bg-[#e8f2ff] px-4 text-xs font-bold text-[#0059b8]"
-                              >
-                                <Eye size={15} />
-                                Detail
-                              </button>
+                                    <IconActionButton
+                                      label="Approve"
+                                      tone="green"
+                                      disabled={!canProcessDaily || processingId === log.id}
+                                      onClick={() => handleDailyApproval(log, 'approve')}
+                                    >
+                                      <CheckCircle2 size={15} />
+                                    </IconActionButton>
 
-                              <button
-                                type="button"
-                                disabled={!canProcessDaily || processingId === log.id}
-                                onClick={() => handleDailyApproval(log, 'approve')}
-                                className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-2xl bg-green-50 px-3 text-xs font-bold text-green-700 transition hover:bg-green-100 disabled:cursor-not-allowed disabled:opacity-50"
-                              >
-                                <CheckCircle2 size={14} />
-                                Approve
-                              </button>
+                                    <IconActionButton
+                                      label="Reject"
+                                      tone="red"
+                                      disabled={!canProcessDaily || processingId === log.id}
+                                      onClick={() => {
+                                        setRejectTarget({
+                                          type: 'daily',
+                                          id: log.id,
+                                          name: employee?.full_name || '-',
+                                          date: log.attendance_date,
+                                        })
+                                        setRejectReason('')
+                                      }}
+                                    >
+                                      <XCircle size={15} />
+                                    </IconActionButton>
+                                  </div>
+                                ) : (
+                                  <span className="flex justify-center text-xs font-semibold text-[#86868b]">
+                                    -
+                                  </span>
+                                )}
+                              </td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
 
-                              <button
-                                type="button"
-                                disabled={!canProcessDaily || processingId === log.id}
-                                onClick={() => {
-                                  setRejectTarget({
-                                    type: 'daily',
-                                    id: log.id,
-                                    name: employee?.full_name || '-',
-                                    date: log.attendance_date,
-                                  })
-                                  setRejectReason('')
-                                }}
-                                className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-2xl bg-red-50 px-3 text-xs font-bold text-red-700 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
-                              >
-                                <XCircle size={14} />
-                                Reject
-                              </button>
-                            </div>
-                          ) : (
-                            <span className="flex justify-center text-xs font-semibold text-[#86868b]">
-                              -
-                            </span>
-                          )}
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
+                  <div className="grid gap-3 lg:hidden">
+                    {calendarRows.map((row) => {
+                      const log = row.log
+                      const displayStatus = getDisplayStatus(row)
+                      const canProcessDaily =
+                        Boolean(log?.id) &&
+                        normalizeStatus(log?.employee_confirmation_status) === 'submitted' &&
+                        normalizeStatus(log?.supervisor_approval_status) === 'pending' &&
+                        !isReadOnly
+
+                      return (
+                        <DailyMobileApprovalCard
+                          key={row.date}
+                          row={row}
+                          log={log}
+                          displayStatus={displayStatus}
+                          selected={Boolean(log?.id && selectedLogIds.includes(log.id))}
+                          canProcess={canProcessDaily}
+                          processing={Boolean(log?.id && processingId === log.id)}
+                          onSelect={() => toggleDailySelection(log)}
+                          onDetail={() => log && setSelectedLog(log)}
+                          onApprove={() => log && handleDailyApproval(log, 'approve')}
+                          onReject={() => {
+                            if (!log) return
+
+                            setRejectTarget({
+                              type: 'daily',
+                              id: log.id,
+                              name: employee?.full_name || '-',
+                              date: log.attendance_date,
+                            })
+                            setRejectReason('')
+                          }}
+                        />
+                      )
+                    })}
+                  </div>
+                </>
+              )}
             </div>
           )}
         </div>
@@ -1091,6 +1313,187 @@ export default function EmployeeApprovalDetailPage() {
       </section>
     </>
   )
+}
+
+function CompactTime({
+  label,
+  value,
+}: {
+  label: string
+  value: string
+}) {
+  return (
+    <p className="text-[11px] leading-5 text-[#6e6e73]">
+      <span className="font-bold text-[#1d1d1f]">{label}:</span> {value || '-'}
+    </p>
+  )
+}
+
+function IconActionButton({
+  label,
+  tone,
+  disabled,
+  onClick,
+  children,
+}: {
+  label: string
+  tone: 'blue' | 'green' | 'red'
+  disabled?: boolean
+  onClick: () => void
+  children: ReactNode
+}) {
+  const toneClass = {
+    blue: 'bg-[#e8f2ff] text-[#0059b8] hover:bg-blue-100',
+    green: 'bg-green-50 text-green-700 hover:bg-green-100',
+    red: 'bg-red-50 text-red-700 hover:bg-red-100',
+  }[tone]
+
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      title={label}
+      disabled={disabled}
+      onClick={onClick}
+      className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl transition disabled:cursor-not-allowed disabled:opacity-40 ${toneClass}`}
+    >
+      {children}
+    </button>
+  )
+}
+
+function DailyMobileApprovalCard({
+  row,
+  log,
+  displayStatus,
+  selected,
+  canProcess,
+  processing,
+  onSelect,
+  onDetail,
+  onApprove,
+  onReject,
+}: {
+  row: CalendarRow
+  log: AttendanceLog | null
+  displayStatus: string
+  selected: boolean
+  canProcess: boolean
+  processing: boolean
+  onSelect: () => void
+  onDetail: () => void
+  onApprove: () => void
+  onReject: () => void
+}) {
+  const proofCount = getProofCount(log)
+
+  return (
+    <div
+      className={[
+        'rounded-[26px] border border-black/5 p-4 shadow-sm',
+        row.holiday_name
+          ? 'bg-[#fff7e6]'
+          : row.is_weekend
+            ? 'bg-[#f3f8ff]'
+            : 'bg-white',
+      ].join(' ')}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="font-bold text-[#1d1d1f]">
+            {formatDisplayDate(row.date)}
+          </p>
+          <p className="mt-1 text-xs font-semibold text-[#6e6e73]">
+            {row.day_name}
+          </p>
+          {row.holiday_name && (
+            <p className="mt-1 line-clamp-2 text-[11px] font-bold text-orange-700">
+              {row.holiday_name}
+            </p>
+          )}
+        </div>
+
+        <input
+          type="checkbox"
+          checked={selected}
+          disabled={!canProcess}
+          onChange={onSelect}
+          className="mt-1 h-4 w-4 rounded border-black/20 disabled:opacity-40"
+          aria-label={`Pilih ${formatDisplayDate(row.date)}`}
+        />
+      </div>
+
+      <div className="mt-4 grid grid-cols-2 gap-3">
+        <MobileMiniBox
+          label="Jam Mesin"
+          value={`In: ${log?.check_in || '-'}\nOut: ${log?.check_out || '-'}`}
+        />
+        <MobileMiniBox
+          label="Jam Manual"
+          value={`In: ${log?.manual_check_in || log?.requested_check_in || '-'}\nOut: ${log?.manual_check_out || log?.requested_check_out || '-'}`}
+        />
+      </div>
+
+      <div className="mt-4 flex flex-wrap gap-2">
+        {log ? <StatusBadge status={displayStatus} log={log} /> : <span className="text-xs font-semibold text-[#86868b]">-</span>}
+        <RequestLabelBadge log={log} status={displayStatus} />
+        <ApprovalBadge status={log?.supervisor_approval_status || 'none'} />
+      </div>
+
+      <p className="mt-4 line-clamp-3 text-xs leading-5 text-[#6e6e73]">
+        {log?.employee_daily_note || log?.correction_reason || log?.notes || '-'}
+      </p>
+
+      <div className="mt-4 flex items-center justify-between gap-3">
+        <span className="text-xs font-bold text-[#6e6e73]">
+          {proofCount > 0 ? `${proofCount} bukti/evidence` : 'Tidak ada bukti'}
+        </span>
+
+        {log ? (
+          <div className="flex items-center gap-2">
+            <IconActionButton label="Detail" tone="blue" onClick={onDetail}>
+              <Eye size={15} />
+            </IconActionButton>
+            <IconActionButton label="Approve" tone="green" disabled={!canProcess || processing} onClick={onApprove}>
+              <CheckCircle2 size={15} />
+            </IconActionButton>
+            <IconActionButton label="Reject" tone="red" disabled={!canProcess || processing} onClick={onReject}>
+              <XCircle size={15} />
+            </IconActionButton>
+          </div>
+        ) : null}
+      </div>
+    </div>
+  )
+}
+
+function MobileMiniBox({
+  label,
+  value,
+}: {
+  label: string
+  value: string
+}) {
+  return (
+    <div className="rounded-2xl bg-[#f5f5f7]/80 p-3">
+      <p className="text-[10px] font-bold uppercase tracking-wide text-[#6e6e73]">
+        {label}
+      </p>
+      <p className="mt-1 whitespace-pre-line text-xs font-semibold leading-5 text-[#1d1d1f]">
+        {value}
+      </p>
+    </div>
+  )
+}
+
+function getProofCount(log: AttendanceLog | null) {
+  if (!log) return 0
+
+  return [
+    log.absence_proof_url,
+    log.phl_proof_url,
+    log.correction_proof_url,
+  ].filter(Boolean).length
 }
 
 function AttendanceDetailModal({
@@ -1743,8 +2146,76 @@ function getRequestTone(value: string): 'green' | 'orange' | 'red' | 'blue' | 'p
   return 'neutral'
 }
 
+function getRouteParamValue(
+  params: ReturnType<typeof useParams>,
+  keys: string[]
+) {
+  const routeParams = params as Record<string, string | string[] | undefined>
+
+  for (const key of keys) {
+    const value = routeParams?.[key]
+
+    if (Array.isArray(value)) {
+      const firstValue = value[0]
+      if (firstValue) return decodeURIComponent(firstValue)
+      continue
+    }
+
+    if (value) return decodeURIComponent(value)
+  }
+
+  return ''
+}
+
+function normalizePeriodMonthParam(value: string) {
+  const cleaned = String(value || '').trim()
+
+  if (!cleaned) return ''
+
+  const directMatch = cleaned.match(/^(\d{4})-(\d{2})$/)
+
+  if (directMatch) {
+    return `${directMatch[1]}-${directMatch[2]}`
+  }
+
+  const looseMatch = cleaned.match(/(\d{4})-(\d{1,2})/)
+
+  if (!looseMatch) return ''
+
+  const year = looseMatch[1]
+  const month = String(Number(looseMatch[2])).padStart(2, '0')
+
+  return `${year}-${month}`
+}
+
+function isValidPeriodMonth(value: string) {
+  const match = value.match(/^(\d{4})-(\d{2})$/)
+
+  if (!match) return false
+
+  const month = Number(match[2])
+
+  return month >= 1 && month <= 12
+}
+
+function getCurrentPeriodMonth() {
+  const today = new Date()
+  const day = today.getDate()
+  const period = new Date(today)
+
+  if (day <= 10) {
+    period.setMonth(period.getMonth() - 1)
+  }
+
+  return `${period.getFullYear()}-${String(period.getMonth() + 1).padStart(2, '0')}`
+}
+
 function getCutoffRange(periodMonth: string) {
-  const [yearText, monthText] = periodMonth.split('-')
+  const safePeriodMonth = isValidPeriodMonth(periodMonth)
+    ? periodMonth
+    : getCurrentPeriodMonth()
+
+  const [yearText, monthText] = safePeriodMonth.split('-')
   const year = Number(yearText)
   const month = Number(monthText)
 
