@@ -1154,7 +1154,7 @@ export default function EmployeeAttendancePage() {
 
             </div>
 
-            <div className="flex flex-col gap-3 md:flex-row md:items-center">
+            <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
               <input
                 type="month"
                 value={periodMonth}
@@ -1299,7 +1299,7 @@ export default function EmployeeAttendancePage() {
                   )}
                 </div>
 
-                <div className="flex flex-col gap-3 md:flex-row md:items-center">
+                <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
                   <button
                     type="button"
                     onClick={toggleSelectAllAttendance}
@@ -1332,7 +1332,7 @@ export default function EmployeeAttendancePage() {
                 </div>
               </div>
 
-              <div className="grid gap-3 p-4 lg:hidden">
+              <div className="grid gap-3 p-4 2xl:hidden">
                 {calendarRows.map((row) => {
                   const draft = getDraft(row);
                   const displayStatus = getDisplayStatus(row, draft);
@@ -1465,8 +1465,8 @@ export default function EmployeeAttendancePage() {
                 })}
               </div>
 
-              <div className="hidden overflow-hidden lg:block">
-                <table className="w-full table-fixed border-collapse text-left text-[12px]">
+              <div className="hidden overflow-x-auto 2xl:block">
+                <table className="min-w-[1220px] w-full table-fixed border-collapse text-left text-[12px]">
                   <thead>
                     <tr className="border-b border-black/5 bg-[#f5f5f7]/90 text-xs uppercase tracking-wide text-[#6e6e73]">
                       <th className="w-[58px] px-3 py-3 text-center font-semibold">
