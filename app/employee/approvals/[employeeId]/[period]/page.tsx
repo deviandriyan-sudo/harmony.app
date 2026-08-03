@@ -25,6 +25,7 @@ import {
 
 import { Topbar } from '@/components/layout/Topbar'
 import { supabase } from '@/lib/supabase'
+import { sendHarmonyEmail } from '@/lib/notifications'
 
 type AppUser = {
   id: string
@@ -335,10 +336,13 @@ export default function EmployeeApprovalDetailPage() {
     fetchData()
   }, [employeeId, periodMonth])
 
-  async function fetchData() {
+  async function fetchData(resetMessage = true) {
     setLoading(true)
-    setErrorMessage('')
-    setSuccessMessage('')
+
+    if (resetMessage) {
+      setErrorMessage('')
+      setSuccessMessage('')
+    }
     setSelectedLog(null)
     setSelectedLogIds([])
     setRejectTarget(null)
@@ -479,6 +483,99 @@ export default function EmployeeApprovalDetailPage() {
     return true
   }
 
+  function getAppBaseUrl() {
+    if (typeof window === 'undefined') return ''
+    return window.location.origin
+  }
+
+  function isValidEmailAddress(value: string | null | undefined) {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || '').trim())
+  }
+
+  async function getHrNotificationEmails() {
+    const { data, error } = await supabase
+      .from('app_users')
+      .select('email, role, is_active')
+
+    if (error) {
+      console.warn('HR email notification warning:', error)
+      return []
+    }
+
+    const emails = (data || [])
+      .filter((user) => user.is_active !== false)
+      .filter((user) => normalizeStatus(user.role).includes('hr'))
+      .map((user) => String(user.email || '').trim())
+      .filter(isValidEmailAddress)
+
+    return Array.from(new Set(emails))
+  }
+
+  async function sendSupervisorApprovalNotification({
+    action,
+    scope,
+    date,
+    note,
+    totalDays,
+  }: {
+    action: 'approved' | 'rejected'
+    scope: 'daily' | 'selected' | 'period'
+    date?: string
+    note?: string
+    totalDays?: number
+  }) {
+    const employeeEmail = String(employee?.email || '').trim()
+    const validEmployeeEmail = isValidEmailAddress(employeeEmail)
+    const hrEmails = action === 'approved' ? await getHrNotificationEmails() : []
+
+    if (!validEmployeeEmail && hrEmails.length === 0) {
+      return 'Email notifikasi belum terkirim karena email employee/HR belum tersedia.'
+    }
+
+    const baseUrl = getAppBaseUrl()
+    const periodText = `${formatDisplayDate(periodRange.start)} s.d. ${formatDisplayDate(periodRange.end)}`
+    const supervisorName = getSupervisorName()
+    const employeeName = employee?.full_name || '-'
+    const actionLabel = action === 'approved' ? 'disetujui' : 'ditolak'
+    const scopeLabel =
+      scope === 'period'
+        ? 'periode absensi'
+        : scope === 'selected'
+          ? `${totalDays || 0} tanggal absensi`
+          : `absensi tanggal ${date ? formatDisplayDate(date) : '-'}`
+
+    const recipients = validEmployeeEmail ? [employeeEmail] : hrEmails
+    const ccRecipients = validEmployeeEmail ? hrEmails.filter((email) => email !== employeeEmail) : []
+
+    await sendHarmonyEmail({
+      to: recipients,
+      cc: ccRecipients.length > 0 ? ccRecipients : undefined,
+      subject: `[HARMONY] Absensi ${employeeName} ${actionLabel} atasan`,
+      title: `Absensi ${actionLabel.charAt(0).toUpperCase()}${actionLabel.slice(1)} Atasan`,
+      message: [
+        `Halo,`,
+        ``,
+        `${scopeLabel} milik ${employeeName} untuk periode ${periodText} sudah ${actionLabel} oleh ${supervisorName}.`,
+        note ? `Catatan atasan: ${note}` : '',
+        action === 'approved'
+          ? `Status sekarang siap diproses HR pada menu Final Report.`
+          : `Silakan cek kembali data absensi dan lakukan revisi bila diperlukan.`,
+      ]
+        .filter(Boolean)
+        .join('\n'),
+      actionLabel: 'Buka HARMONY',
+      actionUrl:
+        action === 'approved' && hrEmails.length > 0
+          ? `${baseUrl}/hr/attendance/final-report`
+          : `${baseUrl}/employee/attendance`,
+      footer: 'Email ini dikirim otomatis oleh HARMONY setelah approval absensi diproses atasan.',
+    })
+
+    return validEmployeeEmail
+      ? 'Notifikasi email sudah dikirim ke employee.'
+      : 'Notifikasi email sudah dikirim ke HR, tetapi email employee belum tersedia.'
+  }
+
   async function handleDailyApproval(log: AttendanceLog, action: DailyAction, note = '') {
     if (!ensureCanProcess()) return
 
@@ -525,14 +622,28 @@ export default function EmployeeApprovalDetailPage() {
       return
     }
 
+    let emailInfo = ''
+
+    try {
+      emailInfo = await sendSupervisorApprovalNotification({
+        action: action === 'approve' ? 'approved' : 'rejected',
+        scope: 'daily',
+        date: log.attendance_date,
+        note: note || (action === 'approve' ? 'Disetujui oleh atasan.' : 'Ditolak oleh atasan.'),
+      })
+    } catch (emailError: any) {
+      console.warn('Approval email notification warning:', emailError)
+      emailInfo = `Email notifikasi belum terkirim: ${emailError?.message || 'Terjadi kendala saat mengirim email.'}`
+    }
+
     setSuccessMessage(
       action === 'approve'
-        ? `Absensi ${formatDisplayDate(log.attendance_date)} berhasil disetujui.`
-        : `Absensi ${formatDisplayDate(log.attendance_date)} berhasil ditolak.`
+        ? `Absensi ${formatDisplayDate(log.attendance_date)} berhasil disetujui. ${emailInfo}`
+        : `Absensi ${formatDisplayDate(log.attendance_date)} berhasil ditolak. ${emailInfo}`
     )
 
     setProcessingId('')
-    await fetchData()
+    await fetchData(false)
   }
 
   function toggleDailySelection(log: AttendanceLog | null) {
@@ -602,10 +713,24 @@ export default function EmployeeApprovalDetailPage() {
       }
     }
 
-    setSuccessMessage(`${selectedActionableLogs.length} tanggal absensi berhasil disetujui.`)
+    let emailInfo = ''
+
+    try {
+      emailInfo = await sendSupervisorApprovalNotification({
+        action: 'approved',
+        scope: 'selected',
+        totalDays: selectedActionableLogs.length,
+        note: 'Disetujui oleh atasan dari pilihan manual.',
+      })
+    } catch (emailError: any) {
+      console.warn('Approval selected email notification warning:', emailError)
+      emailInfo = `Email notifikasi belum terkirim: ${emailError?.message || 'Terjadi kendala saat mengirim email.'}`
+    }
+
+    setSuccessMessage(`${selectedActionableLogs.length} tanggal absensi berhasil disetujui. ${emailInfo}`)
     setSelectedLogIds([])
     setProcessingPeriod(false)
-    await fetchData()
+    await fetchData(false)
   }
 
   async function handleApprovePeriod() {
@@ -688,9 +813,23 @@ export default function EmployeeApprovalDetailPage() {
 
     await syncPHLBalance(employeeId, periodRange.start, periodRange.end)
 
-    setSuccessMessage('Periode absensi berhasil disetujui atasan dan siap diproses HR.')
+    let emailInfo = ''
+
+    try {
+      emailInfo = await sendSupervisorApprovalNotification({
+        action: 'approved',
+        scope: 'period',
+        totalDays: pendingLogs.length,
+        note: 'Periode disetujui oleh atasan.',
+      })
+    } catch (emailError: any) {
+      console.warn('Approval period email notification warning:', emailError)
+      emailInfo = `Email notifikasi belum terkirim: ${emailError?.message || 'Terjadi kendala saat mengirim email.'}`
+    }
+
+    setSuccessMessage(`Periode absensi berhasil disetujui atasan dan siap diproses HR. ${emailInfo}`)
     setProcessingPeriod(false)
-    await fetchData()
+    await fetchData(false)
   }
 
   async function handleRejectPeriod() {
@@ -750,11 +889,25 @@ export default function EmployeeApprovalDetailPage() {
       return
     }
 
-    setSuccessMessage('Periode absensi berhasil ditolak dan dikembalikan ke employee.')
+    let emailInfo = ''
+
+    try {
+      emailInfo = await sendSupervisorApprovalNotification({
+        action: 'rejected',
+        scope: 'period',
+        totalDays: logs.length,
+        note: rejectReason,
+      })
+    } catch (emailError: any) {
+      console.warn('Reject period email notification warning:', emailError)
+      emailInfo = `Email notifikasi belum terkirim: ${emailError?.message || 'Terjadi kendala saat mengirim email.'}`
+    }
+
+    setSuccessMessage(`Periode absensi berhasil ditolak dan dikembalikan ke employee. ${emailInfo}`)
     setRejectTarget(null)
     setRejectReason('')
     setProcessingPeriod(false)
-    await fetchData()
+    await fetchData(false)
   }
 
   async function handleRejectDaily() {
@@ -968,7 +1121,7 @@ export default function EmployeeApprovalDetailPage() {
             <div className="grid gap-2 sm:grid-cols-2 xl:flex xl:flex-wrap xl:items-center xl:justify-end">
               <button
                 type="button"
-                onClick={fetchData}
+                onClick={() => fetchData()}
                 className="inline-flex min-h-10 items-center justify-center gap-2 rounded-2xl border border-black/10 bg-white px-4 text-xs font-bold text-[#1d1d1f] transition hover:bg-[#f5f5f7]"
               >
                 <RefreshCcw size={16} />
