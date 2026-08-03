@@ -25,7 +25,7 @@ import {
 
 import { Topbar } from '@/components/layout/Topbar'
 import { supabase } from '@/lib/supabase'
-import { notifyAbsenceRequestSubmitted } from '@/lib/absence-notifications'
+import { sendHarmonyEmail } from '@/lib/notifications'
 
 type AppUser = {
   id: string
@@ -151,6 +151,136 @@ const initialForm: FormState = {
   handover_note: '',
   proof_file: null,
 }
+
+
+type LeaveNotificationResult = {
+  success: boolean
+  count: number
+  message: string
+}
+
+function uniqueLeaveEmailList(values: Array<string | null | undefined>) {
+  return Array.from(
+    new Set(
+      values
+        .map((value) => String(value || '').trim().toLowerCase())
+        .filter((value) => value.includes('@'))
+    )
+  )
+}
+
+function getLeaveHarmonyBaseUrl() {
+  if (typeof window !== 'undefined') {
+    return window.location.origin
+  }
+
+  return process.env.NEXT_PUBLIC_SITE_URL || ''
+}
+
+async function getHrLeaveNotificationEmails() {
+  const { data, error } = await supabase
+    .from('app_users')
+    .select('email, role, is_active')
+    .eq('is_active', true)
+    .ilike('role', '%hr%')
+
+  if (error) {
+    console.warn('HR leave email lookup warning:', error)
+    return []
+  }
+
+  return uniqueLeaveEmailList((data || []).map((item: any) => item.email))
+}
+
+async function notifyLeaveRequestSubmitted({
+  requester,
+  supervisorOne,
+  supervisorTwo,
+  requestId,
+  requestTypeLabel,
+  startDate,
+  endDate,
+  totalDays,
+  reason,
+  jobPending,
+  handoverTo,
+  handoverNote,
+}: {
+  requester: Employee
+  supervisorOne: Employee | null
+  supervisorTwo: Employee | null
+  requestId?: string | null
+  requestTypeLabel: string
+  startDate: string
+  endDate: string
+  totalDays: number
+  reason: string
+  jobPending: string
+  handoverTo: string
+  handoverNote?: string | null
+}): Promise<LeaveNotificationResult> {
+  const supervisorEmails = uniqueLeaveEmailList([
+    supervisorOne?.email,
+    supervisorTwo?.email,
+  ])
+
+  const hrEmails = await getHrLeaveNotificationEmails()
+
+  const toEmails = supervisorEmails.length > 0 ? supervisorEmails : hrEmails
+  const ccEmails = supervisorEmails.length > 0 ? hrEmails : []
+
+  if (toEmails.length === 0 && ccEmails.length === 0) {
+    return {
+      success: false,
+      count: 0,
+      message: 'Email atasan atau HR belum ditemukan.',
+    }
+  }
+
+  try {
+    await sendHarmonyEmail({
+      to: toEmails.length > 0 ? toEmails : ccEmails,
+      cc: toEmails.length > 0 ? ccEmails : [],
+      subject: `Pengajuan ${requestTypeLabel} - ${requester.full_name || requester.email || 'Employee'}`,
+      title: `Pengajuan ${requestTypeLabel} Baru`,
+      message: [
+        `Karyawan ${requester.full_name || requester.email || '-'} mengajukan ${requestTypeLabel}.`,
+        '',
+        `NIP / Employee Number: ${requester.employee_number || requester.machine_pin || '-'}`,
+        `Departemen: ${requester.department || '-'}`,
+        `Jabatan: ${requester.position || '-'}`,
+        `Periode: ${formatDisplayDate(startDate)} s.d. ${formatDisplayDate(endDate)}`,
+        `Total hari kerja: ${totalDays} hari`,
+        '',
+        `Alasan: ${reason || '-'}`,
+        '',
+        `Job pending: ${jobPending || '-'}`,
+        `Dialihkan kepada: ${handoverTo || '-'}`,
+        `Catatan serah terima: ${handoverNote || '-'}`,
+        requestId ? `ID Pengajuan: ${requestId}` : '',
+        '',
+        'Silakan buka HARMONY untuk melakukan pengecekan dan approval.',
+      ]
+        .filter(Boolean)
+        .join('\n'),
+      actionLabel: 'Buka Approval HARMONY',
+      actionUrl: `${getLeaveHarmonyBaseUrl()}/employee/approvals/leave`,
+    })
+
+    return {
+      success: true,
+      count: uniqueLeaveEmailList([...toEmails, ...ccEmails]).length,
+      message: 'Email notifikasi berhasil dikirim.',
+    }
+  } catch (error: any) {
+    return {
+      success: false,
+      count: 0,
+      message: error?.message || 'Email notifikasi gagal dikirim.',
+    }
+  }
+}
+
 
 export default function EmployeeLeavePage() {
   const [appUser, setAppUser] = useState<AppUser | null>(null)
@@ -615,14 +745,10 @@ export default function EmployeeLeavePage() {
       return
     }
 
-    const employeesForNotification =
-      employeeDirectory.length > 0
-        ? employeeDirectory
-        : ([employee, supervisorOne, supervisorTwo].filter(Boolean) as Employee[])
-
-    const notificationResult: any = await notifyAbsenceRequestSubmitted({
-      employees: employeesForNotification as any[],
+    const notificationResult = await notifyLeaveRequestSubmitted({
       requester: employee,
+      supervisorOne,
+      supervisorTwo,
 
       requestId: insertedRequest?.id,
       requestTypeLabel: selectedRequestMeta.label,
@@ -632,18 +758,14 @@ export default function EmployeeLeavePage() {
 
       reason: form.reason.trim(),
       jobPending: form.job_pending.trim(),
-      handoverTo: form.handover_to.trim(),
+      handoverTo: selectedHandoverEmployee?.full_name || form.handover_to.trim(),
       handoverNote: form.handover_note.trim() || null,
-
-      relatedModule: 'leave',
-      relatedTable: 'leave_requests',
-      actionPath: '/employee/approvals/leave',
     })
 
     setSuccessMessage(
-      notificationResult?.success
-        ? `${selectedRequestMeta.label} berhasil diajukan dan email notifikasi sudah dikirim.`
-        : `${selectedRequestMeta.label} berhasil diajukan, tetapi email notifikasi belum terkirim: ${notificationResult?.message || notificationResult?.error || 'Tidak diketahui.'}`
+      notificationResult.success
+        ? `${selectedRequestMeta.label} berhasil diajukan dan email notifikasi terkirim ke ${notificationResult.count} penerima.`
+        : `${selectedRequestMeta.label} berhasil diajukan, tetapi email notifikasi belum terkirim: ${notificationResult.message}`
     )
 
     resetForm()

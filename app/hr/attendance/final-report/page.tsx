@@ -16,6 +16,7 @@ import {
 
 import { Topbar } from '@/components/layout/Topbar'
 import { supabase } from '@/lib/supabase'
+import { sendHarmonyEmail } from '@/lib/notifications'
 
 type PeriodConfirmation = {
   id: string
@@ -102,6 +103,13 @@ type AttendanceLog = {
   lock_note: string | null
 
   deleted_at: string | null
+}
+
+
+type EmployeeContact = {
+  id: string
+  full_name: string | null
+  email: string | null
 }
 
 export default function HRFinalAttendanceReportPage() {
@@ -222,6 +230,195 @@ export default function HRFinalAttendanceReportPage() {
     }
   }
 
+  function getNotificationBaseUrl() {
+    if (typeof window === 'undefined') return ''
+
+    return window.location.origin
+  }
+
+  async function fetchEmployeeContacts(employeeIds: string[]) {
+    const cleanIds = Array.from(
+      new Set(employeeIds.map((id) => String(id || '').trim()).filter(Boolean))
+    )
+
+    if (cleanIds.length === 0) return [] as EmployeeContact[]
+
+    const { data, error } = await supabase
+      .from('employees')
+      .select('id, full_name, email')
+      .in('id', cleanIds)
+
+    if (error) {
+      console.warn('Employee contact fetch warning:', error)
+      return [] as EmployeeContact[]
+    }
+
+    return (data || []) as EmployeeContact[]
+  }
+
+  function getValidEmail(value: string | null | undefined) {
+    const email = String(value || '').trim().toLowerCase()
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return ''
+
+    return email
+  }
+
+  async function sendFinalizationEmailToEmployee({
+    report,
+    finalizedBy,
+    lockNote,
+    action,
+  }: {
+    report: PeriodConfirmation
+    finalizedBy: string
+    lockNote: string
+    action: 'single_finalize' | 'full_period_lock'
+  }) {
+    const contacts = await fetchEmployeeContacts([report.employee_id])
+    const contact = contacts[0]
+    const employeeEmail = getValidEmail(contact?.email)
+
+    if (!employeeEmail) {
+      return {
+        total: 0,
+        sent: 0,
+        failed: 0,
+        message: 'Email karyawan tidak tersedia, notifikasi email tidak terkirim.',
+      }
+    }
+
+    const periodLabel = `${formatDisplayDate(report.period_start)} - ${formatDisplayDate(report.period_end)}`
+    const isFullLock = action === 'full_period_lock'
+
+    try {
+      await sendHarmonyEmail({
+        to: employeeEmail,
+        subject: isFullLock
+          ? `Absensi Periode ${report.period_month} Telah Dikunci HR`
+          : `Absensi Periode ${report.period_month} Telah Difinalisasi HR`,
+        title: isFullLock
+          ? 'Absensi Telah Dikunci HR'
+          : 'Absensi Telah Difinalisasi HR',
+        message: [
+          `Yth. ${contact?.full_name || report.full_name || 'Employee'},`,
+          '',
+          isFullLock
+            ? `Absensi periode ${periodLabel} telah dikunci oleh ${finalizedBy}.`
+            : `Absensi periode ${periodLabel} telah difinalisasi dan dikunci oleh ${finalizedBy}.`,
+          '',
+          'Data absensi periode ini sudah menjadi read-only dan tidak bisa diubah dari dashboard employee.',
+          '',
+          `Catatan HR: ${lockNote || '-'}`,
+        ].join('\n'),
+        actionLabel: 'Buka Absensi HARMONY',
+        actionUrl: `${getNotificationBaseUrl()}/employee/attendance`,
+        footer:
+          'Email ini dikirim otomatis oleh HARMONY setelah HR melakukan finalisasi atau lock periode absensi.',
+      })
+
+      return {
+        total: 1,
+        sent: 1,
+        failed: 0,
+        message: 'Notifikasi email terkirim ke karyawan.',
+      }
+    } catch (error) {
+      console.warn('Finalization notification warning:', error)
+
+      return {
+        total: 1,
+        sent: 0,
+        failed: 1,
+        message: 'Data berhasil diproses, tetapi notifikasi email gagal terkirim.',
+      }
+    }
+  }
+
+  async function sendFullPeriodLockEmail({
+    finalizedBy,
+    lockNote,
+  }: {
+    finalizedBy: string
+    lockNote: string
+  }) {
+    const employeeIds = reports
+      .map((report) => report.employee_id)
+      .filter(Boolean)
+
+    const contacts = await fetchEmployeeContacts(employeeIds)
+    const contactById = new Map(contacts.map((contact) => [contact.id, contact]))
+    const recipients = reports
+      .map((report) => {
+        const contact = contactById.get(report.employee_id)
+        const email = getValidEmail(contact?.email)
+
+        if (!email) return null
+
+        return {
+          report,
+          contact,
+          email,
+        }
+      })
+      .filter(Boolean) as Array<{
+        report: PeriodConfirmation
+        contact: EmployeeContact | undefined
+        email: string
+      }>
+
+    if (recipients.length === 0) {
+      return {
+        total: 0,
+        sent: 0,
+        failed: 0,
+        message: 'Tidak ada email karyawan yang valid untuk dikirimi notifikasi.',
+      }
+    }
+
+    const results = await Promise.allSettled(
+      recipients.map(({ report, contact, email }) =>
+        sendHarmonyEmail({
+          to: email,
+          subject: `Absensi Periode ${periodMonth} Telah Dikunci HR`,
+          title: 'Absensi Telah Dikunci HR',
+          message: [
+            `Yth. ${contact?.full_name || report.full_name || 'Employee'},`,
+            '',
+            `Absensi periode ${getPeriodApprovalLabel(periodMonth)} telah dikunci oleh ${finalizedBy}.`,
+            '',
+            'Data absensi periode ini sudah menjadi read-only. Laporan dengan status Ready for HR juga otomatis difinalisasi.',
+            '',
+            `Catatan HR: ${lockNote || '-'}`,
+          ].join('\n'),
+          actionLabel: 'Buka Absensi HARMONY',
+          actionUrl: `${getNotificationBaseUrl()}/employee/attendance`,
+          footer:
+            'Email ini dikirim otomatis oleh HARMONY setelah HR melakukan lock periode absensi.',
+        })
+      )
+    )
+
+    const sent = results.filter((result) => result.status === 'fulfilled').length
+    const failed = results.length - sent
+
+    return {
+      total: recipients.length,
+      sent,
+      failed,
+      message:
+        failed > 0
+          ? `Notifikasi email terkirim ke ${sent} dari ${recipients.length} karyawan. ${failed} email gagal terkirim.`
+          : `Notifikasi email terkirim ke ${sent} karyawan.`,
+    }
+  }
+
+  function buildEmailResultText(result: Awaited<ReturnType<typeof sendFullPeriodLockEmail>>) {
+    if (result.total === 0) return ` ${result.message}`
+
+    return ` ${result.message}`
+  }
+
   async function finalizeReport(report: PeriodConfirmation) {
     setFinalizingId(report.id)
     setErrorMessage('')
@@ -303,8 +500,15 @@ export default function HRFinalAttendanceReportPage() {
       return
     }
 
+    const emailResult = await sendFinalizationEmailToEmployee({
+      report,
+      finalizedBy,
+      lockNote,
+      action: 'single_finalize',
+    })
+
     setSuccessMessage(
-      `Laporan absensi ${report.full_name || '-'} berhasil difinalisasi dan dikunci.`
+      `Laporan absensi ${report.full_name || '-'} berhasil difinalisasi dan dikunci.${buildEmailResultText(emailResult)}`
     )
 
     setFinalizingId('')
@@ -424,8 +628,13 @@ export default function HRFinalAttendanceReportPage() {
       return
     }
 
+    const emailResult = await sendFullPeriodLockEmail({
+      finalizedBy,
+      lockNote,
+    })
+
     setSuccessMessage(
-      `Periode ${getPeriodApprovalLabel(periodMonth)} berhasil dikunci penuh. ${readyReports.length} laporan Ready for HR otomatis difinalisasi, dan seluruh data periode ini menjadi read-only.`
+      `Periode ${getPeriodApprovalLabel(periodMonth)} berhasil dikunci penuh. ${readyReports.length} laporan Ready for HR otomatis difinalisasi, dan seluruh data periode ini menjadi read-only.${buildEmailResultText(emailResult)}`
     )
 
     setPeriodLocking(false)

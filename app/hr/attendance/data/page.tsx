@@ -19,6 +19,7 @@ import {
 } from 'lucide-react'
 
 import { supabase } from '@/lib/supabase'
+import { sendHarmonyEmail } from '@/lib/notifications'
 
 type Employee = {
   id: string
@@ -295,6 +296,10 @@ function getEmployeeUnit(employee: Employee) {
 
 function normalizeText(value: unknown) {
   return String(value || '').trim().toLowerCase()
+}
+
+function isValidEmail(value: string | null | undefined) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || '').trim())
 }
 
 function normalizeStatus(log: AttendanceLog) {
@@ -856,6 +861,150 @@ export default function HRAttendanceDataPage() {
     )
   }
 
+  function getValidEmployeeRecipients() {
+    const map = new Map<string, Employee>()
+
+    employees.forEach((employee) => {
+      if (employee.is_active === false) return
+
+      const email = String(employee.email || '').trim().toLowerCase()
+
+      if (!email || !isValidEmail(email)) return
+
+      map.set(email, {
+        ...employee,
+        email,
+      })
+    })
+
+    return Array.from(map.values())
+  }
+
+  function getNotificationBaseUrl() {
+    if (typeof window === 'undefined') return ''
+
+    return window.location.origin
+  }
+
+  function getPeriodActionEmailContent({
+    action,
+    actorName,
+    note,
+  }: {
+    action: 'finalized' | 'locked' | 'unlocked'
+    actorName: string
+    note: string
+  }) {
+    const periodLabel = periodRange.label
+
+    if (action === 'finalized') {
+      return {
+        subject: `Absensi Periode ${periodMonth} Telah Difinalisasi HR`,
+        title: 'Absensi Telah Difinalisasi HR',
+        message: [
+          `Absensi periode ${periodLabel} telah difinalisasi dan dikunci oleh ${actorName}.`,
+          '',
+          'Data absensi periode ini sudah menjadi read-only dan tidak dapat diubah dari dashboard employee.',
+          '',
+          `Catatan HR: ${note || '-'}`,
+        ].join('\n'),
+      }
+    }
+
+    if (action === 'locked') {
+      return {
+        subject: `Absensi Periode ${periodMonth} Telah Dikunci HR`,
+        title: 'Absensi Telah Dikunci HR',
+        message: [
+          `Absensi periode ${periodLabel} telah dikunci oleh ${actorName}.`,
+          '',
+          'Employee tidak dapat melakukan perubahan data absensi pada periode ini sampai HR membuka lock.',
+          '',
+          `Catatan HR: ${note || '-'}`,
+        ].join('\n'),
+      }
+    }
+
+    return {
+      subject: `Absensi Periode ${periodMonth} Dibuka Kembali oleh HR`,
+      title: 'Absensi Dibuka Kembali untuk Revisi',
+      message: [
+        `Absensi periode ${periodLabel} telah dibuka kembali oleh ${actorName}.`,
+        '',
+        'Silakan cek kembali data absensi pada dashboard employee jika diperlukan revisi.',
+        '',
+        `Catatan HR: ${note || '-'}`,
+      ].join('\n'),
+    }
+  }
+
+  async function sendPeriodActionEmailToEmployees({
+    action,
+    actor,
+    note,
+  }: {
+    action: 'finalized' | 'locked' | 'unlocked'
+    actor: Awaited<ReturnType<typeof getActor>>
+    note: string
+  }) {
+    const recipients = getValidEmployeeRecipients()
+
+    if (recipients.length === 0) {
+      return {
+        total: 0,
+        sent: 0,
+        failed: 0,
+        message: 'Tidak ada email employee aktif yang valid untuk dikirimi notifikasi.',
+      }
+    }
+
+    const content = getPeriodActionEmailContent({
+      action,
+      actorName: actor.name,
+      note,
+    })
+
+    const actionUrl = `${getNotificationBaseUrl()}/employee/attendance`
+
+    const results = await Promise.allSettled(
+      recipients.map((employee) =>
+        sendHarmonyEmail({
+          to: employee.email || '',
+          subject: content.subject,
+          title: content.title,
+          message: [
+            `Yth. ${getEmployeeName(employee)},`,
+            '',
+            content.message,
+          ].join('\n'),
+          actionLabel: 'Buka Absensi HARMONY',
+          actionUrl,
+          footer:
+            'Email ini dikirim otomatis oleh HARMONY setelah HR melakukan perubahan status periode absensi.',
+        })
+      )
+    )
+
+    const sent = results.filter((result) => result.status === 'fulfilled').length
+    const failed = results.length - sent
+
+    return {
+      total: recipients.length,
+      sent,
+      failed,
+      message:
+        failed > 0
+          ? `Notifikasi email terkirim ke ${sent} dari ${recipients.length} employee. ${failed} email gagal terkirim.`
+          : `Notifikasi email terkirim ke ${sent} employee.`,
+    }
+  }
+
+  function buildEmailResultText(result: Awaited<ReturnType<typeof sendPeriodActionEmailToEmployees>>) {
+    if (result.total === 0) return ` ${result.message}`
+
+    return ` ${result.message}`
+  }
+
   async function writeAttendanceAuditLog({
     actionType,
     actionLabel,
@@ -1098,9 +1247,15 @@ export default function HRAttendanceDataPage() {
         },
       })
 
+      const emailResult = await sendPeriodActionEmailToEmployees({
+        action: 'finalized',
+        actor,
+        note,
+      })
+
       setMessage({
         type: 'success',
-        text: `Finalisasi berhasil. ${confirmationCount} data karyawan dan ${attendanceLogCount} data absensi harian dikunci penuh.`,
+        text: `Finalisasi berhasil. ${confirmationCount} data karyawan dan ${attendanceLogCount} data absensi harian dikunci penuh.${buildEmailResultText(emailResult)}`,
       })
 
       await fetchData()
@@ -1170,9 +1325,15 @@ export default function HRAttendanceDataPage() {
         },
       })
 
+      const emailResult = await sendPeriodActionEmailToEmployees({
+        action: 'locked',
+        actor,
+        note: lockNote,
+      })
+
       setMessage({
         type: 'success',
-        text: `Periode berhasil dikunci penuh. ${confirmationCount} data karyawan dan ${attendanceLogCount} data absensi harian ikut terkunci.`,
+        text: `Periode berhasil dikunci penuh. ${confirmationCount} data karyawan dan ${attendanceLogCount} data absensi harian ikut terkunci.${buildEmailResultText(emailResult)}`,
       })
 
       await fetchData()
@@ -1242,9 +1403,15 @@ export default function HRAttendanceDataPage() {
         },
       })
 
+      const emailResult = await sendPeriodActionEmailToEmployees({
+        action: 'unlocked',
+        actor,
+        note: unlockNote,
+      })
+
       setMessage({
         type: 'success',
-        text: `Periode berhasil dibuka kembali. ${updatedConfirmations?.length || 0} data karyawan dan ${attendanceLogCount} data absensi harian ikut terbuka.`,
+        text: `Periode berhasil dibuka kembali. ${updatedConfirmations?.length || 0} data karyawan dan ${attendanceLogCount} data absensi harian ikut terbuka.${buildEmailResultText(emailResult)}`,
       })
 
       await fetchData()
