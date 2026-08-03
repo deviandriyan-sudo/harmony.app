@@ -35,45 +35,106 @@ export default function LoginPage() {
 
   const [checkingSession, setCheckingSession] = useState(true)
   const [loading, setLoading] = useState(false)
+  const [googleLoading, setGoogleLoading] = useState(false)
+
   const [message, setMessage] = useState('')
   const [messageType, setMessageType] = useState<'error' | 'info'>('error')
 
   useEffect(() => {
+    readUrlMessage()
     checkExistingSession()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  async function findAppUser(userId: string, userEmail: string) {
-    const normalizedEmail = userEmail.trim().toLowerCase()
+  function readUrlMessage() {
+    if (typeof window === 'undefined') return
 
-    const { data: appUserById, error: userByIdError } = await supabase
-      .from('app_users')
-      .select('id, email, role, employee_id, is_active')
-      .eq('id', userId)
-      .maybeSingle<AppUser>()
+    const params = new URLSearchParams(window.location.search)
+    const googleError = params.get('google_error')
+    const info = params.get('info')
 
-    if (userByIdError) {
-      throw userByIdError
+    if (googleError) {
+      setMessage(decodeURIComponent(googleError))
+      setMessageType('error')
+      window.history.replaceState({}, document.title, '/login')
+      return
     }
 
-    if (appUserById) return appUserById
-
-    if (!normalizedEmail) return null
-
-    const { data: appUserByEmail, error: userByEmailError } = await supabase
-      .from('app_users')
-      .select('id, email, role, employee_id, is_active')
-      .eq('email', normalizedEmail)
-      .maybeSingle<AppUser>()
-
-    if (userByEmailError) {
-      throw userByEmailError
+    if (info) {
+      setMessage(decodeURIComponent(info))
+      setMessageType('info')
+      window.history.replaceState({}, document.title, '/login')
     }
-
-    return appUserByEmail
   }
 
-  function saveHarmonyUser(appUser: AppUser) {
+  async function checkExistingSession() {
+    setCheckingSession(true)
+
+    const { data: authData } = await supabase.auth.getUser()
+
+    if (!authData.user) {
+      localStorage.removeItem('harmony_user')
+      setCheckingSession(false)
+      return
+    }
+
+    const appUser = await findAppUser(authData.user.id, authData.user.email || '')
+
+    if (!appUser) {
+      localStorage.removeItem('harmony_user')
+      setCheckingSession(false)
+      return
+    }
+
+    if (appUser.is_active === false) {
+      await supabase.auth.signOut()
+      localStorage.removeItem('harmony_user')
+      setMessage('Akun Anda sedang tidak aktif. Hubungi HR Administrator.')
+      setMessageType('error')
+      setCheckingSession(false)
+      return
+    }
+
+    saveLocalSession(appUser)
+    redirectByRole(appUser.role)
+  }
+
+  async function findAppUser(authUserId: string, userEmail: string) {
+    const { data: userById, error: userByIdError } = await supabase
+      .from('app_users')
+      .select('id, email, role, employee_id, is_active')
+      .eq('id', authUserId)
+      .maybeSingle()
+
+    if (userByIdError) {
+      setMessage(userByIdError.message)
+      setMessageType('error')
+      return null
+    }
+
+    if (userById) {
+      return userById as AppUser
+    }
+
+    const cleanEmail = userEmail.trim().toLowerCase()
+
+    if (!cleanEmail) return null
+
+    const { data: userByEmail, error: userByEmailError } = await supabase
+      .from('app_users')
+      .select('id, email, role, employee_id, is_active')
+      .ilike('email', cleanEmail)
+      .maybeSingle()
+
+    if (userByEmailError) {
+      setMessage(userByEmailError.message)
+      setMessageType('error')
+      return null
+    }
+
+    return (userByEmail || null) as AppUser | null
+  }
+
+  function saveLocalSession(appUser: AppUser) {
     localStorage.setItem(
       'harmony_user',
       JSON.stringify({
@@ -94,52 +155,6 @@ export default function LoginPage() {
     router.replace('/employee/dashboard')
   }
 
-  async function checkExistingSession() {
-    setCheckingSession(true)
-    setMessage('')
-
-    try {
-      const { data: authData, error: authError } = await supabase.auth.getUser()
-
-      if (authError || !authData.user) {
-        setCheckingSession(false)
-        return
-      }
-
-      const appUser = await findAppUser(
-        authData.user.id,
-        authData.user.email || ''
-      )
-
-      if (!appUser) {
-        await supabase.auth.signOut()
-        localStorage.removeItem('harmony_user')
-        setCheckingSession(false)
-        return
-      }
-
-      if (appUser.is_active === false) {
-        await supabase.auth.signOut()
-        localStorage.removeItem('harmony_user')
-        setMessage('Akun Anda sedang tidak aktif. Hubungi HR Administrator.')
-        setMessageType('error')
-        setCheckingSession(false)
-        return
-      }
-
-      saveHarmonyUser(appUser)
-      redirectByRole(appUser.role)
-    } catch (error: any) {
-      console.error(error)
-      setMessage(
-        error?.message ||
-          'Gagal memeriksa sesi login. Silakan refresh halaman.'
-      )
-      setMessageType('error')
-      setCheckingSession(false)
-    }
-  }
-
   async function handleLogin(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
 
@@ -147,64 +162,73 @@ export default function LoginPage() {
     setMessage('')
     setMessageType('error')
 
-    const normalizedEmail = email.trim().toLowerCase()
-
-    if (!normalizedEmail || !password) {
+    if (!email.trim() || !password) {
       setMessage('Email dan password wajib diisi.')
       setLoading(false)
       return
     }
 
-    try {
-      const { data: authData, error: authError } =
-        await supabase.auth.signInWithPassword({
-          email: normalizedEmail,
-          password,
-        })
+    const { data: authData, error: authError } =
+      await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password,
+      })
 
-      if (authError || !authData.user) {
-        setMessage(
-          'Login gagal. Periksa kembali email dan password, atau hubungi HR Administrator.'
-        )
-        setLoading(false)
-        return
-      }
-
-      const appUser = await findAppUser(
-        authData.user.id,
-        authData.user.email || normalizedEmail
-      )
-
-      if (!appUser) {
-        await supabase.auth.signOut()
-        localStorage.removeItem('harmony_user')
-        setMessage('Akun belum terdaftar pada sistem HARMONY.')
-        setLoading(false)
-        return
-      }
-
-      if (appUser.is_active === false) {
-        await supabase.auth.signOut()
-        localStorage.removeItem('harmony_user')
-        setMessage('Akun Anda sedang tidak aktif. Hubungi HR Administrator.')
-        setLoading(false)
-        return
-      }
-
-      saveHarmonyUser(appUser)
-      setMessage('Login berhasil. Mengalihkan dashboard...')
-      setMessageType('info')
-
-      redirectByRole(appUser.role)
-    } catch (error: any) {
-      console.error(error)
+    if (authError || !authData.user) {
       setMessage(
-        error?.message ||
-          'Terjadi kesalahan saat login. Silakan coba lagi.'
+        authError?.message || 'Login gagal. Periksa kembali email dan password.'
       )
-      setMessageType('error')
-    } finally {
       setLoading(false)
+      return
+    }
+
+    const appUser = await findAppUser(authData.user.id, authData.user.email || email)
+
+    if (!appUser) {
+      await supabase.auth.signOut()
+      localStorage.removeItem('harmony_user')
+      setMessage('Akun belum terdaftar pada sistem HARMONY.')
+      setLoading(false)
+      return
+    }
+
+    if (appUser.is_active === false) {
+      await supabase.auth.signOut()
+      localStorage.removeItem('harmony_user')
+      setMessage('Akun Anda sedang tidak aktif. Hubungi HR Administrator.')
+      setLoading(false)
+      return
+    }
+
+    saveLocalSession(appUser)
+    redirectByRole(appUser.role)
+  }
+
+  async function handleGoogleLogin() {
+    setGoogleLoading(true)
+    setMessage('')
+    setMessageType('error')
+
+    if (typeof window === 'undefined') {
+      setGoogleLoading(false)
+      return
+    }
+
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback`,
+        queryParams: {
+          access_type: 'offline',
+          prompt: 'select_account',
+        },
+      },
+    })
+
+    if (error) {
+      setMessage(error.message || 'Login Google gagal.')
+      setMessageType('error')
+      setGoogleLoading(false)
     }
   }
 
@@ -212,49 +236,29 @@ export default function LoginPage() {
     setMessage('')
     setMessageType('error')
 
-    const normalizedEmail = email.trim().toLowerCase()
-
-    if (!normalizedEmail) {
+    if (!email.trim()) {
       setMessage('Masukkan email terlebih dahulu untuk reset password.')
       return
     }
 
     setLoading(true)
 
-    try {
-      const redirectTo =
+    const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+      redirectTo:
         typeof window !== 'undefined'
-          ? `${window.location.origin}/reset-password`
-          : undefined
+          ? `${window.location.origin}/login`
+          : undefined,
+    })
 
-      const { error } = await supabase.auth.resetPasswordForEmail(
-        normalizedEmail,
-        {
-          redirectTo,
-        }
-      )
-
-      if (error) {
-        setMessage(error.message)
-        setMessageType('error')
-        setLoading(false)
-        return
-      }
-
-      setMessage(
-        'Link reset password sudah dikirim ke email jika akun tersedia. Silakan cek inbox atau spam.'
-      )
-      setMessageType('info')
-    } catch (error: any) {
-      console.error(error)
-      setMessage(
-        error?.message ||
-          'Gagal mengirim email reset password. Silakan coba lagi.'
-      )
-      setMessageType('error')
-    } finally {
+    if (error) {
+      setMessage(error.message)
       setLoading(false)
+      return
     }
+
+    setMessage('Link reset password telah dikirim ke email jika akun tersedia.')
+    setMessageType('info')
+    setLoading(false)
   }
 
   if (checkingSession) {
@@ -264,11 +268,9 @@ export default function LoginPage() {
           <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[#e8f2ff] text-[#007aff]">
             <Loader2 size={26} className="animate-spin" />
           </div>
-
           <h1 className="mt-5 text-xl font-semibold text-[#1d1d1f]">
             Memeriksa Sesi
           </h1>
-
           <p className="mt-2 text-sm leading-6 text-[#6e6e73]">
             Sistem sedang memeriksa status login akun Anda.
           </p>
@@ -289,7 +291,6 @@ export default function LoginPage() {
             <div className="pointer-events-none absolute -right-20 -top-20 h-72 w-72 rounded-full bg-[#007aff]/35 blur-3xl" />
             <div className="pointer-events-none absolute -bottom-28 -left-20 h-72 w-72 rounded-full bg-[#af52de]/25 blur-3xl" />
             <div className="pointer-events-none absolute right-20 top-1/2 h-56 w-56 rounded-full bg-[#34c759]/15 blur-3xl" />
-            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(0,122,255,0.16),transparent_38%),radial-gradient(circle_at_bottom_left,rgba(175,82,222,0.16),transparent_34%)]" />
 
             <div className="relative flex h-full flex-col justify-between">
               <div>
@@ -315,7 +316,6 @@ export default function LoginPage() {
                       <h1 className="text-4xl font-semibold tracking-tight text-white">
                         HARMONY
                       </h1>
-
                       <p className="mt-3 max-w-sm text-sm leading-6 text-white/58">
                         Human Attendance, Request, Monitoring & Leave System
                       </p>
@@ -457,7 +457,7 @@ export default function LoginPage() {
                   <button
                     type="button"
                     onClick={handleForgotPassword}
-                    disabled={loading}
+                    disabled={loading || googleLoading}
                     className="text-sm font-semibold text-[#007aff] transition hover:text-[#0059b8] disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     Lupa password?
@@ -466,8 +466,8 @@ export default function LoginPage() {
 
                 <button
                   type="submit"
-                  disabled={loading}
-                  className="group relative flex min-h-13 w-full items-center justify-center gap-2 overflow-hidden rounded-[22px] bg-[#007aff] px-5 text-sm font-bold text-white shadow-[0_18px_45px_rgba(0,122,255,0.28)] transition hover:-translate-y-0.5 hover:bg-[#0067d8] hover:shadow-[0_24px_60px_rgba(0,122,255,0.34)] disabled:cursor-not-allowed disabled:opacity-65"
+                  disabled={loading || googleLoading}
+                  className="group relative flex min-h-13 w-full items-center justify-center gap-2 overflow-hidden rounded-[22px] bg-[#007aff] px-5 text-sm font-bold text-white shadow-[0_18px_45px_rgba(0,122,255,0.28)] transition hover:-translate-y-0.5 hover:bg-[#0067d8] disabled:cursor-not-allowed disabled:opacity-65"
                 >
                   <span className="pointer-events-none absolute inset-0 translate-x-[-100%] bg-gradient-to-r from-transparent via-white/25 to-transparent transition duration-700 group-hover:translate-x-[100%]" />
 
@@ -488,15 +488,67 @@ export default function LoginPage() {
                 </button>
               </form>
 
-              <p className="mt-10 text-center text-xs leading-5 text-[#86868b]">
-                © {new Date().getFullYear()} HARMONY · Poltek Sinar Mas Berau
-                Coal
+              <div className="my-5 flex items-center gap-3">
+                <div className="h-px flex-1 bg-black/10" />
+                <span className="text-xs font-semibold uppercase tracking-wide text-[#86868b]">
+                  atau
+                </span>
+                <div className="h-px flex-1 bg-black/10" />
+              </div>
+
+              <button
+                type="button"
+                onClick={handleGoogleLogin}
+                disabled={loading || googleLoading}
+                className="flex min-h-13 w-full items-center justify-center gap-3 rounded-[22px] border border-black/5 bg-white px-5 text-sm font-bold text-[#1d1d1f] shadow-sm transition hover:-translate-y-0.5 hover:bg-[#f5f5f7] hover:shadow-md disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {googleLoading ? (
+                  <Loader2 size={18} className="animate-spin text-[#007aff]" />
+                ) : (
+                  <GoogleIcon />
+                )}
+                {googleLoading ? 'Menghubungkan Google...' : 'Masuk dengan Google'}
+              </button>
+
+              <p className="mt-4 text-center text-xs leading-5 text-[#86868b]">
+                Google login hanya berlaku untuk email yang sudah terdaftar di sistem HARMONY.
+              </p>
+
+              <p className="mt-8 text-center text-xs leading-5 text-[#86868b]">
+                © {new Date().getFullYear()} HARMONY · Poltek Sinar Mas Berau Coal
               </p>
             </div>
           </section>
         </div>
       </section>
     </main>
+  )
+}
+
+function GoogleIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 48 48"
+      className="h-5 w-5"
+    >
+      <path
+        fill="#EA4335"
+        d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"
+      />
+      <path
+        fill="#4285F4"
+        d="M46.5 24.5c0-1.57-.14-3.08-.4-4.5H24v9h12.65c-.55 2.96-2.2 5.47-4.7 7.15l7.27 5.64C43.47 37.86 46.5 31.7 46.5 24.5z"
+      />
+      <path
+        fill="#FBBC05"
+        d="M10.54 28.59A14.5 14.5 0 0 1 9.78 24c0-1.59.27-3.14.76-4.59l-7.98-6.19A23.93 23.93 0 0 0 0 24c0 3.86.92 7.51 2.56 10.78l7.98-6.19z"
+      />
+      <path
+        fill="#34A853"
+        d="M24 48c6.47 0 11.9-2.13 15.87-5.81l-7.27-5.64c-2.02 1.36-4.61 2.16-8.6 2.16-6.26 0-11.57-4.22-13.46-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"
+      />
+    </svg>
   )
 }
 
@@ -520,10 +572,14 @@ function FeatureCard({
   return (
     <div className="group rounded-[28px] border border-white/10 bg-white/10 p-5 backdrop-blur-2xl transition duration-300 hover:-translate-y-0.5 hover:bg-white/14">
       <div className="flex items-start gap-4">
-        <div className={`rounded-2xl p-3 ${toneClass}`}>{icon}</div>
+        <div className={`rounded-2xl p-3 ${toneClass}`}>
+          {icon}
+        </div>
 
         <div>
-          <h3 className="font-semibold text-white">{title}</h3>
+          <h3 className="font-semibold text-white">
+            {title}
+          </h3>
 
           <p className="mt-1 text-sm leading-6 text-white/52">
             {description}

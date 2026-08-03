@@ -174,6 +174,26 @@ const assignmentTypeOptions = [
   { label: 'Plt. / Pelaksana Tugas', value: 'acting' },
 ]
 
+function hasAssignmentDraft(form: AssignmentForm) {
+  return Boolean(
+    form.assignment_department.trim() ||
+      form.assignment_position.trim() ||
+      form.assignment_type.trim() !== initialAssignmentForm.assignment_type ||
+      form.supervisor_2.trim() ||
+      form.start_date.trim() ||
+      form.notes.trim()
+  )
+}
+
+function isAssignmentDraftComplete(form: AssignmentForm) {
+  return Boolean(
+    form.assignment_department.trim() &&
+      form.assignment_position.trim() &&
+      form.supervisor_2.trim() &&
+      form.start_date.trim()
+  )
+}
+
 export default function HREmployeesPage() {
   const [employees, setEmployees] = useState<Employee[]>([])
   const [profileLogs, setProfileLogs] = useState<ProfileUpdateLog[]>([])
@@ -492,9 +512,39 @@ export default function HREmployeesPage() {
   const selectedEmployeeAssignments = useMemo(() => {
     if (!selectedEmployee) return []
 
-    return assignments.filter((assignment) => {
+    const activeAssignments = assignments.filter((assignment) => {
       return assignment.employee_id === selectedEmployee.id && assignment.is_active !== false
     })
+
+    if (activeAssignments.length > 0) return activeAssignments
+
+    if (selectedEmployee.supervisor_2) {
+      return [
+        {
+          id: `legacy-supervisor-2-${selectedEmployee.id}`,
+          employee_id: selectedEmployee.id,
+          employee_number: selectedEmployee.employee_number,
+          full_name: selectedEmployee.full_name,
+          assignment_department: selectedEmployee.department,
+          assignment_position: selectedEmployee.position
+            ? `Penugasan Tambahan - ${selectedEmployee.position}`
+            : 'Penugasan Tambahan',
+          assignment_type: 'additional_assignment',
+          supervisor_1: null,
+          supervisor_2: selectedEmployee.supervisor_2,
+          start_date: selectedEmployee.updated_at || selectedEmployee.join_date,
+          end_date: null,
+          is_primary: false,
+          is_active: true,
+          notes:
+            'Data lama dari kolom Atasan 2. Setelah struktur baru digunakan, simpan data ini melalui menu Penugasan Tambahan.',
+          created_at: selectedEmployee.updated_at || selectedEmployee.created_at,
+          updated_at: selectedEmployee.updated_at,
+        },
+      ]
+    }
+
+    return []
   }, [assignments, selectedEmployee])
 
   const filteredEmployees = useMemo(() => {
@@ -824,7 +874,7 @@ export default function HREmployeesPage() {
         join_date: form.join_date || null,
         employment_status: form.employment_status || 'active',
         supervisor_1: form.supervisor_1.trim() || null,
-        supervisor_2: form.supervisor_2.trim() || null,
+        supervisor_2: null,
         schedule_group: 'regular',
         auto_detect_schedule: true,
         annual_leave_balance: form.annual_leave_balance,
@@ -840,7 +890,39 @@ export default function HREmployeesPage() {
       if (editingEmployeeId) {
         const { error } = await supabase.from('employees').update(payload).eq('id', editingEmployeeId)
         if (error) throw error
-        setSuccessMessage('Data karyawan berhasil diperbarui.')
+
+        if (hasAssignmentDraft(assignmentForm)) {
+          if (!isAssignmentDraftComplete(assignmentForm)) {
+            throw new Error('Penugasan tambahan belum lengkap. Isi departemen, jabatan, atasan 2, dan tanggal mulai penugasan, atau kosongkan semua field penugasan tambahan.')
+          }
+
+          await ensureMasterOption('department', assignmentForm.assignment_department)
+          await ensureMasterOption('position', assignmentForm.assignment_position)
+
+          const { error: assignmentError } = await supabase.from('employee_assignments').insert({
+            employee_id: editingEmployeeId,
+            employee_number: form.employee_number.trim(),
+            full_name: form.full_name.trim(),
+            assignment_department: assignmentForm.assignment_department.trim(),
+            assignment_position: assignmentForm.assignment_position.trim(),
+            assignment_type: assignmentForm.assignment_type || 'additional_assignment',
+            supervisor_1: null,
+            supervisor_2: assignmentForm.supervisor_2.trim() || null,
+            start_date: assignmentForm.start_date || null,
+            end_date: null,
+            is_primary: false,
+            is_active: true,
+            notes: assignmentForm.notes.trim() || null,
+            created_at: now,
+            updated_at: now,
+          })
+
+          if (assignmentError) throw assignmentError
+
+          setSuccessMessage('Data karyawan dan penugasan tambahan berhasil diperbarui.')
+        } else {
+          setSuccessMessage('Data karyawan berhasil diperbarui.')
+        }
       } else {
         const { error } = await supabase.from('employees').insert({ ...payload, created_at: now })
         if (error) throw error
@@ -892,10 +974,10 @@ export default function HREmployeesPage() {
         assignment_department: assignmentForm.assignment_department.trim(),
         assignment_position: assignmentForm.assignment_position.trim(),
         assignment_type: assignmentForm.assignment_type || 'additional_assignment',
-        supervisor_1: assignmentForm.supervisor_1.trim() || null,
+        supervisor_1: null,
         supervisor_2: assignmentForm.supervisor_2.trim() || null,
         start_date: assignmentForm.start_date || null,
-        end_date: assignmentForm.end_date || null,
+        end_date: null,
         is_primary: false,
         is_active: true,
         notes: assignmentForm.notes.trim() || null,
@@ -1565,8 +1647,7 @@ function EmployeeDetailModal({ employee, assignments, employees, onClose, onEdit
               <DetailItem label="Departemen Utama" value={employee.department} />
               <DetailItem label="Jabatan Utama" value={employee.position} />
               <DetailItem label="Join Date" value={formatDisplayDate(employee.join_date || '')} />
-              <DetailItem label="Atasan 1" value={getSupervisorLabel(employee.supervisor_1, employees)} />
-              <DetailItem label="Atasan 2" value={getSupervisorLabel(employee.supervisor_2, employees)} />
+              <DetailItem label="Atasan Utama" value={getSupervisorLabel(employee.supervisor_1, employees)} />
               <DetailItem label="Update Terakhir" value={formatDateTime(employee.updated_at || '')} />
             </DetailSection>
 
@@ -1581,8 +1662,8 @@ function EmployeeDetailModal({ employee, assignments, employees, onClose, onEdit
 
             <DetailSection title="Jabatan & Penugasan Tambahan" icon={<Briefcase size={18} />} wide>
               {assignments.length === 0 ? (
-                <div className="rounded-2xl border border-dashed border-black/10 bg-white p-5 text-sm font-semibold text-[#6e6e73]">
-                  Belum ada jabatan rangkap atau penugasan tambahan aktif.
+                <div className="rounded-2xl border border-dashed border-black/10 bg-white p-5 text-sm font-semibold leading-6 text-[#6e6e73]">
+                  Belum ada jabatan rangkap atau penugasan tambahan aktif. Tambahkan lewat tombol Edit Data, isi bagian Jabatan & Penugasan Tambahan, lalu simpan atau klik Tambah Penugasan.
                 </div>
               ) : (
                 <div className="space-y-3">
@@ -1686,7 +1767,7 @@ function EmployeeFormModal({
               <SelectField label="Gender" value={form.gender} onChange={(value) => onUpdate('gender', value)} options={[{ label: 'Semua / Tidak diset', value: 'all' }, { label: 'Laki-laki', value: 'male' }, { label: 'Perempuan', value: 'female' }]} />
             </FormSection>
 
-            <FormSection title="Homebase Utama & Status" description="Departemen dan jabatan utama dipakai untuk identitas HR, absensi, cuti, dan pelaporan utama." icon={<Building2 size={18} />}>
+            <FormSection title="Homebase Utama & Status" description="Departemen, jabatan utama, status kerja, dan satu atasan utama untuk identitas HR, absensi, cuti, dan pelaporan." icon={<Building2 size={18} />}>
               <OrganizationOptionField
                 label="Departemen Utama"
                 value={form.department}
@@ -1703,8 +1784,7 @@ function EmployeeFormModal({
               />
               <InputField label="Join Date" type="date" value={form.join_date} onChange={(value) => onUpdate('join_date', value)} />
               <SelectField label="Employment Status" value={form.employment_status} onChange={(value) => onUpdate('employment_status', value)} options={[{ label: 'Active', value: 'active' }, { label: 'Probation', value: 'probation' }, { label: 'Contract', value: 'contract' }, { label: 'Permanent', value: 'permanent' }, { label: 'Resigned', value: 'resigned' }, { label: 'Inactive', value: 'inactive' }]} />
-              <SupervisorSelectField label="Atasan 1" value={form.supervisor_1} employees={employees} currentEmployeeId={editingEmployeeId} onChange={(value) => onUpdate('supervisor_1', value)} />
-              <SupervisorSelectField label="Atasan 2" value={form.supervisor_2} employees={employees} currentEmployeeId={editingEmployeeId} onChange={(value) => onUpdate('supervisor_2', value)} />
+              <SupervisorSelectField label="Atasan Utama" value={form.supervisor_1} employees={employees} currentEmployeeId={editingEmployeeId} onChange={(value) => onUpdate('supervisor_1', value)} />
             </FormSection>
 
             <AssignmentSection
@@ -1780,7 +1860,7 @@ function AssignmentSection({
         <div className="min-w-0">
           <h3 className="font-semibold text-[#1d1d1f]">Jabatan & Penugasan Tambahan</h3>
           <p className="mt-1 text-sm leading-6 text-[#6e6e73]">
-            Gunakan ini untuk dosen yang merangkap kepala unit, staf unit, koordinator, atau jabatan struktural tambahan. Data utama karyawan tetap menjadi homebase.
+            Gunakan ini untuk jabatan rangkap/penugasan tambahan. Atasan 2 ditempatkan di bagian ini supaya homebase utama tetap rapi.
           </p>
         </div>
       </div>
@@ -1830,19 +1910,21 @@ function AssignmentSection({
                 otherPlaceholder="Isi jabatan penugasan"
               />
               <SelectField label="Jenis Penugasan" value={form.assignment_type} onChange={(value) => onUpdate('assignment_type', value)} options={assignmentTypeOptions} />
-              <SupervisorSelectField label="Atasan Penugasan 1" value={form.supervisor_1} employees={employees} currentEmployeeId={editingEmployeeId} onChange={(value) => onUpdate('supervisor_1', value)} />
-              <SupervisorSelectField label="Atasan Penugasan 2" value={form.supervisor_2} employees={employees} currentEmployeeId={editingEmployeeId} onChange={(value) => onUpdate('supervisor_2', value)} />
-              <InputField label="Tanggal Mulai" type="date" value={form.start_date} onChange={(value) => onUpdate('start_date', value)} />
-              <InputField label="Tanggal Berakhir" type="date" value={form.end_date} onChange={(value) => onUpdate('end_date', value)} />
+              <SupervisorSelectField label="Atasan 2 / Atasan Jabatan Tambahan" value={form.supervisor_2} employees={employees} currentEmployeeId={editingEmployeeId} onChange={(value) => onUpdate('supervisor_2', value)} />
+              <InputField label="Tanggal Mulai Penugasan" type="date" value={form.start_date} onChange={(value) => onUpdate('start_date', value)} />
               <TextareaField label="Catatan Penugasan" value={form.notes} onChange={(value) => onUpdate('notes', value)} placeholder="Contoh: Merangkap sebagai Kepala Unit Kerja Sama berdasarkan SK penugasan." />
             </div>
 
-            <div className="mt-4 flex justify-end">
+            <div className="mt-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <p className="text-xs leading-5 text-[#6e6e73]">
+                Penugasan akan tampil di Detail Karyawan setelah klik <strong>Tambah Penugasan</strong>. Jika field ini terisi lalu klik <strong>Update Data Utama</strong>, sistem juga akan ikut menyimpan penugasan baru.
+              </p>
+
               <button
                 type="button"
                 onClick={onAdd}
                 disabled={saving}
-                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl bg-[#7b2cbf] px-5 text-sm font-bold text-white shadow-sm transition hover:bg-[#6823a0] disabled:cursor-not-allowed disabled:opacity-60"
+                className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-2xl bg-[#7b2cbf] px-5 text-sm font-bold text-white shadow-sm transition hover:bg-[#6823a0] disabled:cursor-not-allowed disabled:opacity-60"
               >
                 <Plus size={17} />
                 {saving ? 'Menyimpan...' : 'Tambah Penugasan'}
@@ -1876,9 +1958,8 @@ function AssignmentManageCard({ assignment, employees, deleting, onDelete }: { a
         </button>
       </div>
       <div className="mt-3 grid gap-2 text-xs text-[#6e6e73]">
-        <p><strong>Atasan 1:</strong> {getSupervisorLabel(assignment.supervisor_1, employees)}</p>
         <p><strong>Atasan 2:</strong> {getSupervisorLabel(assignment.supervisor_2, employees)}</p>
-        <p><strong>Periode:</strong> {formatDisplayDate(assignment.start_date || '')} - {assignment.end_date ? formatDisplayDate(assignment.end_date) : 'Aktif'}</p>
+        <p><strong>Mulai Penugasan:</strong> {formatDisplayDate(assignment.start_date || '')}</p>
         {assignment.notes && <p className="leading-5"><strong>Catatan:</strong> {assignment.notes}</p>}
       </div>
     </div>
@@ -1897,11 +1978,10 @@ function AssignmentDetailCard({ assignment, employees }: { assignment: EmployeeA
           <p className="mt-1 break-words text-xs font-semibold text-[#6e6e73]">{assignment.assignment_department || '-'}</p>
         </div>
         <div className="rounded-2xl bg-[#f5f5f7] px-4 py-3 text-xs font-semibold text-[#6e6e73]">
-          {formatDisplayDate(assignment.start_date || '')} - {assignment.end_date ? formatDisplayDate(assignment.end_date) : 'Aktif'}
+          Mulai {formatDisplayDate(assignment.start_date || '')}
         </div>
       </div>
-      <div className="mt-3 grid gap-2 text-xs text-[#6e6e73] sm:grid-cols-2">
-        <p><strong>Atasan 1:</strong> {getSupervisorLabel(assignment.supervisor_1, employees)}</p>
+      <div className="mt-3 grid gap-2 text-xs text-[#6e6e73]">
         <p><strong>Atasan 2:</strong> {getSupervisorLabel(assignment.supervisor_2, employees)}</p>
       </div>
       {assignment.notes && <p className="mt-3 text-xs leading-5 text-[#6e6e73]"><strong>Catatan:</strong> {assignment.notes}</p>}
