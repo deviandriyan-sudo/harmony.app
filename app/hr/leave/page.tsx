@@ -23,6 +23,7 @@ import {
 
 import { Topbar } from '@/components/layout/Topbar'
 import { supabase } from '@/lib/supabase'
+import { sendHarmonyEmail } from '@/lib/notifications'
 
 type ActiveTab = 'leave' | 'phl-claim' | 'phl-balance' | 'history'
 
@@ -41,6 +42,7 @@ type LeaveRequest = {
   full_name?: string | null
   department?: string | null
   position?: string | null
+  email?: string | null
 
   request_type?: string | null
   leave_type?: string | null
@@ -48,6 +50,8 @@ type LeaveRequest = {
   end_date?: string | null
   total_days?: number | null
   reason?: string | null
+  job_pending?: string | null
+  handover_to?: string | null
 
   status?: string | null
 
@@ -94,6 +98,7 @@ type PHLRecord = {
   full_name?: string | null
   department?: string | null
   position?: string | null
+  email?: string | null
 
   phl_date?: string | null
   valid_from?: string | null
@@ -161,6 +166,265 @@ type DeleteTarget = {
   title: string
   employeeName: string
   description: string
+}
+
+
+type NotificationRecipient = {
+  email: string
+  fullName: string
+}
+
+function isValidEmail(value: string | null | undefined) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || '').trim())
+}
+
+function getNotificationBaseUrl() {
+  if (typeof window === 'undefined') return ''
+
+  return window.location.origin
+}
+
+function getRequestLabel(item: LeaveRequest) {
+  return item.leave_type || item.request_type || 'Cuti/Izin'
+}
+
+function getRequestPeriodText(startDate?: string | null, endDate?: string | null) {
+  return `${formatDisplayDate(startDate || '')} s.d. ${formatDisplayDate(endDate || '')}`
+}
+
+async function resolveEmployeeRecipient({
+  employeeId,
+  employeeNumber,
+  fullName,
+  directEmail,
+}: {
+  employeeId?: string | null
+  employeeNumber?: string | null
+  fullName?: string | null
+  directEmail?: string | null
+}): Promise<NotificationRecipient | null> {
+  const direct = String(directEmail || '').trim().toLowerCase()
+
+  if (isValidEmail(direct)) {
+    return {
+      email: direct,
+      fullName: fullName || direct,
+    }
+  }
+
+  const selectColumns = 'id,email,full_name,employee_number,machine_pin'
+
+  if (employeeId) {
+    const { data } = await supabase
+      .from('employees')
+      .select(selectColumns)
+      .eq('id', employeeId)
+      .maybeSingle<{
+        email?: string | null
+        full_name?: string | null
+        employee_number?: string | null
+      }>()
+
+    const email = String(data?.email || '').trim().toLowerCase()
+
+    if (isValidEmail(email)) {
+      return {
+        email,
+        fullName: data?.full_name || fullName || email,
+      }
+    }
+  }
+
+  if (employeeNumber) {
+    const { data } = await supabase
+      .from('employees')
+      .select(selectColumns)
+      .eq('employee_number', employeeNumber)
+      .limit(1)
+
+    const matched = data?.[0] as {
+      email?: string | null
+      full_name?: string | null
+      employee_number?: string | null
+    } | undefined
+
+    const email = String(matched?.email || '').trim().toLowerCase()
+
+    if (isValidEmail(email)) {
+      return {
+        email,
+        fullName: matched?.full_name || fullName || email,
+      }
+    }
+  }
+
+  if (fullName) {
+    const { data } = await supabase
+      .from('employees')
+      .select(selectColumns)
+      .eq('full_name', fullName)
+      .limit(1)
+
+    const matched = data?.[0] as {
+      email?: string | null
+      full_name?: string | null
+      employee_number?: string | null
+    } | undefined
+
+    const email = String(matched?.email || '').trim().toLowerCase()
+
+    if (isValidEmail(email)) {
+      return {
+        email,
+        fullName: matched?.full_name || fullName || email,
+      }
+    }
+  }
+
+  return null
+}
+
+async function sendHRLeaveDecisionEmail({
+  item,
+  decision,
+  hrName,
+  note,
+}: {
+  item: LeaveRequest
+  decision: 'approved' | 'rejected'
+  hrName: string
+  note: string
+}) {
+  const recipient = await resolveEmployeeRecipient({
+    employeeId: item.employee_id,
+    employeeNumber: item.employee_number,
+    fullName: item.full_name,
+    directEmail: item.email,
+  })
+
+  if (!recipient) {
+    return {
+      success: false,
+      message: 'Email employee tidak ditemukan pada data karyawan.',
+    }
+  }
+
+  const approved = decision === 'approved'
+  const requestLabel = getRequestLabel(item)
+  const statusLabel = approved ? 'disetujui' : 'ditolak'
+  const title = approved
+    ? `${requestLabel} Disetujui HR`
+    : `${requestLabel} Ditolak HR`
+
+  try {
+    await sendHarmonyEmail({
+      to: recipient.email,
+      subject: `[HARMONY] ${title}`,
+      title,
+      message: [
+        `Yth. ${recipient.fullName},`,
+        '',
+        `Pengajuan ${requestLabel} Anda telah ${statusLabel} oleh HR.`,
+        '',
+        `Periode: ${getRequestPeriodText(item.start_date, item.end_date)}`,
+        `Jumlah hari: ${item.total_days || 0} hari`,
+        `Alasan pengajuan: ${item.reason || '-'}`,
+        `Job pending: ${item.job_pending_summary || item.job_pending_detail || item.job_pending || '-'}`,
+        `Penerima handover: ${item.handover_to_full_name || item.handover_to || '-'}`,
+        '',
+        `Catatan HR: ${note || '-'}`,
+        `Diproses oleh: ${hrName}`,
+      ].join('\n'),
+      actionLabel: 'Buka Cuti & Izin HARMONY',
+      actionUrl: `${getNotificationBaseUrl()}/employee/leave`,
+      footer:
+        'Email ini dikirim otomatis oleh HARMONY setelah HR memproses pengajuan cuti/izin/PHL.',
+    })
+
+    return {
+      success: true,
+      message: `Email notifikasi terkirim ke ${recipient.email}.`,
+    }
+  } catch (error: any) {
+    return {
+      success: false,
+      message: error?.message || 'Email notifikasi gagal terkirim.',
+    }
+  }
+}
+
+async function sendHRPHLDecisionEmail({
+  record,
+  decision,
+  hrName,
+  note,
+}: {
+  record: PHLRecord
+  decision: 'approved' | 'rejected'
+  hrName: string
+  note: string
+}) {
+  const recipient = await resolveEmployeeRecipient({
+    employeeId: record.employee_id,
+    employeeNumber: record.employee_number,
+    fullName: record.full_name,
+    directEmail: record.email,
+  })
+
+  if (!recipient) {
+    return {
+      success: false,
+      message: 'Email employee tidak ditemukan pada data karyawan.',
+    }
+  }
+
+  const approved = decision === 'approved'
+  const title = approved
+    ? 'Klaim PHL Disetujui HR'
+    : 'Klaim PHL Ditolak HR'
+  const statusLabel = approved ? 'disetujui' : 'ditolak'
+
+  try {
+    await sendHarmonyEmail({
+      to: recipient.email,
+      subject: `[HARMONY] ${title}`,
+      title,
+      message: [
+        `Yth. ${recipient.fullName},`,
+        '',
+        `Klaim PHL Anda telah ${statusLabel} oleh HR.`,
+        '',
+        `Tanggal PHL: ${formatDisplayDate(record.phl_date || record.valid_from || '')}`,
+        `Jumlah klaim: ${record.used_days || record.balance_days || 0} hari`,
+        `Alasan: ${record.reason || record.notes || '-'}`,
+        `Job pending: ${record.job_pending_summary || record.job_pending_detail || '-'}`,
+        `Penerima handover: ${record.handover_to_full_name || '-'}`,
+        '',
+        `Catatan HR: ${note || '-'}`,
+        `Diproses oleh: ${hrName}`,
+      ].join('\n'),
+      actionLabel: 'Buka Cuti & Izin HARMONY',
+      actionUrl: `${getNotificationBaseUrl()}/employee/leave`,
+      footer:
+        'Email ini dikirim otomatis oleh HARMONY setelah HR memproses klaim PHL.',
+    })
+
+    return {
+      success: true,
+      message: `Email notifikasi terkirim ke ${recipient.email}.`,
+    }
+  } catch (error: any) {
+    return {
+      success: false,
+      message: error?.message || 'Email notifikasi gagal terkirim.',
+    }
+  }
+}
+
+function appendNotificationText(baseMessage: string, notification: { success: boolean; message: string }) {
+  return notification.success
+    ? `${baseMessage} ${notification.message}`
+    : `${baseMessage} Namun email notifikasi belum terkirim: ${notification.message}`
 }
 
 export default function HRLeavePage() {
@@ -426,7 +690,20 @@ export default function HRLeavePage() {
       return
     }
 
-    setSuccessMessage(message || 'Klaim PHL berhasil disetujui HR dan saldo PHL sudah dikurangi.')
+    const notification = await sendHRPHLDecisionEmail({
+      record,
+      decision: 'approved',
+      hrName: approvedBy,
+      note: 'Disetujui oleh HR.',
+    })
+
+    setSuccessMessage(
+      appendNotificationText(
+        message || 'Klaim PHL berhasil disetujui HR dan saldo PHL sudah dikurangi.',
+        notification
+      )
+    )
+
     setProcessingId('')
     await fetchData()
   }
@@ -439,11 +716,12 @@ export default function HRLeavePage() {
     setSuccessMessage('')
 
     const rejectedBy = appUser?.email || 'HR Administrator'
+    const rejectNote = rejectPHLReason || 'Ditolak oleh HR.'
 
     const { data, error } = await supabase.rpc('reject_phl_claim', {
       p_claim_record_id: rejectPHLRecord.id,
       p_rejected_by: rejectedBy,
-      p_reason: rejectPHLReason,
+      p_reason: rejectNote,
     })
 
     if (error) {
@@ -452,7 +730,20 @@ export default function HRLeavePage() {
       return
     }
 
-    setSuccessMessage(String(data || 'Klaim PHL berhasil ditolak HR.'))
+    const notification = await sendHRPHLDecisionEmail({
+      record: rejectPHLRecord,
+      decision: 'rejected',
+      hrName: rejectedBy,
+      note: rejectNote,
+    })
+
+    setSuccessMessage(
+      appendNotificationText(
+        String(data || 'Klaim PHL berhasil ditolak HR.'),
+        notification
+      )
+    )
+
     setRejectPHLRecord(null)
     setRejectPHLReason('')
     setProcessingId('')
@@ -466,6 +757,7 @@ export default function HRLeavePage() {
 
     const now = new Date().toISOString()
     const approvedBy = appUser?.email || 'HR Administrator'
+    const approvalNote = 'Disetujui oleh HR.'
 
     const { error } = await supabase
       .from('leave_requests')
@@ -474,7 +766,7 @@ export default function HRLeavePage() {
         hr_status: 'approved',
         hr_approved_by: approvedBy,
         hr_approved_at: now,
-        hr_note: 'Disetujui oleh HR.',
+        hr_note: approvalNote,
         updated_at: now,
       })
       .eq('id', item.id)
@@ -500,7 +792,20 @@ export default function HRLeavePage() {
       }
     }
 
-    setSuccessMessage('Pengajuan cuti/izin berhasil disetujui HR dan disinkronkan ke absensi.')
+    const notification = await sendHRLeaveDecisionEmail({
+      item,
+      decision: 'approved',
+      hrName: approvedBy,
+      note: approvalNote,
+    })
+
+    setSuccessMessage(
+      appendNotificationText(
+        'Pengajuan cuti/izin berhasil disetujui HR dan disinkronkan ke absensi.',
+        notification
+      )
+    )
+
     setProcessingId('')
     await fetchData()
   }
@@ -514,6 +819,7 @@ export default function HRLeavePage() {
 
     const now = new Date().toISOString()
     const rejectedBy = appUser?.email || 'HR Administrator'
+    const rejectNote = rejectLeaveReason || 'Ditolak oleh HR.'
 
     const { error } = await supabase
       .from('leave_requests')
@@ -522,7 +828,7 @@ export default function HRLeavePage() {
         hr_status: 'rejected',
         hr_approved_by: rejectedBy,
         hr_approved_at: now,
-        hr_note: rejectLeaveReason || 'Ditolak oleh HR.',
+        hr_note: rejectNote,
         updated_at: now,
       })
       .eq('id', rejectLeaveRecord.id)
@@ -533,7 +839,20 @@ export default function HRLeavePage() {
       return
     }
 
-    setSuccessMessage('Pengajuan cuti/izin berhasil ditolak HR.')
+    const notification = await sendHRLeaveDecisionEmail({
+      item: rejectLeaveRecord,
+      decision: 'rejected',
+      hrName: rejectedBy,
+      note: rejectNote,
+    })
+
+    setSuccessMessage(
+      appendNotificationText(
+        'Pengajuan cuti/izin berhasil ditolak HR.',
+        notification
+      )
+    )
+
     setRejectLeaveRecord(null)
     setRejectLeaveReason('')
     setProcessingId('')

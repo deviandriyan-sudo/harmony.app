@@ -15,6 +15,7 @@ import {
 
 import { supabase } from '@/lib/supabase'
 import { Topbar } from '@/components/layout/Topbar'
+import { sendHarmonyEmail } from '@/lib/notifications'
 
 type LeavePostponeRequest = {
   id: string
@@ -42,6 +43,17 @@ type LeavePostponeRequest = {
   hr_notes?: string | null
   is_active?: boolean | null
   created_at?: string | null
+}
+
+
+type EmployeeEmailTarget = {
+  id: string
+  full_name?: string | null
+  employee_number?: string | null
+  machine_pin?: string | null
+  email?: string | null
+  department?: string | null
+  position?: string | null
 }
 
 type FilterStatus =
@@ -145,6 +157,143 @@ function isReadyForHR(item: LeavePostponeRequest) {
     normalize(item.approval_status) === 'pending_hr' &&
     normalize(item.hr_status) === 'pending'
   )
+}
+
+
+function getPostponeEmployeeName(postpone: LeavePostponeRequest, employee?: EmployeeEmailTarget | null) {
+  return employee?.full_name || postpone.full_name || 'Employee'
+}
+
+function getPostponeEmployeeNumber(postpone: LeavePostponeRequest, employee?: EmployeeEmailTarget | null) {
+  return employee?.employee_number || employee?.machine_pin || postpone.employee_number || '-'
+}
+
+async function findPostponeEmployee(postpone: LeavePostponeRequest) {
+  const columns = 'id, full_name, employee_number, machine_pin, email, department, position'
+
+  if (postpone.employee_id) {
+    const { data } = await supabase
+      .from('employees')
+      .select(columns)
+      .eq('id', postpone.employee_id)
+      .maybeSingle<EmployeeEmailTarget>()
+
+    if (data) return data
+  }
+
+  if (postpone.employee_number) {
+    const { data } = await supabase
+      .from('employees')
+      .select(columns)
+      .eq('employee_number', postpone.employee_number)
+      .maybeSingle<EmployeeEmailTarget>()
+
+    if (data) return data
+  }
+
+  if (postpone.full_name) {
+    const { data } = await supabase
+      .from('employees')
+      .select(columns)
+      .ilike('full_name', postpone.full_name)
+      .limit(1)
+
+    if (data?.[0]) return data[0] as EmployeeEmailTarget
+  }
+
+  return null
+}
+
+function buildPostponeEmailMessage({
+  postpone,
+  employee,
+  decisionLabel,
+  note,
+}: {
+  postpone: LeavePostponeRequest
+  employee: EmployeeEmailTarget | null
+  decisionLabel: string
+  note: string
+}) {
+  return [
+    `Pengajuan postpone cuti atas nama ${getPostponeEmployeeName(postpone, employee)} telah ${decisionLabel} oleh HR.`,
+    '',
+    `NIP/ID: ${getPostponeEmployeeNumber(postpone, employee)}`,
+    `Departemen: ${employee?.department || postpone.department || '-'}`,
+    `Sisa cuti awal: ${postpone.remaining_days || 0} hari`,
+    `Jumlah postpone: ${postpone.requested_days || 0} hari`,
+    `Akhir cycle lama: ${formatDate(postpone.old_cycle_end)}`,
+    `Batas pengajuan: ${formatDate(postpone.postpone_deadline)}`,
+    `Berlaku sampai: ${formatDate(postpone.new_expired_at)}`,
+    '',
+    `Catatan HR: ${note || '-'}`,
+    '',
+    'Silakan cek kembali status pengajuan melalui menu Cuti & Izin di HARMONY.',
+  ].join('\n')
+}
+
+async function notifyPostponeDecisionByEmail({
+  postpone,
+  decision,
+  note,
+}: {
+  postpone: LeavePostponeRequest
+  decision: 'approved' | 'rejected' | 'cancelled'
+  note: string
+}) {
+  try {
+    const employee = await findPostponeEmployee(postpone)
+    const recipientEmail = employee?.email || ''
+
+    if (!recipientEmail) {
+      return {
+        success: false,
+        message: 'Email karyawan tidak ditemukan pada tabel employees.',
+      }
+    }
+
+    const decisionLabelMap = {
+      approved: 'disetujui',
+      rejected: 'ditolak',
+      cancelled: 'dibatalkan',
+    }
+
+    const titleMap = {
+      approved: 'Postpone Cuti Disetujui HR',
+      rejected: 'Postpone Cuti Ditolak HR',
+      cancelled: 'Postpone Cuti Dibatalkan HR',
+    }
+
+    const subjectMap = {
+      approved: '[HARMONY] Postpone Cuti Disetujui HR',
+      rejected: '[HARMONY] Postpone Cuti Ditolak HR',
+      cancelled: '[HARMONY] Postpone Cuti Dibatalkan HR',
+    }
+
+    await sendHarmonyEmail({
+      to: recipientEmail,
+      subject: subjectMap[decision],
+      title: titleMap[decision],
+      message: buildPostponeEmailMessage({
+        postpone,
+        employee,
+        decisionLabel: decisionLabelMap[decision],
+        note,
+      }),
+      actionLabel: 'Lihat Pengajuan Postpone',
+      actionUrl: `${window.location.origin}/employee/leave/postpone`,
+    })
+
+    return {
+      success: true,
+      message: `Email notifikasi terkirim ke ${recipientEmail}.`,
+    }
+  } catch (error: any) {
+    return {
+      success: false,
+      message: error?.message || 'Email notifikasi gagal dikirim.',
+    }
+  }
 }
 
 export default function HRLeavePostponePage() {
@@ -317,9 +466,17 @@ export default function HRLeavePostponePage() {
 
       if (error) throw error
 
+      const notification = await notifyPostponeDecisionByEmail({
+        postpone,
+        decision: 'approved',
+        note: note || 'Disetujui HR. Sisa cuti dibawa sebagai saldo postpone/carry forward.',
+      })
+
       setMessage({
         type: 'success',
-        text: 'Postpone berhasil disetujui HR. Saldo carry forward sudah diterapkan.',
+        text: notification.success
+          ? `Postpone berhasil disetujui HR. Saldo carry forward sudah diterapkan. ${notification.message}`
+          : `Postpone berhasil disetujui HR dan saldo carry forward sudah diterapkan, tetapi email belum terkirim: ${notification.message}`,
       })
 
       await fetchData()
@@ -372,9 +529,17 @@ export default function HRLeavePostponePage() {
 
       if (error) throw error
 
+      const notification = await notifyPostponeDecisionByEmail({
+        postpone,
+        decision: 'rejected',
+        note,
+      })
+
       setMessage({
         type: 'success',
-        text: 'Postpone berhasil ditolak oleh HR.',
+        text: notification.success
+          ? `Postpone berhasil ditolak oleh HR. ${notification.message}`
+          : `Postpone berhasil ditolak oleh HR, tetapi email belum terkirim: ${notification.message}`,
       })
 
       await fetchData()
@@ -430,9 +595,17 @@ export default function HRLeavePostponePage() {
           .eq('id', postpone.source_cycle_id)
       }
 
+      const notification = await notifyPostponeDecisionByEmail({
+        postpone,
+        decision: 'cancelled',
+        note: postpone.hr_notes || 'Postpone cancelled by HR.',
+      })
+
       setMessage({
         type: 'success',
-        text: 'Postpone berhasil dibatalkan.',
+        text: notification.success
+          ? `Postpone berhasil dibatalkan. ${notification.message}`
+          : `Postpone berhasil dibatalkan, tetapi email belum terkirim: ${notification.message}`,
       })
 
       await fetchData()
