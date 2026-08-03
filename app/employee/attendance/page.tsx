@@ -23,6 +23,7 @@ import {
 
 import { Topbar } from "@/components/layout/Topbar";
 import { supabase } from "@/lib/supabase";
+import { sendHarmonyEmail } from "@/lib/notifications";
 
 type AppUser = {
   id: string;
@@ -44,6 +45,14 @@ type EmployeeProfile = {
   supervisor_2: string | null;
   is_active: boolean | null;
   join_date?: string | null;
+};
+
+type EmployeeAssignment = {
+  id: string;
+  employee_id: string;
+  supervisor_1: string | null;
+  supervisor_2: string | null;
+  is_active: boolean | null;
 };
 
 type AttendanceLog = {
@@ -889,12 +898,164 @@ export default function EmployeeAttendancePage() {
       return;
     }
 
+    const notificationResult = await sendAttendanceSubmitNotification({
+      batchId,
+      totals,
+      submittedRows: selectedRows.length,
+    });
+
     setSuccessMessage(
-      `Absensi periode ${formatDisplayDate(periodRange.start)} s.d. ${formatDisplayDate(periodRange.end)} berhasil dikirim ke atasan.`,
+      [
+        `Absensi periode ${formatDisplayDate(periodRange.start)} s.d. ${formatDisplayDate(periodRange.end)} berhasil dikirim ke atasan.`,
+        notificationResult.sent
+          ? `Notifikasi email sudah dikirim ke ${notificationResult.totalRecipients} atasan.`
+          : `Data berhasil tersimpan, tetapi email notifikasi belum terkirim: ${notificationResult.message}`,
+      ].join(" "),
     );
 
     setSubmittingPeriod(false);
     await fetchData(false);
+  }
+
+  async function sendAttendanceSubmitNotification({
+    batchId,
+    totals,
+    submittedRows,
+  }: {
+    batchId: string;
+    totals: PeriodTotals;
+    submittedRows: number;
+  }) {
+    try {
+      if (!employee || !appUser) {
+        return {
+          sent: false,
+          totalRecipients: 0,
+          message: "Data employee atau user belum tersedia.",
+        };
+      }
+
+      const recipients = await resolveSupervisorEmails(employee);
+
+      if (recipients.length === 0) {
+        return {
+          sent: false,
+          totalRecipients: 0,
+          message:
+            "Email atasan belum ditemukan. Pastikan atasan utama/atasan tambahan memiliki email pada master karyawan.",
+        };
+      }
+
+      const appUrl =
+        typeof window !== "undefined" ? window.location.origin : "";
+
+      await sendHarmonyEmail({
+        to: recipients,
+        subject: `Pengajuan Absensi Menunggu Approval - ${employee.full_name || appUser.email}`,
+        title: "Pengajuan Absensi Menunggu Approval",
+        message: [
+          `Ada pengajuan absensi baru yang menunggu approval atasan.`,
+          ``,
+          `Nama: ${employee.full_name || "-"}`,
+          `NPK: ${employee.employee_number || "-"}`,
+          `Departemen: ${employee.department || "-"}`,
+          `Jabatan: ${employee.position || "-"}`,
+          `Periode: ${formatDisplayDate(periodRange.start)} s.d. ${formatDisplayDate(periodRange.end)}`,
+          `Jumlah hari disubmit: ${submittedRows}`,
+          `Hadir: ${totals.present}`,
+          `Cuti: ${totals.leave}`,
+          `Izin: ${totals.permit}`,
+          `Sakit: ${totals.sick}`,
+          `Potensi/Klaim PHL: ${totals.phl + totals.phlClaim}`,
+          ``,
+          `Batch ID: ${batchId}`,
+        ].join("\n"),
+        actionLabel: "Buka HARMONY",
+        actionUrl: appUrl ? `${appUrl}/login` : undefined,
+        footer:
+          "Email ini dikirim otomatis oleh HARMONY setelah employee melakukan submit absensi periode.",
+      });
+
+      return {
+        sent: true,
+        totalRecipients: recipients.length,
+        message: "Email notifikasi berhasil dikirim.",
+      };
+    } catch (error: any) {
+      return {
+        sent: false,
+        totalRecipients: 0,
+        message: error?.message || "Email notifikasi gagal dikirim.",
+      };
+    }
+  }
+
+  async function resolveSupervisorEmails(currentEmployee: EmployeeProfile) {
+    const references = new Set<string>();
+
+    [
+      currentEmployee.supervisor_1,
+      currentEmployee.supervisor_2,
+    ].forEach((item) => {
+      const value = String(item || "").trim();
+
+      if (value) references.add(value);
+    });
+
+    const { data: assignmentData } = await supabase
+      .from("employee_assignments")
+      .select("supervisor_1, supervisor_2, is_active")
+      .eq("employee_id", currentEmployee.id)
+      .eq("is_active", true);
+
+    ((assignmentData || []) as EmployeeAssignment[]).forEach((assignment) => {
+      [assignment.supervisor_1, assignment.supervisor_2].forEach((item) => {
+        const value = String(item || "").trim();
+
+        if (value) references.add(value);
+      });
+    });
+
+    const referenceList = Array.from(references);
+    const emailRefs = referenceList.filter(isValidEmail);
+    const nameRefs = referenceList.filter((item) => !isValidEmail(item));
+
+    const recipients = new Set<string>();
+
+    emailRefs.forEach((email) => recipients.add(email.toLowerCase()));
+
+    if (nameRefs.length > 0) {
+      const { data: supervisorEmployees } = await supabase
+        .from("employees")
+        .select("full_name, email")
+        .in("full_name", nameRefs);
+
+      (supervisorEmployees || []).forEach((supervisor) => {
+        const email = String(supervisor.email || "").trim().toLowerCase();
+
+        if (isValidEmail(email)) {
+          recipients.add(email);
+        }
+      });
+    }
+
+    if (recipients.size === 0 && currentEmployee.department) {
+      const { data: hrUsers } = await supabase
+        .from("app_users")
+        .select("email, role, is_active")
+        .eq("role", "hr")
+        .eq("is_active", true);
+
+      (hrUsers || []).forEach((user) => {
+        const email = String(user.email || "").trim().toLowerCase();
+
+        if (isValidEmail(email)) {
+          recipients.add(email);
+        }
+      });
+    }
+
+    return Array.from(recipients);
   }
 
   function validateRowBeforeSubmit(row: CalendarDayRow) {
@@ -2942,6 +3103,10 @@ function formatPeriodStatus(period: AttendancePeriodConfirmation | null) {
     return "Sudah disubmit oleh employee.";
 
   return "Belum disubmit ke atasan.";
+}
+
+function isValidEmail(value: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || "").trim());
 }
 
 function formatDuration(value: number | null | undefined) {
