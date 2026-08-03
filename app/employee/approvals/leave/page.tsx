@@ -17,6 +17,7 @@ import {
 } from 'lucide-react'
 
 import { supabase } from '@/lib/supabase'
+import { sendHarmonyEmail } from '@/lib/notifications'
 
 type Employee = {
   id: string
@@ -54,6 +55,7 @@ type LeaveRequest = {
   employee_number?: string | null
   department?: string | null
   position?: string | null
+  email?: string | null
 
   request_type?: string | null
   leave_type?: string | null
@@ -248,6 +250,20 @@ function isSameSupervisor(value: string | null | undefined, supervisor: Employee
     .map((item) => normalize(String(item)))
 
   return options.includes(target)
+}
+
+function uniqueEmails(values: Array<string | null | undefined>) {
+  const emails = new Set<string>()
+
+  values.forEach((value) => {
+    const email = String(value || '').trim().toLowerCase()
+
+    if (email && email.includes('@')) {
+      emails.add(email)
+    }
+  })
+
+  return Array.from(emails)
 }
 
 export default function EmployeeLeaveApprovalPage() {
@@ -446,6 +462,129 @@ export default function EmployeeLeaveApprovalPage() {
     }
   }
 
+  function findRequestEmployee(request: LeaveRequest) {
+    if (request.employee_id) {
+      return employeeById.get(request.employee_id) || null
+    }
+
+    const requestEmployeeNumber = normalize(request.employee_number)
+    const requestFullName = normalize(request.full_name || request.employee_name)
+
+    return (
+      employees.find((employee) => {
+        return (
+          normalize(employee.employee_number) === requestEmployeeNumber ||
+          normalize(employee.nip) === requestEmployeeNumber ||
+          normalize(employee.machine_pin) === requestEmployeeNumber ||
+          normalize(employee.full_name) === requestFullName ||
+          normalize(employee.employee_name) === requestFullName ||
+          normalize(employee.name) === requestFullName ||
+          normalize(employee.email) === normalize(request.email)
+        )
+      }) || null
+    )
+  }
+
+  async function getHrEmails() {
+    const { data, error } = await supabase
+      .from('app_users')
+      .select('email, role, is_active')
+
+    if (error) {
+      console.warn('HR email lookup warning:', error)
+      return []
+    }
+
+    return uniqueEmails(
+      ((data || []) as Array<{ email?: string | null; role?: string | null; is_active?: boolean | null }>)
+        .filter((user) => {
+          const role = normalize(user.role)
+          return (
+            user.is_active !== false &&
+            ['hr', 'admin', 'super_admin', 'human_resources'].includes(role)
+          )
+        })
+        .map((user) => user.email)
+    )
+  }
+
+  async function notifyLeaveApprovalDecision({
+    request,
+    decision,
+    note,
+  }: {
+    request: LeaveRequest
+    decision: 'approved' | 'rejected'
+    note: string
+  }) {
+    try {
+      const requester = findRequestEmployee(request)
+      const requesterEmail = request.email || requester?.email || null
+      const requesterName = getRequestEmployeeName(request, requester || undefined)
+      const requestTypeLabel = getRequestTypeLabel(request.request_type, request.leave_type)
+      const actorName = getEmployeeName(currentEmployee)
+
+      if (!requesterEmail) {
+        return {
+          success: false,
+          message: 'Email karyawan pemohon belum tersedia pada master employee atau leave request.',
+        }
+      }
+
+      const hrEmails = decision === 'approved' ? await getHrEmails() : []
+
+      const title = decision === 'approved'
+        ? `${requestTypeLabel} Disetujui Atasan`
+        : `${requestTypeLabel} Ditolak Atasan`
+
+      const subject = decision === 'approved'
+        ? `[HARMONY] ${requestTypeLabel} Disetujui Atasan`
+        : `[HARMONY] ${requestTypeLabel} Ditolak Atasan`
+
+      const message = [
+        `Halo ${requesterName || '-'},`,
+        '',
+        `Pengajuan ${requestTypeLabel} kamu telah ${decision === 'approved' ? 'disetujui' : 'ditolak'} oleh ${actorName}.`,
+        '',
+        'Detail Pengajuan:',
+        `- Tanggal: ${formatDate(request.start_date)} s.d. ${formatDate(request.end_date)}`,
+        `- Jumlah hari: ${request.total_days || 0} hari`,
+        `- Alasan: ${request.reason || '-'}`,
+        `- Job pending: ${request.job_pending || '-'}`,
+        `- Penerima job pending: ${request.handover_to || '-'}`,
+        `- Catatan atasan: ${note || '-'}`,
+        '',
+        decision === 'approved'
+          ? 'Pengajuan sudah diteruskan ke HR untuk proses berikutnya. Silakan pantau status melalui menu Cuti & Izin.'
+          : 'Silakan cek catatan penolakan melalui menu Cuti & Izin.',
+      ].join('\n')
+
+      await sendHarmonyEmail({
+        to: requesterEmail,
+        cc: hrEmails.length > 0 ? hrEmails : undefined,
+        subject,
+        title,
+        message,
+        actionLabel: 'Buka Cuti & Izin',
+        actionUrl: `${window.location.origin}/employee/leave`,
+      })
+
+      return {
+        success: true,
+        message: hrEmails.length > 0
+          ? 'Email terkirim ke employee dan HR.'
+          : 'Email terkirim ke employee.',
+      }
+    } catch (error: any) {
+      console.warn('Leave approval notification warning:', error)
+
+      return {
+        success: false,
+        message: error?.message || 'Email notifikasi gagal dikirim.',
+      }
+    }
+  }
+
   async function handleApprove(request: LeaveRequest) {
     if (!currentEmployee || !currentUser) {
       setMessage({
@@ -475,9 +614,17 @@ export default function EmployeeLeaveApprovalPage() {
 
       if (error) throw error
 
+      const notificationResult = await notifyLeaveApprovalDecision({
+        request,
+        decision: 'approved',
+        note: note || 'Disetujui oleh atasan.',
+      })
+
       setMessage({
         type: 'success',
-        text: 'Pengajuan berhasil disetujui.',
+        text: notificationResult.success
+          ? `Pengajuan berhasil disetujui. ${notificationResult.message}`
+          : `Pengajuan berhasil disetujui, tetapi email notifikasi belum terkirim: ${notificationResult.message}`,
       })
 
       await fetchData()
@@ -529,9 +676,17 @@ export default function EmployeeLeaveApprovalPage() {
 
       if (error) throw error
 
+      const notificationResult = await notifyLeaveApprovalDecision({
+        request,
+        decision: 'rejected',
+        note,
+      })
+
       setMessage({
         type: 'success',
-        text: 'Pengajuan berhasil ditolak.',
+        text: notificationResult.success
+          ? `Pengajuan berhasil ditolak. ${notificationResult.message}`
+          : `Pengajuan berhasil ditolak, tetapi email notifikasi belum terkirim: ${notificationResult.message}`,
       })
 
       await fetchData()
