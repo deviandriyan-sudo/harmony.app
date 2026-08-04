@@ -45,6 +45,8 @@ type Employee = {
   email: string | null
   supervisor_1?: string | null
   supervisor_2?: string | null
+  annual_leave_balance?: number | null
+  phl_balance?: number | null
   is_active: boolean | null
   join_date?: string | null
 }
@@ -303,13 +305,20 @@ export default function EmployeeLeavePage() {
   const [successMessage, setSuccessMessage] = useState('')
   const [errorMessage, setErrorMessage] = useState('')
 
-  const annualRemaining = Number(annualLeave?.total_remaining_days || 0)
+  const annualRemainingFromSummary = Number(annualLeave?.total_remaining_days || 0)
+  const annualRemaining = Number(
+    employee?.annual_leave_balance ?? annualRemainingFromSummary
+  )
+  const annualBalanceUsesHROverride = employee?.annual_leave_balance !== null && employee?.annual_leave_balance !== undefined
 
-  const phlRemaining = useMemo(() => {
+  const phlRemainingFromRecords = useMemo(() => {
     return phlRecords.reduce((sum, item) => {
       return sum + Number(item.remaining_days || 0)
     }, 0)
   }, [phlRecords])
+
+  const phlRemaining = Number(employee?.phl_balance ?? phlRemainingFromRecords)
+  const phlBalanceUsesHROverride = employee?.phl_balance !== null && employee?.phl_balance !== undefined
 
   const pendingCount = useMemo(() => {
     return leaveRequests.filter((item) => {
@@ -834,9 +843,11 @@ export default function EmployeeLeavePage() {
             title="Sisa Cuti Tahunan"
             value={`${annualRemaining} hari`}
             description={
-              annualLeave?.latest_matured_date
-                ? `Matang terakhir: ${formatDisplayDate(annualLeave.latest_matured_date)}`
-                : 'Belum ada cycle cuti aktif'
+              annualBalanceUsesHROverride
+                ? 'Mengikuti saldo dari HR Master Employee'
+                : annualLeave?.latest_matured_date
+                  ? `Matang terakhir: ${formatDisplayDate(annualLeave.latest_matured_date)}`
+                  : 'Belum ada cycle cuti aktif'
             }
             icon={<WalletCards size={22} />}
             tone="blue"
@@ -845,7 +856,11 @@ export default function EmployeeLeavePage() {
           <SummaryCard
             title="Sisa PHL"
             value={`${phlRemaining} hari`}
-            description="Saldo PHL aktif dan belum expired"
+            description={
+              phlBalanceUsesHROverride
+                ? 'Mengikuti saldo dari HR Master Employee'
+                : 'Saldo PHL aktif dan belum expired'
+            }
             icon={<Plane size={22} />}
             tone="purple"
           />
