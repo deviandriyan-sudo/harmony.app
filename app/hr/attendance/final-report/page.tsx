@@ -820,6 +820,7 @@ export default function HRFinalAttendanceReportPage() {
             <div className="flex flex-col gap-3 md:flex-row md:flex-wrap md:items-center md:justify-end">
               <input
                 type="month"
+                min="2026-01"
                 value={periodMonth}
                 onChange={(event) => setPeriodMonth(event.target.value)}
                 className="harmony-input md:w-[180px]"
@@ -1286,10 +1287,16 @@ function formatHRStatus(status: string) {
 
 function getCurrentPeriodMonth() {
   const today = new Date()
-  const year = today.getFullYear()
-  const month = String(today.getMonth() + 1).padStart(2, '0')
+  const day = today.getDate()
+  const period = new Date(today)
 
-  return `${year}-${month}`
+  if (day <= 10) {
+    period.setMonth(period.getMonth() - 1)
+  }
+
+  const periodMonth = `${period.getFullYear()}-${String(period.getMonth() + 1).padStart(2, '0')}`
+
+  return periodMonth < '2026-01' ? '2026-01' : periodMonth
 }
 
 function getCutoffRange(periodMonth: string) {

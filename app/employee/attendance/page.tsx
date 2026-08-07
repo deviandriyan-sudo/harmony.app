@@ -1318,6 +1318,7 @@ export default function EmployeeAttendancePage() {
             <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
               <input
                 type="month"
+                min="2026-01"
                 value={periodMonth}
                 onChange={(event) => setPeriodMonth(event.target.value)}
                 className="harmony-input md:w-[190px]"
@@ -2955,7 +2956,9 @@ function getCurrentPeriodMonth() {
     period.setMonth(period.getMonth() - 1);
   }
 
-  return `${period.getFullYear()}-${String(period.getMonth() + 1).padStart(2, "0")}`;
+  const periodMonth = `${period.getFullYear()}-${String(period.getMonth() + 1).padStart(2, "0")}`;
+
+  return periodMonth < "2026-01" ? "2026-01" : periodMonth;
 }
 
 function getCutoffRange(periodMonth: string) {

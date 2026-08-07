@@ -393,6 +393,12 @@ export default function EmployeeApprovalsPage() {
           onRefresh={fetchData}
         />
 
+        <SubordinateOrgChart
+          supervisor={supervisor}
+          employees={subordinates}
+          loading={loading}
+        />
+
         <div className="grid gap-6 xl:grid-cols-2">
           <ApprovalModuleCard
             title="Approval Absensi"
@@ -456,12 +462,6 @@ export default function EmployeeApprovalsPage() {
             ]}
           />
         </div>
-
-        <SubordinateOrgChart
-          supervisor={supervisor}
-          employees={subordinates}
-          loading={loading}
-        />
       </section>
     </>
   )
@@ -510,6 +510,7 @@ function PeriodFilterBar({
             <span className="sr-only">Periode Cut-off</span>
             <input
               type="month"
+              min="2026-01"
               value={periodMonth}
               onChange={(event) => onMonthChange(event.target.value)}
               className="harmony-input h-12"
@@ -617,15 +618,15 @@ function SubordinateOrgChart({
             <OrgSupervisorNode supervisor={supervisor} />
           </div>
 
-          <div className="mx-auto h-10 w-[4px] rounded-full bg-[#007aff]/35" />
+          <div className="mx-auto h-8 w-px bg-black/10" />
 
           <div className="relative mx-auto max-w-6xl">
-            <div className="absolute left-4 right-4 top-0 hidden h-[4px] rounded-full bg-[#007aff]/25 sm:block" />
+            <div className="absolute left-4 right-4 top-0 hidden h-px bg-black/10 sm:block" />
 
             <div className="grid gap-4 pt-6 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
               {employees.map((employee) => (
                 <div key={employee.id} className="relative">
-                  <div className="absolute left-1/2 top-[-24px] hidden h-6 w-[4px] -translate-x-1/2 rounded-full bg-[#007aff]/25 sm:block" />
+                  <div className="absolute left-1/2 top-[-24px] hidden h-6 w-px bg-black/10 sm:block" />
                   <OrgEmployeeNode
                     employee={employee}
                     supervisor={supervisor}
@@ -911,7 +912,9 @@ function getCurrentPeriodMonth() {
     period.setMonth(period.getMonth() - 1)
   }
 
-  return `${period.getFullYear()}-${String(period.getMonth() + 1).padStart(2, '0')}`
+  const periodMonth = `${period.getFullYear()}-${String(period.getMonth() + 1).padStart(2, '0')}`
+
+  return periodMonth < '2026-01' ? '2026-01' : periodMonth
 }
 
 function getCutoffRange(periodMonth: string) {
