@@ -6,19 +6,24 @@ import {
   BadgeCheck,
   Briefcase,
   Building2,
+  CalendarClock,
   Clock3,
+  History,
   Eye,
   Fingerprint,
   GitBranch,
   HeartHandshake,
   Mail,
+  Loader2,
   MapPin,
+  Minus,
   Pencil,
   Plus,
   Power,
   RefreshCcw,
   Save,
   Search,
+  ShieldCheck,
   Sparkles,
   Trash2,
   UserCheck,
@@ -133,6 +138,57 @@ type AssignmentForm = {
   notes: string
 }
 
+
+type PHLBalanceLot = {
+  id: string
+  phl_date: string | null
+  valid_from: string | null
+  expired_at: string | null
+  balance_days: number | null
+  used_days: number | null
+  remaining_days: number | null
+  reason: string | null
+  notes: string | null
+  is_expired: boolean
+  days_to_expiry: number | null
+}
+
+type PHLAdjustmentLog = {
+  id: string
+  action: 'add' | 'subtract'
+  days: number
+  phl_date: string | null
+  expired_at: string | null
+  balance_before: number
+  balance_after: number
+  reason: string
+  actor_email: string | null
+  created_at: string | null
+}
+
+type PHLBalanceDetail = {
+  success: boolean
+  employee_id: string
+  employee_number: string | null
+  full_name: string | null
+  active_balance: number
+  active_ledger_balance: number
+  legacy_balance: number
+  expired_balance: number
+  expiring_30_days: number
+  next_expiry: string | null
+  expiry_rule_days: number
+  lots: PHLBalanceLot[]
+  adjustments: PHLAdjustmentLog[]
+}
+
+type PHLAdjustmentForm = {
+  action: 'add' | 'subtract'
+  days: number
+  phl_date: string
+  reason: string
+}
+
 const initialForm: EmployeeForm = {
   employee_number: '',
   machine_pin: '',
@@ -166,6 +222,14 @@ const initialAssignmentForm: AssignmentForm = {
   notes: '',
 }
 
+
+const initialPHLAdjustmentForm: PHLAdjustmentForm = {
+  action: 'add',
+  days: 1,
+  phl_date: '',
+  reason: '',
+}
+
 const assignmentTypeOptions = [
   { label: 'Penugasan Tambahan', value: 'additional_assignment' },
   { label: 'Jabatan Struktural', value: 'structural' },
@@ -173,26 +237,6 @@ const assignmentTypeOptions = [
   { label: 'Task Force / Tim Khusus', value: 'task_force' },
   { label: 'Plt. / Pelaksana Tugas', value: 'acting' },
 ]
-
-function hasAssignmentDraft(form: AssignmentForm) {
-  return Boolean(
-    form.assignment_department.trim() ||
-      form.assignment_position.trim() ||
-      form.assignment_type.trim() !== initialAssignmentForm.assignment_type ||
-      form.supervisor_2.trim() ||
-      form.start_date.trim() ||
-      form.notes.trim()
-  )
-}
-
-function isAssignmentDraftComplete(form: AssignmentForm) {
-  return Boolean(
-    form.assignment_department.trim() &&
-      form.assignment_position.trim() &&
-      form.supervisor_2.trim() &&
-      form.start_date.trim()
-  )
-}
 
 export default function HREmployeesPage() {
   const [employees, setEmployees] = useState<Employee[]>([])
@@ -221,6 +265,13 @@ export default function HREmployeesPage() {
   const [newDepartmentOption, setNewDepartmentOption] = useState('')
   const [newPositionOption, setNewPositionOption] = useState('')
   const [assignmentForm, setAssignmentForm] = useState<AssignmentForm>(initialAssignmentForm)
+
+  const [phlBalanceDetail, setPHLBalanceDetail] = useState<PHLBalanceDetail | null>(null)
+  const [phlAdjustmentForm, setPHLAdjustmentForm] = useState<PHLAdjustmentForm>(
+    initialPHLAdjustmentForm
+  )
+  const [loadingPHLBalance, setLoadingPHLBalance] = useState(false)
+  const [savingPHLAdjustment, setSavingPHLAdjustment] = useState(false)
 
   const [errorMessage, setErrorMessage] = useState('')
   const [successMessage, setSuccessMessage] = useState('')
@@ -447,9 +498,152 @@ export default function HREmployeesPage() {
     setAssignmentForm((prev) => ({ ...prev, [field]: value }))
   }
 
+  function updatePHLAdjustmentForm<K extends keyof PHLAdjustmentForm>(
+    field: K,
+    value: PHLAdjustmentForm[K]
+  ) {
+    setPHLAdjustmentForm((prev) => ({
+      ...prev,
+      [field]: value,
+    }))
+  }
+
+  async function fetchEmployeePHLBalanceDetail(employeeId: string) {
+    setLoadingPHLBalance(true)
+
+    try {
+      const { data, error } = await supabase.rpc(
+        'hr_get_employee_phl_balance_detail',
+        {
+          p_employee_id: employeeId,
+        }
+      )
+
+      if (error) throw error
+
+      const detail = (data || null) as PHLBalanceDetail | null
+      setPHLBalanceDetail(detail)
+
+      if (detail) {
+        setForm((current) => ({
+          ...current,
+          phl_balance: Number(detail.active_balance || 0),
+        }))
+      }
+    } catch (error: any) {
+      setPHLBalanceDetail(null)
+      setErrorMessage(
+        error?.message ||
+          'Detail saldo PHL gagal dimuat. Pastikan SQL Master V4 sudah dijalankan.'
+      )
+    } finally {
+      setLoadingPHLBalance(false)
+    }
+  }
+
+  async function handlePHLBalanceAdjustment() {
+    if (!editingEmployeeId) {
+      setErrorMessage('Simpan data karyawan terlebih dahulu sebelum menyesuaikan saldo PHL.')
+      return
+    }
+
+    const days = Number(phlAdjustmentForm.days || 0)
+    const reason = phlAdjustmentForm.reason.trim()
+
+    if (days <= 0) {
+      setErrorMessage('Jumlah penyesuaian PHL harus lebih dari 0 hari.')
+      return
+    }
+
+    if (reason.length < 5) {
+      setErrorMessage('Alasan penyesuaian PHL minimal 5 karakter.')
+      return
+    }
+
+    if (phlAdjustmentForm.action === 'add' && !phlAdjustmentForm.phl_date) {
+      setErrorMessage('Tanggal pelaksanaan PHL wajib diisi untuk penambahan saldo.')
+      return
+    }
+
+    setSavingPHLAdjustment(true)
+    setErrorMessage('')
+    setSuccessMessage('')
+
+    try {
+      const { data: authData } = await supabase.auth.getUser()
+      const actorEmail = authData.user?.email || 'HR Administrator'
+
+      const { data, error } = await supabase.rpc(
+        'hr_adjust_employee_phl_balance',
+        {
+          p_request_key: crypto.randomUUID(),
+          p_employee_id: editingEmployeeId,
+          p_action: phlAdjustmentForm.action,
+          p_days: days,
+          p_phl_date:
+            phlAdjustmentForm.action === 'add'
+              ? phlAdjustmentForm.phl_date
+              : null,
+          p_reason: reason,
+          p_actor_email: actorEmail,
+        }
+      )
+
+      if (error) throw error
+
+      const result = (data || {}) as {
+        success?: boolean
+        balance_before?: number
+        balance_after?: number
+        expired_at?: string | null
+        message?: string
+      }
+
+      if (!result.success) {
+        throw new Error(result.message || 'Penyesuaian saldo PHL belum berhasil.')
+      }
+
+      setSuccessMessage(
+        `${result.message || 'Saldo PHL berhasil disesuaikan.'} Saldo aktif: ${
+          result.balance_before ?? 0
+        } → ${result.balance_after ?? 0} hari.${
+          result.expired_at
+            ? ` Expired: ${formatDate(result.expired_at)}.`
+            : ''
+        }`
+      )
+
+      setPHLAdjustmentForm({
+        action: phlAdjustmentForm.action,
+        days: 1,
+        phl_date:
+          phlAdjustmentForm.action === 'add'
+            ? getTodayISO()
+            : '',
+        reason: '',
+      })
+
+      await Promise.all([
+        fetchEmployeePHLBalanceDetail(editingEmployeeId),
+        fetchEmployees(),
+      ])
+    } catch (error: any) {
+      setErrorMessage(
+        error?.message ||
+          'Penyesuaian saldo PHL gagal. Tidak ada perubahan saldo yang disimpan.'
+      )
+    } finally {
+      setSavingPHLAdjustment(false)
+    }
+  }
+
   function resetForm() {
     setForm(initialForm)
     setAssignmentForm(initialAssignmentForm)
+    setPHLAdjustmentForm(initialPHLAdjustmentForm)
+    setPHLBalanceDetail(null)
+    setLoadingPHLBalance(false)
+    setSavingPHLAdjustment(false)
     setEditingEmployeeId(null)
     setEditModalOpen(false)
     setErrorMessage('')
@@ -458,6 +652,8 @@ export default function HREmployeesPage() {
   function handleAddNew() {
     setForm(initialForm)
     setAssignmentForm(initialAssignmentForm)
+    setPHLAdjustmentForm(initialPHLAdjustmentForm)
+    setPHLBalanceDetail(null)
     setEditingEmployeeId(null)
     setSelectedEmployee(null)
     setEditModalOpen(true)
@@ -469,10 +665,16 @@ export default function HREmployeesPage() {
     setEditingEmployeeId(employee.id)
     setForm(employeeToForm(employee))
     setAssignmentForm(initialAssignmentForm)
+    setPHLAdjustmentForm({
+      ...initialPHLAdjustmentForm,
+      phl_date: getTodayISO(),
+    })
+    setPHLBalanceDetail(null)
     setEditModalOpen(true)
     setSelectedEmployee(null)
     setSuccessMessage('')
     setErrorMessage('')
+    void fetchEmployeePHLBalanceDetail(employee.id)
   }
 
   const activeMasterOptions = useMemo(() => {
@@ -512,39 +714,9 @@ export default function HREmployeesPage() {
   const selectedEmployeeAssignments = useMemo(() => {
     if (!selectedEmployee) return []
 
-    const activeAssignments = assignments.filter((assignment) => {
+    return assignments.filter((assignment) => {
       return assignment.employee_id === selectedEmployee.id && assignment.is_active !== false
     })
-
-    if (activeAssignments.length > 0) return activeAssignments
-
-    if (selectedEmployee.supervisor_2) {
-      return [
-        {
-          id: `legacy-supervisor-2-${selectedEmployee.id}`,
-          employee_id: selectedEmployee.id,
-          employee_number: selectedEmployee.employee_number,
-          full_name: selectedEmployee.full_name,
-          assignment_department: selectedEmployee.department,
-          assignment_position: selectedEmployee.position
-            ? `Penugasan Tambahan - ${selectedEmployee.position}`
-            : 'Penugasan Tambahan',
-          assignment_type: 'additional_assignment',
-          supervisor_1: null,
-          supervisor_2: selectedEmployee.supervisor_2,
-          start_date: selectedEmployee.updated_at || selectedEmployee.join_date,
-          end_date: null,
-          is_primary: false,
-          is_active: true,
-          notes:
-            'Data lama dari kolom Atasan 2. Setelah struktur baru digunakan, simpan data ini melalui menu Penugasan Tambahan.',
-          created_at: selectedEmployee.updated_at || selectedEmployee.created_at,
-          updated_at: selectedEmployee.updated_at,
-        },
-      ]
-    }
-
-    return []
   }, [assignments, selectedEmployee])
 
   const filteredEmployees = useMemo(() => {
@@ -874,11 +1046,10 @@ export default function HREmployeesPage() {
         join_date: form.join_date || null,
         employment_status: form.employment_status || 'active',
         supervisor_1: form.supervisor_1.trim() || null,
-        supervisor_2: null,
+        supervisor_2: form.supervisor_2.trim() || null,
         schedule_group: 'regular',
         auto_detect_schedule: true,
         annual_leave_balance: form.annual_leave_balance,
-        phl_balance: form.phl_balance,
         is_active: form.is_active,
         personal_phone: form.personal_phone.trim() || null,
         address: form.address.trim() || null,
@@ -890,39 +1061,7 @@ export default function HREmployeesPage() {
       if (editingEmployeeId) {
         const { error } = await supabase.from('employees').update(payload).eq('id', editingEmployeeId)
         if (error) throw error
-
-        if (hasAssignmentDraft(assignmentForm)) {
-          if (!isAssignmentDraftComplete(assignmentForm)) {
-            throw new Error('Penugasan tambahan belum lengkap. Isi departemen, jabatan, atasan 2, dan tanggal mulai penugasan, atau kosongkan semua field penugasan tambahan.')
-          }
-
-          await ensureMasterOption('department', assignmentForm.assignment_department)
-          await ensureMasterOption('position', assignmentForm.assignment_position)
-
-          const { error: assignmentError } = await supabase.from('employee_assignments').insert({
-            employee_id: editingEmployeeId,
-            employee_number: form.employee_number.trim(),
-            full_name: form.full_name.trim(),
-            assignment_department: assignmentForm.assignment_department.trim(),
-            assignment_position: assignmentForm.assignment_position.trim(),
-            assignment_type: assignmentForm.assignment_type || 'additional_assignment',
-            supervisor_1: null,
-            supervisor_2: assignmentForm.supervisor_2.trim() || null,
-            start_date: assignmentForm.start_date || null,
-            end_date: null,
-            is_primary: false,
-            is_active: true,
-            notes: assignmentForm.notes.trim() || null,
-            created_at: now,
-            updated_at: now,
-          })
-
-          if (assignmentError) throw assignmentError
-
-          setSuccessMessage('Data karyawan dan penugasan tambahan berhasil diperbarui.')
-        } else {
-          setSuccessMessage('Data karyawan berhasil diperbarui.')
-        }
+        setSuccessMessage('Data karyawan berhasil diperbarui.')
       } else {
         const { error } = await supabase.from('employees').insert({ ...payload, created_at: now })
         if (error) throw error
@@ -974,10 +1113,10 @@ export default function HREmployeesPage() {
         assignment_department: assignmentForm.assignment_department.trim(),
         assignment_position: assignmentForm.assignment_position.trim(),
         assignment_type: assignmentForm.assignment_type || 'additional_assignment',
-        supervisor_1: null,
+        supervisor_1: assignmentForm.supervisor_1.trim() || null,
         supervisor_2: assignmentForm.supervisor_2.trim() || null,
         start_date: assignmentForm.start_date || null,
-        end_date: null,
+        end_date: assignmentForm.end_date || null,
         is_primary: false,
         is_active: true,
         notes: assignmentForm.notes.trim() || null,
@@ -1209,10 +1348,16 @@ export default function HREmployeesPage() {
             positionOptions={positionOptions}
             assignments={currentEmployeeAssignments}
             assignmentForm={assignmentForm}
+            phlBalanceDetail={phlBalanceDetail}
+            phlAdjustmentForm={phlAdjustmentForm}
+            loadingPHLBalance={loadingPHLBalance}
+            savingPHLAdjustment={savingPHLAdjustment}
             onSubmit={handleSubmit}
             onClose={resetForm}
             onUpdate={updateForm}
             onAssignmentUpdate={updateAssignmentForm}
+            onPHLAdjustmentUpdate={updatePHLAdjustmentForm}
+            onPHLAdjust={handlePHLBalanceAdjustment}
             onAddAssignment={handleAddAssignment}
             onDeleteAssignment={handleDeleteAssignment}
           />
@@ -1647,7 +1792,8 @@ function EmployeeDetailModal({ employee, assignments, employees, onClose, onEdit
               <DetailItem label="Departemen Utama" value={employee.department} />
               <DetailItem label="Jabatan Utama" value={employee.position} />
               <DetailItem label="Join Date" value={formatDisplayDate(employee.join_date || '')} />
-              <DetailItem label="Atasan Utama" value={getSupervisorLabel(employee.supervisor_1, employees)} />
+              <DetailItem label="Atasan 1" value={getSupervisorLabel(employee.supervisor_1, employees)} />
+              <DetailItem label="Atasan 2" value={getSupervisorLabel(employee.supervisor_2, employees)} />
               <DetailItem label="Update Terakhir" value={formatDateTime(employee.updated_at || '')} />
             </DetailSection>
 
@@ -1662,8 +1808,8 @@ function EmployeeDetailModal({ employee, assignments, employees, onClose, onEdit
 
             <DetailSection title="Jabatan & Penugasan Tambahan" icon={<Briefcase size={18} />} wide>
               {assignments.length === 0 ? (
-                <div className="rounded-2xl border border-dashed border-black/10 bg-white p-5 text-sm font-semibold leading-6 text-[#6e6e73]">
-                  Belum ada jabatan rangkap atau penugasan tambahan aktif. Tambahkan lewat tombol Edit Data, isi bagian Jabatan & Penugasan Tambahan, lalu simpan atau klik Tambah Penugasan.
+                <div className="rounded-2xl border border-dashed border-black/10 bg-white p-5 text-sm font-semibold text-[#6e6e73]">
+                  Belum ada jabatan rangkap atau penugasan tambahan aktif.
                 </div>
               ) : (
                 <div className="space-y-3">
@@ -1715,10 +1861,16 @@ function EmployeeFormModal({
   positionOptions,
   assignments,
   assignmentForm,
+  phlBalanceDetail,
+  phlAdjustmentForm,
+  loadingPHLBalance,
+  savingPHLAdjustment,
   onSubmit,
   onClose,
   onUpdate,
   onAssignmentUpdate,
+  onPHLAdjustmentUpdate,
+  onPHLAdjust,
   onAddAssignment,
   onDeleteAssignment,
 }: {
@@ -1732,10 +1884,19 @@ function EmployeeFormModal({
   positionOptions: string[]
   assignments: EmployeeAssignment[]
   assignmentForm: AssignmentForm
+  phlBalanceDetail: PHLBalanceDetail | null
+  phlAdjustmentForm: PHLAdjustmentForm
+  loadingPHLBalance: boolean
+  savingPHLAdjustment: boolean
   onSubmit: (event: FormEvent<HTMLFormElement>) => void
   onClose: () => void
   onUpdate: (field: keyof EmployeeForm, value: string | number | boolean) => void
   onAssignmentUpdate: (field: keyof AssignmentForm, value: string) => void
+  onPHLAdjustmentUpdate: <K extends keyof PHLAdjustmentForm>(
+    field: K,
+    value: PHLAdjustmentForm[K]
+  ) => void
+  onPHLAdjust: () => void
   onAddAssignment: () => void
   onDeleteAssignment: (assignment: EmployeeAssignment) => void
 }) {
@@ -1767,7 +1928,7 @@ function EmployeeFormModal({
               <SelectField label="Gender" value={form.gender} onChange={(value) => onUpdate('gender', value)} options={[{ label: 'Semua / Tidak diset', value: 'all' }, { label: 'Laki-laki', value: 'male' }, { label: 'Perempuan', value: 'female' }]} />
             </FormSection>
 
-            <FormSection title="Homebase Utama & Status" description="Departemen, jabatan utama, status kerja, dan satu atasan utama untuk identitas HR, absensi, cuti, dan pelaporan." icon={<Building2 size={18} />}>
+            <FormSection title="Homebase Utama & Status" description="Departemen dan jabatan utama dipakai untuk identitas HR, absensi, cuti, dan pelaporan utama." icon={<Building2 size={18} />}>
               <OrganizationOptionField
                 label="Departemen Utama"
                 value={form.department}
@@ -1784,7 +1945,8 @@ function EmployeeFormModal({
               />
               <InputField label="Join Date" type="date" value={form.join_date} onChange={(value) => onUpdate('join_date', value)} />
               <SelectField label="Employment Status" value={form.employment_status} onChange={(value) => onUpdate('employment_status', value)} options={[{ label: 'Active', value: 'active' }, { label: 'Probation', value: 'probation' }, { label: 'Contract', value: 'contract' }, { label: 'Permanent', value: 'permanent' }, { label: 'Resigned', value: 'resigned' }, { label: 'Inactive', value: 'inactive' }]} />
-              <SupervisorSelectField label="Atasan Utama" value={form.supervisor_1} employees={employees} currentEmployeeId={editingEmployeeId} onChange={(value) => onUpdate('supervisor_1', value)} />
+              <SupervisorSelectField label="Atasan 1" value={form.supervisor_1} employees={employees} currentEmployeeId={editingEmployeeId} onChange={(value) => onUpdate('supervisor_1', value)} />
+              <SupervisorSelectField label="Atasan 2" value={form.supervisor_2} employees={employees} currentEmployeeId={editingEmployeeId} onChange={(value) => onUpdate('supervisor_2', value)} />
             </FormSection>
 
             <AssignmentSection
@@ -1808,11 +1970,29 @@ function EmployeeFormModal({
               <TextareaField label="Alamat Domisili" value={form.address} onChange={(value) => onUpdate('address', value)} placeholder="Alamat domisili karyawan" />
             </FormSection>
 
-            <FormSection title="Saldo & Status Data" description="Saldo cuti tahunan, saldo PHL, dan status aktif data employee." icon={<WalletCards size={18} />}>
+            <FormSection title="Saldo & Status Data" description="Saldo cuti tahunan dapat dikoreksi pada data utama. Saldo PHL dikelola melalui ledger bertanggal di bagian berikutnya." icon={<WalletCards size={18} />}>
               <InputField label="Saldo Cuti Tahunan" type="number" value={String(form.annual_leave_balance)} onChange={(value) => onUpdate('annual_leave_balance', Number(value))} />
-              <InputField label="Saldo PHL" type="number" value={String(form.phl_balance)} onChange={(value) => onUpdate('phl_balance', Number(value))} />
+              <ReadOnlyBalanceField
+                label="Saldo PHL Aktif"
+                value={
+                  loadingPHLBalance
+                    ? 'Memuat...'
+                    : `${Number(phlBalanceDetail?.active_balance ?? form.phl_balance ?? 0)} hari`
+                }
+                description="Tidak dapat diedit langsung. Gunakan Penyesuaian Saldo PHL agar tanggal dan audit tersimpan."
+              />
               <SelectField label="Status Data" value={form.is_active ? 'active' : 'inactive'} onChange={(value) => onUpdate('is_active', value === 'active')} options={[{ label: 'Active', value: 'active' }, { label: 'Inactive', value: 'inactive' }]} />
             </FormSection>
+
+            <PHLBalanceAdjustmentSection
+              editingEmployeeId={editingEmployeeId}
+              detail={phlBalanceDetail}
+              form={phlAdjustmentForm}
+              loading={loadingPHLBalance}
+              saving={savingPHLAdjustment}
+              onUpdate={onPHLAdjustmentUpdate}
+              onAdjust={onPHLAdjust}
+            />
           </div>
 
           <div className="flex flex-col gap-3 border-t border-black/5 p-6 md:flex-row md:justify-end">
@@ -1823,6 +2003,379 @@ function EmployeeFormModal({
             </button>
           </div>
         </form>
+      </div>
+    </div>
+  )
+}
+
+
+function ReadOnlyBalanceField({
+  label,
+  value,
+  description,
+}: {
+  label: string
+  value: string
+  description: string
+}) {
+  return (
+    <div className="rounded-[22px] border border-black/5 bg-[#f5f5f7] p-4">
+      <span className="harmony-label">{label}</span>
+      <div className="mt-1 text-lg font-bold text-[#1d1d1f]">{value}</div>
+      <p className="mt-1 text-xs leading-5 text-[#6e6e73]">{description}</p>
+    </div>
+  )
+}
+
+function PHLBalanceAdjustmentSection({
+  editingEmployeeId,
+  detail,
+  form,
+  loading,
+  saving,
+  onUpdate,
+  onAdjust,
+}: {
+  editingEmployeeId: string | null
+  detail: PHLBalanceDetail | null
+  form: PHLAdjustmentForm
+  loading: boolean
+  saving: boolean
+  onUpdate: <K extends keyof PHLAdjustmentForm>(
+    field: K,
+    value: PHLAdjustmentForm[K]
+  ) => void
+  onAdjust: () => void
+}) {
+  const calculatedExpiry =
+    form.action === 'add' && form.phl_date
+      ? addDaysISO(form.phl_date, 90)
+      : ''
+
+  return (
+    <div className="rounded-[28px] border border-[#d6e8ff] bg-gradient-to-br from-[#f8fbff] to-white p-5 shadow-sm">
+      <div className="flex flex-col gap-3 border-b border-black/5 pb-5 md:flex-row md:items-start md:justify-between">
+        <div className="flex min-w-0 items-start gap-3">
+          <div className="rounded-2xl bg-[#e8f2ff] p-3 text-[#0059b8]">
+            <CalendarClock size={19} />
+          </div>
+          <div className="min-w-0">
+            <h3 className="font-semibold text-[#1d1d1f]">Penyesuaian Saldo PHL</h3>
+            <p className="mt-1 text-sm leading-6 text-[#6e6e73]">
+              Setiap saldo tambahan wajib memiliki tanggal pelaksanaan. Masa berlaku otomatis 90 hari. Pengurangan mengambil saldo yang paling cepat expired.
+            </p>
+          </div>
+        </div>
+
+        <div className="inline-flex w-fit items-center gap-2 rounded-full bg-green-50 px-3 py-1.5 text-xs font-bold text-green-700">
+          <ShieldCheck size={14} />
+          Ledger & Audit Aktif
+        </div>
+      </div>
+
+      {!editingEmployeeId ? (
+        <div className="mt-5 rounded-[22px] border border-amber-200 bg-amber-50 p-4 text-sm font-semibold leading-6 text-amber-700">
+          Simpan karyawan terlebih dahulu. Setelah itu buka kembali Edit Data untuk menambahkan atau mengurangi saldo PHL.
+        </div>
+      ) : loading ? (
+        <div className="mt-5 flex min-h-32 items-center justify-center gap-3 rounded-[22px] border border-black/5 bg-white">
+          <Loader2 size={20} className="animate-spin text-[#007aff]" />
+          <span className="text-sm font-semibold text-[#6e6e73]">Memuat ledger PHL...</span>
+        </div>
+      ) : (
+        <>
+          <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+            <PHLSummaryMiniCard
+              title="Saldo Aktif"
+              value={`${Number(detail?.active_balance || 0)} hari`}
+              description="Dapat digunakan"
+            />
+            <PHLSummaryMiniCard
+              title="Ledger Bertanggal"
+              value={`${Number(detail?.active_ledger_balance || 0)} hari`}
+              description="Memiliki expiry"
+            />
+            <PHLSummaryMiniCard
+              title="Saldo Legacy"
+              value={`${Number(detail?.legacy_balance || 0)} hari`}
+              description="Belum bertanggal"
+            />
+            <PHLSummaryMiniCard
+              title="Expired Tersisa"
+              value={`${Number(detail?.expired_balance || 0)} hari`}
+              description="Tidak dapat digunakan"
+            />
+            <PHLSummaryMiniCard
+              title="Expired ≤30 Hari"
+              value={`${Number(detail?.expiring_30_days || 0)} hari`}
+              description={
+                detail?.next_expiry
+                  ? `Terdekat ${formatDate(detail.next_expiry)}`
+                  : 'Tidak ada'
+              }
+            />
+          </div>
+
+          <div className="mt-5 rounded-[24px] border border-black/5 bg-white p-5">
+            <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-4">
+              <SelectField
+                label="Jenis Penyesuaian"
+                value={form.action}
+                onChange={(value) =>
+                  onUpdate('action', value as 'add' | 'subtract')
+                }
+                options={[
+                  { label: 'Tambah Saldo PHL', value: 'add' },
+                  { label: 'Kurangi Saldo PHL', value: 'subtract' },
+                ]}
+              />
+
+              <InputField
+                label="Jumlah Hari"
+                type="number"
+                value={String(form.days)}
+                onChange={(value) => onUpdate('days', Number(value))}
+                placeholder="Contoh: 1"
+              />
+
+              {form.action === 'add' ? (
+                <InputField
+                  label="Tanggal PHL Dilaksanakan"
+                  type="date"
+                  value={form.phl_date}
+                  onChange={(value) => onUpdate('phl_date', value)}
+                />
+              ) : (
+                <ReadOnlyBalanceField
+                  label="Metode Pengurangan"
+                  value="FIFO Expiry"
+                  description="Saldo terdekat expired dipotong terlebih dahulu."
+                />
+              )}
+
+              {form.action === 'add' ? (
+                <ReadOnlyBalanceField
+                  label="Tanggal Expired Otomatis"
+                  value={calculatedExpiry ? formatDate(calculatedExpiry) : '-'}
+                  description="Tanggal pelaksanaan + 90 hari."
+                />
+              ) : (
+                <ReadOnlyBalanceField
+                  label="Saldo Maksimal Dikurangi"
+                  value={`${Number(detail?.active_balance || 0)} hari`}
+                  description="Saldo tidak boleh menjadi minus."
+                />
+              )}
+            </div>
+
+            <div className="mt-4">
+              <TextareaField
+                label="Alasan Penyesuaian"
+                value={form.reason}
+                onChange={(value) => onUpdate('reason', value)}
+                placeholder={
+                  form.action === 'add'
+                    ? 'Contoh: Koreksi saldo PHL berdasarkan pelaksanaan kerja pada hari libur.'
+                    : 'Contoh: Koreksi saldo karena input ganda.'
+                }
+              />
+            </div>
+
+            <div className="mt-5 flex justify-end">
+              <button
+                type="button"
+                onClick={onAdjust}
+                disabled={
+                  saving ||
+                  Number(form.days || 0) <= 0 ||
+                  form.reason.trim().length < 5 ||
+                  (form.action === 'add' && !form.phl_date)
+                }
+                className={[
+                  'inline-flex min-h-11 items-center justify-center gap-2 rounded-[18px] px-5 text-sm font-bold text-white transition disabled:cursor-not-allowed disabled:opacity-50',
+                  form.action === 'add'
+                    ? 'bg-[#007aff] hover:bg-[#0067d8]'
+                    : 'bg-orange-600 hover:bg-orange-700',
+                ].join(' ')}
+              >
+                {saving ? (
+                  <Loader2 size={17} className="animate-spin" />
+                ) : form.action === 'add' ? (
+                  <Plus size={17} />
+                ) : (
+                  <Minus size={17} />
+                )}
+                {saving
+                  ? 'Memproses...'
+                  : form.action === 'add'
+                    ? 'Tambahkan Saldo PHL'
+                    : 'Kurangi Saldo PHL'}
+              </button>
+            </div>
+          </div>
+
+          <div className="mt-5 grid gap-5 xl:grid-cols-2">
+            <PHLLotHistory lots={detail?.lots || []} />
+            <PHLAdjustmentHistory adjustments={detail?.adjustments || []} />
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
+function PHLSummaryMiniCard({
+  title,
+  value,
+  description,
+}: {
+  title: string
+  value: string
+  description: string
+}) {
+  return (
+    <div className="rounded-[22px] border border-black/5 bg-white p-4 shadow-sm">
+      <div className="text-xs font-bold uppercase tracking-[0.08em] text-[#86868b]">
+        {title}
+      </div>
+      <div className="mt-2 text-xl font-bold text-[#1d1d1f]">{value}</div>
+      <div className="mt-1 text-xs text-[#6e6e73]">{description}</div>
+    </div>
+  )
+}
+
+function PHLLotHistory({ lots }: { lots: PHLBalanceLot[] }) {
+  return (
+    <div className="overflow-hidden rounded-[24px] border border-black/5 bg-white">
+      <div className="flex items-center gap-3 border-b border-black/5 p-4">
+        <CalendarClock size={17} className="text-[#007aff]" />
+        <div>
+          <h4 className="text-sm font-bold text-[#1d1d1f]">Saldo Berdasarkan Tanggal PHL</h4>
+          <p className="mt-0.5 text-xs text-[#6e6e73]">Maksimal 50 lot terbaru.</p>
+        </div>
+      </div>
+
+      <div className="max-h-80 overflow-y-auto">
+        {lots.length === 0 ? (
+          <div className="p-5 text-sm text-[#6e6e73]">Belum ada saldo PHL bertanggal.</div>
+        ) : (
+          <div className="divide-y divide-black/5">
+            {lots.map((lot) => (
+              <div key={lot.id} className="grid gap-3 p-4 sm:grid-cols-[1fr_auto]">
+                <div className="min-w-0">
+                  <div className="font-semibold text-[#1d1d1f]">
+                    PHL {formatDate(lot.phl_date)}
+                  </div>
+                  <div className="mt-1 text-xs leading-5 text-[#6e6e73]">
+                    {lot.reason || lot.notes || 'Saldo PHL'}
+                  </div>
+                  <div className="mt-2 flex flex-wrap gap-2 text-[11px] font-bold">
+                    <span className="rounded-full bg-[#e8f2ff] px-2.5 py-1 text-[#0059b8]">
+                      Total {Number(lot.balance_days || 0)}
+                    </span>
+                    <span className="rounded-full bg-orange-50 px-2.5 py-1 text-orange-700">
+                      Terpakai {Number(lot.used_days || 0)}
+                    </span>
+                    <span className="rounded-full bg-green-50 px-2.5 py-1 text-green-700">
+                      Sisa {Number(lot.remaining_days || 0)}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="sm:text-right">
+                  <div
+                    className={[
+                      'inline-flex rounded-full px-3 py-1 text-[11px] font-bold',
+                      lot.is_expired
+                        ? 'bg-red-50 text-red-700'
+                        : Number(lot.days_to_expiry ?? 999) <= 30
+                          ? 'bg-amber-50 text-amber-700'
+                          : 'bg-green-50 text-green-700',
+                    ].join(' ')}
+                  >
+                    {lot.is_expired
+                      ? 'Expired'
+                      : lot.days_to_expiry === null
+                        ? 'Tanpa expired'
+                        : `${lot.days_to_expiry} hari lagi`}
+                  </div>
+                  <div className="mt-2 text-xs font-semibold text-[#6e6e73]">
+                    Expired {formatDate(lot.expired_at)}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function PHLAdjustmentHistory({
+  adjustments,
+}: {
+  adjustments: PHLAdjustmentLog[]
+}) {
+  return (
+    <div className="overflow-hidden rounded-[24px] border border-black/5 bg-white">
+      <div className="flex items-center gap-3 border-b border-black/5 p-4">
+        <History size={17} className="text-[#7b2cbf]" />
+        <div>
+          <h4 className="text-sm font-bold text-[#1d1d1f]">Riwayat Penyesuaian HR</h4>
+          <p className="mt-0.5 text-xs text-[#6e6e73]">Maksimal 30 transaksi terbaru.</p>
+        </div>
+      </div>
+
+      <div className="max-h-80 overflow-y-auto">
+        {adjustments.length === 0 ? (
+          <div className="p-5 text-sm text-[#6e6e73]">Belum ada penyesuaian saldo oleh HR.</div>
+        ) : (
+          <div className="divide-y divide-black/5">
+            {adjustments.map((adjustment) => (
+              <div key={adjustment.id} className="p-4">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span
+                        className={[
+                          'rounded-full px-3 py-1 text-[11px] font-bold',
+                          adjustment.action === 'add'
+                            ? 'bg-green-50 text-green-700'
+                            : 'bg-orange-50 text-orange-700',
+                        ].join(' ')}
+                      >
+                        {adjustment.action === 'add' ? 'Tambah' : 'Kurangi'}{' '}
+                        {Number(adjustment.days || 0)} hari
+                      </span>
+                      <span className="text-xs font-semibold text-[#6e6e73]">
+                        {adjustment.created_at ? formatDateTime(adjustment.created_at) : '-'}
+                      </span>
+                    </div>
+                    <p className="mt-2 text-sm leading-6 text-[#1d1d1f]">
+                      {adjustment.reason}
+                    </p>
+                    <p className="mt-1 text-xs text-[#6e6e73]">
+                      Oleh {adjustment.actor_email || 'HR Administrator'}
+                    </p>
+                  </div>
+
+                  <div className="shrink-0 rounded-2xl bg-[#f5f5f7] px-3 py-2 text-xs font-bold text-[#1d1d1f]">
+                    {Number(adjustment.balance_before || 0)} →{' '}
+                    {Number(adjustment.balance_after || 0)} hari
+                  </div>
+                </div>
+
+                {adjustment.action === 'add' && (
+                  <div className="mt-2 text-xs font-semibold text-[#6e6e73]">
+                    PHL {formatDate(adjustment.phl_date)} · Expired{' '}
+                    {formatDate(adjustment.expired_at)}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   )
@@ -1860,7 +2413,7 @@ function AssignmentSection({
         <div className="min-w-0">
           <h3 className="font-semibold text-[#1d1d1f]">Jabatan & Penugasan Tambahan</h3>
           <p className="mt-1 text-sm leading-6 text-[#6e6e73]">
-            Gunakan ini untuk jabatan rangkap/penugasan tambahan. Atasan 2 ditempatkan di bagian ini supaya homebase utama tetap rapi.
+            Gunakan ini untuk dosen yang merangkap kepala unit, staf unit, koordinator, atau jabatan struktural tambahan. Data utama karyawan tetap menjadi homebase.
           </p>
         </div>
       </div>
@@ -1910,21 +2463,19 @@ function AssignmentSection({
                 otherPlaceholder="Isi jabatan penugasan"
               />
               <SelectField label="Jenis Penugasan" value={form.assignment_type} onChange={(value) => onUpdate('assignment_type', value)} options={assignmentTypeOptions} />
-              <SupervisorSelectField label="Atasan 2 / Atasan Jabatan Tambahan" value={form.supervisor_2} employees={employees} currentEmployeeId={editingEmployeeId} onChange={(value) => onUpdate('supervisor_2', value)} />
-              <InputField label="Tanggal Mulai Penugasan" type="date" value={form.start_date} onChange={(value) => onUpdate('start_date', value)} />
+              <SupervisorSelectField label="Atasan Penugasan 1" value={form.supervisor_1} employees={employees} currentEmployeeId={editingEmployeeId} onChange={(value) => onUpdate('supervisor_1', value)} />
+              <SupervisorSelectField label="Atasan Penugasan 2" value={form.supervisor_2} employees={employees} currentEmployeeId={editingEmployeeId} onChange={(value) => onUpdate('supervisor_2', value)} />
+              <InputField label="Tanggal Mulai" type="date" value={form.start_date} onChange={(value) => onUpdate('start_date', value)} />
+              <InputField label="Tanggal Berakhir" type="date" value={form.end_date} onChange={(value) => onUpdate('end_date', value)} />
               <TextareaField label="Catatan Penugasan" value={form.notes} onChange={(value) => onUpdate('notes', value)} placeholder="Contoh: Merangkap sebagai Kepala Unit Kerja Sama berdasarkan SK penugasan." />
             </div>
 
-            <div className="mt-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-              <p className="text-xs leading-5 text-[#6e6e73]">
-                Penugasan akan tampil di Detail Karyawan setelah klik <strong>Tambah Penugasan</strong>. Jika field ini terisi lalu klik <strong>Update Data Utama</strong>, sistem juga akan ikut menyimpan penugasan baru.
-              </p>
-
+            <div className="mt-4 flex justify-end">
               <button
                 type="button"
                 onClick={onAdd}
                 disabled={saving}
-                className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-2xl bg-[#7b2cbf] px-5 text-sm font-bold text-white shadow-sm transition hover:bg-[#6823a0] disabled:cursor-not-allowed disabled:opacity-60"
+                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl bg-[#7b2cbf] px-5 text-sm font-bold text-white shadow-sm transition hover:bg-[#6823a0] disabled:cursor-not-allowed disabled:opacity-60"
               >
                 <Plus size={17} />
                 {saving ? 'Menyimpan...' : 'Tambah Penugasan'}
@@ -1958,8 +2509,9 @@ function AssignmentManageCard({ assignment, employees, deleting, onDelete }: { a
         </button>
       </div>
       <div className="mt-3 grid gap-2 text-xs text-[#6e6e73]">
+        <p><strong>Atasan 1:</strong> {getSupervisorLabel(assignment.supervisor_1, employees)}</p>
         <p><strong>Atasan 2:</strong> {getSupervisorLabel(assignment.supervisor_2, employees)}</p>
-        <p><strong>Mulai Penugasan:</strong> {formatDisplayDate(assignment.start_date || '')}</p>
+        <p><strong>Periode:</strong> {formatDisplayDate(assignment.start_date || '')} - {assignment.end_date ? formatDisplayDate(assignment.end_date) : 'Aktif'}</p>
         {assignment.notes && <p className="leading-5"><strong>Catatan:</strong> {assignment.notes}</p>}
       </div>
     </div>
@@ -1978,10 +2530,11 @@ function AssignmentDetailCard({ assignment, employees }: { assignment: EmployeeA
           <p className="mt-1 break-words text-xs font-semibold text-[#6e6e73]">{assignment.assignment_department || '-'}</p>
         </div>
         <div className="rounded-2xl bg-[#f5f5f7] px-4 py-3 text-xs font-semibold text-[#6e6e73]">
-          Mulai {formatDisplayDate(assignment.start_date || '')}
+          {formatDisplayDate(assignment.start_date || '')} - {assignment.end_date ? formatDisplayDate(assignment.end_date) : 'Aktif'}
         </div>
       </div>
-      <div className="mt-3 grid gap-2 text-xs text-[#6e6e73]">
+      <div className="mt-3 grid gap-2 text-xs text-[#6e6e73] sm:grid-cols-2">
+        <p><strong>Atasan 1:</strong> {getSupervisorLabel(assignment.supervisor_1, employees)}</p>
         <p><strong>Atasan 2:</strong> {getSupervisorLabel(assignment.supervisor_2, employees)}</p>
       </div>
       {assignment.notes && <p className="mt-3 text-xs leading-5 text-[#6e6e73]"><strong>Catatan:</strong> {assignment.notes}</p>}
@@ -2202,6 +2755,42 @@ function StatusBadge({ active }: { active: boolean }) {
 function AlertBox({ type, message }: { type: 'success' | 'error'; message: string }) {
   const className = type === 'success' ? 'border-green-200 bg-green-50 text-green-700' : 'border-red-200 bg-red-50 text-red-600'
   return <div className={`rounded-2xl border p-4 text-sm ${className}`}>{message}</div>
+}
+
+
+function getTodayISO() {
+  const today = new Date()
+  const year = today.getFullYear()
+  const month = String(today.getMonth() + 1).padStart(2, '0')
+  const day = String(today.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+function addDaysISO(dateText: string, days: number) {
+  if (!dateText) return ''
+
+  const date = new Date(`${dateText}T00:00:00`)
+  if (Number.isNaN(date.getTime())) return ''
+
+  date.setDate(date.getDate() + days)
+
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+function formatDate(value: string | null | undefined) {
+  if (!value) return '-'
+
+  const date = new Date(`${value.slice(0, 10)}T00:00:00`)
+  if (Number.isNaN(date.getTime())) return '-'
+
+  return new Intl.DateTimeFormat('id-ID', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  }).format(date)
 }
 
 function employeeToForm(employee: Employee): EmployeeForm {

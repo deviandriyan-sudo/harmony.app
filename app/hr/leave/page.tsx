@@ -13,6 +13,7 @@ import {
   Loader2,
   Plane,
   RefreshCcw,
+  RotateCcw,
   Search,
   ShieldCheck,
   Trash2,
@@ -25,7 +26,7 @@ import { Topbar } from '@/components/layout/Topbar'
 import { supabase } from '@/lib/supabase'
 import { sendHarmonyEmail } from '@/lib/notifications'
 
-type ActiveTab = 'leave' | 'phl-claim' | 'phl-balance' | 'history'
+type ActiveTab = 'leave' | 'phl-claim' | 'phl-balance' | 'phl-audit' | 'history'
 
 type AppUser = {
   id: string
@@ -66,6 +67,9 @@ type LeaveRequest = {
   hr_approved_by?: string | null
   hr_approved_at?: string | null
   hr_note?: string | null
+  hr_cancelled_by?: string | null
+  hr_cancelled_at?: string | null
+  hr_cancel_note?: string | null
 
   proof_url?: string | null
   proof_file_url?: string | null
@@ -129,6 +133,14 @@ type PHLRecord = {
   hr_approved_by?: string | null
   hr_approved_at?: string | null
   hr_note?: string | null
+  hr_cancelled_by?: string | null
+  hr_cancelled_at?: string | null
+  hr_cancel_note?: string | null
+
+  legacy_review_status?: string | null
+  legacy_review_note?: string | null
+  legacy_reviewed_by?: string | null
+  legacy_reviewed_at?: string | null
 
   job_pending_summary?: string | null
   job_pending_detail?: string | null
@@ -158,6 +170,48 @@ type PHLBalanceSummary = {
   total_used_days: number | null
   total_available_days: number | null
   pending_claim_count: number | null
+}
+
+type PHLReconciliationRow = {
+  employee_id: string
+  employee_number: string | null
+  full_name: string | null
+  department: string | null
+  position: string | null
+  manual_phl_balance: number | null
+  active_ledger_balance: number | null
+  manual_ledger_difference: number | null
+  expired_remaining_balance: number | null
+  total_earned_days: number | null
+  total_used_days: number | null
+  pending_claim_count: number | null
+  approved_claim_count: number | null
+  legacy_untracked_claim_count: number | null
+  reviewed_legacy_claim_count: number | null
+  reconciliation_status: string | null
+  last_reviewed_by: string | null
+  last_reviewed_at: string | null
+  last_review_note: string | null
+}
+
+type LegacyPHLClaimReview = {
+  claim_record_id: string
+  employee_id: string | null
+  employee_number: string | null
+  full_name: string | null
+  department: string | null
+  position: string | null
+  phl_date: string | null
+  claim_days: number | null
+  allocated_days: number | null
+  override_consumed_days: number | null
+  tracking_gap_days: number | null
+  legacy_review_status: string | null
+  legacy_review_note: string | null
+  legacy_reviewed_by: string | null
+  legacy_reviewed_at: string | null
+  hr_approved_by: string | null
+  hr_approved_at: string | null
 }
 
 type DeleteTarget = {
@@ -353,6 +407,70 @@ async function sendHRLeaveDecisionEmail({
   }
 }
 
+async function sendHRLeaveCancellationEmail({
+  item,
+  hrName,
+  note,
+  balanceText,
+}: {
+  item: LeaveRequest
+  hrName: string
+  note: string
+  balanceText?: string
+}) {
+  const recipient = await resolveEmployeeRecipient({
+    employeeId: item.employee_id,
+    employeeNumber: item.employee_number,
+    fullName: item.full_name,
+    directEmail: item.email,
+  })
+
+  if (!recipient) {
+    return {
+      success: false,
+      message: 'Email employee tidak ditemukan pada data karyawan.',
+    }
+  }
+
+  const requestLabel = getRequestLabel(item)
+  const title = `${requestLabel} Dibatalkan HR`
+
+  try {
+    await sendHarmonyEmail({
+      to: recipient.email,
+      subject: `[HARMONY] ${title}`,
+      title,
+      message: [
+        `Yth. ${recipient.fullName},`,
+        '',
+        `Pengajuan ${requestLabel} Anda yang sebelumnya sudah disetujui telah dibatalkan oleh HR.`,
+        '',
+        `Periode: ${getRequestPeriodText(item.start_date, item.end_date)}`,
+        `Jumlah hari: ${item.total_days || 0} hari`,
+        `Alasan pengajuan: ${item.reason || '-'}`,
+        balanceText ? `Perubahan saldo: ${balanceText}` : 'Perubahan saldo: tidak ada saldo manual yang dikembalikan.',
+        '',
+        `Alasan pembatalan: ${note || '-'}`,
+        `Diproses oleh: ${hrName}`,
+      ].join('\n'),
+      actionLabel: 'Buka Cuti & Izin HARMONY',
+      actionUrl: `${getNotificationBaseUrl()}/employee/leave`,
+      footer:
+        'Email ini dikirim otomatis oleh HARMONY setelah HR membatalkan pengajuan yang sudah disetujui.',
+    })
+
+    return {
+      success: true,
+      message: `Email notifikasi terkirim ke ${recipient.email}.`,
+    }
+  } catch (error: any) {
+    return {
+      success: false,
+      message: error?.message || 'Email notifikasi pembatalan gagal terkirim.',
+    }
+  }
+}
+
 async function sendHRPHLDecisionEmail({
   record,
   decision,
@@ -421,6 +539,74 @@ async function sendHRPHLDecisionEmail({
   }
 }
 
+
+async function sendHRPHLCancellationEmail({
+  record,
+  hrName,
+  note,
+  restoredText,
+  expiredText,
+}: {
+  record: PHLRecord
+  hrName: string
+  note: string
+  restoredText: string
+  expiredText?: string
+}) {
+  const recipient = await resolveEmployeeRecipient({
+    employeeId: record.employee_id,
+    employeeNumber: record.employee_number,
+    fullName: record.full_name,
+    directEmail: record.email,
+  })
+
+  if (!recipient) {
+    return {
+      success: false,
+      message: 'Email employee tidak ditemukan pada data karyawan.',
+    }
+  }
+
+  const title = 'Klaim PHL Dibatalkan HR'
+
+  try {
+    await sendHarmonyEmail({
+      to: recipient.email,
+      subject: `[HARMONY] ${title}`,
+      title,
+      message: [
+        `Yth. ${recipient.fullName},`,
+        '',
+        'Klaim PHL Anda yang sebelumnya sudah disetujui telah dibatalkan oleh HR.',
+        '',
+        `Tanggal klaim: ${formatDisplayDate(record.phl_date || record.valid_from || '')}`,
+        `Jumlah klaim: ${record.used_days || record.balance_days || 0} hari`,
+        `Saldo dikembalikan: ${restoredText || '-'}`,
+        expiredText ? `Catatan masa berlaku: ${expiredText}` : '',
+        '',
+        `Alasan pembatalan: ${note || '-'}`,
+        `Diproses oleh: ${hrName}`,
+      ]
+        .filter(Boolean)
+        .join('\n'),
+      actionLabel: 'Buka Cuti & Izin HARMONY',
+      actionUrl: `${getNotificationBaseUrl()}/employee/leave`,
+      footer:
+        'Email ini dikirim otomatis oleh HARMONY setelah HR membatalkan klaim PHL yang sudah disetujui.',
+    })
+
+    return {
+      success: true,
+      message: `Email notifikasi terkirim ke ${recipient.email}.`,
+    }
+  } catch (error: any) {
+    return {
+      success: false,
+      message: error?.message || 'Email notifikasi pembatalan PHL gagal terkirim.',
+    }
+  }
+}
+
 function appendNotificationText(baseMessage: string, notification: { success: boolean; message: string }) {
   return notification.success
     ? `${baseMessage} ${notification.message}`
@@ -434,6 +620,9 @@ export default function HRLeavePage() {
   const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>([])
   const [phlRecords, setPHLRecords] = useState<PHLRecord[]>([])
   const [phlBalanceSummary, setPHLBalanceSummary] = useState<PHLBalanceSummary[]>([])
+  const [phlReconciliationRows, setPHLReconciliationRows] = useState<PHLReconciliationRow[]>([])
+  const [legacyPHLClaims, setLegacyPHLClaims] = useState<LegacyPHLClaimReview[]>([])
+  const [phlAuditError, setPHLAuditError] = useState('')
 
   const [loading, setLoading] = useState(true)
   const [processingId, setProcessingId] = useState('')
@@ -448,6 +637,18 @@ export default function HRLeavePage() {
 
   const [rejectLeaveRecord, setRejectLeaveRecord] = useState<LeaveRequest | null>(null)
   const [rejectLeaveReason, setRejectLeaveReason] = useState('')
+
+  const [cancelLeaveRecord, setCancelLeaveRecord] = useState<LeaveRequest | null>(null)
+  const [cancelLeaveReason, setCancelLeaveReason] = useState('')
+
+  const [cancelPHLRecord, setCancelPHLRecord] = useState<PHLRecord | null>(null)
+  const [cancelPHLReason, setCancelPHLReason] = useState('')
+
+  const [employeePHLReviewTarget, setEmployeePHLReviewTarget] = useState<PHLReconciliationRow | null>(null)
+  const [employeePHLReviewNote, setEmployeePHLReviewNote] = useState('')
+
+  const [legacyPHLReviewTarget, setLegacyPHLReviewTarget] = useState<LegacyPHLClaimReview | null>(null)
+  const [legacyPHLReviewNote, setLegacyPHLReviewNote] = useState('')
 
   const [errorMessage, setErrorMessage] = useState('')
   const [successMessage, setSuccessMessage] = useState('')
@@ -566,14 +767,51 @@ export default function HRLeavePage() {
     })
   }, [phlBalanceSummary, searchKeyword])
 
+  const filteredPHLReconciliationRows = useMemo(() => {
+    const keyword = searchKeyword.trim().toLowerCase()
+
+    if (!keyword) return phlReconciliationRows
+
+    return phlReconciliationRows.filter((item) => {
+      return (
+        item.full_name?.toLowerCase().includes(keyword) ||
+        item.employee_number?.toLowerCase().includes(keyword) ||
+        item.department?.toLowerCase().includes(keyword) ||
+        item.position?.toLowerCase().includes(keyword) ||
+        item.reconciliation_status?.toLowerCase().includes(keyword) ||
+        item.last_review_note?.toLowerCase().includes(keyword)
+      )
+    })
+  }, [phlReconciliationRows, searchKeyword])
+
+  const filteredLegacyPHLClaims = useMemo(() => {
+    const keyword = searchKeyword.trim().toLowerCase()
+
+    if (!keyword) return legacyPHLClaims
+
+    return legacyPHLClaims.filter((item) => {
+      return (
+        item.full_name?.toLowerCase().includes(keyword) ||
+        item.employee_number?.toLowerCase().includes(keyword) ||
+        item.department?.toLowerCase().includes(keyword) ||
+        item.position?.toLowerCase().includes(keyword) ||
+        item.legacy_review_status?.toLowerCase().includes(keyword) ||
+        item.legacy_review_note?.toLowerCase().includes(keyword)
+      )
+    })
+  }, [legacyPHLClaims, searchKeyword])
+
   useEffect(() => {
     fetchData()
   }, [])
 
-  async function fetchData() {
+  async function fetchData(options?: { preserveMessages?: boolean }) {
     setLoading(true)
-    setErrorMessage('')
-    setSuccessMessage('')
+
+    if (!options?.preserveMessages) {
+      setErrorMessage('')
+      setSuccessMessage('')
+    }
     setSelectedLeaveRequest(null)
     setSelectedPHLRecord(null)
     setDeleteTarget(null)
@@ -581,6 +819,15 @@ export default function HRLeavePage() {
     setRejectPHLReason('')
     setRejectLeaveRecord(null)
     setRejectLeaveReason('')
+    setCancelLeaveRecord(null)
+    setCancelLeaveReason('')
+    setCancelPHLRecord(null)
+    setCancelPHLReason('')
+    setEmployeePHLReviewTarget(null)
+    setEmployeePHLReviewNote('')
+    setLegacyPHLReviewTarget(null)
+    setLegacyPHLReviewNote('')
+    setPHLAuditError('')
 
     const { data: authData, error: authError } = await supabase.auth.getUser()
 
@@ -610,6 +857,7 @@ export default function HRLeavePage() {
       fetchLeaveRequests(),
       fetchPHLRecords(),
       fetchPHLBalanceSummary(),
+      fetchPHLAuditData(),
     ])
 
     setLoading(false)
@@ -657,97 +905,383 @@ export default function HRLeavePage() {
     setPHLBalanceSummary(data || [])
   }
 
+  async function fetchPHLAuditData() {
+    const [reconciliationResult, legacyResult] = await Promise.all([
+      supabase.rpc('hr_get_phl_reconciliation'),
+      supabase.rpc('hr_get_legacy_phl_claims'),
+    ])
+
+    const auditError =
+      reconciliationResult.error?.message ||
+      legacyResult.error?.message ||
+      ''
+
+    if (auditError) {
+      setPHLReconciliationRows([])
+      setLegacyPHLClaims([])
+      setPHLAuditError(
+        `${auditError} Jalankan SQL rekonsiliasi PHL terlebih dahulu.`
+      )
+      return
+    }
+
+    setPHLReconciliationRows(
+      (reconciliationResult.data || []) as PHLReconciliationRow[]
+    )
+    setLegacyPHLClaims(
+      (legacyResult.data || []) as LegacyPHLClaimReview[]
+    )
+    setPHLAuditError('')
+  }
+
   async function approvePHLClaim(record: PHLRecord) {
     setProcessingId(record.id)
     setErrorMessage('')
     setSuccessMessage('')
 
     const approvedBy = appUser?.email || 'HR Administrator'
+    const approvalNote = 'Disetujui oleh HR.'
 
-    const { data, error } = await supabase.rpc('approve_phl_claim', {
-      p_claim_record_id: record.id,
-      p_approved_by: approvedBy,
-    })
-
-    if (error) {
-      setErrorMessage(error.message)
-      setProcessingId('')
-      return
+    type AtomicPHLApprovalResult = {
+      success?: boolean
+      already_approved?: boolean
+      claim_record_id?: string
+      employee_id?: string
+      claim_days?: number
+      available_balance_before?: number | null
+      available_balance_after?: number | null
+      employee_override_before?: number | null
+      employee_override_after?: number | null
+      legacy_message?: string | null
+      message?: string
     }
 
-    const message = String(data || '')
+    try {
+      const { data, error } = await supabase.rpc('hr_approve_phl_claim_atomic', {
+        p_claim_record_id: record.id,
+        p_approved_by: approvedBy,
+        p_note: approvalNote,
+      })
 
-    if (
-      message.toLowerCase().includes('tidak') ||
-      message.toLowerCase().includes('bukan') ||
-      message.toLowerCase().includes('kurang') ||
-      message.toLowerCase().includes('invalid') ||
-      message.toLowerCase().includes('ditolak')
-    ) {
-      setErrorMessage(message)
-      setProcessingId('')
-      await fetchData()
-      return
-    }
+      if (error) throw error
 
-    const notification = await sendHRPHLDecisionEmail({
-      record,
-      decision: 'approved',
-      hrName: approvedBy,
-      note: 'Disetujui oleh HR.',
-    })
+      const result = (data || {}) as AtomicPHLApprovalResult
 
-    setSuccessMessage(
-      appendNotificationText(
-        message || 'Klaim PHL berhasil disetujui HR dan saldo PHL sudah dikurangi.',
-        notification
+      const ledgerInfo =
+        result.available_balance_before !== null &&
+        result.available_balance_before !== undefined &&
+        result.available_balance_after !== null &&
+        result.available_balance_after !== undefined
+          ? ` Saldo ledger: ${result.available_balance_before} → ${result.available_balance_after} hari.`
+          : ''
+
+      const overrideInfo =
+        result.employee_override_before !== null &&
+        result.employee_override_before !== undefined &&
+        result.employee_override_after !== null &&
+        result.employee_override_after !== undefined &&
+        result.employee_override_before !== result.employee_override_after
+          ? ` Saldo manual employee: ${result.employee_override_before} → ${result.employee_override_after} hari.`
+          : ''
+
+      const notification = await sendHRPHLDecisionEmail({
+        record,
+        decision: 'approved',
+        hrName: approvedBy,
+        note: approvalNote,
+      })
+
+      setSuccessMessage(
+        appendNotificationText(
+          `${result.message || 'Klaim PHL berhasil disetujui secara atomik.'}${ledgerInfo}${overrideInfo}`,
+          notification
+        )
       )
-    )
-
-    setProcessingId('')
-    await fetchData()
+    } catch (error: any) {
+      setErrorMessage(
+        error?.message ||
+          'Klaim PHL gagal disetujui. Pastikan SQL atomic workflow PHL sudah dijalankan.'
+      )
+    } finally {
+      setProcessingId('')
+      await fetchData({ preserveMessages: true })
+    }
   }
 
   async function rejectPHLClaim() {
     if (!rejectPHLRecord) return
 
-    setProcessingId(rejectPHLRecord.id)
+    const targetRecord = rejectPHLRecord
+
+    setProcessingId(targetRecord.id)
     setErrorMessage('')
     setSuccessMessage('')
 
     const rejectedBy = appUser?.email || 'HR Administrator'
-    const rejectNote = rejectPHLReason || 'Ditolak oleh HR.'
+    const rejectNote = rejectPHLReason.trim() || 'Ditolak oleh HR.'
 
-    const { data, error } = await supabase.rpc('reject_phl_claim', {
-      p_claim_record_id: rejectPHLRecord.id,
-      p_rejected_by: rejectedBy,
-      p_reason: rejectNote,
-    })
+    type AtomicPHLRejectResult = {
+      success?: boolean
+      already_rejected?: boolean
+      claim_record_id?: string
+      employee_id?: string
+      claim_days?: number
+      legacy_message?: string | null
+      message?: string
+    }
 
-    if (error) {
-      setErrorMessage(error.message)
+    try {
+      const { data, error } = await supabase.rpc('hr_reject_phl_claim_atomic', {
+        p_claim_record_id: targetRecord.id,
+        p_rejected_by: rejectedBy,
+        p_reason: rejectNote,
+      })
+
+      if (error) throw error
+
+      const result = (data || {}) as AtomicPHLRejectResult
+
+      const notification = await sendHRPHLDecisionEmail({
+        record: targetRecord,
+        decision: 'rejected',
+        hrName: rejectedBy,
+        note: rejectNote,
+      })
+
+      setSuccessMessage(
+        appendNotificationText(
+          result.message || 'Klaim PHL berhasil ditolak secara atomik.',
+          notification
+        )
+      )
+
+      setRejectPHLRecord(null)
+      setRejectPHLReason('')
+    } catch (error: any) {
+      setErrorMessage(
+        error?.message ||
+          'Klaim PHL gagal ditolak. Pastikan SQL atomic workflow PHL sudah dijalankan.'
+      )
+    } finally {
       setProcessingId('')
+      await fetchData({ preserveMessages: true })
+    }
+  }
+
+
+  async function cancelApprovedPHLClaim() {
+    if (!cancelPHLRecord) return
+
+    const targetRecord = cancelPHLRecord
+    const reason = cancelPHLReason.trim()
+
+    if (reason.length < 5) {
+      setErrorMessage('Alasan pembatalan PHL minimal 5 karakter agar audit HR tetap jelas.')
       return
     }
 
-    const notification = await sendHRPHLDecisionEmail({
-      record: rejectPHLRecord,
-      decision: 'rejected',
-      hrName: rejectedBy,
-      note: rejectNote,
-    })
+    setProcessingId(targetRecord.id)
+    setErrorMessage('')
+    setSuccessMessage('')
 
-    setSuccessMessage(
-      appendNotificationText(
-        String(data || 'Klaim PHL berhasil ditolak HR.'),
-        notification
+    const cancelledBy = appUser?.email || 'HR Administrator'
+
+    type AtomicPHLCancellationResult = {
+      success?: boolean
+      already_cancelled?: boolean
+      claim_record_id?: string
+      employee_id?: string
+      claim_days?: number | null
+      allocation_count?: number | null
+      restored_fifo_days?: number | null
+      restored_employee_override_days?: number | null
+      restored_active_days?: number | null
+      restored_expired_days?: number | null
+      available_balance_before?: number | null
+      available_balance_after?: number | null
+      employee_override_before?: number | null
+      employee_override_after?: number | null
+      message?: string
+    }
+
+    try {
+      const { data, error } = await supabase.rpc(
+        'hr_cancel_approved_phl_claim_atomic',
+        {
+          p_claim_record_id: targetRecord.id,
+          p_cancelled_by: cancelledBy,
+          p_note: reason,
+        }
       )
-    )
 
-    setRejectPHLRecord(null)
-    setRejectPHLReason('')
-    setProcessingId('')
-    await fetchData()
+      if (error) throw error
+
+      const result = (data || {}) as AtomicPHLCancellationResult
+
+      if (!result.success) {
+        throw new Error(
+          result.message || 'Pembatalan klaim PHL belum berhasil diproses.'
+        )
+      }
+
+      const fifoDays = Number(result.restored_fifo_days || 0)
+      const overrideDays = Number(result.restored_employee_override_days || 0)
+      const activeDays = Number(result.restored_active_days || 0)
+      const expiredDays = Number(result.restored_expired_days || 0)
+
+      const restoredParts = [
+        fifoDays > 0 ? `${fifoDays} hari ke saldo FIFO asal` : '',
+        overrideDays > 0 ? `${overrideDays} hari ke saldo manual employee` : '',
+      ].filter(Boolean)
+
+      const restoredText =
+        restoredParts.join(' dan ') || 'tidak ada saldo yang dikembalikan ulang'
+
+      const expiredText =
+        expiredDays > 0
+          ? `${expiredDays} hari dikembalikan ke saldo asal yang masa berlakunya sudah berakhir, sehingga tidak menambah saldo aktif.`
+          : activeDays > 0
+            ? `${activeDays} hari kembali sebagai saldo aktif dengan tanggal kedaluwarsa sumber tetap dipertahankan.`
+            : ''
+
+      const ledgerInfo =
+        result.available_balance_before !== null &&
+        result.available_balance_before !== undefined &&
+        result.available_balance_after !== null &&
+        result.available_balance_after !== undefined
+          ? ` Saldo aktif ledger: ${result.available_balance_before} → ${result.available_balance_after} hari.`
+          : ''
+
+      const baseMessage = result.already_cancelled
+        ? 'Klaim PHL sebelumnya sudah dibatalkan. Saldo tidak dikembalikan ulang.'
+        : `${result.message || 'Klaim PHL berhasil dibatalkan.'} ${restoredText}.${ledgerInfo}${expiredText ? ` ${expiredText}` : ''}`
+
+      const notification = await sendHRPHLCancellationEmail({
+        record: targetRecord,
+        hrName: cancelledBy,
+        note: reason,
+        restoredText,
+        expiredText,
+      })
+
+      setSuccessMessage(
+        appendNotificationText(baseMessage, notification)
+      )
+
+      setCancelPHLRecord(null)
+      setCancelPHLReason('')
+    } catch (error: any) {
+      console.error('Atomic PHL cancellation error:', error)
+
+      setErrorMessage(
+        error?.message ||
+          'Pembatalan klaim PHL gagal. Status dan seluruh saldo tetap seperti semula.'
+      )
+    } finally {
+      setProcessingId('')
+      await fetchData({ preserveMessages: true })
+    }
+  }
+
+
+  async function recordPHLEmployeeReview() {
+    if (!employeePHLReviewTarget) return
+
+    const note = employeePHLReviewNote.trim()
+
+    if (note.length < 5) {
+      setErrorMessage('Catatan review rekonsiliasi minimal 5 karakter.')
+      return
+    }
+
+    const processingKey = `phl-review-${employeePHLReviewTarget.employee_id}`
+
+    setProcessingId(processingKey)
+    setErrorMessage('')
+    setSuccessMessage('')
+
+    try {
+      const { data, error } = await supabase.rpc(
+        'hr_record_phl_employee_review',
+        {
+          p_employee_id: employeePHLReviewTarget.employee_id,
+          p_note: note,
+        }
+      )
+
+      if (error) throw error
+
+      const result = (data || {}) as {
+        success?: boolean
+        message?: string
+      }
+
+      setSuccessMessage(
+        result.message ||
+          'Review rekonsiliasi PHL berhasil dicatat tanpa mengubah saldo.'
+      )
+
+      setEmployeePHLReviewTarget(null)
+      setEmployeePHLReviewNote('')
+    } catch (error: any) {
+      setErrorMessage(
+        error?.message ||
+          'Gagal mencatat review rekonsiliasi PHL.'
+      )
+    } finally {
+      setProcessingId('')
+      await fetchData({ preserveMessages: true })
+    }
+  }
+
+  async function markLegacyPHLClaimReviewed() {
+    if (!legacyPHLReviewTarget) return
+
+    const note = legacyPHLReviewNote.trim()
+
+    if (note.length < 5) {
+      setErrorMessage('Catatan review klaim legacy minimal 5 karakter.')
+      return
+    }
+
+    const processingKey = `legacy-review-${legacyPHLReviewTarget.claim_record_id}`
+
+    setProcessingId(processingKey)
+    setErrorMessage('')
+    setSuccessMessage('')
+
+    try {
+      const { data, error } = await supabase.rpc(
+        'hr_mark_legacy_phl_claim_reviewed',
+        {
+          p_claim_record_id: legacyPHLReviewTarget.claim_record_id,
+          p_note: note,
+        }
+      )
+
+      if (error) throw error
+
+      const result = (data || {}) as {
+        success?: boolean
+        message?: string
+      }
+
+      setSuccessMessage(
+        result.message ||
+          'Klaim legacy berhasil ditandai sudah direview tanpa mengubah saldo.'
+      )
+
+      setLegacyPHLReviewTarget(null)
+      setLegacyPHLReviewNote('')
+    } catch (error: any) {
+      setErrorMessage(
+        error?.message ||
+          'Gagal mencatat review klaim legacy PHL.'
+      )
+    } finally {
+      setProcessingId('')
+      await fetchData({ preserveMessages: true })
+    }
   }
 
   async function approveLeaveRequest(item: LeaveRequest) {
@@ -755,59 +1289,208 @@ export default function HRLeavePage() {
     setErrorMessage('')
     setSuccessMessage('')
 
-    const now = new Date().toISOString()
     const approvedBy = appUser?.email || 'HR Administrator'
     const approvalNote = 'Disetujui oleh HR.'
 
-    const { error } = await supabase
-      .from('leave_requests')
-      .update({
-        status: 'approved',
-        hr_status: 'approved',
-        hr_approved_by: approvedBy,
-        hr_approved_at: now,
-        hr_note: approvalNote,
-        updated_at: now,
-      })
-      .eq('id', item.id)
+    type AtomicApprovalResult = {
+      success?: boolean
+      already_approved?: boolean
+      request_id?: string
+      employee_id?: string
+      request_type?: string | null
+      total_days?: number | null
+      balance_field?: 'annual_leave_balance' | 'phl_balance' | null
+      balance_before?: number | null
+      balance_after?: number | null
+      attendance_sync?: string | null
+      message?: string
+    }
 
-    if (error) {
-      setErrorMessage(error.message)
+    try {
+      const { data, error } = await supabase.rpc(
+        'hr_approve_leave_request_atomic',
+        {
+          p_request_id: item.id,
+          p_approved_by: approvedBy,
+          p_note: approvalNote,
+        }
+      )
+
+      if (error) {
+        throw error
+      }
+
+      const result = (data || {}) as AtomicApprovalResult
+
+      if (!result.success) {
+        throw new Error(
+          result.message ||
+            'Approval final HR belum berhasil diproses.'
+        )
+      }
+
+      let balanceText = ''
+
+      if (
+        result.balance_field &&
+        result.balance_before !== null &&
+        result.balance_before !== undefined &&
+        result.balance_after !== null &&
+        result.balance_after !== undefined
+      ) {
+        const balanceLabel =
+          result.balance_field === 'annual_leave_balance'
+            ? 'Saldo cuti tahunan'
+            : 'Saldo PHL'
+
+        balanceText =
+          ` ${balanceLabel}: ${result.balance_before} hari → ` +
+          `${result.balance_after} hari.`
+      }
+
+      const baseMessage = result.already_approved
+        ? 'Pengajuan sebelumnya sudah disetujui HR. Tidak ada pemotongan saldo ulang.'
+        : `Pengajuan cuti/izin berhasil disetujui HR secara atomik, saldo diperbarui, dan data absensi tersinkron.${balanceText}`
+
+      let notification
+
+      try {
+        notification = await sendHRLeaveDecisionEmail({
+          item,
+          decision: 'approved',
+          hrName: approvedBy,
+          note: approvalNote,
+        })
+      } catch (notificationError: any) {
+        console.warn(
+          'HR leave approval notification warning:',
+          notificationError
+        )
+
+        notification = {
+          success: false,
+          message:
+            notificationError?.message ||
+            'Email notifikasi belum berhasil dikirim.',
+        }
+      }
+
+      setSuccessMessage(
+        appendNotificationText(baseMessage, notification)
+      )
+    } catch (error: any) {
+      console.error('Atomic HR leave approval error:', error)
+
+      setErrorMessage(
+        error?.message ||
+          'Approval final HR gagal. Tidak ada status, saldo, atau data absensi yang diubah.'
+      )
+    } finally {
       setProcessingId('')
+      await fetchData({ preserveMessages: true })
+    }
+  }
+
+  async function cancelApprovedLeaveRequest() {
+    if (!cancelLeaveRecord) return
+
+    const reason = cancelLeaveReason.trim()
+
+    if (reason.length < 5) {
+      setErrorMessage('Alasan pembatalan minimal 5 karakter agar audit HR tetap jelas.')
       return
     }
 
-    if (item.employee_id && item.start_date && item.end_date) {
-      const { error: syncError } = await supabase.rpc('sync_employee_absence_requests_to_attendance', {
-        p_employee_id: item.employee_id,
-        p_period_start: item.start_date,
-        p_period_end: item.end_date,
-      })
+    setProcessingId(cancelLeaveRecord.id)
+    setErrorMessage('')
+    setSuccessMessage('')
 
-      if (syncError) {
-        setErrorMessage(`Pengajuan disetujui HR, tetapi sinkron ke absensi gagal: ${syncError.message}`)
-        setProcessingId('')
-        await fetchData()
-        return
-      }
+    const cancelledBy = appUser?.email || 'HR Administrator'
+
+    type AtomicCancellationResult = {
+      success?: boolean
+      already_cancelled?: boolean
+      request_id?: string
+      employee_id?: string
+      balance_field?: 'annual_leave_balance' | 'phl_balance' | null
+      balance_before?: number | null
+      balance_after?: number | null
+      restored_days?: number | null
+      attendance_sync?: string | null
+      message?: string
     }
 
-    const notification = await sendHRLeaveDecisionEmail({
-      item,
-      decision: 'approved',
-      hrName: approvedBy,
-      note: approvalNote,
-    })
-
-    setSuccessMessage(
-      appendNotificationText(
-        'Pengajuan cuti/izin berhasil disetujui HR dan disinkronkan ke absensi.',
-        notification
+    try {
+      const { data, error } = await supabase.rpc(
+        'hr_cancel_approved_leave_request_atomic',
+        {
+          p_request_id: cancelLeaveRecord.id,
+          p_cancelled_by: cancelledBy,
+          p_note: reason,
+        }
       )
-    )
 
-    setProcessingId('')
-    await fetchData()
+      if (error) throw error
+
+      const result = (data || {}) as AtomicCancellationResult
+
+      if (!result.success) {
+        throw new Error(
+          result.message ||
+            'Pembatalan pengajuan belum berhasil diproses.'
+        )
+      }
+
+      let balanceMessage = ''
+      let emailBalanceText = ''
+
+      if (
+        result.balance_field &&
+        result.balance_before !== null &&
+        result.balance_before !== undefined &&
+        result.balance_after !== null &&
+        result.balance_after !== undefined
+      ) {
+        const balanceLabel =
+          result.balance_field === 'annual_leave_balance'
+            ? 'Saldo cuti tahunan'
+            : 'Saldo PHL'
+
+        emailBalanceText =
+          `${balanceLabel} ${result.balance_before} hari → ` +
+          `${result.balance_after} hari`
+
+        balanceMessage = ` ${emailBalanceText}.`
+      }
+
+      const baseMessage = result.already_cancelled
+        ? 'Pengajuan sebelumnya sudah dibatalkan. Saldo tidak dikembalikan ulang.'
+        : `Pengajuan berhasil dibatalkan, absensi disinkronkan ulang.${balanceMessage}`
+
+      const notification = await sendHRLeaveCancellationEmail({
+        item: cancelLeaveRecord,
+        hrName: cancelledBy,
+        note: reason,
+        balanceText: emailBalanceText,
+      })
+
+      setSuccessMessage(
+        appendNotificationText(baseMessage, notification)
+      )
+
+      setCancelLeaveRecord(null)
+      setCancelLeaveReason('')
+    } catch (error: any) {
+      console.error('Atomic HR leave cancellation error:', error)
+
+      setErrorMessage(
+        error?.message ||
+          'Pembatalan gagal. Status, saldo, dan data absensi tidak diubah.'
+      )
+    } finally {
+      setProcessingId('')
+      await fetchData({ preserveMessages: true })
+    }
   }
 
   async function rejectLeaveRequest() {
@@ -856,10 +1539,20 @@ export default function HRLeavePage() {
     setRejectLeaveRecord(null)
     setRejectLeaveReason('')
     setProcessingId('')
-    await fetchData()
+    await fetchData({ preserveMessages: true })
   }
 
   function requestDeleteLeave(item: LeaveRequest) {
+    const status = normalizeStatus(item.hr_status || item.status)
+
+    if (status === 'approved') {
+      setErrorMessage(
+        'Pengajuan yang sudah disetujui tidak boleh langsung dihapus. Gunakan tombol Batalkan agar saldo dikembalikan dan absensi disinkronkan ulang.'
+      )
+      setSuccessMessage('')
+      return
+    }
+
     setDeleteTarget({
       id: item.id,
       kind: 'leave',
@@ -871,13 +1564,31 @@ export default function HRLeavePage() {
   }
 
   function requestDeletePHL(record: PHLRecord) {
+    const status = normalizeStatus(record.hr_status || record.status)
+    const usedDays = Number(record.used_days || 0)
+
+    if (
+      status === 'approved' ||
+      status === 'cancelled' ||
+      status === 'canceled' ||
+      usedDays > 0
+    ) {
+      setErrorMessage(
+        record.source === 'employee_phl_claim'
+          ? 'Klaim PHL approved/cancelled tidak boleh dihapus karena merupakan bagian dari ledger saldo dan audit reversal.'
+          : 'Saldo PHL approved atau yang sudah pernah digunakan tidak boleh langsung dihapus karena dapat merusak perhitungan saldo karyawan.'
+      )
+      setSuccessMessage('')
+      return
+    }
+
     setDeleteTarget({
       id: record.id,
       kind: 'phl',
       title: 'Hapus Data PHL',
       employeeName: record.full_name || 'Karyawan',
       description:
-        'Data PHL ini akan dihapus permanen dari database. Gunakan hanya untuk membersihkan data dummy atau data testing.',
+        'Data PHL pending/rejected ini akan dihapus permanen. Gunakan hanya untuk membersihkan data dummy atau data testing.',
     })
   }
 
@@ -912,7 +1623,7 @@ export default function HRLeavePage() {
     setSelectedPHLRecord(null)
     setDeleteTarget(null)
 
-    await fetchData()
+    await fetchData({ preserveMessages: true })
   }
 
   return (
@@ -997,6 +1708,13 @@ export default function HRLeavePage() {
               />
 
               <TabButton
+                active={activeTab === 'phl-audit'}
+                label="Audit PHL"
+                icon={<ShieldCheck size={17} />}
+                onClick={() => setActiveTab('phl-audit')}
+              />
+
+              <TabButton
                 active={activeTab === 'history'}
                 label="Riwayat"
                 icon={<History size={17} />}
@@ -1017,7 +1735,7 @@ export default function HRLeavePage() {
 
               <button
                 type="button"
-                onClick={fetchData}
+                onClick={() => fetchData()}
                 className="harmony-button-secondary"
               >
                 <RefreshCcw size={18} />
@@ -1042,6 +1760,10 @@ export default function HRLeavePage() {
                 setRejectLeaveRecord(item)
                 setRejectLeaveReason('')
               }}
+              onCancel={(item) => {
+                setCancelLeaveRecord(item)
+                setCancelLeaveReason('')
+              }}
               onDelete={requestDeleteLeave}
               onDetail={setSelectedLeaveRequest}
             />
@@ -1056,6 +1778,10 @@ export default function HRLeavePage() {
                 setRejectPHLRecord(record)
                 setRejectPHLReason('')
               }}
+              onCancel={(record) => {
+                setCancelPHLRecord(record)
+                setCancelPHLReason('')
+              }}
               onDelete={requestDeletePHL}
               onDetail={setSelectedPHLRecord}
             />
@@ -1067,6 +1793,23 @@ export default function HRLeavePage() {
               balances={filteredPHLBalances}
               onDelete={requestDeletePHL}
               onDetail={setSelectedPHLRecord}
+            />
+          )}
+
+          {!loading && activeTab === 'phl-audit' && (
+            <PHLReconciliationTab
+              rows={filteredPHLReconciliationRows}
+              legacyClaims={filteredLegacyPHLClaims}
+              auditError={phlAuditError}
+              processingId={processingId}
+              onReviewEmployee={(item) => {
+                setEmployeePHLReviewTarget(item)
+                setEmployeePHLReviewNote(item.last_review_note || '')
+              }}
+              onReviewLegacy={(item) => {
+                setLegacyPHLReviewTarget(item)
+                setLegacyPHLReviewNote(item.legacy_review_note || '')
+              }}
             />
           )}
 
@@ -1110,6 +1853,20 @@ export default function HRLeavePage() {
           />
         )}
 
+        {cancelPHLRecord && (
+          <CancelPHLModal
+            record={cancelPHLRecord}
+            reason={cancelPHLReason}
+            processing={processingId === cancelPHLRecord.id}
+            onReasonChange={setCancelPHLReason}
+            onClose={() => {
+              setCancelPHLRecord(null)
+              setCancelPHLReason('')
+            }}
+            onSubmit={cancelApprovedPHLClaim}
+          />
+        )}
+
         {rejectLeaveRecord && (
           <RejectLeaveModal
             record={rejectLeaveRecord}
@@ -1121,6 +1878,54 @@ export default function HRLeavePage() {
               setRejectLeaveReason('')
             }}
             onSubmit={rejectLeaveRequest}
+          />
+        )}
+
+        {cancelLeaveRecord && (
+          <CancelLeaveModal
+            record={cancelLeaveRecord}
+            reason={cancelLeaveReason}
+            processing={processingId === cancelLeaveRecord.id}
+            onReasonChange={setCancelLeaveReason}
+            onClose={() => {
+              setCancelLeaveRecord(null)
+              setCancelLeaveReason('')
+            }}
+            onSubmit={cancelApprovedLeaveRequest}
+          />
+        )}
+
+        {employeePHLReviewTarget && (
+          <PHLEmployeeReviewModal
+            record={employeePHLReviewTarget}
+            note={employeePHLReviewNote}
+            processing={
+              processingId ===
+              `phl-review-${employeePHLReviewTarget.employee_id}`
+            }
+            onNoteChange={setEmployeePHLReviewNote}
+            onClose={() => {
+              setEmployeePHLReviewTarget(null)
+              setEmployeePHLReviewNote('')
+            }}
+            onSubmit={recordPHLEmployeeReview}
+          />
+        )}
+
+        {legacyPHLReviewTarget && (
+          <LegacyPHLReviewModal
+            record={legacyPHLReviewTarget}
+            note={legacyPHLReviewNote}
+            processing={
+              processingId ===
+              `legacy-review-${legacyPHLReviewTarget.claim_record_id}`
+            }
+            onNoteChange={setLegacyPHLReviewNote}
+            onClose={() => {
+              setLegacyPHLReviewTarget(null)
+              setLegacyPHLReviewNote('')
+            }}
+            onSubmit={markLegacyPHLClaimReviewed}
           />
         )}
 
@@ -1142,6 +1947,7 @@ function LeaveRequestTab({
   processingId,
   onApprove,
   onReject,
+  onCancel,
   onDelete,
   onDetail,
 }: {
@@ -1149,6 +1955,7 @@ function LeaveRequestTab({
   processingId: string
   onApprove: (item: LeaveRequest) => void
   onReject: (item: LeaveRequest) => void
+  onCancel: (item: LeaveRequest) => void
   onDelete: (item: LeaveRequest) => void
   onDetail: (item: LeaveRequest) => void
 }) {
@@ -1236,8 +2043,8 @@ function LeaveRequestTab({
               </td>
 
               <td className="px-5 py-4">
-                <div className="flex items-center gap-2">
-                  {canProcess ? (
+                <div className="flex flex-wrap items-center gap-2">
+                  {canProcess && (
                     <>
                       <SmallActionButton
                         label="Approve"
@@ -1254,19 +2061,27 @@ function LeaveRequestTab({
                         onClick={() => onReject(item)}
                       />
                     </>
-                  ) : (
-                    <span className="text-xs font-semibold text-[#86868b]">
-                      Selesai
-                    </span>
                   )}
 
-                  <SmallActionButton
-                    label="Hapus"
-                    icon={<Trash2 size={14} />}
-                    tone="red"
-                    disabled={processingId === item.id}
-                    onClick={() => onDelete(item)}
-                  />
+                  {hrStatus === 'approved' && (
+                    <SmallActionButton
+                      label="Batalkan"
+                      icon={<RotateCcw size={14} />}
+                      tone="blue"
+                      disabled={processingId === item.id}
+                      onClick={() => onCancel(item)}
+                    />
+                  )}
+
+                  {hrStatus !== 'approved' && (
+                    <SmallActionButton
+                      label="Hapus"
+                      icon={<Trash2 size={14} />}
+                      tone="red"
+                      disabled={processingId === item.id}
+                      onClick={() => onDelete(item)}
+                    />
+                  )}
                 </div>
               </td>
             </tr>
@@ -1282,6 +2097,7 @@ function PHLClaimApprovalTab({
   processingId,
   onApprove,
   onReject,
+  onCancel,
   onDelete,
   onDetail,
 }: {
@@ -1289,11 +2105,12 @@ function PHLClaimApprovalTab({
   processingId: string
   onApprove: (record: PHLRecord) => void
   onReject: (record: PHLRecord) => void
+  onCancel: (record: PHLRecord) => void
   onDelete: (record: PHLRecord) => void
   onDetail: (record: PHLRecord) => void
 }) {
   const pending = claims.filter((item) => {
-    const status = normalizeStatus(item.status)
+    const status = normalizeStatus(item.hr_status || item.status)
 
     return (
       status === 'pending' ||
@@ -1302,23 +2119,33 @@ function PHLClaimApprovalTab({
     )
   })
 
+  const approved = claims.filter((item) => {
+    return normalizeStatus(item.hr_status || item.status) === 'approved'
+  })
+
+  const cancelled = claims.filter((item) => {
+    const status = normalizeStatus(item.hr_status || item.status)
+    return status === 'cancelled' || status === 'canceled'
+  })
+
   return (
     <div>
       <SectionIntro
         title="Approval Klaim PHL"
-        description="Jika disetujui HR, saldo PHL otomatis berkurang. HR juga dapat menjadi backup jika atasan berhalangan."
+        description="Approval mencatat alokasi FIFO per saldo sumber. Klaim approved dapat dibatalkan secara atomik dan saldo dikembalikan ke sumber dengan masa berlaku asli."
       />
 
-      <div className="grid gap-5 p-6 md:grid-cols-3">
+      <div className="grid gap-5 p-6 md:grid-cols-4">
         <MiniPanel title="Pending Klaim" value={`${pending.length}`} icon={<Clock3 size={20} />} />
-        <MiniPanel title="Total Klaim" value={`${claims.length}`} icon={<Plane size={20} />} />
-        <MiniPanel title="Metode Saldo" value="FIFO" icon={<ShieldCheck size={20} />} />
+        <MiniPanel title="Approved" value={`${approved.length}`} icon={<CheckCircle2 size={20} />} />
+        <MiniPanel title="Dibatalkan" value={`${cancelled.length}`} icon={<RotateCcw size={20} />} />
+        <MiniPanel title="Metode Saldo" value="FIFO Audit" icon={<ShieldCheck size={20} />} />
       </div>
 
       <DataTable
         emptyTitle="Belum ada klaim PHL"
         emptyDescription="Pengajuan klaim PHL karyawan akan muncul di sini."
-        minWidth="1450px"
+        minWidth="1500px"
         headers={[
           'Karyawan',
           'Tanggal Klaim',
@@ -1332,12 +2159,15 @@ function PHLClaimApprovalTab({
         ]}
       >
         {claims.map((item) => {
-          const status = normalizeStatus(item.status)
+          const status = normalizeStatus(item.hr_status || item.status)
 
           const canProcess =
             status === 'pending' ||
             status === 'submitted' ||
             status === 'waiting_hr'
+
+          const canCancel = status === 'approved'
+          const isCancelled = status === 'cancelled' || status === 'canceled'
 
           return (
             <tr key={item.id} className="border-b border-black/5 transition hover:bg-[#f5f5f7]/70">
@@ -1353,7 +2183,7 @@ function PHLClaimApprovalTab({
               </td>
 
               <td className="px-5 py-4 text-sm font-semibold text-[#1d1d1f]">
-                {item.used_days || 0} hari
+                {item.used_days || item.balance_days || 0} hari
               </td>
 
               <td className="px-5 py-4">
@@ -1389,8 +2219,8 @@ function PHLClaimApprovalTab({
               </td>
 
               <td className="px-5 py-4">
-                <div className="flex items-center gap-2">
-                  {canProcess ? (
+                <div className="flex flex-wrap items-center gap-2">
+                  {canProcess && (
                     <>
                       <SmallActionButton
                         label="Approve"
@@ -1407,19 +2237,37 @@ function PHLClaimApprovalTab({
                         onClick={() => onReject(item)}
                       />
                     </>
-                  ) : (
-                    <span className="text-xs font-semibold text-[#86868b]">
-                      Selesai
+                  )}
+
+                  {canCancel && (
+                    <SmallActionButton
+                      label="Batalkan"
+                      icon={<RotateCcw size={14} />}
+                      tone="orange"
+                      disabled={processingId === item.id}
+                      onClick={() => onCancel(item)}
+                    />
+                  )}
+
+                  {!canProcess && !canCancel && (
+                    <span className="rounded-full bg-[#f5f5f7] px-3 py-2 text-[11px] font-bold text-[#86868b]">
+                      {isCancelled ? 'Reversal selesai' : 'Proses selesai'}
                     </span>
                   )}
 
-                  <SmallActionButton
-                    label="Hapus"
-                    icon={<Trash2 size={14} />}
-                    tone="red"
-                    disabled={processingId === item.id}
-                    onClick={() => onDelete(item)}
-                  />
+                  {canProcess ? (
+                    <SmallActionButton
+                      label="Hapus"
+                      icon={<Trash2 size={14} />}
+                      tone="red"
+                      disabled={processingId === item.id}
+                      onClick={() => onDelete(item)}
+                    />
+                  ) : (
+                    <span className="rounded-full bg-[#f5f5f7] px-3 py-2 text-[11px] font-bold text-[#86868b]">
+                      Audit terkunci
+                    </span>
+                  )}
                 </div>
               </td>
             </tr>
@@ -1527,18 +2375,363 @@ function PHLBalanceTab({
             </td>
 
             <td className="px-5 py-4">
-              <SmallActionButton
-                label="Hapus"
-                icon={<Trash2 size={14} />}
-                tone="red"
-                disabled={false}
-                onClick={() => onDelete(item)}
-              />
+              {normalizeStatus(item.status) === 'approved' || Number(item.used_days || 0) > 0 ? (
+                <span className="rounded-full bg-[#f5f5f7] px-3 py-2 text-[11px] font-bold text-[#86868b]">
+                  Saldo terkunci
+                </span>
+              ) : (
+                <SmallActionButton
+                  label="Hapus"
+                  icon={<Trash2 size={14} />}
+                  tone="red"
+                  disabled={false}
+                  onClick={() => onDelete(item)}
+                />
+              )}
             </td>
           </tr>
         ))}
       </DataTable>
     </div>
+  )
+}
+
+
+function PHLReconciliationTab({
+  rows,
+  legacyClaims,
+  auditError,
+  processingId,
+  onReviewEmployee,
+  onReviewLegacy,
+}: {
+  rows: PHLReconciliationRow[]
+  legacyClaims: LegacyPHLClaimReview[]
+  auditError: string
+  processingId: string
+  onReviewEmployee: (record: PHLReconciliationRow) => void
+  onReviewLegacy: (record: LegacyPHLClaimReview) => void
+}) {
+  const healthyCount = rows.filter(
+    (item) => normalizeStatus(item.reconciliation_status) === 'healthy'
+  ).length
+
+  const manualDifferenceCount = rows.filter(
+    (item) =>
+      normalizeStatus(item.reconciliation_status) === 'manual_difference'
+  ).length
+
+  const needsReviewCount = rows.filter(
+    (item) =>
+      normalizeStatus(item.reconciliation_status) === 'needs_review'
+  ).length
+
+  const unreviewedLegacyCount = legacyClaims.filter(
+    (item) => normalizeStatus(item.legacy_review_status) !== 'reviewed'
+  ).length
+
+  return (
+    <div>
+      <SectionIntro
+        title="Audit & Rekonsiliasi PHL"
+        description="Bandingkan ledger aktif, saldo manual employee, saldo kedaluwarsa, dan tracking klaim legacy. Semua tindakan pada tab ini hanya mencatat review dan tidak mengubah saldo."
+      />
+
+      {auditError && (
+        <div className="mx-6 mt-6 rounded-[24px] border border-orange-200 bg-orange-50 p-4 text-sm leading-6 text-orange-800">
+          <div className="mb-1 flex items-center gap-2 font-bold">
+            <AlertTriangle size={17} />
+            Modul audit belum tersedia
+          </div>
+          {auditError}
+        </div>
+      )}
+
+      <div className="grid gap-4 p-6 md:grid-cols-2 xl:grid-cols-4">
+        <MiniPanel
+          title="Data Sehat"
+          value={String(healthyCount)}
+          icon={<CheckCircle2 size={20} />}
+        />
+        <MiniPanel
+          title="Selisih Saldo Manual"
+          value={String(manualDifferenceCount)}
+          icon={<Landmark size={20} />}
+        />
+        <MiniPanel
+          title="Perlu Review"
+          value={String(needsReviewCount)}
+          icon={<AlertTriangle size={20} />}
+        />
+        <MiniPanel
+          title="Legacy Belum Direview"
+          value={String(unreviewedLegacyCount)}
+          icon={<History size={20} />}
+        />
+      </div>
+
+      <div className="border-t border-black/5">
+        <SectionIntro
+          title="Rekonsiliasi per Karyawan"
+          description="Saldo manual hanya dibandingkan sebagai indikator. Sistem tidak menyamakan atau mengubah saldo secara otomatis."
+        />
+
+        <DataTable
+          emptyTitle="Belum ada data rekonsiliasi"
+          emptyDescription="Jalankan SQL rekonsiliasi PHL lalu tekan Refresh."
+          minWidth="1700px"
+          headers={[
+            'Karyawan',
+            'Ledger Aktif',
+            'Saldo Manual',
+            'Selisih',
+            'Saldo Expired',
+            'Earned / Used',
+            'Klaim',
+            'Tracking Legacy',
+            'Status',
+            'Review Terakhir',
+            'Action',
+          ]}
+        >
+          {rows.map((item) => {
+            const status = normalizeStatus(item.reconciliation_status)
+            const legacyCount = Number(item.legacy_untracked_claim_count || 0)
+            const reviewedCount = Number(item.reviewed_legacy_claim_count || 0)
+            const reviewKey = `phl-review-${item.employee_id}`
+
+            return (
+              <tr
+                key={item.employee_id}
+                className="border-b border-black/5 transition hover:bg-[#f5f5f7]/70"
+              >
+                <td className="px-5 py-4">
+                  <EmployeeCell
+                    name={item.full_name || '-'}
+                    meta={`${item.employee_number || '-'} · ${item.department || '-'} · ${item.position || '-'}`}
+                  />
+                </td>
+
+                <NumberCell
+                  value={item.active_ledger_balance || 0}
+                  tone="green"
+                />
+
+                <td className="px-5 py-4 text-sm font-semibold text-[#1d1d1f]">
+                  {item.manual_phl_balance === null ||
+                  item.manual_phl_balance === undefined
+                    ? '-'
+                    : `${formatPHLNumber(item.manual_phl_balance)} hari`}
+                </td>
+
+                <td className="px-5 py-4">
+                  <span
+                    className={[
+                      'inline-flex rounded-full px-3 py-1.5 text-xs font-bold',
+                      Math.abs(Number(item.manual_ledger_difference || 0)) > 0.0001
+                        ? 'bg-orange-50 text-orange-700'
+                        : 'bg-green-50 text-green-700',
+                    ].join(' ')}
+                  >
+                    {item.manual_ledger_difference === null ||
+                    item.manual_ledger_difference === undefined
+                      ? '-'
+                      : `${formatPHLNumber(item.manual_ledger_difference)} hari`}
+                  </span>
+                </td>
+
+                <NumberCell
+                  value={item.expired_remaining_balance || 0}
+                  tone="orange"
+                />
+
+                <td className="px-5 py-4 text-sm leading-6 text-[#6e6e73]">
+                  <div className="font-semibold text-[#1d1d1f]">
+                    {formatPHLNumber(item.total_earned_days)} earned
+                  </div>
+                  <div>
+                    {formatPHLNumber(item.total_used_days)} used
+                  </div>
+                </td>
+
+                <td className="px-5 py-4 text-sm leading-6 text-[#6e6e73]">
+                  <div className="font-semibold text-[#1d1d1f]">
+                    {Number(item.approved_claim_count || 0)} approved
+                  </div>
+                  <div>
+                    {Number(item.pending_claim_count || 0)} pending
+                  </div>
+                </td>
+
+                <td className="px-5 py-4 text-sm leading-6 text-[#6e6e73]">
+                  <div className="font-semibold text-[#1d1d1f]">
+                    {legacyCount} gap
+                  </div>
+                  <div>
+                    {reviewedCount} direview
+                  </div>
+                </td>
+
+                <td className="px-5 py-4">
+                  <PHLReconciliationBadge status={status} />
+                </td>
+
+                <td className="px-5 py-4 text-sm leading-6 text-[#6e6e73]">
+                  {item.last_reviewed_at ? (
+                    <>
+                      <div className="font-semibold text-[#1d1d1f]">
+                        {new Date(item.last_reviewed_at).toLocaleString('id-ID')}
+                      </div>
+                      <div>{item.last_reviewed_by || '-'}</div>
+                      {item.last_review_note && (
+                        <div className="mt-1 line-clamp-2 max-w-[260px]">
+                          {item.last_review_note}
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    '-'
+                  )}
+                </td>
+
+                <td className="px-5 py-4">
+                  <SmallActionButton
+                    label={item.last_reviewed_at ? 'Review Ulang' : 'Catat Review'}
+                    icon={<FileText size={14} />}
+                    tone="blue"
+                    disabled={processingId === reviewKey}
+                    onClick={() => onReviewEmployee(item)}
+                  />
+                </td>
+              </tr>
+            )
+          })}
+        </DataTable>
+      </div>
+
+      <div className="border-t border-black/5">
+        <SectionIntro
+          title="Klaim Legacy Belum Terlacak Penuh"
+          description="Daftar ini berisi klaim approved yang jumlah pemotongannya tidak dapat dibuktikan penuh dari alokasi FIFO dan audit saldo manual. Review tidak membuat alokasi palsu."
+        />
+
+        <DataTable
+          emptyTitle="Tidak ada klaim legacy bermasalah"
+          emptyDescription="Seluruh klaim approved sudah memiliki tracking saldo yang lengkap."
+          minWidth="1500px"
+          headers={[
+            'Karyawan',
+            'Tanggal',
+            'Klaim',
+            'Alokasi FIFO',
+            'Saldo Manual',
+            'Gap Tracking',
+            'Approval HR',
+            'Status Review',
+            'Catatan',
+            'Action',
+          ]}
+        >
+          {legacyClaims.map((item) => {
+            const reviewed =
+              normalizeStatus(item.legacy_review_status) === 'reviewed'
+            const reviewKey = `legacy-review-${item.claim_record_id}`
+
+            return (
+              <tr
+                key={item.claim_record_id}
+                className="border-b border-black/5 transition hover:bg-[#f5f5f7]/70"
+              >
+                <td className="px-5 py-4">
+                  <EmployeeCell
+                    name={item.full_name || '-'}
+                    meta={`${item.employee_number || '-'} · ${item.department || '-'} · ${item.position || '-'}`}
+                  />
+                </td>
+
+                <td className="px-5 py-4 text-sm font-semibold text-[#1d1d1f]">
+                  {formatDisplayDate(item.phl_date || '')}
+                </td>
+
+                <NumberCell value={item.claim_days || 0} tone="purple" />
+                <NumberCell value={item.allocated_days || 0} tone="green" />
+                <NumberCell
+                  value={item.override_consumed_days || 0}
+                  tone="blue"
+                />
+                <NumberCell value={item.tracking_gap_days || 0} tone="orange" />
+
+                <td className="px-5 py-4 text-sm leading-6 text-[#6e6e73]">
+                  <div className="font-semibold text-[#1d1d1f]">
+                    {item.hr_approved_by || '-'}
+                  </div>
+                  <div>
+                    {item.hr_approved_at
+                      ? new Date(item.hr_approved_at).toLocaleString('id-ID')
+                      : '-'}
+                  </div>
+                </td>
+
+                <td className="px-5 py-4">
+                  <span
+                    className={[
+                      'inline-flex rounded-full px-3 py-1.5 text-xs font-bold',
+                      reviewed
+                        ? 'bg-blue-50 text-blue-700'
+                        : 'bg-orange-50 text-orange-700',
+                    ].join(' ')}
+                  >
+                    {reviewed ? 'Sudah Direview' : 'Belum Direview'}
+                  </span>
+                </td>
+
+                <td className="px-5 py-4 text-sm leading-6 text-[#6e6e73]">
+                  {item.legacy_review_note || '-'}
+                </td>
+
+                <td className="px-5 py-4">
+                  <SmallActionButton
+                    label={reviewed ? 'Review Ulang' : 'Tandai Review'}
+                    icon={<ShieldCheck size={14} />}
+                    tone="orange"
+                    disabled={processingId === reviewKey}
+                    onClick={() => onReviewLegacy(item)}
+                  />
+                </td>
+              </tr>
+            )
+          })}
+        </DataTable>
+      </div>
+    </div>
+  )
+}
+
+function PHLReconciliationBadge({ status }: { status: string }) {
+  const config = {
+    healthy: {
+      label: 'Sehat',
+      className: 'bg-green-50 text-green-700',
+    },
+    manual_difference: {
+      label: 'Cek Saldo Manual',
+      className: 'bg-blue-50 text-blue-700',
+    },
+    needs_review: {
+      label: 'Perlu Review',
+      className: 'bg-orange-50 text-orange-700',
+    },
+  }[status] || {
+    label: status || 'Belum Terdata',
+    className: 'bg-[#f5f5f7] text-[#6e6e73]',
+  }
+
+  return (
+    <span
+      className={`inline-flex rounded-full px-3 py-1.5 text-xs font-bold ${config.className}`}
+    >
+      {config.label}
+    </span>
   )
 }
 
@@ -1663,13 +2856,21 @@ function HistoryTab({
             </td>
 
             <td className="px-5 py-4">
-              <SmallActionButton
-                label="Hapus"
-                icon={<Trash2 size={14} />}
-                tone="red"
-                disabled={false}
-                onClick={() => onDeletePHL(item)}
-              />
+              {['approved', 'cancelled', 'canceled'].includes(
+                normalizeStatus(item.hr_status || item.status)
+              ) || Number(item.used_days || 0) > 0 ? (
+                <span className="rounded-full bg-[#f5f5f7] px-3 py-2 text-[11px] font-bold text-[#86868b]">
+                  Audit tersimpan
+                </span>
+              ) : (
+                <SmallActionButton
+                  label="Hapus"
+                  icon={<Trash2 size={14} />}
+                  tone="red"
+                  disabled={false}
+                  onClick={() => onDeletePHL(item)}
+                />
+              )}
             </td>
           </tr>
         ))}
@@ -1702,12 +2903,30 @@ function LeaveDetailModal({
         <InfoBox label="Status Atasan" value={formatStatus(normalizeStatus(record.supervisor_status))} />
         <InfoBox label="Status HR" value={formatStatus(normalizeStatus(record.hr_status || record.status))} />
         <InfoBox label="Diajukan Oleh" value={record.submitted_by || '-'} />
+        {normalizeStatus(record.hr_status || record.status) === 'cancelled' && (
+          <>
+            <InfoBox label="Dibatalkan Oleh" value={record.hr_cancelled_by || '-'} />
+            <InfoBox
+              label="Waktu Pembatalan"
+              value={record.hr_cancelled_at
+                ? new Date(record.hr_cancelled_at).toLocaleString('id-ID')
+                : '-'}
+            />
+          </>
+        )}
       </div>
 
       <ContentBox
         title="Alasan Pengajuan"
         content={record.reason || '-'}
       />
+
+      {normalizeStatus(record.hr_status || record.status) === 'cancelled' && (
+        <ContentBox
+          title="Alasan Pembatalan HR"
+          content={record.hr_cancel_note || record.hr_note || '-'}
+        />
+      )}
 
       <HandoverDetailBox
         summary={record.job_pending_summary}
@@ -1758,12 +2977,32 @@ function PHLDetailModal({
         <InfoBox label="Sisa" value={`${record.remaining_days || 0} hari`} />
         <InfoBox label="Status Atasan" value={formatStatus(normalizeStatus(record.supervisor_status))} />
         <InfoBox label="Status HR" value={formatStatus(normalizeStatus(record.hr_status || record.status))} />
+        {(normalizeStatus(record.hr_status || record.status) === 'cancelled' ||
+          normalizeStatus(record.hr_status || record.status) === 'canceled') && (
+          <>
+            <InfoBox label="Dibatalkan Oleh" value={record.hr_cancelled_by || '-'} />
+            <InfoBox
+              label="Waktu Pembatalan"
+              value={record.hr_cancelled_at
+                ? new Date(record.hr_cancelled_at).toLocaleString('id-ID')
+                : '-'}
+            />
+          </>
+        )}
       </div>
 
       <ContentBox
         title={record.source === 'employee_phl_claim' ? 'Alasan Klaim PHL' : 'Alasan / Catatan'}
         content={record.reason || record.notes || '-'}
       />
+
+      {(normalizeStatus(record.hr_status || record.status) === 'cancelled' ||
+        normalizeStatus(record.hr_status || record.status) === 'canceled') && (
+        <ContentBox
+          title="Alasan Pembatalan HR"
+          content={record.hr_cancel_note || record.hr_note || '-'}
+        />
+      )}
 
       {record.source === 'employee_phl_claim' && (
         <HandoverDetailBox
@@ -1953,6 +3192,329 @@ function RejectLeaveModal({
         onSubmit={onSubmit}
         submitLabel="Reject Pengajuan"
       />
+    </ModalShell>
+  )
+}
+
+
+
+function PHLEmployeeReviewModal({
+  record,
+  note,
+  processing,
+  onNoteChange,
+  onClose,
+  onSubmit,
+}: {
+  record: PHLReconciliationRow
+  note: string
+  processing: boolean
+  onNoteChange: (value: string) => void
+  onClose: () => void
+  onSubmit: () => void
+}) {
+  return (
+    <ModalShell
+      title="Catat Review Rekonsiliasi PHL"
+      description={`${record.full_name || '-'} · ${record.employee_number || '-'}`}
+      onClose={onClose}
+    >
+      <div className="rounded-[24px] border border-blue-200 bg-blue-50 p-4 text-sm leading-6 text-blue-800">
+        Tindakan ini hanya mencatat hasil review HR. Saldo manual dan ledger PHL tidak akan diubah.
+      </div>
+
+      <div className="mt-4 grid gap-4 md:grid-cols-3">
+        <InfoBox
+          label="Ledger Aktif"
+          value={`${formatPHLNumber(record.active_ledger_balance)} hari`}
+        />
+        <InfoBox
+          label="Saldo Manual"
+          value={
+            record.manual_phl_balance === null ||
+            record.manual_phl_balance === undefined
+              ? '-'
+              : `${formatPHLNumber(record.manual_phl_balance)} hari`
+          }
+        />
+        <InfoBox
+          label="Tracking Legacy"
+          value={`${Number(record.legacy_untracked_claim_count || 0)} klaim`}
+        />
+      </div>
+
+      <label className="mt-5 block">
+        <span className="harmony-label">Catatan Review HR</span>
+        <textarea
+          value={note}
+          onChange={(event) => onNoteChange(event.target.value)}
+          className="harmony-textarea"
+          placeholder="Contoh: Saldo manual sudah dibandingkan dengan ledger dan akan ditindaklanjuti melalui koreksi terpisah."
+        />
+      </label>
+
+      <div className="mt-6 flex flex-col-reverse gap-3 border-t border-black/5 pt-5 sm:flex-row sm:justify-end">
+        <button
+          type="button"
+          onClick={onClose}
+          disabled={processing}
+          className="harmony-button-secondary"
+        >
+          Kembali
+        </button>
+
+        <button
+          type="button"
+          disabled={processing || note.trim().length < 5}
+          onClick={onSubmit}
+          className="inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl bg-[#007aff] px-5 text-sm font-bold text-white transition hover:bg-[#0066d6] disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {processing ? (
+            <Loader2 size={17} className="animate-spin" />
+          ) : (
+            <ShieldCheck size={17} />
+          )}
+          {processing ? 'Menyimpan Review...' : 'Simpan Review'}
+        </button>
+      </div>
+    </ModalShell>
+  )
+}
+
+function LegacyPHLReviewModal({
+  record,
+  note,
+  processing,
+  onNoteChange,
+  onClose,
+  onSubmit,
+}: {
+  record: LegacyPHLClaimReview
+  note: string
+  processing: boolean
+  onNoteChange: (value: string) => void
+  onClose: () => void
+  onSubmit: () => void
+}) {
+  return (
+    <ModalShell
+      title="Review Klaim Legacy PHL"
+      description={`${record.full_name || '-'} · ${formatDisplayDate(record.phl_date || '')}`}
+      onClose={onClose}
+    >
+      <div className="rounded-[24px] border border-orange-200 bg-orange-50 p-4 text-sm leading-6 text-orange-800">
+        Klaim ini tidak memiliki tracking pemotongan saldo yang lengkap. Menandai review tidak membuat alokasi FIFO baru dan tidak membuka reversal otomatis.
+      </div>
+
+      <div className="mt-4 grid gap-4 md:grid-cols-4">
+        <InfoBox
+          label="Jumlah Klaim"
+          value={`${formatPHLNumber(record.claim_days)} hari`}
+        />
+        <InfoBox
+          label="Alokasi FIFO"
+          value={`${formatPHLNumber(record.allocated_days)} hari`}
+        />
+        <InfoBox
+          label="Saldo Manual"
+          value={`${formatPHLNumber(record.override_consumed_days)} hari`}
+        />
+        <InfoBox
+          label="Gap Tracking"
+          value={`${formatPHLNumber(record.tracking_gap_days)} hari`}
+        />
+      </div>
+
+      <label className="mt-5 block">
+        <span className="harmony-label">Catatan Review Legacy</span>
+        <textarea
+          value={note}
+          onChange={(event) => onNoteChange(event.target.value)}
+          className="harmony-textarea"
+          placeholder="Contoh: Klaim lama diverifikasi berdasarkan dokumen HR dan saldo akan dikoreksi manual apabila diperlukan."
+        />
+      </label>
+
+      <div className="mt-6 flex flex-col-reverse gap-3 border-t border-black/5 pt-5 sm:flex-row sm:justify-end">
+        <button
+          type="button"
+          onClick={onClose}
+          disabled={processing}
+          className="harmony-button-secondary"
+        >
+          Kembali
+        </button>
+
+        <button
+          type="button"
+          disabled={processing || note.trim().length < 5}
+          onClick={onSubmit}
+          className="inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl bg-orange-600 px-5 text-sm font-bold text-white transition hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {processing ? (
+            <Loader2 size={17} className="animate-spin" />
+          ) : (
+            <History size={17} />
+          )}
+          {processing ? 'Menyimpan Review...' : 'Tandai Sudah Direview'}
+        </button>
+      </div>
+    </ModalShell>
+  )
+}
+
+function CancelPHLModal({
+  record,
+  reason,
+  processing,
+  onReasonChange,
+  onClose,
+  onSubmit,
+}: {
+  record: PHLRecord
+  reason: string
+  processing: boolean
+  onReasonChange: (value: string) => void
+  onClose: () => void
+  onSubmit: () => void
+}) {
+  return (
+    <ModalShell
+      title="Batalkan Klaim PHL Approved"
+      description={`${record.full_name || '-'} · ${formatDisplayDate(record.phl_date || '')}`}
+      onClose={onClose}
+    >
+      <div className="rounded-[24px] border border-orange-200 bg-orange-50 p-4 text-sm leading-6 text-orange-800">
+        Sistem akan mengembalikan saldo ke record PHL sumber yang dahulu dipotong saat approval. Tanggal kedaluwarsa saldo sumber tidak akan diperpanjang.
+      </div>
+
+      <div className="mt-4 grid gap-4 md:grid-cols-3">
+        <InfoBox
+          label="Tanggal Klaim"
+          value={formatDisplayDate(record.phl_date || '')}
+        />
+        <InfoBox
+          label="Jumlah Klaim"
+          value={`${record.used_days || record.balance_days || 0} hari`}
+        />
+        <InfoBox
+          label="Status Saat Ini"
+          value={formatStatus(normalizeStatus(record.hr_status || record.status))}
+        />
+      </div>
+
+      <label className="mt-5 block">
+        <span className="harmony-label">Alasan Pembatalan</span>
+        <textarea
+          value={reason}
+          onChange={(event) => onReasonChange(event.target.value)}
+          className="harmony-textarea"
+          placeholder="Contoh: Klaim PHL dibatalkan karena perubahan jadwal penggunaan PHL."
+        />
+      </label>
+
+      <div className="mt-6 flex flex-col-reverse gap-3 border-t border-black/5 pt-5 sm:flex-row sm:justify-end">
+        <button
+          type="button"
+          onClick={onClose}
+          disabled={processing}
+          className="harmony-button-secondary"
+        >
+          Kembali
+        </button>
+
+        <button
+          type="button"
+          disabled={processing || reason.trim().length < 5}
+          onClick={onSubmit}
+          className="inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl bg-orange-600 px-5 text-sm font-bold text-white transition hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {processing ? (
+            <Loader2 size={17} className="animate-spin" />
+          ) : (
+            <RotateCcw size={17} />
+          )}
+          {processing ? 'Mengembalikan Saldo...' : 'Batalkan & Reversal Saldo'}
+        </button>
+      </div>
+    </ModalShell>
+  )
+}
+
+function CancelLeaveModal({
+  record,
+  reason,
+  processing,
+  onReasonChange,
+  onClose,
+  onSubmit,
+}: {
+  record: LeaveRequest
+  reason: string
+  processing: boolean
+  onReasonChange: (value: string) => void
+  onClose: () => void
+  onSubmit: () => void
+}) {
+  return (
+    <ModalShell
+      title="Batalkan Pengajuan Approved"
+      description={`${record.full_name || '-'} · ${getRequestLabel(record)}`}
+      onClose={onClose}
+    >
+      <div className="rounded-[24px] border border-orange-200 bg-orange-50 p-4 text-sm leading-6 text-orange-800">
+        Pembatalan akan mengubah status menjadi dibatalkan, mengembalikan saldo manual yang sebelumnya dipotong, dan menyinkronkan ulang data absensi. Proses ini tercatat pada audit log.
+      </div>
+
+      <div className="mt-4 grid gap-4 md:grid-cols-3">
+        <InfoBox
+          label="Periode"
+          value={getRequestPeriodText(record.start_date, record.end_date)}
+        />
+        <InfoBox
+          label="Total Hari"
+          value={`${record.total_days || 0} hari`}
+        />
+        <InfoBox
+          label="Status Saat Ini"
+          value={formatStatus(normalizeStatus(record.hr_status || record.status))}
+        />
+      </div>
+
+      <label className="mt-5 block">
+        <span className="harmony-label">Alasan Pembatalan</span>
+        <textarea
+          value={reason}
+          onChange={(event) => onReasonChange(event.target.value)}
+          className="harmony-textarea"
+          placeholder="Contoh: Pengajuan dibatalkan karena perubahan jadwal kerja karyawan."
+        />
+      </label>
+
+      <div className="mt-6 flex flex-col-reverse gap-3 border-t border-black/5 pt-5 sm:flex-row sm:justify-end">
+        <button
+          type="button"
+          onClick={onClose}
+          disabled={processing}
+          className="harmony-button-secondary"
+        >
+          Kembali
+        </button>
+
+        <button
+          type="button"
+          disabled={processing || reason.trim().length < 5}
+          onClick={onSubmit}
+          className="inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl bg-orange-600 px-5 text-sm font-bold text-white transition hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {processing ? (
+            <Loader2 size={17} className="animate-spin" />
+          ) : (
+            <RotateCcw size={17} />
+          )}
+          {processing ? 'Membatalkan...' : 'Batalkan & Kembalikan Saldo'}
+        </button>
+      </div>
     </ModalShell>
   )
 }
@@ -2353,7 +3915,7 @@ function SmallActionButton({
 }: {
   label: string
   icon: ReactNode
-  tone: 'green' | 'red' | 'blue'
+  tone: 'green' | 'red' | 'blue' | 'orange'
   disabled: boolean
   onClick: () => void
 }) {
@@ -2361,6 +3923,7 @@ function SmallActionButton({
     green: 'bg-green-50 text-green-700 hover:bg-green-100',
     red: 'bg-red-50 text-red-700 hover:bg-red-100',
     blue: 'bg-[#e8f2ff] text-[#0059b8] hover:bg-blue-100',
+    orange: 'bg-orange-50 text-orange-700 hover:bg-orange-100',
   }[tone]
 
   return (
@@ -2386,12 +3949,13 @@ function BalanceBox({
 }: {
   label: string
   value: number
-  tone: 'green' | 'orange' | 'purple'
+  tone: 'green' | 'orange' | 'purple' | 'blue'
 }) {
   const className = {
     green: 'bg-green-50 text-green-700',
     orange: 'bg-orange-50 text-orange-700',
     purple: 'bg-[#f7edfc] text-[#7b2cbf]',
+    blue: 'bg-[#e8f2ff] text-[#0059b8]',
   }[tone]
 
   return (
@@ -2411,12 +3975,13 @@ function NumberCell({
   tone,
 }: {
   value: number
-  tone: 'green' | 'orange' | 'purple'
+  tone: 'green' | 'orange' | 'purple' | 'blue'
 }) {
   const className = {
     green: 'bg-green-50 text-green-700',
     orange: 'bg-orange-50 text-orange-700',
     purple: 'bg-[#f7edfc] text-[#7b2cbf]',
+    blue: 'bg-[#e8f2ff] text-[#0059b8]',
   }[tone]
 
   return (
@@ -2458,7 +4023,10 @@ function StatusBadge({
   const className =
     normalized === 'approved' || normalized === 'finalized'
       ? 'bg-green-50 text-green-700'
-      : normalized === 'rejected' || normalized === 'rejected_by_supervisor'
+      : normalized === 'rejected' ||
+          normalized === 'rejected_by_supervisor' ||
+          normalized === 'cancelled' ||
+          normalized === 'canceled'
         ? 'bg-red-50 text-red-700'
         : normalized === 'pending' ||
             normalized === 'submitted' ||
@@ -2472,6 +4040,17 @@ function StatusBadge({
       {formatStatus(normalized)}
     </span>
   )
+}
+
+function formatPHLNumber(value: number | string | null | undefined) {
+  const numberValue = Number(value || 0)
+
+  if (!Number.isFinite(numberValue)) return '0'
+
+  return numberValue.toLocaleString('id-ID', {
+    minimumFractionDigits: Number.isInteger(numberValue) ? 0 : 1,
+    maximumFractionDigits: 2,
+  })
 }
 
 function normalizeStatus(value: string | null | undefined) {
@@ -2489,6 +4068,7 @@ function formatStatus(value: string) {
   if (value === 'waiting_hr') return 'Menunggu HR'
   if (value === 'approved') return 'Disetujui'
   if (value === 'rejected') return 'Ditolak'
+  if (value === 'cancelled' || value === 'canceled') return 'Dibatalkan'
   if (value === 'rejected_by_supervisor') return 'Ditolak Atasan'
   if (value === 'finalized') return 'Final'
   if (value === 'draft') return 'Draft'

@@ -81,6 +81,18 @@ type PHLRecord = {
   source: string | null
 }
 
+
+type MyPHLBalanceSummary = {
+  success: boolean
+  employee_id: string
+  total_available_days: number
+  active_ledger_balance: number
+  legacy_balance: number
+  expiring_30_days: number
+  next_expiry: string | null
+  expiry_rule_days: number
+}
+
 type LeaveRequest = {
   id: string
   employee_id: string | null
@@ -293,6 +305,7 @@ export default function EmployeeLeavePage() {
 
   const [annualLeave, setAnnualLeave] = useState<AnnualLeaveSummary | null>(null)
   const [phlRecords, setPhlRecords] = useState<PHLRecord[]>([])
+  const [myPHLBalance, setMyPHLBalance] = useState<MyPHLBalanceSummary | null>(null)
   const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>([])
   const [holidays, setHolidays] = useState<Holiday[]>([])
 
@@ -317,8 +330,10 @@ export default function EmployeeLeavePage() {
     }, 0)
   }, [phlRecords])
 
-  const phlRemaining = Number(employee?.phl_balance ?? phlRemainingFromRecords)
-  const phlBalanceUsesHROverride = employee?.phl_balance !== null && employee?.phl_balance !== undefined
+  const phlRemaining = Number(
+    myPHLBalance?.total_available_days ?? phlRemainingFromRecords
+  )
+  const phlBalanceUsesHROverride = Number(myPHLBalance?.legacy_balance || 0) > 0
 
   const pendingCount = useMemo(() => {
     return leaveRequests.filter((item) => {
@@ -499,16 +514,28 @@ export default function EmployeeLeavePage() {
   }
 
   async function fetchPHLBalance(employeeId: string) {
-    const { data } = await supabase
-      .from('phl_records')
-      .select('*')
-      .eq('employee_id', employeeId)
-      .eq('status', 'approved')
-      .gt('remaining_days', 0)
-      .gte('expired_at', getTodayISO())
-      .order('expired_at', { ascending: true })
+    const [{ data: recordData }, { data: summaryData, error: summaryError }] =
+      await Promise.all([
+        supabase
+          .from('phl_records')
+          .select('*')
+          .eq('employee_id', employeeId)
+          .eq('status', 'approved')
+          .gt('remaining_days', 0)
+          .gte('expired_at', getTodayISO())
+          .order('expired_at', { ascending: true }),
+        supabase.rpc('get_my_phl_balance_summary'),
+      ])
 
-    setPhlRecords(data || [])
+    setPhlRecords(recordData || [])
+
+    if (summaryError) {
+      console.warn('Ringkasan saldo PHL V4 gagal dimuat:', summaryError.message)
+      setMyPHLBalance(null)
+      return
+    }
+
+    setMyPHLBalance((summaryData || null) as MyPHLBalanceSummary | null)
   }
 
   async function fetchLeaveRequests(employeeId: string) {
