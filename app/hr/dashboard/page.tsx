@@ -31,6 +31,7 @@ import {
 
 import { Topbar } from '@/components/layout/Topbar'
 import { supabase } from '@/lib/supabase'
+import { GeneralOrganizationChart } from '@/components/organization/GeneralOrganizationChart'
 
 type AnyRow = Record<string, any>
 
@@ -267,6 +268,8 @@ export default function HRDashboardPage() {
             metrics={metrics}
           />
         </div>
+
+        <GeneralOrganizationChart />
 
         <div className="grid gap-5 xl:grid-cols-[0.95fr_1.05fr]">
           <SystemModulesPanel metrics={metrics} loading={loading} />

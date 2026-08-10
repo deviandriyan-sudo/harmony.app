@@ -22,6 +22,7 @@ import {
 
 import { Topbar } from '@/components/layout/Topbar'
 import { supabase } from '@/lib/supabase'
+import { GeneralOrganizationChart } from '@/components/organization/GeneralOrganizationChart'
 
 type AppUser = {
   id: string
@@ -777,6 +778,8 @@ export default function EmployeeDashboardPage() {
             tone="slate"
           />
         </section>
+
+        <GeneralOrganizationChart />
 
         <section className="rounded-[32px] border border-black/5 bg-white shadow-sm">
           <div className="flex flex-col gap-4 border-b border-black/5 p-5 sm:p-6 lg:flex-row lg:items-center lg:justify-between">
