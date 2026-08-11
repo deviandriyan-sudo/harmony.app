@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
+import {
+  buildServerHarmonyEmailHtml,
+  buildServerHarmonyEmailText,
+  getNotificationEnvironmentStatus,
+  sendHarmonyServerEmail,
+} from '@/lib/notifications-server'
+
 export const runtime = 'nodejs'
 
 function normalizeEmail(value: unknown) {
@@ -389,6 +396,62 @@ export async function POST(request: NextRequest) {
         },
       })
 
+    // ----------------------------------------------------------------
+    // 9. Email notification
+    // Email gagal TIDAK membatalkan create/sync/reset account.
+    // Password plaintext sengaja tidak dikirim melalui email.
+    // ----------------------------------------------------------------
+    const notificationEnv =
+      getNotificationEnvironmentStatus()
+
+    const accountActionLabel = createdAccount
+      ? 'Akun HARMONY Dibuat'
+      : syncedAccount
+        ? 'Akun HARMONY Disinkronkan'
+        : 'Password HARMONY Direset'
+
+    const notificationMessage = [
+      `Yth. ${targetEmployee.full_name || employeeEmail},`,
+      '',
+      createdAccount
+        ? 'Akun login HARMONY Anda telah dibuat dan diaktifkan oleh HR.'
+        : syncedAccount
+          ? 'Akun login HARMONY Anda telah disinkronkan dan diaktifkan oleh HR.'
+          : 'Password login HARMONY Anda telah direset oleh HR.',
+      '',
+      `Username: ${employeeEmail}`,
+      `Status akses: Aktif`,
+      '',
+      createdAccount || syncedAccount
+        ? 'Password sementara telah ditetapkan oleh HR. Demi keamanan, password tidak ditampilkan pada email ini.'
+        : 'Gunakan password baru yang telah diinformasikan oleh HR.',
+      'Anda juga dapat menggunakan menu Masuk dengan Google apabila email Google kantor sama dengan email yang terdaftar di HARMONY.',
+      '',
+      'Jika Anda tidak mengenali perubahan ini, segera hubungi HR/PSDM.',
+    ].join('\n')
+
+    const notificationResult =
+      await sendHarmonyServerEmail({
+        to: employeeEmail,
+        subject: `[HARMONY] ${accountActionLabel}`,
+        html: buildServerHarmonyEmailHtml({
+          title: accountActionLabel,
+          message: notificationMessage,
+          actionLabel: 'Buka HARMONY',
+          actionUrl: `${notificationEnv.appUrl}/login`,
+          footer:
+            'Email ini dikirim otomatis oleh HARMONY setelah HR memproses akun login.',
+        }),
+        text: buildServerHarmonyEmailText({
+          title: accountActionLabel,
+          message: notificationMessage,
+          actionLabel: 'Buka HARMONY',
+          actionUrl: `${notificationEnv.appUrl}/login`,
+          footer:
+            'Email ini dikirim otomatis oleh HARMONY setelah HR memproses akun login.',
+        }),
+      })
+
     return NextResponse.json({
       success: true,
       created_account: createdAccount,
@@ -399,6 +462,11 @@ export async function POST(request: NextRequest) {
         role: 'employee',
         employee_id: employeeId,
         is_active: true,
+      },
+      notification: {
+        success: notificationResult.ok,
+        message: notificationResult.message,
+        provider_id: notificationResult.providerId || null,
       },
       message: createdAccount
         ? 'Akun login dan password karyawan berhasil dibuat.'

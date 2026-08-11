@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import Link from 'next/link'
 import type { ReactNode } from 'react'
 import {
   AlertTriangle,
@@ -13,6 +14,7 @@ import {
   KeyRound,
   Lock,
   Mail,
+  MailCheck,
   Power,
   RefreshCcw,
   RotateCcw,
@@ -465,17 +467,23 @@ export default function HRSettingsPage() {
         selectedEmployee.email ||
         'karyawan'
 
+      const notificationText = result?.notification?.success
+        ? ` Email notifikasi berhasil dikirim ke ${employeeEmail}.`
+        : result?.notification?.message
+          ? ` Akun berhasil diproses, tetapi email belum terkirim: ${result.notification.message}`
+          : ''
+
       if (result?.created_account) {
         setSuccessMessage(
-          `Akun login ${employeeLabel} berhasil dibuat. Username: ${employeeEmail}. Password sudah aktif dan akun juga dapat digunakan untuk login Google jika email Google sama.`
+          `Akun login ${employeeLabel} berhasil dibuat. Username: ${employeeEmail}. Password sudah aktif dan akun juga dapat digunakan untuk login Google jika email Google sama.${notificationText}`
         )
       } else if (result?.synced_account) {
         setSuccessMessage(
-          `Akun login ${employeeLabel} berhasil disinkronkan dan password berhasil ditetapkan.`
+          `Akun login ${employeeLabel} berhasil disinkronkan dan password berhasil ditetapkan.${notificationText}`
         )
       } else {
         setSuccessMessage(
-          `Password ${employeeLabel} berhasil direset.`
+          `Password ${employeeLabel} berhasil direset.${notificationText}`
         )
       }
 
@@ -661,6 +669,29 @@ export default function HRSettingsPage() {
             message={errorMessage}
           />
         )}
+
+        <Link
+          href="/hr/settings/notifications"
+          className="group flex flex-col gap-4 rounded-[28px] border border-[#b9dcff] bg-gradient-to-br from-[#f4f9ff] to-white p-5 shadow-sm transition hover:border-[#007aff]/40 hover:shadow-md sm:flex-row sm:items-center sm:justify-between"
+        >
+          <div className="flex items-start gap-4">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-3xl bg-[#e8f2ff] text-[#007aff]">
+              <MailCheck size={22} />
+            </div>
+            <div>
+              <p className="text-sm font-bold text-[#1d1d1f]">
+                Diagnostik Email HARMONY
+              </p>
+              <p className="mt-1 max-w-3xl text-sm leading-6 text-[#6e6e73]">
+                Cek RESEND_API_KEY, sender, status domain Resend, URL production, dan kirim test email dari satu tempat.
+              </p>
+            </div>
+          </div>
+
+          <span className="inline-flex shrink-0 items-center justify-center rounded-2xl bg-[#007aff] px-4 py-2.5 text-xs font-bold text-white transition group-hover:bg-[#0066d6]">
+            Buka Diagnostik
+          </span>
+        </Link>
 
         <div className="grid gap-5 xl:grid-cols-[0.82fr_1.18fr]">
           <div className="space-y-5">
