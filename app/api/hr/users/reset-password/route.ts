@@ -1,6 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
+export const runtime = 'nodejs'
+
+function normalizeEmail(value: unknown) {
+  return String(value || '').trim().toLowerCase()
+}
+
+function isValidEmail(value: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
+}
+
+function normalizeRole(value: unknown) {
+  return String(value || '').trim().toLowerCase()
+}
+
 export async function POST(request: NextRequest) {
   try {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -9,7 +23,8 @@ export async function POST(request: NextRequest) {
     if (!supabaseUrl || !serviceRoleKey) {
       return NextResponse.json(
         {
-          error: 'Supabase server env belum lengkap. Pastikan NEXT_PUBLIC_SUPABASE_URL dan SUPABASE_SERVICE_ROLE_KEY sudah ada.',
+          error:
+            'Supabase server env belum lengkap. Pastikan NEXT_PUBLIC_SUPABASE_URL dan SUPABASE_SERVICE_ROLE_KEY sudah ada di .env.local dan Vercel.',
         },
         { status: 500 }
       )
@@ -20,9 +35,7 @@ export async function POST(request: NextRequest) {
 
     if (!token) {
       return NextResponse.json(
-        {
-          error: 'Token HR tidak ditemukan.',
-        },
+        { error: 'Token HR tidak ditemukan.' },
         { status: 401 }
       )
     }
@@ -34,115 +47,371 @@ export async function POST(request: NextRequest) {
       },
     })
 
-    const { data: authUserData, error: authUserError } = await admin.auth.getUser(token)
+    // ----------------------------------------------------------------
+    // 1. Validasi actor HR
+    // ----------------------------------------------------------------
+    const { data: authUserData, error: authUserError } =
+      await admin.auth.getUser(token)
 
     if (authUserError || !authUserData.user) {
       return NextResponse.json(
-        {
-          error: 'Session HR tidak valid.',
-        },
+        { error: 'Session HR tidak valid.' },
         { status: 401 }
       )
     }
 
-    const { data: actorAppUser, error: actorError } = await admin
+    let actorAppUser: any = null
+
+    const actorById = await admin
       .from('app_users')
       .select('*')
       .eq('id', authUserData.user.id)
       .maybeSingle()
 
-    if (actorError || !actorAppUser || actorAppUser.role !== 'hr' || actorAppUser.is_active === false) {
+    if (!actorById.error && actorById.data) {
+      actorAppUser = actorById.data
+    } else if (authUserData.user.email) {
+      const actorByEmail = await admin
+        .from('app_users')
+        .select('*')
+        .eq('email', normalizeEmail(authUserData.user.email))
+        .maybeSingle()
+
+      if (!actorByEmail.error) {
+        actorAppUser = actorByEmail.data
+      }
+    }
+
+    const actorRole = normalizeRole(actorAppUser?.role)
+
+    if (
+      !actorAppUser ||
+      actorAppUser.is_active === false ||
+      !['hr', 'admin', 'administrator', 'super_admin'].includes(actorRole)
+    ) {
       return NextResponse.json(
         {
-          error: 'Akun ini tidak memiliki akses reset password karyawan.',
+          error:
+            'Akun ini tidak memiliki akses membuat atau reset akun login karyawan.',
         },
         { status: 403 }
       )
     }
 
+    // ----------------------------------------------------------------
+    // 2. Request
+    // ----------------------------------------------------------------
     const body = await request.json().catch(() => null)
 
-    const appUserId = String(body?.app_user_id || '').trim()
+    const requestedAppUserId = String(body?.app_user_id || '').trim()
     const employeeId = String(body?.employee_id || '').trim()
+    const requestEmail = normalizeEmail(body?.email)
     const newPassword = String(body?.new_password || '')
 
-    if (!appUserId || !employeeId || !newPassword) {
+    if (!employeeId || !newPassword) {
       return NextResponse.json(
-        {
-          error: 'Data reset password belum lengkap.',
-        },
+        { error: 'Employee dan password wajib diisi.' },
         { status: 400 }
       )
     }
 
     if (newPassword.length < 8) {
       return NextResponse.json(
-        {
-          error: 'Password baru minimal 8 karakter.',
-        },
+        { error: 'Password baru minimal 8 karakter.' },
         { status: 400 }
       )
     }
 
-    const { data: targetAppUser, error: targetAppUserError } = await admin
-      .from('app_users')
-      .select('*')
-      .eq('id', appUserId)
-      .eq('employee_id', employeeId)
-      .maybeSingle()
-
-    if (targetAppUserError || !targetAppUser) {
-      return NextResponse.json(
-        {
-          error: 'Akun app_users karyawan tidak ditemukan atau tidak sesuai employee.',
-        },
-        { status: 404 }
-      )
-    }
-
-    const { data: targetEmployee } = await admin
+    // ----------------------------------------------------------------
+    // 3. Employee master adalah sumber identitas utama
+    // ----------------------------------------------------------------
+    const { data: targetEmployee, error: employeeError } = await admin
       .from('employees')
       .select('*')
       .eq('id', employeeId)
       .maybeSingle()
 
-    const { error: updateError } = await admin.auth.admin.updateUserById(appUserId, {
-      password: newPassword,
-    })
-
-    if (updateError) {
+    if (employeeError || !targetEmployee) {
       return NextResponse.json(
-        {
-          error: updateError.message,
-        },
-        { status: 500 }
+        { error: 'Data karyawan tidak ditemukan pada employees.' },
+        { status: 404 }
       )
     }
 
+    const employeeEmail = normalizeEmail(
+      targetEmployee.email || requestEmail
+    )
+
+    if (!employeeEmail || !isValidEmail(employeeEmail)) {
+      return NextResponse.json(
+        {
+          error:
+            'Email karyawan belum tersedia atau formatnya tidak valid. Isi email karyawan terlebih dahulu.',
+        },
+        { status: 400 }
+      )
+    }
+
+    // ----------------------------------------------------------------
+    // 4. Cari app_users existing berdasarkan employee_id, id, atau email
+    // ----------------------------------------------------------------
+    let targetAppUser: any = null
+
+    const byEmployee = await admin
+      .from('app_users')
+      .select('*')
+      .eq('employee_id', employeeId)
+      .maybeSingle()
+
+    if (!byEmployee.error && byEmployee.data) {
+      targetAppUser = byEmployee.data
+    }
+
+    if (!targetAppUser && requestedAppUserId) {
+      const byId = await admin
+        .from('app_users')
+        .select('*')
+        .eq('id', requestedAppUserId)
+        .maybeSingle()
+
+      if (!byId.error && byId.data) {
+        targetAppUser = byId.data
+      }
+    }
+
+    if (!targetAppUser) {
+      const byEmail = await admin
+        .from('app_users')
+        .select('*')
+        .eq('email', employeeEmail)
+        .maybeSingle()
+
+      if (!byEmail.error && byEmail.data) {
+        targetAppUser = byEmail.data
+      }
+    }
+
+    // ----------------------------------------------------------------
+    // 5. Cari Supabase Auth user berdasarkan app_user id / email
+    // ----------------------------------------------------------------
+    let authTarget: any = null
+
+    if (targetAppUser?.id) {
+      const authById = await admin.auth.admin.getUserById(targetAppUser.id)
+
+      if (!authById.error && authById.data?.user) {
+        authTarget = authById.data.user
+      }
+    }
+
+    if (!authTarget) {
+      // Project HARMONY memiliki user relatif sedikit.
+      // 1000 cukup untuk pencarian email tanpa loop yang kompleks.
+      const listResult = await admin.auth.admin.listUsers({
+        page: 1,
+        perPage: 1000,
+      })
+
+      if (listResult.error) {
+        return NextResponse.json(
+          {
+            error:
+              listResult.error.message ||
+              'Gagal membaca daftar Supabase Auth user.',
+          },
+          { status: 500 }
+        )
+      }
+
+      authTarget =
+        listResult.data.users.find(
+          (user) => normalizeEmail(user.email) === employeeEmail
+        ) || null
+    }
+
+    let createdAccount = false
+    let syncedAccount = false
+
+    // ----------------------------------------------------------------
+    // 6. Kalau Auth belum ada -> buat
+    // ----------------------------------------------------------------
+    if (!authTarget) {
+      const createResult = await admin.auth.admin.createUser({
+        email: employeeEmail,
+        password: newPassword,
+        email_confirm: true,
+        user_metadata: {
+          employee_id: employeeId,
+          employee_number: targetEmployee.employee_number || null,
+          full_name: targetEmployee.full_name || null,
+          source: 'harmony_hr_settings',
+        },
+      })
+
+      if (createResult.error || !createResult.data?.user) {
+        return NextResponse.json(
+          {
+            error:
+              createResult.error?.message ||
+              'Gagal membuat Supabase Auth user karyawan.',
+          },
+          { status: 500 }
+        )
+      }
+
+      authTarget = createResult.data.user
+      createdAccount = true
+    } else {
+      // Auth ada -> pastikan email/password/metadata tersinkron
+      const updateAuthResult = await admin.auth.admin.updateUserById(
+        authTarget.id,
+        {
+          email: employeeEmail,
+          password: newPassword,
+          email_confirm: true,
+          user_metadata: {
+            ...(authTarget.user_metadata || {}),
+            employee_id: employeeId,
+            employee_number: targetEmployee.employee_number || null,
+            full_name: targetEmployee.full_name || null,
+            source: 'harmony_hr_settings',
+          },
+        }
+      )
+
+      if (updateAuthResult.error) {
+        return NextResponse.json(
+          { error: updateAuthResult.error.message },
+          { status: 500 }
+        )
+      }
+
+      authTarget = updateAuthResult.data.user || authTarget
+    }
+
+    // ----------------------------------------------------------------
+    // 7. Sinkronkan app_users dengan UUID Auth canonical
+    // ----------------------------------------------------------------
+    const now = new Date().toISOString()
+    const canonicalAuthId = authTarget.id
+
+    if (targetAppUser && targetAppUser.id !== canonicalAuthId) {
+      // Kondisi tidak normal: app_users lama menunjuk UUID berbeda.
+      // Jangan menimpa diam-diam karena bisa merusak relasi.
+      return NextResponse.json(
+        {
+          error:
+            'Ditemukan konflik UUID antara app_users dan Supabase Auth. Hubungi admin untuk rekonsiliasi akun sebelum melanjutkan.',
+        },
+        { status: 409 }
+      )
+    }
+
+    const appUserPayload = {
+      id: canonicalAuthId,
+      email: employeeEmail,
+      role: 'employee',
+      employee_id: employeeId,
+      is_active: true,
+      updated_at: now,
+    }
+
+    if (targetAppUser) {
+      const updateAppUser = await admin
+        .from('app_users')
+        .update(appUserPayload)
+        .eq('id', canonicalAuthId)
+
+      if (updateAppUser.error) {
+        return NextResponse.json(
+          {
+            error:
+              `Supabase Auth berhasil diproses tetapi app_users gagal disinkronkan: ${updateAppUser.error.message}`,
+          },
+          { status: 500 }
+        )
+      }
+    } else {
+      const insertAppUser = await admin
+        .from('app_users')
+        .insert({
+          ...appUserPayload,
+          created_at: now,
+        })
+
+      if (insertAppUser.error) {
+        return NextResponse.json(
+          {
+            error:
+              `Supabase Auth berhasil dibuat/ditemukan tetapi app_users gagal dibuat: ${insertAppUser.error.message}`,
+          },
+          { status: 500 }
+        )
+      }
+
+      syncedAccount = !createdAccount
+    }
+
+    // Pastikan employee tetap aktif saat akun dibuat/reset.
+    await admin
+      .from('employees')
+      .update({
+        email: employeeEmail,
+        is_active: true,
+        updated_at: now,
+      })
+      .eq('id', employeeId)
+
+    // ----------------------------------------------------------------
+    // 8. Audit
+    // ----------------------------------------------------------------
     await admin
       .from('hr_setting_action_logs')
       .insert({
         actor_user_id: actorAppUser.id,
         actor_email: actorAppUser.email,
-        action_type: 'reset_employee_password',
+        action_type: createdAccount
+          ? 'create_employee_login_account'
+          : syncedAccount
+            ? 'sync_employee_login_account'
+            : 'reset_employee_password',
         target_employee_id: employeeId,
-        target_employee_number: targetEmployee?.employee_number || null,
-        target_full_name: targetEmployee?.full_name || targetAppUser.email || null,
+        target_employee_number:
+          targetEmployee.employee_number || null,
+        target_full_name:
+          targetEmployee.full_name || employeeEmail,
         metadata: {
-          target_app_user_id: appUserId,
-          target_email: targetAppUser.email,
+          target_app_user_id: canonicalAuthId,
+          target_email: employeeEmail,
           source: 'hr_settings',
+          created_account: createdAccount,
+          synced_account: syncedAccount,
         },
       })
 
     return NextResponse.json({
       success: true,
-      message: 'Password karyawan berhasil direset.',
+      created_account: createdAccount,
+      synced_account: syncedAccount,
+      app_user: {
+        id: canonicalAuthId,
+        email: employeeEmail,
+        role: 'employee',
+        employee_id: employeeId,
+        is_active: true,
+      },
+      message: createdAccount
+        ? 'Akun login dan password karyawan berhasil dibuat.'
+        : syncedAccount
+          ? 'Akun login berhasil disinkronkan dan password berhasil ditetapkan.'
+          : 'Password karyawan berhasil direset.',
     })
   } catch (error: any) {
     return NextResponse.json(
       {
-        error: error?.message || 'Terjadi kesalahan saat reset password.',
+        error:
+          error?.message ||
+          'Terjadi kesalahan saat membuat/sinkronkan/reset akun karyawan.',
       },
       { status: 500 }
     )

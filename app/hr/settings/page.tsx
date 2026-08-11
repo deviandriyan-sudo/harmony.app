@@ -370,7 +370,7 @@ export default function HRSettingsPage() {
       confirm_password: generated,
     })
 
-    setSuccessMessage('Password sementara berhasil dibuat. Salin password sebelum melakukan reset.')
+    setSuccessMessage('Password sementara berhasil dibuat. Salin password sebelum membuat/reset akun.')
     setErrorMessage('')
   }
 
@@ -398,8 +398,18 @@ export default function HRSettingsPage() {
       return
     }
 
-    if (!selectedEmployeeAppUser) {
-      setErrorMessage('Karyawan ini belum memiliki app_users. Buat atau sinkronkan akun login terlebih dahulu.')
+    const employeeEmail = String(selectedEmployee.email || '').trim().toLowerCase()
+
+    if (!employeeEmail) {
+      setErrorMessage(
+        'Email karyawan belum diisi pada Data Karyawan. Isi email terlebih dahulu karena email digunakan sebagai username login.'
+      )
+      setProcessing(false)
+      return
+    }
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(employeeEmail)) {
+      setErrorMessage('Format email karyawan belum valid.')
       setProcessing(false)
       return
     }
@@ -425,30 +435,63 @@ export default function HRSettingsPage() {
       return
     }
 
-    const response = await fetch('/api/hr/users/reset-password', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({
-        app_user_id: selectedEmployeeAppUser.id,
-        employee_id: selectedEmployee.id,
-        new_password: employeePasswordForm.new_password,
-      }),
-    })
+    try {
+      const response = await fetch('/api/hr/users/reset-password', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          app_user_id: selectedEmployeeAppUser?.id || null,
+          employee_id: selectedEmployee.id,
+          email: employeeEmail,
+          new_password: employeePasswordForm.new_password,
+        }),
+      })
 
-    const result = await response.json().catch(() => null)
+      const result = await response.json().catch(() => null)
 
-    if (!response.ok) {
-      setErrorMessage(result?.error || 'Gagal reset password karyawan.')
+      if (!response.ok) {
+        setErrorMessage(
+          result?.error ||
+            'Gagal membuat/sinkronkan akun atau mengubah password karyawan.'
+        )
+        return
+      }
+
+      const employeeLabel =
+        selectedEmployee.full_name ||
+        selectedEmployee.email ||
+        'karyawan'
+
+      if (result?.created_account) {
+        setSuccessMessage(
+          `Akun login ${employeeLabel} berhasil dibuat. Username: ${employeeEmail}. Password sudah aktif dan akun juga dapat digunakan untuk login Google jika email Google sama.`
+        )
+      } else if (result?.synced_account) {
+        setSuccessMessage(
+          `Akun login ${employeeLabel} berhasil disinkronkan dan password berhasil ditetapkan.`
+        )
+      } else {
+        setSuccessMessage(
+          `Password ${employeeLabel} berhasil direset.`
+        )
+      }
+
+      setEmployeePasswordForm(initialEmployeePasswordForm)
+
+      // Penting: refresh app_users agar badge "Belum Ada" langsung berubah
+      // tanpa perlu reload browser.
+      await fetchAppUsers()
+    } catch (error: any) {
+      setErrorMessage(
+        error?.message ||
+          'Terjadi kesalahan saat membuat/sinkronkan akun karyawan.'
+      )
+    } finally {
       setProcessing(false)
-      return
     }
-
-    setSuccessMessage(`Password ${selectedEmployee.full_name || selectedEmployee.email || 'karyawan'} berhasil direset.`)
-    setEmployeePasswordForm(initialEmployeePasswordForm)
-    setProcessing(false)
   }
 
   async function resetEmployeeProfile() {
@@ -991,7 +1034,10 @@ function EmployeePasswordResetPanel({
   onTogglePassword: () => void
   onToggleConfirmPassword: () => void
 }) {
-  const disabled = !selectedEmployee || !selectedEmployeeAppUser
+  const hasEmployee = Boolean(selectedEmployee)
+  const hasEmail = Boolean(String(selectedEmployee?.email || '').trim())
+  const hasAppUser = Boolean(selectedEmployeeAppUser)
+  const disabled = !hasEmployee || !hasEmail
 
   return (
     <div className="harmony-card overflow-hidden">
@@ -1003,20 +1049,43 @@ function EmployeePasswordResetPanel({
 
           <div className="min-w-0">
             <h2 className="text-base font-semibold text-[#1d1d1f]">
-              Reset Password Karyawan
+              {hasAppUser ? 'Reset Password Karyawan' : 'Buat Akun & Password Karyawan'}
             </h2>
 
             <p className="mt-1 text-sm leading-6 text-[#6e6e73]">
-              Reset password login Supabase Auth karyawan terpilih.
+              {hasAppUser
+                ? 'Reset password login Supabase Auth karyawan terpilih.'
+                : 'Karyawan belum memiliki akun login. Saat disimpan, sistem otomatis membuat/sinkronkan Supabase Auth dan app_users.'}
             </p>
           </div>
         </div>
       </div>
 
       <form onSubmit={onSubmit} className="space-y-4 p-5">
-        {disabled && (
+        {!selectedEmployee && (
           <div className="rounded-[24px] border border-orange-200 bg-orange-50 p-4 text-sm leading-6 text-orange-700">
-            Pilih karyawan yang sudah memiliki akun app_users terlebih dahulu.
+            Pilih karyawan terlebih dahulu.
+          </div>
+        )}
+
+        {selectedEmployee && !hasEmail && (
+          <div className="rounded-[24px] border border-red-200 bg-red-50 p-4 text-sm leading-6 text-red-700">
+            Email karyawan belum tersedia. Isi email pada menu Data Karyawan terlebih dahulu karena email akan menjadi username login HARMONY.
+          </div>
+        )}
+
+        {selectedEmployee && hasEmail && !hasAppUser && (
+          <div className="rounded-[24px] border border-blue-200 bg-blue-50 p-4 text-sm leading-6 text-blue-700">
+            <p className="font-bold">Akun login belum ada — siap dibuat.</p>
+            <p className="mt-1">
+              Isi password lalu klik <b>Buat Akun & Password</b>. Sistem akan otomatis membuat/sinkronkan Supabase Auth, membuat app_users role employee, menghubungkan employee_id, dan mengaktifkan akses.
+            </p>
+          </div>
+        )}
+
+        {selectedEmployee && hasEmail && hasAppUser && (
+          <div className="rounded-[24px] border border-green-200 bg-green-50 p-4 text-sm leading-6 text-green-700">
+            Akun login sudah tersedia. Password baru di bawah akan mengganti password login saat ini.
           </div>
         )}
 
@@ -1039,7 +1108,11 @@ function EmployeePasswordResetPanel({
 
         <button type="submit" disabled={disabled || processing} className="harmony-button-primary w-full disabled:cursor-not-allowed disabled:opacity-60">
           <KeyRound size={18} />
-          {processing ? 'Memproses...' : 'Reset Password Karyawan'}
+          {processing
+            ? 'Memproses...'
+            : hasAppUser
+              ? 'Reset Password Karyawan'
+              : 'Buat Akun & Password'}
         </button>
       </form>
     </div>
