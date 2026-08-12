@@ -17,6 +17,7 @@ import {
   Save,
   Send,
   Timer,
+  Trash2,
   Upload,
   X,
 } from "lucide-react";
@@ -264,6 +265,7 @@ export default function EmployeeAttendancePage() {
 
   const [editOpen, setEditOpen] = useState(false);
   const [selectedRow, setSelectedRow] = useState<CalendarDayRow | null>(null);
+  const [resettingDate, setResettingDate] = useState<string>("");
   const [selectedDates, setSelectedDates] = useState<string[]>([]);
   const [rowDrafts, setRowDrafts] = useState<Record<string, RowDraft>>({});
 
@@ -607,6 +609,195 @@ export default function EmployeeAttendancePage() {
 
     selectableRows.forEach((row) => ensureDraft(row));
     setSelectedDates(selectableRows.map((row) => row.date));
+  }
+
+  function hasLocalResettableVerification(row: CalendarDayRow) {
+    const draft = rowDrafts[row.date];
+
+    if (!draft) return false;
+
+    return Boolean(
+      draft.manual_check_in ||
+        draft.manual_check_out ||
+        draft.employee_daily_note ||
+        draft.absence_file ||
+        draft.phl_file ||
+        draft.daily_type !== inferDailyType(row) ||
+        selectedDates.includes(row.date),
+    );
+  }
+
+  function hasDatabaseEmployeeVerification(row: CalendarDayRow) {
+    const log = row.log;
+
+    if (!log) return false;
+
+    return Boolean(
+      log.manual_check_in ||
+        log.manual_check_out ||
+        log.requested_check_in ||
+        log.requested_check_out ||
+        log.employee_daily_note ||
+        log.employee_confirmation_status ||
+        log.employee_confirmation_batch_id ||
+        log.phl_proof_url ||
+        log.phl_proof_name ||
+        log.absence_proof_url ||
+        log.absence_proof_name ||
+        log.absence_request_type ||
+        log.absence_request_label ||
+        log.absence_request_status ||
+        log.absence_request_source === "employee_attendance_confirmation" ||
+        log.correction_submitted_role === "employee" ||
+        log.correction_status === "pending" ||
+        log.correction_type === "manual_check" ||
+        log.source === "employee_manual_confirmation" ||
+        log.source === "employee_correction",
+    );
+  }
+
+  function hasResettableVerification(row: CalendarDayRow) {
+    return (
+      hasLocalResettableVerification(row) ||
+      hasDatabaseEmployeeVerification(row)
+    );
+  }
+
+  function canShowResetButton(row: CalendarDayRow) {
+    // Tombol selalu dirender. Fungsi ini menentukan apakah tombol aktif.
+    // Row dengan draft/selection/log dapat direset secara aman; API tetap
+    // memutuskan apakah database perlu dihapus atau hanya draft lokal.
+    return Boolean(
+      rowDrafts[row.date] ||
+        selectedDates.includes(row.date) ||
+        row.log?.id,
+    );
+  }
+
+  function clearLocalVerification(date: string) {
+    setRowDrafts((prev) => {
+      const next = { ...prev };
+      delete next[date];
+      return next;
+    });
+
+    setSelectedDates((prev) => prev.filter((item) => item !== date));
+
+    if (selectedRow?.date === date) {
+      closeEdit();
+    }
+  }
+
+  async function handleResetVerification(row: CalendarDayRow) {
+    setErrorMessage("");
+    setSuccessMessage("");
+
+    if (!employee || !appUser) {
+      setErrorMessage("Data user atau employee belum tersedia.");
+      return;
+    }
+
+    if (isPeriodLocked) {
+      setErrorMessage(
+        "Periode ini sudah dikunci HR. Verifikasi tidak dapat direset.",
+      );
+      return;
+    }
+
+    if (submittedPeriod) {
+      setErrorMessage(
+        "Periode ini sudah disubmit. Reset hanya dapat dilakukan sebelum Submit Periode ke Atasan.",
+      );
+      return;
+    }
+
+    const hasLocalData = hasLocalResettableVerification(row);
+    const hasDatabaseData = hasDatabaseEmployeeVerification(row);
+
+    if (!hasLocalData && !hasDatabaseData) {
+      setSuccessMessage(
+        `${formatDisplayDate(row.date)} belum memiliki data manual/verifikasi yang perlu direset.`,
+      );
+      return;
+    }
+
+    const confirmed = window.confirm(
+      [
+        `Reset verifikasi tanggal ${formatDisplayDate(row.date)}?`,
+        "",
+        "Data manual, keterangan, bukti PHL/ketidakhadiran, dan status verifikasi employee pada tanggal ini akan dibersihkan.",
+        "Data fingerprint/scan asli dari mesin TIDAK akan dihapus.",
+        "",
+        "Setelah reset, tanggal ini dapat diisi ulang melalui tombol Lengkapi.",
+      ].join("\n"),
+    );
+
+    if (!confirmed) return;
+
+    setResettingDate(row.date);
+
+    try {
+      // Jika perubahan masih draft lokal atau row database hanya berisi
+      // fingerprint/system data tanpa verifikasi employee, jangan sentuh DB.
+      if (!hasDatabaseData) {
+        clearLocalVerification(row.date);
+        setSuccessMessage(
+          `Draft/verifikasi ${formatDisplayDate(row.date)} berhasil direset. Data dapat diisi ulang.`,
+        );
+        return;
+      }
+
+      const { data: sessionData, error: sessionError } =
+        await supabase.auth.getSession();
+
+      if (sessionError || !sessionData.session?.access_token) {
+        throw new Error("Session login tidak valid. Silakan login ulang.");
+      }
+
+      const response = await fetch(
+        "/api/employee/attendance/reset-verification",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${sessionData.session.access_token}`,
+          },
+          body: JSON.stringify({
+            employee_id: employee.id,
+            attendance_log_id: row.log.id,
+            attendance_date: row.date,
+            period_month: periodMonth,
+          }),
+        },
+      );
+
+      const result = await response.json().catch(() => null);
+
+      if (!response.ok || result?.success === false) {
+        throw new Error(
+          result?.error ||
+            result?.message ||
+            "Reset verifikasi absensi gagal diproses.",
+        );
+      }
+
+      clearLocalVerification(row.date);
+
+      setSuccessMessage(
+        result?.mode === "deleted"
+          ? `Data manual ${formatDisplayDate(row.date)} berhasil dihapus dari database. Tanggal tersebut dapat diisi ulang.`
+          : `Verifikasi manual ${formatDisplayDate(row.date)} berhasil direset. Data fingerprint asli tetap dipertahankan.`,
+      );
+
+      await fetchData(false);
+    } catch (error: any) {
+      setErrorMessage(
+        error?.message ||
+          "Terjadi kesalahan saat mereset verifikasi absensi.",
+      );
+    } finally {
+      setResettingDate("");
+    }
   }
 
   async function uploadFile(file: File | null, folder: string) {
@@ -1640,27 +1831,54 @@ export default function EmployeeAttendancePage() {
                           <ValidationInfo row={row} draft={draft} />
                         </div>
 
-                        <div className="flex items-center justify-between gap-3 rounded-2xl bg-[#f5f5f7]/80 p-3">
-                          <div>
-                            <p className="mb-2 text-[11px] font-bold uppercase tracking-wide text-[#86868b]">
-                              Approval
-                            </p>
-                            <ApprovalBadge
-                              status={
-                                row.log?.supervisor_approval_status || "none"
-                              }
-                            />
-                          </div>
+                        <div className="rounded-2xl bg-[#f5f5f7]/80 p-3">
+                          <div className="flex items-center justify-between gap-3">
+                            <div>
+                              <p className="mb-2 text-[11px] font-bold uppercase tracking-wide text-[#86868b]">
+                                Approval
+                              </p>
+                              <ApprovalBadge
+                                status={
+                                  row.log?.supervisor_approval_status || "none"
+                                }
+                              />
+                            </div>
 
-                          <button
-                            type="button"
-                            disabled={isReadOnlyPeriod || submittingPeriod}
-                            onClick={() => openEdit(row)}
-                            className="inline-flex min-h-10 shrink-0 items-center justify-center gap-2 rounded-2xl bg-[#e8f2ff] px-4 text-xs font-bold text-[#0059b8] transition hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
-                          >
-                            <PencilLine size={15} />
-                            Lengkapi
-                          </button>
+                            <div className="flex flex-wrap justify-end gap-2">
+                              <button
+                                type="button"
+                                disabled={isReadOnlyPeriod || submittingPeriod}
+                                onClick={() => openEdit(row)}
+                                className="inline-flex min-h-10 shrink-0 items-center justify-center gap-2 rounded-2xl bg-[#e8f2ff] px-4 text-xs font-bold text-[#0059b8] transition hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
+                              >
+                                <PencilLine size={15} />
+                                Lengkapi
+                              </button>
+                              <button
+                                type="button"
+                                disabled={
+                                  isReadOnlyPeriod ||
+                                  submittingPeriod ||
+                                  resettingDate === row.date ||
+                                  !canShowResetButton(row)
+                                }
+                                onClick={() => handleResetVerification(row)}
+                                className="inline-flex min-h-10 shrink-0 items-center justify-center gap-2 rounded-2xl bg-red-50 px-4 text-xs font-bold text-red-700 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-40"
+                                title={
+                                  canShowResetButton(row)
+                                    ? "Reset data manual/verifikasi tanggal ini"
+                                    : "Belum ada data yang dapat direset"
+                                }
+                              >
+                                {resettingDate === row.date ? (
+                                  <RefreshCcw size={15} className="animate-spin" />
+                                ) : (
+                                  <Trash2 size={15} />
+                                )}
+                                Reset
+                              </button>
+                            </div>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -1669,7 +1887,7 @@ export default function EmployeeAttendancePage() {
               </div>
 
               <div className="hidden overflow-x-auto 2xl:block">
-                <table className="min-w-[1220px] w-full table-fixed border-collapse text-left text-[12px]">
+                <table className="min-w-[1320px] w-full table-fixed border-collapse text-left text-[12px]">
                   <thead>
                     <tr className="border-b border-black/5 bg-[#f5f5f7]/90 text-xs uppercase tracking-wide text-[#6e6e73]">
                       <th className="w-[58px] px-3 py-3 text-center font-semibold">
@@ -1698,7 +1916,7 @@ export default function EmployeeAttendancePage() {
                       <th className="w-[105px] px-3 py-3 font-semibold">
                         Approval
                       </th>
-                      <th className="w-[105px] px-3 py-3 text-center font-semibold">
+                      <th className="w-[190px] px-3 py-3 text-center font-semibold">
                         Action
                       </th>
                     </tr>
@@ -1812,15 +2030,40 @@ export default function EmployeeAttendancePage() {
                           </td>
 
                           <td className="px-3 py-3 text-center">
-                            <button
-                              type="button"
-                              disabled={isReadOnlyPeriod || submittingPeriod}
-                              onClick={() => openEdit(row)}
-                              className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-2xl bg-[#e8f2ff] px-3 text-[11px] font-bold text-[#0059b8] transition hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
-                            >
-                              <PencilLine size={15} />
-                              Lengkapi
-                            </button>
+                            <div className="flex items-center justify-center gap-2">
+                              <button
+                                type="button"
+                                disabled={isReadOnlyPeriod || submittingPeriod}
+                                onClick={() => openEdit(row)}
+                                className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-2xl bg-[#e8f2ff] px-3 text-[11px] font-bold text-[#0059b8] transition hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
+                              >
+                                <PencilLine size={15} />
+                                Lengkapi
+                              </button>
+                              <button
+                                type="button"
+                                disabled={
+                                  isReadOnlyPeriod ||
+                                  submittingPeriod ||
+                                  resettingDate === row.date ||
+                                  !canShowResetButton(row)
+                                }
+                                onClick={() => handleResetVerification(row)}
+                                className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-2xl bg-red-50 px-3 text-[11px] font-bold text-red-700 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-40"
+                                title={
+                                  canShowResetButton(row)
+                                    ? "Reset data manual/verifikasi tanggal ini"
+                                    : "Belum ada data yang dapat direset"
+                                }
+                              >
+                                {resettingDate === row.date ? (
+                                  <RefreshCcw size={15} className="animate-spin" />
+                                ) : (
+                                  <Trash2 size={15} />
+                                )}
+                                Reset
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       );

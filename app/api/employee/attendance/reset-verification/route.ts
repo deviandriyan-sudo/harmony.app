@@ -50,31 +50,38 @@ function isSubmittedOrLocked(confirmation: any) {
   );
 }
 
-function isPureEmployeeManualLog(log: any) {
-  const source = normalize(log?.source);
+function hasEmployeeVerificationData(log: any) {
+  return Boolean(
+    log?.manual_check_in ||
+      log?.manual_check_out ||
+      log?.requested_check_in ||
+      log?.requested_check_out ||
+      log?.employee_daily_note ||
+      log?.employee_confirmation_status ||
+      log?.employee_confirmation_batch_id ||
+      log?.phl_proof_url ||
+      log?.phl_proof_name ||
+      log?.absence_proof_url ||
+      log?.absence_proof_name ||
+      log?.absence_request_type ||
+      log?.absence_request_label ||
+      log?.absence_request_status ||
+      normalize(log?.absence_request_source) ===
+        "employee_attendance_confirmation" ||
+      normalize(log?.correction_submitted_role) === "employee" ||
+      normalize(log?.source) === "employee_manual_confirmation" ||
+      normalize(log?.source) === "employee_correction"
+  );
+}
 
+function isPureEmployeeManualLog(log: any) {
   const noMachineData =
     !log?.upload_id &&
     !log?.check_in &&
     !log?.check_out &&
     Number(log?.total_punches || 0) === 0;
 
-  const employeeSource = [
-    "employee_manual_confirmation",
-    "employee_correction",
-    "employee_attendance_confirmation",
-  ].includes(source);
-
-  const absenceOwnedByEmployeeConfirmation =
-    !log?.absence_request_source ||
-    normalize(log?.absence_request_source) ===
-      "employee_attendance_confirmation";
-
-  return (
-    noMachineData &&
-    employeeSource &&
-    absenceOwnedByEmployeeConfirmation
-  );
+  return noMachineData && hasEmployeeVerificationData(log);
 }
 
 function publicStoragePathFromUrl(url: unknown) {
@@ -310,6 +317,17 @@ export async function POST(request: NextRequest) {
         },
         { status: 409 },
       );
+    }
+
+    if (!hasEmployeeVerificationData(log)) {
+      return NextResponse.json({
+        success: true,
+        mode: "none",
+        attendance_log_id: log.id,
+        attendance_date: attendanceDate,
+        message:
+          "Tidak ada data manual/verifikasi employee pada row ini. Data fingerprint tidak diubah.",
+      });
     }
 
     // Best-effort cleanup proof files uploaded by employee.
