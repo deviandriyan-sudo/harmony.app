@@ -747,6 +747,16 @@ export default function EmployeeAttendancePage() {
         return;
       }
 
+      const attendanceLogId = row.log?.id;
+
+      if (!attendanceLogId) {
+        clearLocalVerification(row.date);
+        setSuccessMessage(
+          `Draft/verifikasi ${formatDisplayDate(row.date)} berhasil direset. Data dapat diisi ulang.`,
+        );
+        return;
+      }
+
       const { data: sessionData, error: sessionError } =
         await supabase.auth.getSession();
 
@@ -764,7 +774,7 @@ export default function EmployeeAttendancePage() {
           },
           body: JSON.stringify({
             employee_id: employee.id,
-            attendance_log_id: row.log.id,
+            attendance_log_id: attendanceLogId,
             attendance_date: row.date,
             period_month: periodMonth,
           }),
