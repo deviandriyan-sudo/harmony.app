@@ -1302,8 +1302,8 @@ export default function EmployeeAttendancePage() {
         </div>
 
         <div className="harmony-card overflow-hidden">
-          <div className="flex flex-col gap-4 border-b border-black/5 p-6 xl:flex-row xl:items-center xl:justify-between">
-            <div>
+          <div className="flex min-w-0 flex-col gap-4 border-b border-black/5 p-4 sm:p-6 xl:grid xl:grid-cols-[minmax(0,1fr)_minmax(320px,620px)] xl:items-start xl:gap-6">
+            <div className="min-w-0">
               <h2 className="text-lg font-semibold text-[#1d1d1f]">
                 Rekap Absensi Pribadi
               </h2>
@@ -1315,32 +1315,73 @@ export default function EmployeeAttendancePage() {
 
             </div>
 
-            <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
-              <input
-                type="month"
-                min="2026-01"
-                value={periodMonth}
-                onChange={(event) => setPeriodMonth(event.target.value)}
-                className="harmony-input md:w-[190px]"
-              />
+            <div className="w-full min-w-0 xl:w-auto xl:max-w-[620px]">
+              <div className="rounded-[24px] border border-[#d8e8ff] bg-[#f7fbff] p-3 shadow-sm">
+                <div className="mb-2 flex items-center gap-2 text-xs font-bold text-[#0059b8]">
+                  <CalendarDays size={15} />
+                  Periode Absensi
+                </div>
 
-              <button
-                type="button"
-                onClick={exportCsv}
-                className="harmony-button-secondary"
-              >
-                <Download size={18} />
-                Export
-              </button>
+                <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_110px] gap-2 sm:flex sm:flex-wrap sm:items-center">
+                  <select
+                    aria-label="Pilih bulan periode absensi"
+                    value={normalizePeriodMonth(periodMonth).split("-")[1]}
+                    onChange={(event) =>
+                      setPeriodMonth((current) =>
+                        updatePeriodPart(current, "month", event.target.value),
+                      )
+                    }
+                    className="harmony-input min-w-0 w-full sm:w-[160px]"
+                  >
+                    {ATTENDANCE_MONTH_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
 
-              <button
-                type="button"
-                onClick={() => fetchData()}
-                className="harmony-button-secondary"
-              >
-                <RefreshCcw size={18} />
-                Refresh
-              </button>
+                  <select
+                    aria-label="Pilih tahun periode absensi"
+                    value={Number(normalizePeriodMonth(periodMonth).split("-")[0])}
+                    onChange={(event) =>
+                      setPeriodMonth((current) =>
+                        updatePeriodPart(current, "year", event.target.value),
+                      )
+                    }
+                    className="harmony-input min-w-0 w-full sm:w-[110px]"
+                  >
+                    {getAttendanceYearOptions().map((year) => (
+                      <option key={year} value={year}>
+                        {year}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <p className="mt-2 text-[11px] font-semibold leading-5 text-[#6e6e73]">
+                  Aktif: {getPeriodLabel(periodMonth)}
+                </p>
+              </div>
+
+              <div className="mt-3 grid grid-cols-2 gap-2 sm:flex sm:justify-end">
+                <button
+                  type="button"
+                  onClick={exportCsv}
+                  className="harmony-button-secondary w-full sm:w-auto"
+                >
+                  <Download size={18} />
+                  Export
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => fetchData()}
+                  className="harmony-button-secondary w-full sm:w-auto"
+                >
+                  <RefreshCcw size={18} />
+                  Refresh
+                </button>
+              </div>
             </div>
           </div>
 
@@ -2944,6 +2985,67 @@ function getLeaveMaturity(
     matured,
     date: matured ? formatDateToISO(maturedDate) : "",
   };
+}
+
+const ATTENDANCE_START_YEAR = 2026;
+
+const ATTENDANCE_MONTH_OPTIONS = [
+  { value: "01", label: "Januari" },
+  { value: "02", label: "Februari" },
+  { value: "03", label: "Maret" },
+  { value: "04", label: "April" },
+  { value: "05", label: "Mei" },
+  { value: "06", label: "Juni" },
+  { value: "07", label: "Juli" },
+  { value: "08", label: "Agustus" },
+  { value: "09", label: "September" },
+  { value: "10", label: "Oktober" },
+  { value: "11", label: "November" },
+  { value: "12", label: "Desember" },
+];
+
+function getAttendanceYearOptions() {
+  const currentYear = new Date().getFullYear();
+  const lastVisibleYear = Math.max(currentYear + 10, ATTENDANCE_START_YEAR + 10);
+
+  return Array.from(
+    { length: lastVisibleYear - ATTENDANCE_START_YEAR + 1 },
+    (_, index) => ATTENDANCE_START_YEAR + index,
+  );
+}
+
+function normalizePeriodMonth(value: string) {
+  const match = String(value || "").match(/^(\d{4})-(\d{2})$/);
+
+  if (!match) {
+    return getCurrentPeriodMonth();
+  }
+
+  const year = Math.max(Number(match[1]), ATTENDANCE_START_YEAR);
+  const monthNumber = Math.min(Math.max(Number(match[2]), 1), 12);
+  const month = String(monthNumber).padStart(2, "0");
+
+  return `${year}-${month}`;
+}
+
+function updatePeriodPart(
+  currentPeriod: string,
+  part: "month" | "year",
+  value: string,
+) {
+  const normalized = normalizePeriodMonth(currentPeriod);
+  const [year, month] = normalized.split("-");
+
+  if (part === "year") {
+    const nextYear = Math.max(Number(value || year), ATTENDANCE_START_YEAR);
+    return `${nextYear}-${month}`;
+  }
+
+  const nextMonth = String(
+    Math.min(Math.max(Number(value || month), 1), 12),
+  ).padStart(2, "0");
+
+  return `${year}-${nextMonth}`;
 }
 
 function getCurrentPeriodMonth() {
