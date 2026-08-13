@@ -227,6 +227,16 @@ type DailyTypeMeta = {
   isPHLClaim: boolean;
 };
 
+type LiveManualForm = {
+  attendance_date: string;
+  manual_check_in: string;
+  manual_check_out: string;
+  reason: string;
+  proof_file: File | null;
+  existing_proof_url: string;
+  existing_proof_name: string;
+};
+
 type PeriodTotals = {
   totalWorkDays: number;
   present: number;
@@ -251,6 +261,18 @@ const emptyRowDraft: RowDraft = {
   phl_file: null,
 };
 
+function createLiveManualForm(date = getTodayISO()): LiveManualForm {
+  return {
+    attendance_date: date,
+    manual_check_in: "",
+    manual_check_out: "",
+    reason: "",
+    proof_file: null,
+    existing_proof_url: "",
+    existing_proof_name: "",
+  };
+}
+
 export default function EmployeeAttendancePage() {
   const [appUser, setAppUser] = useState<AppUser | null>(null);
   const [employee, setEmployee] = useState<EmployeeProfile | null>(null);
@@ -266,6 +288,19 @@ export default function EmployeeAttendancePage() {
   const [editOpen, setEditOpen] = useState(false);
   const [selectedRow, setSelectedRow] = useState<CalendarDayRow | null>(null);
   const [resettingDate, setResettingDate] = useState<string>("");
+  const [savingInlineManualDate, setSavingInlineManualDate] =
+    useState<string>("");
+
+  // Absensi manual harian yang dapat digunakan kapan saja,
+  // tidak bergantung pada periode yang sedang dipilih di tabel.
+  const [liveManualOpen, setLiveManualOpen] = useState(false);
+  const [liveManualLoading, setLiveManualLoading] = useState(false);
+  const [liveManualSaving, setLiveManualSaving] = useState(false);
+  const [liveManualRecord, setLiveManualRecord] =
+    useState<AttendanceLog | null>(null);
+  const [liveManualForm, setLiveManualForm] = useState<LiveManualForm>(() =>
+    createLiveManualForm(),
+  );
   const [selectedDates, setSelectedDates] = useState<string[]>([]);
   const [rowDrafts, setRowDrafts] = useState<Record<string, RowDraft>>({});
 
@@ -357,21 +392,30 @@ export default function EmployeeAttendancePage() {
 
   const latestLog = logs[logs.length - 1] || null;
 
-  const presentCount = calendarRows.filter((item) => {
-    return getDisplayStatus(item, getDraft(item)) === "present";
-  }).length;
+  // Satu tanggal hanya boleh masuk SATU kartu ringkasan.
+  // Ini mencegah manual attendance terhitung sebagai Hadir + Incomplete
+  // atau Hadir + Tanpa Data secara bersamaan.
+  const summaryBuckets = useMemo(() => {
+    return calendarRows.map((row) =>
+      classifyAttendanceSummary(row, getDraft(row)),
+    );
+  }, [calendarRows, rowDrafts]);
 
-  const incompleteCount = calendarRows.filter((item) => {
-    return isIncompleteRow(item, getDraft(item));
-  }).length;
+  const presentCount = summaryBuckets.filter(
+    (bucket) => bucket === "present",
+  ).length;
 
-  const noRecordCount = calendarRows.filter((item) => {
-    return !item.log && !isOffDayWithoutAttendance(item, getDraft(item));
-  }).length;
+  const incompleteCount = summaryBuckets.filter(
+    (bucket) => bucket === "incomplete",
+  ).length;
 
-  const phlCandidateCount = calendarRows.filter((item) => {
-    return isPotentialPHL(item, getDraft(item));
-  }).length;
+  const noRecordCount = summaryBuckets.filter(
+    (bucket) => bucket === "no_record",
+  ).length;
+
+  const phlCandidateCount = summaryBuckets.filter(
+    (bucket) => bucket === "phl",
+  ).length;
 
   useEffect(() => {
     fetchData();
@@ -847,6 +891,409 @@ export default function EmployeeAttendancePage() {
       name: file.name,
       error: "",
     };
+  }
+
+  async function loadLiveManualAttendance(date: string) {
+    if (!employee?.id || !date) return;
+
+    setLiveManualLoading(true);
+
+    try {
+      const { data: sessionData, error: sessionError } =
+        await supabase.auth.getSession();
+
+      if (sessionError || !sessionData.session?.access_token) {
+        throw new Error("Session login tidak valid. Silakan login ulang.");
+      }
+
+      const query = new URLSearchParams({
+        employee_id: employee.id,
+        attendance_date: date,
+      });
+
+      const response = await fetch(
+        `/api/employee/attendance/manual-entry?${query.toString()}`,
+        {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${sessionData.session.access_token}`,
+          },
+          cache: "no-store",
+        },
+      );
+
+      const result = await response.json().catch(() => null);
+
+      if (!response.ok || result?.success === false) {
+        throw new Error(
+          result?.error ||
+            result?.message ||
+            "Data absensi manual harian gagal dimuat.",
+        );
+      }
+
+      const record = (result?.record || null) as AttendanceLog | null;
+      const existingProofUrl =
+        record?.absence_proof_url || record?.correction_proof_url || "";
+      const existingProofName =
+        record?.absence_proof_name || record?.correction_proof_name || "";
+
+      setLiveManualRecord(record);
+      setLiveManualForm({
+        attendance_date: date,
+        manual_check_in:
+          record?.manual_check_in || record?.requested_check_in || "",
+        manual_check_out:
+          record?.manual_check_out || record?.requested_check_out || "",
+        reason:
+          record?.employee_daily_note || record?.correction_reason || "",
+        proof_file: null,
+        existing_proof_url: existingProofUrl,
+        existing_proof_name: existingProofName,
+      });
+    } catch (error: any) {
+      setLiveManualRecord(null);
+      setLiveManualForm(createLiveManualForm(date));
+      setErrorMessage(
+        error?.message || "Data absensi manual harian gagal dimuat.",
+      );
+    } finally {
+      setLiveManualLoading(false);
+    }
+  }
+
+  async function openLiveManualAttendance() {
+    setErrorMessage("");
+    setSuccessMessage("");
+
+    if (!employee || !appUser) {
+      setErrorMessage("Data employee belum siap. Silakan refresh halaman.");
+      return;
+    }
+
+    if (!employee.machine_pin) {
+      setErrorMessage(
+        "Machine PIN belum tersedia. Hubungi HR sebelum memakai absensi manual.",
+      );
+      return;
+    }
+
+    const today = getTodayISO();
+    setLiveManualOpen(true);
+    setLiveManualForm(createLiveManualForm(today));
+    await loadLiveManualAttendance(today);
+  }
+
+  function closeLiveManualAttendance() {
+    if (liveManualSaving) return;
+
+    setLiveManualOpen(false);
+    setLiveManualRecord(null);
+    setLiveManualForm(createLiveManualForm());
+  }
+
+  async function handleLiveManualDateChange(date: string) {
+    if (!date) return;
+
+    if (date > getTodayISO()) {
+      setErrorMessage("Absensi manual tidak dapat diisi untuk tanggal yang akan datang.");
+      return;
+    }
+
+    setErrorMessage("");
+    setLiveManualForm(createLiveManualForm(date));
+    await loadLiveManualAttendance(date);
+  }
+
+  function updateLiveManualForm<K extends keyof LiveManualForm>(
+    field: K,
+    value: LiveManualForm[K],
+  ) {
+    setLiveManualForm((prev) => ({
+      ...prev,
+      [field]: value,
+    }));
+  }
+
+  async function saveLiveManualAttendance() {
+    setErrorMessage("");
+    setSuccessMessage("");
+
+    if (!employee || !appUser) {
+      setErrorMessage("Data employee atau akun belum tersedia.");
+      return;
+    }
+
+    if (!employee.machine_pin) {
+      setErrorMessage("Machine PIN belum tersedia pada data employee.");
+      return;
+    }
+
+    if (!liveManualForm.attendance_date) {
+      setErrorMessage("Tanggal absensi wajib dipilih.");
+      return;
+    }
+
+    if (liveManualForm.attendance_date > getTodayISO()) {
+      setErrorMessage("Tanggal absensi tidak boleh melebihi hari ini.");
+      return;
+    }
+
+    if (
+      !liveManualForm.manual_check_in &&
+      !liveManualForm.manual_check_out
+    ) {
+      setErrorMessage(
+        "Isi minimal jam masuk atau jam pulang manual terlebih dahulu.",
+      );
+      return;
+    }
+
+    if (liveManualForm.reason.trim().length < 5) {
+      setErrorMessage(
+        "Keterangan/alasan absensi manual wajib diisi minimal 5 karakter.",
+      );
+      return;
+    }
+
+    if (
+      !liveManualForm.proof_file &&
+      !liveManualForm.existing_proof_url
+    ) {
+      setErrorMessage(
+        "Upload bukti tugas luar/perintah atasan/dokumen pendukung sebelum menyimpan absensi manual.",
+      );
+      return;
+    }
+
+    setLiveManualSaving(true);
+
+    try {
+      let proofUrl = liveManualForm.existing_proof_url;
+      let proofName = liveManualForm.existing_proof_name;
+
+      if (liveManualForm.proof_file) {
+        const upload = await uploadFile(
+          liveManualForm.proof_file,
+          `attendance-live-manual/${employee.id}/${liveManualForm.attendance_date}`,
+        );
+
+        if (upload.error) {
+          throw new Error(upload.error);
+        }
+
+        proofUrl = upload.url;
+        proofName = upload.name;
+      }
+
+      const { data: sessionData, error: sessionError } =
+        await supabase.auth.getSession();
+
+      if (sessionError || !sessionData.session?.access_token) {
+        throw new Error("Session login tidak valid. Silakan login ulang.");
+      }
+
+      const response = await fetch(
+        "/api/employee/attendance/manual-entry",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${sessionData.session.access_token}`,
+          },
+          body: JSON.stringify({
+            employee_id: employee.id,
+            attendance_date: liveManualForm.attendance_date,
+            manual_check_in: liveManualForm.manual_check_in || null,
+            manual_check_out: liveManualForm.manual_check_out || null,
+            reason: liveManualForm.reason.trim(),
+            proof_url: proofUrl,
+            proof_name: proofName,
+          }),
+        },
+      );
+
+      const result = await response.json().catch(() => null);
+
+      if (!response.ok || result?.success === false) {
+        throw new Error(
+          result?.error ||
+            result?.message ||
+            "Absensi manual gagal disimpan.",
+        );
+      }
+
+      const savedDate = liveManualForm.attendance_date;
+      const savedPeriod =
+        result?.period_month || getPeriodMonthForDate(savedDate);
+
+      setLiveManualOpen(false);
+      setLiveManualRecord(null);
+      setLiveManualForm(createLiveManualForm());
+
+      setSuccessMessage(
+        [
+          `Absensi manual ${formatDisplayDate(savedDate)} berhasil disimpan langsung ke database.`,
+          `Data tercatat untuk periode ${getPeriodLabel(savedPeriod)}.`,
+          "Bukti tetap disimpan dan akan dipertahankan saat HR meng-upload fingerprint periode tersebut.",
+          "Approval tetap mengikuti Submit Periode ke Atasan agar flow lama tidak berubah.",
+        ].join(" "),
+      );
+
+      if (savedPeriod === periodMonth) {
+        await fetchData(false);
+      }
+    } catch (error: any) {
+      setErrorMessage(
+        error?.message || "Terjadi kesalahan saat menyimpan absensi manual.",
+      );
+    } finally {
+      setLiveManualSaving(false);
+    }
+  }
+
+  async function saveInlineManualVerification(row: CalendarDayRow) {
+    setErrorMessage("");
+    setSuccessMessage("");
+
+    if (!employee || !appUser) {
+      setErrorMessage("Data employee atau akun belum tersedia.");
+      return;
+    }
+
+    if (isPeriodLocked || submittedPeriod) {
+      setErrorMessage(
+        "Periode ini sudah masuk proses approval atau sudah dikunci. Data manual tidak dapat diubah.",
+      );
+      return;
+    }
+
+    const draft = getDraft(row);
+    const shouldPersistManual =
+      draft.daily_type === "manual_attendance" ||
+      Boolean(draft.manual_check_in || draft.manual_check_out);
+
+    // Jenis selain manual tetap memakai flow lama:
+    // disimpan sebagai draft UI lalu ikut Submit Periode.
+    if (!shouldPersistManual) {
+      closeEdit();
+      setSuccessMessage(
+        `${formatDisplayDate(row.date)} tersimpan sebagai draft verifikasi. Data akan masuk database saat Submit Periode ke Atasan.`,
+      );
+      return;
+    }
+
+    const effectiveIn = getEffectiveCheckIn(row, draft);
+    const effectiveOut = getEffectiveCheckOut(row, draft);
+
+    if (!effectiveIn && !effectiveOut) {
+      setErrorMessage(
+        `${formatDisplayDate(row.date)}: isi minimal jam masuk atau jam pulang manual.`,
+      );
+      return;
+    }
+
+    if (!draft.employee_daily_note.trim()) {
+      setErrorMessage(
+        `${formatDisplayDate(row.date)}: catatan/alasan wajib diisi untuk absensi manual.`,
+      );
+      return;
+    }
+
+    const existingProofUrl =
+      row.log?.absence_proof_url || row.log?.correction_proof_url || "";
+    const existingProofName =
+      row.log?.absence_proof_name || row.log?.correction_proof_name || "";
+
+    if (!draft.absence_file && !existingProofUrl) {
+      setErrorMessage(
+        `${formatDisplayDate(row.date)}: upload bukti pendukung untuk absensi manual.`,
+      );
+      return;
+    }
+
+    setSavingInlineManualDate(row.date);
+
+    try {
+      let proofUrl = existingProofUrl;
+      let proofName = existingProofName;
+
+      if (draft.absence_file) {
+        const upload = await uploadFile(
+          draft.absence_file,
+          `attendance-live-manual/${employee.id}/${row.date}`,
+        );
+
+        if (upload.error) {
+          throw new Error(upload.error);
+        }
+
+        proofUrl = upload.url;
+        proofName = upload.name;
+      }
+
+      const { data: sessionData, error: sessionError } =
+        await supabase.auth.getSession();
+
+      if (sessionError || !sessionData.session?.access_token) {
+        throw new Error("Session login tidak valid. Silakan login ulang.");
+      }
+
+      const response = await fetch(
+        "/api/employee/attendance/manual-entry",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${sessionData.session.access_token}`,
+          },
+          body: JSON.stringify({
+            employee_id: employee.id,
+            attendance_date: row.date,
+            manual_check_in: draft.manual_check_in || null,
+            manual_check_out: draft.manual_check_out || null,
+            reason: draft.employee_daily_note.trim(),
+            proof_url: proofUrl,
+            proof_name: proofName,
+          }),
+        },
+      );
+
+      const result = await response.json().catch(() => null);
+
+      if (!response.ok || result?.success === false) {
+        throw new Error(
+          result?.error ||
+            result?.message ||
+            "Absensi manual gagal disimpan ke database.",
+        );
+      }
+
+      closeEdit();
+
+      setSuccessMessage(
+        [
+          `Absensi manual ${formatDisplayDate(row.date)} berhasil disimpan ke database.`,
+          result?.summary_status === "present"
+            ? "Ringkasan kehadiran sekarang dihitung sebagai Hadir."
+            : result?.summary_status === "incomplete"
+              ? "Ringkasan sekarang dihitung sebagai Incomplete sampai jam masuk/pulang lengkap."
+              : "",
+          "Data akan tetap mengikuti Submit Periode ke Atasan untuk proses approval.",
+        ]
+          .filter(Boolean)
+          .join(" "),
+      );
+
+      await fetchData(false);
+    } catch (error: any) {
+      setErrorMessage(
+        error?.message ||
+          "Terjadi kesalahan saat menyimpan absensi manual.",
+      );
+    } finally {
+      setSavingInlineManualDate("");
+    }
   }
 
   async function handleSubmitPeriod() {
@@ -1407,6 +1854,52 @@ export default function EmployeeAttendancePage() {
             {errorMessage}
           </div>
         )}
+
+        <div className="relative overflow-hidden rounded-[30px] border border-[#007aff]/15 bg-[#eef6ff] p-5 shadow-sm sm:p-6">
+          <div className="pointer-events-none absolute -right-16 -top-20 h-52 w-52 rounded-full bg-[#007aff]/10 blur-3xl" />
+
+          <div className="relative flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
+            <div className="max-w-3xl">
+              <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-[#007aff]/15 bg-white px-3 py-1.5 text-xs font-bold text-[#0059b8] shadow-sm">
+                <Clock3 size={15} />
+                Absensi Harian · Tidak Menunggu Periode
+              </div>
+
+              <h2 className="text-xl font-semibold tracking-tight text-[#1d1d1f] sm:text-2xl">
+                Sedang bekerja di luar kantor dan tidak bisa fingerprint?
+              </h2>
+
+              <p className="mt-2 text-sm leading-6 text-[#6e6e73]">
+                Simpan jam masuk/pulang manual dan bukti langsung pada hari
+                kejadian. Data akan otomatis ikut muncul pada periode absensi
+                yang sesuai, meskipun file fingerprint periode tersebut belum
+                di-upload HR.
+              </p>
+
+              <div className="mt-3 flex flex-wrap gap-2 text-[11px] font-semibold text-[#6e6e73]">
+                <span className="rounded-full bg-white px-3 py-1.5 shadow-sm">
+                  Tersimpan langsung ke database
+                </span>
+                <span className="rounded-full bg-white px-3 py-1.5 shadow-sm">
+                  Bukti tidak hilang saat upload fingerprint
+                </span>
+                <span className="rounded-full bg-white px-3 py-1.5 shadow-sm">
+                  Approval tetap lewat Submit Periode
+                </span>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={openLiveManualAttendance}
+              disabled={loading || !employee}
+              className="inline-flex min-h-12 shrink-0 items-center justify-center gap-2 rounded-[18px] bg-[#007aff] px-6 text-sm font-bold text-white shadow-sm transition hover:bg-[#0066d6] disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <Clock3 size={18} />
+              Absen Manual Sekarang
+            </button>
+          </div>
+        </div>
 
         {isPeriodLocked && (
           <div className="rounded-[28px] border border-red-200 bg-red-50 p-5 text-sm leading-6 text-red-700">
@@ -2085,14 +2578,30 @@ export default function EmployeeAttendancePage() {
           )}
         </div>
 
+        {liveManualOpen && (
+          <LiveManualAttendanceModal
+            employee={employee}
+            record={liveManualRecord}
+            form={liveManualForm}
+            loading={liveManualLoading}
+            saving={liveManualSaving}
+            onChange={updateLiveManualForm}
+            onDateChange={handleLiveManualDateChange}
+            onSave={saveLiveManualAttendance}
+            onClose={closeLiveManualAttendance}
+          />
+        )}
+
         {editOpen && selectedRow && (
           <EditAttendanceModal
             row={selectedRow}
             draft={getDraft(selectedRow)}
             locked={isPeriodLocked}
+            saving={savingInlineManualDate === selectedRow.date}
             onChange={(field, value) =>
               updateRowDraft(selectedRow.date, field, value)
             }
+            onSave={() => saveInlineManualVerification(selectedRow)}
             onClose={closeEdit}
           />
         )}
@@ -2101,17 +2610,300 @@ export default function EmployeeAttendancePage() {
   );
 }
 
+function LiveManualAttendanceModal({
+  employee,
+  record,
+  form,
+  loading,
+  saving,
+  onChange,
+  onDateChange,
+  onSave,
+  onClose,
+}: {
+  employee: EmployeeProfile | null;
+  record: AttendanceLog | null;
+  form: LiveManualForm;
+  loading: boolean;
+  saving: boolean;
+  onChange: <K extends keyof LiveManualForm>(
+    field: K,
+    value: LiveManualForm[K],
+  ) => void;
+  onDateChange: (date: string) => void;
+  onSave: () => void;
+  onClose: () => void;
+}) {
+  const periodMonth = getPeriodMonthForDate(form.attendance_date);
+  const periodLabel = form.attendance_date
+    ? getPeriodLabel(periodMonth)
+    : "-";
+
+  const hasMachineData = Boolean(
+    record?.upload_id || record?.check_in || record?.check_out,
+  );
+
+  const hasExistingManual = Boolean(
+    record?.manual_check_in ||
+      record?.manual_check_out ||
+      record?.requested_check_in ||
+      record?.requested_check_out ||
+      record?.employee_daily_note ||
+      record?.correction_reason,
+  );
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm sm:p-5">
+      <div className="flex max-h-[94vh] w-full max-w-3xl flex-col overflow-hidden rounded-[32px] bg-white shadow-[0_32px_100px_rgba(0,0,0,0.28)]">
+        <div className="flex items-start justify-between gap-4 border-b border-black/5 p-5 sm:p-6">
+          <div>
+            <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-[#e8f2ff] px-3 py-1.5 text-xs font-bold text-[#0059b8]">
+              <Clock3 size={14} />
+              Absensi Manual Harian
+            </div>
+
+            <h2 className="text-xl font-semibold text-[#1d1d1f] sm:text-2xl">
+              Kehadiran di Luar Kantor
+            </h2>
+
+            <p className="mt-1 text-sm leading-6 text-[#6e6e73]">
+              {employee?.full_name || "Employee"} · data disimpan sekarang dan
+              akan otomatis masuk ke periode yang sesuai.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={saving}
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#f5f5f7] text-[#1d1d1f] disabled:opacity-50"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="space-y-5 overflow-y-auto p-5 sm:p-6">
+          <div className="rounded-[24px] border border-blue-100 bg-blue-50 p-4 text-sm leading-6 text-blue-700">
+            <strong>Tidak perlu menunggu HR upload fingerprint.</strong> Jika
+            nanti ada file fingerprint untuk tanggal yang sama, HARMONY hanya
+            mengisi data mesin dan tetap mempertahankan jam manual, alasan,
+            serta dokumen bukti ini.
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <label className="block">
+              <span className="harmony-label">Tanggal Kehadiran</span>
+              <input
+                type="date"
+                value={form.attendance_date}
+                max={getTodayISO()}
+                disabled={loading || saving}
+                onChange={(event) => onDateChange(event.target.value)}
+                className="harmony-input disabled:cursor-not-allowed disabled:opacity-60"
+              />
+            </label>
+
+            <ReadOnlyBox label="Masuk Periode" value={periodLabel} />
+          </div>
+
+          {loading ? (
+            <div className="flex items-center gap-3 rounded-[22px] bg-[#f5f5f7] p-4 text-sm text-[#6e6e73]">
+              <RefreshCcw size={17} className="animate-spin" />
+              Mengecek data tanggal ini...
+            </div>
+          ) : (
+            <div className="grid gap-3 sm:grid-cols-3">
+              <LiveManualStatusBox
+                label="Data Mesin"
+                value={hasMachineData ? "Sudah ada" : "Belum ada"}
+              />
+              <LiveManualStatusBox
+                label="Data Manual"
+                value={hasExistingManual ? "Sudah tersimpan" : "Belum ada"}
+              />
+              <LiveManualStatusBox
+                label="Bukti"
+                value={
+                  form.existing_proof_url || form.proof_file
+                    ? "Tersedia"
+                    : "Wajib upload"
+                }
+              />
+            </div>
+          )}
+
+          {hasMachineData && (
+            <div className="grid gap-4 md:grid-cols-2">
+              <ReadOnlyBox
+                label="Fingerprint Masuk"
+                value={record?.check_in || "-"}
+              />
+              <ReadOnlyBox
+                label="Fingerprint Pulang"
+                value={record?.check_out || "-"}
+              />
+            </div>
+          )}
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <label className="block">
+              <span className="harmony-label">Manual Check In</span>
+              <input
+                type="time"
+                value={form.manual_check_in}
+                disabled={loading || saving}
+                onChange={(event) =>
+                  onChange("manual_check_in", event.target.value)
+                }
+                className="harmony-input disabled:cursor-not-allowed disabled:opacity-60"
+              />
+              <p className="mt-1 text-[11px] leading-5 text-[#86868b]">
+                Bisa diisi lebih dulu saat mulai bekerja.
+              </p>
+            </label>
+
+            <label className="block">
+              <span className="harmony-label">Manual Check Out</span>
+              <input
+                type="time"
+                value={form.manual_check_out}
+                disabled={loading || saving}
+                onChange={(event) =>
+                  onChange("manual_check_out", event.target.value)
+                }
+                className="harmony-input disabled:cursor-not-allowed disabled:opacity-60"
+              />
+              <p className="mt-1 text-[11px] leading-5 text-[#86868b]">
+                Dapat ditambahkan kemudian pada tanggal yang sama.
+              </p>
+            </label>
+          </div>
+
+          <label className="block">
+            <span className="harmony-label">Keterangan / Alasan</span>
+            <textarea
+              value={form.reason}
+              disabled={loading || saving}
+              onChange={(event) => onChange("reason", event.target.value)}
+              placeholder="Contoh: kunjungan lapangan, dinas luar, kegiatan eksternal, pekerjaan di lokasi lain, atau alasan tidak dapat fingerprint."
+              className="harmony-textarea disabled:cursor-not-allowed disabled:opacity-60"
+            />
+          </label>
+
+          <div className="rounded-[26px] border border-dashed border-black/10 bg-[#f5f5f7]/70 p-5">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h3 className="font-semibold text-[#1d1d1f]">
+                  Bukti Pendukung
+                </h3>
+                <p className="mt-1 text-sm leading-6 text-[#6e6e73]">
+                  Wajib. Bisa berupa surat tugas, instruksi atasan, foto
+                  kegiatan, atau dokumen relevan lainnya.
+                </p>
+                <p className="mt-1 text-xs font-bold text-[#007aff]">
+                  {form.proof_file?.name ||
+                    form.existing_proof_name ||
+                    "Belum ada file"}
+                </p>
+              </div>
+
+              <label className="inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-2xl bg-white px-5 text-sm font-bold text-[#007aff] shadow-sm transition hover:bg-[#e8f2ff]">
+                <Upload size={17} />
+                Pilih Bukti
+                <input
+                  type="file"
+                  accept=".pdf,.jpg,.jpeg,.png,.webp"
+                  className="hidden"
+                  disabled={loading || saving}
+                  onChange={(event) =>
+                    onChange("proof_file", event.target.files?.[0] || null)
+                  }
+                />
+              </label>
+            </div>
+
+            {form.existing_proof_url && (
+              <a
+                href={form.existing_proof_url}
+                target="_blank"
+                rel="noreferrer"
+                className="mt-4 inline-flex items-center gap-2 rounded-2xl bg-white px-4 py-3 text-sm font-semibold text-[#007aff]"
+              >
+                <FileText size={16} />
+                Lihat bukti yang sudah tersimpan
+              </a>
+            )}
+          </div>
+
+          <div className="rounded-[22px] border border-green-100 bg-green-50 p-4 text-xs leading-6 text-green-700">
+            Data ini <strong>belum otomatis dikirim ke atasan</strong>. Saat
+            periode absensi dibuka/review, data manual akan muncul di tabel
+            dan mengikuti tombol <strong>Submit Periode ke Atasan</strong>
+            seperti flow yang sudah digunakan sekarang.
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-3 border-t border-black/5 p-5 sm:flex-row sm:justify-end sm:p-6">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={saving}
+            className="harmony-button-secondary disabled:opacity-60"
+          >
+            Batal
+          </button>
+
+          <button
+            type="button"
+            onClick={onSave}
+            disabled={loading || saving}
+            className="harmony-button-primary disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {saving ? (
+              <RefreshCcw size={18} className="animate-spin" />
+            ) : (
+              <Save size={18} />
+            )}
+            {saving ? "Menyimpan..." : "Simpan ke Database"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function LiveManualStatusBox({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="rounded-2xl border border-black/5 bg-[#f5f5f7]/80 p-4">
+      <p className="text-[10px] font-bold uppercase tracking-wide text-[#86868b]">
+        {label}
+      </p>
+      <p className="mt-1 text-sm font-semibold text-[#1d1d1f]">{value}</p>
+    </div>
+  );
+}
+
 function EditAttendanceModal({
   row,
   draft,
   locked,
+  saving,
   onChange,
+  onSave,
   onClose,
 }: {
   row: CalendarDayRow;
   draft: RowDraft;
   locked: boolean;
+  saving: boolean;
   onChange: (field: keyof RowDraft, value: string | File | null) => void;
+  onSave: () => void;
   onClose: () => void;
 }) {
   const incomplete = isIncompleteRow(row, draft);
@@ -2290,11 +3082,24 @@ function EditAttendanceModal({
         <div className="flex flex-col gap-3 border-t border-black/5 p-6 md:flex-row md:justify-end">
           <button
             type="button"
-            onClick={onClose}
-            className="harmony-button-primary"
+            onClick={locked ? onClose : onSave}
+            disabled={saving}
+            className="harmony-button-primary disabled:cursor-not-allowed disabled:opacity-60"
           >
-            <Save size={18} />
-            {locked ? "Tutup" : "Simpan Sementara"}
+            {saving ? (
+              <RefreshCcw size={18} className="animate-spin" />
+            ) : (
+              <Save size={18} />
+            )}
+            {locked
+              ? "Tutup"
+              : saving
+                ? "Menyimpan..."
+                : draft.daily_type === "manual_attendance" ||
+                    draft.manual_check_in ||
+                    draft.manual_check_out
+                  ? "Simpan Manual ke Database"
+                  : "Simpan Sementara"}
           </button>
         </div>
       </div>
@@ -2738,6 +3543,7 @@ function inferDailyType(row: CalendarDayRow): DailyType {
   if (type === "menstrual_leave") return "menstrual_leave";
   if (type === "pregnancy_check_leave") return "pregnancy_check_leave";
   if (type === "phl_claim") return "phl_claim";
+  if (type === "manual_attendance") return "manual_attendance";
   if (type === "sick") return "sick";
   if (type === "permit" || type === "permission") return "permit";
   if (type === "official_travel") return "official_travel";
@@ -2752,23 +3558,36 @@ function inferDailyType(row: CalendarDayRow): DailyType {
   return row.log?.id ? "present" : "absent";
 }
 
-function isIncompleteRow(row: CalendarDayRow, draft?: RowDraft) {
-  const hasAnyScan = Boolean(row.log?.check_in || row.log?.check_out);
-
-  const hasManual = Boolean(
+function getEffectiveCheckIn(row: CalendarDayRow, draft?: RowDraft) {
+  return (
+    row.log?.check_in ||
     draft?.manual_check_in ||
-    draft?.manual_check_out ||
     row.log?.manual_check_in ||
-    row.log?.manual_check_out,
+    row.log?.requested_check_in ||
+    ""
   );
+}
 
+function getEffectiveCheckOut(row: CalendarDayRow, draft?: RowDraft) {
+  return (
+    row.log?.check_out ||
+    draft?.manual_check_out ||
+    row.log?.manual_check_out ||
+    row.log?.requested_check_out ||
+    ""
+  );
+}
+
+function isIncompleteRow(row: CalendarDayRow, draft?: RowDraft) {
   const meta = draft ? getDailyTypeMeta(draft.daily_type) : null;
 
   if (meta?.isAbsenceLike) return false;
 
-  const missingOneSide = !row.log?.check_in || !row.log?.check_out;
+  const effectiveIn = getEffectiveCheckIn(row, draft);
+  const effectiveOut = getEffectiveCheckOut(row, draft);
+  const hasAnyAttendanceTime = Boolean(effectiveIn || effectiveOut);
 
-  return (hasAnyScan || hasManual) && missingOneSide;
+  return hasAnyAttendanceTime && !(effectiveIn && effectiveOut);
 }
 
 function isPotentialPHL(row: CalendarDayRow, draft?: RowDraft) {
@@ -2810,7 +3629,28 @@ function getDisplayStatus(row: CalendarDayRow, draft: RowDraft) {
 
   if (meta.isAbsenceLike) return meta.status;
   if (isOffDayWithoutAttendance(row, draft)) return "off_day";
-  if (draft.manual_check_in || draft.manual_check_out) return "present";
+
+  const effectiveIn = getEffectiveCheckIn(row, draft);
+  const effectiveOut = getEffectiveCheckOut(row, draft);
+
+  if (effectiveIn && effectiveOut) {
+    // Late tetap merupakan kehadiran; badge harian boleh tetap "Late"
+    // bila sumber mesin memang menandainya demikian.
+    if (
+      row.log?.status === "late" &&
+      !draft.manual_check_in &&
+      !draft.manual_check_out &&
+      draft.daily_type !== "manual_attendance"
+    ) {
+      return "late";
+    }
+
+    return "present";
+  }
+
+  if (effectiveIn || effectiveOut) {
+    return "incomplete";
+  }
 
   if (row.log?.absence_request_type) {
     return row.log.absence_request_type;
@@ -2827,6 +3667,67 @@ function getDayStatus(
   if (log?.absence_request_type) return log.absence_request_type;
   if (log?.status) return log.status;
   if (isWeekend || isHoliday) return "off_day";
+
+  return "no_record";
+}
+
+type AttendanceSummaryBucket =
+  | "present"
+  | "incomplete"
+  | "no_record"
+  | "phl"
+  | "other";
+
+function classifyAttendanceSummary(
+  row: CalendarDayRow,
+  draft: RowDraft,
+): AttendanceSummaryBucket {
+  const meta = getDailyTypeMeta(draft.daily_type);
+
+  // Cuti, izin, sakit, tugas luar, alpa, klaim PHL, dll tidak boleh
+  // ikut dihitung sebagai "Tanpa Data".
+  if (meta.isAbsenceLike) {
+    return "other";
+  }
+
+  if (isPotentialPHL(row, draft)) {
+    return "phl";
+  }
+
+  const effectiveIn = getEffectiveCheckIn(row, draft);
+  const effectiveOut = getEffectiveCheckOut(row, draft);
+  const hasAnyAttendanceTime = Boolean(effectiveIn || effectiveOut);
+
+  // Hadir = pasangan jam efektif lengkap, baik dari fingerprint,
+  // manual, maupun kombinasi fingerprint + manual.
+  if (effectiveIn && effectiveOut) {
+    return "present";
+  }
+
+  // Hanya salah satu sisi tersedia.
+  if (hasAnyAttendanceTime) {
+    return "incomplete";
+  }
+
+  // Weekend/libur tanpa aktivitas bukan "Tanpa Data".
+  if (row.is_weekend || row.holiday_name) {
+    return "other";
+  }
+
+  // Jika ada record keterangan employee meskipun tanpa jam,
+  // jangan duplikasi sebagai Tanpa Data.
+  const hasEmployeeExplanation = Boolean(
+    row.log?.absence_request_type ||
+      row.log?.absence_request_label ||
+      row.log?.employee_daily_note ||
+      row.log?.correction_reason ||
+      draft.employee_daily_note ||
+      draft.daily_type !== "present",
+  );
+
+  if (hasEmployeeExplanation) {
+    return "other";
+  }
 
   return "no_record";
 }
@@ -3299,6 +4200,38 @@ function updatePeriodPart(
   ).padStart(2, "0");
 
   return `${year}-${nextMonth}`;
+}
+
+function getTodayISO() {
+  const now = new Date();
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Makassar",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(now);
+
+  const map = new Map(parts.map((part) => [part.type, part.value]));
+
+  return `${map.get("year")}-${map.get("month")}-${map.get("day")}`;
+}
+
+function getPeriodMonthForDate(value: string) {
+  const match = String(value || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
+
+  if (!match) return getCurrentPeriodMonth();
+
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+
+  if (day >= 11) {
+    return `${year}-${String(month).padStart(2, "0")}`;
+  }
+
+  const previous = new Date(year, month - 2, 1);
+
+  return `${previous.getFullYear()}-${String(previous.getMonth() + 1).padStart(2, "0")}`;
 }
 
 function getCurrentPeriodMonth() {

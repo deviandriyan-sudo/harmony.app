@@ -839,15 +839,156 @@ export default function HRAttendanceUploadPage() {
     })
   }
 
+  function hasEmployeeProtectedAttendanceData(log: any) {
+    return Boolean(
+      log?.manual_check_in ||
+        log?.manual_check_out ||
+        log?.requested_check_in ||
+        log?.requested_check_out ||
+        log?.employee_daily_note ||
+        log?.employee_confirmation_status ||
+        log?.employee_confirmation_batch_id ||
+        log?.correction_reason ||
+        log?.correction_proof_url ||
+        log?.correction_proof_name ||
+        String(log?.correction_submitted_role || '').toLowerCase() === 'employee' ||
+        log?.absence_request_type ||
+        log?.absence_request_label ||
+        log?.absence_request_status ||
+        log?.absence_proof_url ||
+        log?.absence_proof_name ||
+        log?.phl_proof_url ||
+        log?.phl_proof_name ||
+        String(log?.absence_request_source || '').toLowerCase().startsWith('employee_') ||
+        String(log?.source || '').toLowerCase().includes('employee') ||
+        String(log?.source || '').toLowerCase() === 'upload_merged_manual'
+    )
+  }
+
+  function mergeFingerprintPayloadWithExisting(
+    incoming: AttendanceLogPayload,
+    existing: any
+  ) {
+    if (!existing) return incoming
+
+    const protectedFields = [
+      'manual_check_in',
+      'manual_check_out',
+      'requested_check_in',
+      'requested_check_out',
+      'employee_daily_note',
+
+      'correction_status',
+      'correction_type',
+      'correction_reason',
+      'correction_proof_url',
+      'correction_proof_name',
+      'correction_submitted_by',
+      'correction_submitted_role',
+      'correction_submitted_at',
+      'correction_notes',
+
+      'employee_confirmation_status',
+      'employee_confirmed_at',
+      'employee_confirmation_batch_id',
+
+      'supervisor_approval_status',
+      'supervisor_approved_by',
+      'supervisor_approved_at',
+      'supervisor_reviewed_at',
+      'supervisor_reviewed_by',
+      'supervisor_note',
+
+      'hr_approval_status',
+      'hr_approved_by',
+      'hr_approved_at',
+      'hr_final_status',
+      'hr_finalized_at',
+      'hr_finalized_by',
+      'hr_note',
+
+      'is_phl_candidate',
+      'phl_proof_url',
+      'phl_proof_name',
+
+      'absence_request_type',
+      'absence_request_label',
+      'absence_request_status',
+      'absence_request_source',
+      'absence_proof_url',
+      'absence_proof_name',
+
+      'is_locked',
+      'locked_at',
+      'locked_by',
+      'locked_by_name',
+      'unlocked_at',
+      'unlocked_by',
+      'unlocked_by_name',
+      'lock_note',
+
+      'deleted_at',
+      'deleted_by',
+    ] as const
+
+    const merged: Record<string, unknown> = {
+      ...incoming,
+    }
+
+    protectedFields.forEach((field) => {
+      if (Object.prototype.hasOwnProperty.call(existing, field)) {
+        merged[field] = existing[field]
+      }
+    })
+
+    if (hasEmployeeProtectedAttendanceData(existing)) {
+      merged.source = 'upload_merged_manual'
+    }
+
+    return merged
+  }
+
   async function insertAttendanceLogs(logs: AttendanceLogPayload[]) {
     const batchSize = 500
 
     for (let i = 0; i < logs.length; i += batchSize) {
       const batch = logs.slice(i, i + batchSize)
+      const machinePins = Array.from(new Set(batch.map((item) => item.machine_pin)))
+      const dates = batch.map((item) => item.attendance_date).sort()
+      const minDate = dates[0]
+      const maxDate = dates[dates.length - 1]
+
+      const { data: existingRows, error: existingError } = await supabase
+        .from('attendance_logs')
+        .select('*')
+        .is('deleted_at', null)
+        .in('machine_pin', machinePins)
+        .gte('attendance_date', minDate)
+        .lte('attendance_date', maxDate)
+
+      if (existingError) {
+        return existingError.message
+      }
+
+      const existingMap = new Map<string, any>()
+
+      ;(existingRows || []).forEach((row) => {
+        existingMap.set(
+          `${String(row.machine_pin || '').trim()}|${row.attendance_date}`,
+          row
+        )
+      })
+
+      const mergedBatch = batch.map((incoming) => {
+        const key = `${incoming.machine_pin}|${incoming.attendance_date}`
+        const existing = existingMap.get(key)
+
+        return mergeFingerprintPayloadWithExisting(incoming, existing)
+      })
 
       const { error } = await supabase
         .from('attendance_logs')
-        .upsert(batch, {
+        .upsert(mergedBatch, {
           onConflict: 'machine_pin,attendance_date',
         })
 
@@ -1083,7 +1224,7 @@ export default function HRAttendanceUploadPage() {
       .eq('id', uploadRecord.id)
 
     setSuccessMessage(
-      `Berkas berhasil diproses. ${logs.length} data absensi dibuat atau diperbarui. ${skippedRows} data dilewati. Sinkron cuti/izin/PHL approved berhasil dijalankan untuk ${syncResult.successCount} karyawan.`
+      `Berkas berhasil diproses. ${logs.length} data fingerprint dibuat/diperbarui dengan safe merge. Data manual employee dan dokumen bukti pada tanggal yang sama dipertahankan. ${skippedRows} data dilewati. Sinkron cuti/izin/PHL approved berhasil dijalankan untuk ${syncResult.successCount} karyawan.`
     )
 
     setSelectedFile(null)
@@ -1102,7 +1243,9 @@ export default function HRAttendanceUploadPage() {
 
   async function handleDeleteUpload(upload: AttendanceUpload) {
     const confirmed = window.confirm(
-      `Hapus upload "${upload.file_name || upload.upload_period || '-'}"?\n\nData attendance_logs dari upload ini juga akan dihapus dari sistem.`
+      `Hapus upload "${upload.file_name || upload.upload_period || '-'}"?
+
+Data fingerprint dari upload ini akan dilepas. Data manual employee, alasan, approval, dan dokumen bukti yang sudah tersimpan TIDAK akan dihapus.`
     )
 
     if (!confirmed) return
@@ -1111,37 +1254,99 @@ export default function HRAttendanceUploadPage() {
     setErrorMessage('')
     setSuccessMessage('')
 
-    const { error: logError } = await supabase
-      .from('attendance_logs')
-      .delete()
-      .eq('upload_id', upload.id)
+    try {
+      const { data: linkedRows, error: linkedError } = await supabase
+        .from('attendance_logs')
+        .select('*')
+        .eq('upload_id', upload.id)
 
-    if (logError) {
-      setErrorMessage(logError.message)
+      if (linkedError) throw linkedError
+
+      const protectedRows = (linkedRows || []).filter((row) =>
+        hasEmployeeProtectedAttendanceData(row)
+      )
+
+      const pureUploadRows = (linkedRows || []).filter(
+        (row) => !hasEmployeeProtectedAttendanceData(row)
+      )
+
+      // Row hasil merge dengan data manual tidak boleh dihapus.
+      // Hanya fingerprint/system fields dari upload ini yang dibersihkan.
+      for (const row of protectedRows) {
+        const hasManualTime = Boolean(
+          row.manual_check_in ||
+            row.manual_check_out ||
+            row.requested_check_in ||
+            row.requested_check_out
+        )
+
+        const manualSource = String(row.absence_request_source || '').toLowerCase()
+        const sourceAfterDetach =
+          manualSource === 'employee_live_manual' ||
+          String(row.correction_type || '').toLowerCase() === 'live_manual_attendance'
+            ? 'employee_live_manual'
+            : 'employee_manual_confirmation'
+
+        const { error } = await supabase
+          .from('attendance_logs')
+          .update({
+            upload_id: null,
+            check_in: null,
+            check_out: null,
+            total_punches: 0,
+            raw_data: null,
+            detected_schedule_name: null,
+            detected_schedule_group: null,
+            work_duration_minutes: null,
+            is_double_shift: false,
+            is_night_shift: false,
+            source: sourceAfterDetach,
+            status: hasManualTime ? 'present' : row.status,
+            notes: row.notes,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', row.id)
+
+        if (error) throw error
+      }
+
+      if (pureUploadRows.length > 0) {
+        const pureIds = pureUploadRows.map((row) => row.id)
+
+        const { error: deleteError } = await supabase
+          .from('attendance_logs')
+          .delete()
+          .in('id', pureIds)
+
+        if (deleteError) throw deleteError
+      }
+
+      if (upload.file_path) {
+        await supabase.storage
+          .from('attendance-uploads')
+          .remove([upload.file_path])
+      }
+
+      const { error: uploadError } = await supabase
+        .from('attendance_uploads')
+        .delete()
+        .eq('id', upload.id)
+
+      if (uploadError) throw uploadError
+
+      setSuccessMessage(
+        `Upload berhasil dihapus. ${pureUploadRows.length} row fingerprint murni dihapus dan ${protectedRows.length} row manual employee dipertahankan beserta dokumen buktinya.`
+      )
+
+      await fetchData()
+    } catch (error: any) {
+      setErrorMessage(
+        error?.message ||
+          'Gagal menghapus upload dengan mekanisme safe merge.'
+      )
+    } finally {
       setDeletingId(null)
-      return
     }
-
-    if (upload.file_path) {
-      await supabase.storage
-        .from('attendance-uploads')
-        .remove([upload.file_path])
-    }
-
-    const { error: uploadError } = await supabase
-      .from('attendance_uploads')
-      .delete()
-      .eq('id', upload.id)
-
-    if (uploadError) {
-      setErrorMessage(uploadError.message)
-      setDeletingId(null)
-      return
-    }
-
-    setSuccessMessage('Upload absensi dan data absensi terkait berhasil dihapus.')
-    setDeletingId(null)
-    await fetchData()
   }
 
   const totalUploads = uploads.length
