@@ -88,6 +88,9 @@ type AttendanceLog = {
   employee_daily_note: string | null
   correction_reason: string | null
   supervisor_approval_status: string | null
+  hr_approval_status: string | null
+  hr_approved_by: string | null
+  hr_approved_at: string | null
   hr_final_status: string | null
   is_phl_candidate: boolean | null
   phl_proof_url: string | null
@@ -387,7 +390,7 @@ export default function HRFinalAttendanceReportPage() {
             '',
             `Absensi periode ${getPeriodApprovalLabel(periodMonth)} telah dikunci oleh ${finalizedBy}.`,
             '',
-            'Data absensi periode ini sudah menjadi read-only. Laporan dengan status Ready for HR juga otomatis difinalisasi.',
+            'Data absensi periode ini sudah menjadi read-only. Laporan Ready for HR hanya difinalisasi setelah HR Review berstatus HR Approved.',
             '',
             `Catatan HR: ${lockNote || '-'}`,
           ].join('\n'),
@@ -419,6 +422,40 @@ export default function HRFinalAttendanceReportPage() {
     return ` ${result.message}`
   }
 
+
+  async function checkReportHRApproval(report: PeriodConfirmation) {
+    const { data, error } = await supabase
+      .from('attendance_logs')
+      .select('id, hr_approval_status')
+      .eq('employee_id', report.employee_id)
+      .is('deleted_at', null)
+      .gte('attendance_date', report.period_start)
+      .lte('attendance_date', report.period_end)
+
+    if (error) {
+      return {
+        approved: false,
+        total: 0,
+        pending: 0,
+        error: error.message,
+      }
+    }
+
+    const rows = data || []
+    const pending = rows.filter(
+      (item) =>
+        String(item.hr_approval_status || '').trim().toLowerCase() !==
+        'approved'
+    ).length
+
+    return {
+      approved: rows.length > 0 && pending === 0,
+      total: rows.length,
+      pending,
+      error: '',
+    }
+  }
+
   async function finalizeReport(report: PeriodConfirmation) {
     setFinalizingId(report.id)
     setErrorMessage('')
@@ -426,6 +463,22 @@ export default function HRFinalAttendanceReportPage() {
 
     if (report.hr_status !== 'ready_for_hr') {
       setErrorMessage('Laporan hanya bisa difinalisasi jika status masih Ready for HR.')
+      setFinalizingId('')
+      return
+    }
+
+    const hrApprovalCheck = await checkReportHRApproval(report)
+
+    if (hrApprovalCheck.error) {
+      setErrorMessage(`Gagal memeriksa Approval HR: ${hrApprovalCheck.error}`)
+      setFinalizingId('')
+      return
+    }
+
+    if (!hrApprovalCheck.approved) {
+      setErrorMessage(
+        `Finalisasi diblokir. HR Review belum selesai. ${hrApprovalCheck.pending} dari ${hrApprovalCheck.total} log belum HR Approved. Buka Data Absensi → HR Review terlebih dahulu.`
+      )
       setFinalizingId('')
       return
     }
@@ -539,6 +592,45 @@ export default function HRFinalAttendanceReportPage() {
     const lockNote = 'Seluruh periode dikunci oleh HR.'
 
     const readyReports = reports.filter((item) => item.hr_status === 'ready_for_hr')
+
+    const notHRApproved: Array<{
+      report: PeriodConfirmation
+      pending: number
+      total: number
+      error: string
+    }> = []
+
+    for (const report of readyReports) {
+      const check = await checkReportHRApproval(report)
+
+      if (!check.approved) {
+        notHRApproved.push({
+          report,
+          pending: check.pending,
+          total: check.total,
+          error: check.error,
+        })
+      }
+    }
+
+    if (notHRApproved.length > 0) {
+      const preview = notHRApproved
+        .slice(0, 5)
+        .map(
+          (item) =>
+            item.report.full_name ||
+            item.report.employee_number ||
+            item.report.employee_id
+        )
+        .join(', ')
+
+      setErrorMessage(
+        `Lock 1 Periode diblokir. ${notHRApproved.length} laporan Ready for HR belum HR Approved${preview ? `: ${preview}` : ''}. Selesaikan HR Review terlebih dahulu.`
+      )
+      setPeriodLocking(false)
+      return
+    }
+
     const readyEmployeeIds = readyReports
       .map((item) => item.employee_id)
       .filter(Boolean)
@@ -820,7 +912,6 @@ export default function HRFinalAttendanceReportPage() {
             <div className="flex flex-col gap-3 md:flex-row md:flex-wrap md:items-center md:justify-end">
               <input
                 type="month"
-                min="2026-01"
                 value={periodMonth}
                 onChange={(event) => setPeriodMonth(event.target.value)}
                 className="harmony-input md:w-[180px]"
@@ -1287,16 +1378,10 @@ function formatHRStatus(status: string) {
 
 function getCurrentPeriodMonth() {
   const today = new Date()
-  const day = today.getDate()
-  const period = new Date(today)
+  const year = today.getFullYear()
+  const month = String(today.getMonth() + 1).padStart(2, '0')
 
-  if (day <= 10) {
-    period.setMonth(period.getMonth() - 1)
-  }
-
-  const periodMonth = `${period.getFullYear()}-${String(period.getMonth() + 1).padStart(2, '0')}`
-
-  return periodMonth < '2026-01' ? '2026-01' : periodMonth
+  return `${year}-${month}`
 }
 
 function getCutoffRange(periodMonth: string) {
