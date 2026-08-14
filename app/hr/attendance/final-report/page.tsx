@@ -1,1460 +1,694 @@
 'use client'
 
+import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
+import type { ReactNode } from 'react'
 import {
   AlertTriangle,
+  ArrowLeft,
   CheckCircle2,
-  Download,
   Eye,
-  FileSpreadsheet,
+  Loader2,
   Lock,
   RefreshCcw,
   Search,
-  ShieldCheck,
-  X,
+  UserCheck,
 } from 'lucide-react'
 
 import { Topbar } from '@/components/layout/Topbar'
 import { supabase } from '@/lib/supabase'
-import { sendHarmonyEmail } from '@/lib/notifications'
+import {
+  getCurrentPeriodMonthWita,
+  getCutoffRange,
+  getEmployeeLogs,
+  isUuid,
+  summarizeAttendancePeriod,
+  type AttendanceHoliday,
+  type AttendanceReportingLog,
+} from '@/lib/attendance-reporting'
 
-type PeriodConfirmation = {
+type Employee = {
+  id: string
+  employee_number?: string | null
+  machine_pin?: string | null
+  full_name?: string | null
+  department?: string | null
+  position?: string | null
+  email?: string | null
+  join_date?: string | null
+  is_active?: boolean | null
+}
+
+type Confirmation = {
   id: string
   employee_id: string
-
-  employee_number: string | null
-  machine_pin: string | null
-  full_name: string | null
-  department: string | null
-  position: string | null
-
   period_month: string
   period_start: string
   period_end: string
-
-  employee_status: string | null
-  employee_submitted_at: string | null
-  employee_submitted_by: string | null
-
-  supervisor_status: string | null
-  supervisor_id: string | null
-  supervisor_name: string | null
-  supervisor_approved_at: string | null
-  supervisor_rejected_at: string | null
-  supervisor_note: string | null
-
-  hr_status: string | null
-  hr_finalized_at: string | null
-  hr_finalized_by: string | null
-  hr_note: string | null
-
-  total_work_days: number | null
-  total_present_days: number | null
-  total_late_days: number | null
-  total_incomplete_days: number | null
-  total_absent_days: number | null
-  total_sick_days: number | null
-  total_permit_days: number | null
-  total_leave_days: number | null
-  total_phl_days: number | null
-  total_holiday_work_days: number | null
-
-  annual_leave_matured: boolean | null
-  annual_leave_matured_date: string | null
-  leave_allowance_eligible: boolean | null
-
-  is_locked: boolean | null
-  locked_at: string | null
-  locked_by: string | null
-  locked_by_name: string | null
-  unlocked_at: string | null
-  unlocked_by: string | null
-  unlocked_by_name: string | null
-  lock_note: string | null
-
-  created_at: string | null
-  updated_at: string | null
+  employee_status?: string | null
+  employee_submitted_at?: string | null
+  supervisor_status?: string | null
+  supervisor_name?: string | null
+  supervisor_approved_at?: string | null
+  supervisor_rejected_at?: string | null
+  hr_status?: string | null
+  hr_note?: string | null
+  hr_finalized_at?: string | null
+  hr_finalized_by?: string | null
+  is_locked?: boolean | null
+  locked_at?: string | null
+  locked_by?: string | null
+  locked_by_name?: string | null
+  lock_note?: string | null
 }
 
-type AttendanceLog = {
-  id: string
-  employee_id: string | null
-  attendance_date: string
-  check_in: string | null
-  check_out: string | null
-  manual_check_in: string | null
-  manual_check_out: string | null
-  status: string | null
-  employee_daily_note: string | null
-  correction_reason: string | null
-  supervisor_approval_status: string | null
-  hr_approval_status: string | null
-  hr_approved_by: string | null
-  hr_approved_at: string | null
-  hr_final_status: string | null
-  is_phl_candidate: boolean | null
-  phl_proof_url: string | null
-  absence_proof_url: string | null
-
-  is_locked: boolean | null
-  locked_at: string | null
-  locked_by: string | null
-  locked_by_name: string | null
-  unlocked_at: string | null
-  unlocked_by: string | null
-  unlocked_by_name: string | null
-  lock_note: string | null
-
-  deleted_at: string | null
+type Log = AttendanceReportingLog & {
+  hr_final_status?: string | null
+  hr_finalized_at?: string | null
+  hr_finalized_by?: string | null
+  is_locked?: boolean | null
+  locked_at?: string | null
+  locked_by?: string | null
+  locked_by_name?: string | null
+  lock_note?: string | null
+  deleted_at?: string | null
 }
 
-
-type EmployeeContact = {
-  id: string
-  full_name: string | null
-  email: string | null
+type FinalRow = {
+  employee: Employee
+  confirmation: Confirmation | null
+  logs: Log[]
+  summary: ReturnType<typeof summarizeAttendancePeriod>
+  allHRApproved: boolean
+  finalized: boolean
+  locked: boolean
+  eligible: boolean
+  reason: string
 }
 
-export default function HRFinalAttendanceReportPage() {
-  const [periodMonth, setPeriodMonth] = useState(getCurrentPeriodMonth())
-  const [reports, setReports] = useState<PeriodConfirmation[]>([])
-  const [selectedReport, setSelectedReport] = useState<PeriodConfirmation | null>(null)
-  const [selectedLogs, setSelectedLogs] = useState<AttendanceLog[]>([])
+export default function HRAttendanceFinalReportPage() {
+  const [periodMonth, setPeriodMonth] = useState(getCurrentPeriodMonthWita())
+  const [employees, setEmployees] = useState<Employee[]>([])
+  const [confirmations, setConfirmations] = useState<Confirmation[]>([])
+  const [logs, setLogs] = useState<Log[]>([])
+  const [holidays, setHolidays] = useState<AttendanceHoliday[]>([])
 
+  const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
-  const [loadingDetail, setLoadingDetail] = useState(false)
-  const [finalizingId, setFinalizingId] = useState('')
-  const [periodLocking, setPeriodLocking] = useState(false)
-
-  const [searchKeyword, setSearchKeyword] = useState('')
-  const [statusFilter, setStatusFilter] = useState('ready_for_hr')
-
+  const [processingId, setProcessingId] = useState('')
   const [errorMessage, setErrorMessage] = useState('')
   const [successMessage, setSuccessMessage] = useState('')
 
-  const periodRange = useMemo(() => getCutoffRange(periodMonth), [periodMonth])
+  const range = useMemo(() => getCutoffRange(periodMonth), [periodMonth])
 
-  const filteredReports = useMemo(() => {
-    const keyword = searchKeyword.trim().toLowerCase()
-
-    return reports.filter((item) => {
-      const matchStatus =
-        statusFilter === 'all' ? true : item.hr_status === statusFilter
-
-      const matchKeyword = !keyword
-        ? true
-        : item.full_name?.toLowerCase().includes(keyword) ||
-          item.employee_number?.toLowerCase().includes(keyword) ||
-          item.department?.toLowerCase().includes(keyword) ||
-          item.position?.toLowerCase().includes(keyword) ||
-          item.supervisor_name?.toLowerCase().includes(keyword)
-
-      return matchStatus && matchKeyword
+  const confirmationMap = useMemo(() => {
+    const map = new Map<string, Confirmation>()
+    confirmations.forEach((item) => {
+      if (item.employee_id) map.set(item.employee_id, item)
     })
-  }, [reports, searchKeyword, statusFilter])
+    return map
+  }, [confirmations])
 
-  const readyCount = reports.filter((item) => item.hr_status === 'ready_for_hr').length
-  const finalizedCount = reports.filter((item) => item.hr_status === 'finalized').length
-  const rejectedCount = reports.filter((item) => item.hr_status === 'rejected_by_supervisor').length
-  const lockedCount = reports.filter((item) => item.is_locked).length
-  const openCount = reports.filter((item) => !item.is_locked).length
-  const leaveMaturedCount = reports.filter((item) => item.annual_leave_matured).length
+  const rows = useMemo<FinalRow[]>(() => {
+    return employees.map((employee) => {
+      const confirmation = confirmationMap.get(employee.id) || null
+      const employeeLogs = getEmployeeLogs(employee, logs)
+      const summary = summarizeAttendancePeriod({
+        logs: employeeLogs,
+        holidays,
+        periodStart: range.start,
+        periodEnd: range.end,
+        employmentStart: employee.join_date,
+      })
 
-  const allReportsLocked =
-    reports.length > 0 && reports.every((item) => Boolean(item.is_locked))
+      const exactEmployeeLogs = employeeLogs.filter(
+        (log) => String(log.employee_id || '').trim() === employee.id,
+      )
+
+      const allHRApproved =
+        exactEmployeeLogs.length > 0 &&
+        exactEmployeeLogs.every((log) => normalize(log.hr_approval_status) === 'approved')
+
+      const finalized =
+        normalize(confirmation?.hr_status) === 'finalized' ||
+        employeeLogs.some((log) => normalize(log.hr_final_status) === 'finalized')
+
+      const locked =
+        Boolean(confirmation?.is_locked) ||
+        employeeLogs.some((log) => Boolean(log.is_locked))
+
+      const supervisorApproved = normalize(confirmation?.supervisor_status) === 'approved'
+      const readyForHR = normalize(confirmation?.hr_status) === 'ready_for_hr'
+      const dataClean =
+        summary.conflict === 0 &&
+        summary.incomplete === 0 &&
+        summary.noRecord === 0 &&
+        summary.pendingRequest === 0
+
+      const eligible =
+        Boolean(confirmation) &&
+        exactEmployeeLogs.length > 0 &&
+        supervisorApproved &&
+        readyForHR &&
+        allHRApproved &&
+        dataClean &&
+        !finalized &&
+        !locked
+
+      let reason = 'Siap Finalisasi & Kunci'
+      if (!confirmation) reason = 'Belum Submit Periode'
+      else if (normalize(confirmation.employee_status) !== 'submitted') reason = 'Belum Submit Employee'
+      else if (!supervisorApproved) reason = 'Belum Approved Atasan'
+      else if (!readyForHR && !finalized) reason = 'Belum Ready for HR'
+      else if (!employeeLogs.length) reason = 'Tidak Ada Log Absensi'
+      else if (!exactEmployeeLogs.length) reason = 'Log Belum Terhubung Employee ID'
+      else if (!allHRApproved && !finalized) reason = 'HR Review Belum Selesai'
+      else if (!dataClean && !finalized) reason = 'Masih Ada Incomplete / Tanpa Data / Pending / Konflik'
+      else if (finalized) reason = 'Sudah Finalized'
+      else if (locked) reason = 'Sudah Locked'
+
+      return {
+        employee,
+        confirmation,
+        logs: employeeLogs,
+        summary,
+        allHRApproved,
+        finalized,
+        locked,
+        eligible,
+        reason,
+      }
+    })
+  }, [employees, confirmationMap, logs, holidays, range.start, range.end])
+
+  const filteredRows = useMemo(() => {
+    const keyword = search.trim().toLowerCase()
+    if (!keyword) return rows
+    return rows.filter((row) =>
+      [
+        row.employee.full_name,
+        row.employee.employee_number,
+        row.employee.machine_pin,
+        row.employee.department,
+        row.employee.position,
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase()
+        .includes(keyword),
+    )
+  }, [rows, search])
+
+  const stats = useMemo(() => {
+    return rows.reduce(
+      (acc, row) => {
+        acc.all += 1
+        if (!row.confirmation) acc.notSubmitted += 1
+        if (normalize(row.confirmation?.supervisor_status) === 'approved') acc.supervisorApproved += 1
+        if (row.allHRApproved && normalize(row.confirmation?.hr_status) === 'ready_for_hr') acc.hrReviewed += 1
+        if (row.eligible) acc.readyFinalize += 1
+        if (row.finalized) acc.finalized += 1
+        if (row.locked) acc.locked += 1
+        return acc
+      },
+      {
+        all: 0,
+        notSubmitted: 0,
+        supervisorApproved: 0,
+        hrReviewed: 0,
+        readyFinalize: 0,
+        finalized: 0,
+        locked: 0,
+      },
+    )
+  }, [rows])
 
   useEffect(() => {
-    fetchReports()
+    if (typeof window !== 'undefined') {
+      const queryPeriod = new URLSearchParams(window.location.search).get('period')
+      if (
+        queryPeriod &&
+        /^\d{4}-(0[1-9]|1[0-2])$/.test(queryPeriod) &&
+        queryPeriod !== periodMonth
+      ) {
+        setPeriodMonth(queryPeriod)
+        return
+      }
+    }
+
+    fetchData()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [periodMonth])
 
-  async function fetchReports() {
+  async function fetchData() {
     setLoading(true)
     setErrorMessage('')
-    setSuccessMessage('')
-    setSelectedReport(null)
-    setSelectedLogs([])
-
-    const { data, error } = await supabase
-      .from('attendance_period_confirmations')
-      .select('*')
-      .eq('period_month', periodMonth)
-      .order('department', { ascending: true })
-      .order('full_name', { ascending: true })
-
-    if (error) {
-      setErrorMessage(error.message)
-      setReports([])
-      setLoading(false)
-      return
-    }
-
-    setReports(data || [])
-    setLoading(false)
-  }
-
-  async function openDetail(report: PeriodConfirmation) {
-    setSelectedReport(report)
-    setSelectedLogs([])
-    setLoadingDetail(true)
-    setErrorMessage('')
-
-    const { data, error } = await supabase
-      .from('attendance_logs')
-      .select('*')
-      .is('deleted_at', null)
-      .eq('employee_id', report.employee_id)
-      .gte('attendance_date', report.period_start)
-      .lte('attendance_date', report.period_end)
-      .order('attendance_date', { ascending: true })
-
-    if (error) {
-      setErrorMessage(error.message)
-      setLoadingDetail(false)
-      return
-    }
-
-    setSelectedLogs(data || [])
-    setLoadingDetail(false)
-  }
-
-  async function getHRIdentity() {
-    const { data: authData, error: authError } = await supabase.auth.getUser()
-
-    if (authError) {
-      return {
-        name: '',
-        error: authError.message,
-      }
-    }
-
-    return {
-      name: authData.user?.email || 'HR Administrator',
-      error: '',
-    }
-  }
-
-  function getNotificationBaseUrl() {
-    if (typeof window === 'undefined') return ''
-
-    return window.location.origin
-  }
-
-  async function fetchEmployeeContacts(employeeIds: string[]) {
-    const cleanIds = Array.from(
-      new Set(employeeIds.map((id) => String(id || '').trim()).filter(Boolean))
-    )
-
-    if (cleanIds.length === 0) return [] as EmployeeContact[]
-
-    const { data, error } = await supabase
-      .from('employees')
-      .select('id, full_name, email')
-      .in('id', cleanIds)
-
-    if (error) {
-      console.warn('Employee contact fetch warning:', error)
-      return [] as EmployeeContact[]
-    }
-
-    return (data || []) as EmployeeContact[]
-  }
-
-  function getValidEmail(value: string | null | undefined) {
-    const email = String(value || '').trim().toLowerCase()
-
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return ''
-
-    return email
-  }
-
-  async function sendFinalizationEmailToEmployee({
-    report,
-    finalizedBy,
-    lockNote,
-    action,
-  }: {
-    report: PeriodConfirmation
-    finalizedBy: string
-    lockNote: string
-    action: 'single_finalize' | 'full_period_lock'
-  }) {
-    const contacts = await fetchEmployeeContacts([report.employee_id])
-    const contact = contacts[0]
-    const employeeEmail = getValidEmail(contact?.email)
-
-    if (!employeeEmail) {
-      return {
-        total: 0,
-        sent: 0,
-        failed: 0,
-        message: 'Email karyawan tidak tersedia, notifikasi email tidak terkirim.',
-      }
-    }
-
-    const periodLabel = `${formatDisplayDate(report.period_start)} - ${formatDisplayDate(report.period_end)}`
-    const isFullLock = action === 'full_period_lock'
 
     try {
-      await sendHarmonyEmail({
-        to: employeeEmail,
-        subject: isFullLock
-          ? `Absensi Periode ${report.period_month} Telah Dikunci HR`
-          : `Absensi Periode ${report.period_month} Telah Difinalisasi HR`,
-        title: isFullLock
-          ? 'Absensi Telah Dikunci HR'
-          : 'Absensi Telah Difinalisasi HR',
-        message: [
-          `Yth. ${contact?.full_name || report.full_name || 'Employee'},`,
-          '',
-          isFullLock
-            ? `Absensi periode ${periodLabel} telah dikunci oleh ${finalizedBy}.`
-            : `Absensi periode ${periodLabel} telah difinalisasi dan dikunci oleh ${finalizedBy}.`,
-          '',
-          'Data absensi periode ini sudah menjadi read-only dan tidak bisa diubah dari dashboard employee.',
-          '',
-          `Catatan HR: ${lockNote || '-'}`,
-        ].join('\n'),
-        actionLabel: 'Buka Absensi HARMONY',
-        actionUrl: `${getNotificationBaseUrl()}/employee/attendance`,
-        footer:
-          'Email ini dikirim otomatis oleh HARMONY setelah HR melakukan finalisasi atau lock periode absensi.',
-      })
+      const [employeeResult, confirmationResult, logResult, holidayResult] =
+        await Promise.all([
+          supabase.from('employees').select('*').order('full_name', { ascending: true }),
+          supabase.from('attendance_period_confirmations').select('*').eq('period_month', periodMonth),
+          supabase
+            .from('attendance_logs')
+            .select('*')
+            .is('deleted_at', null)
+            .gte('attendance_date', range.start)
+            .lte('attendance_date', range.end),
+          supabase
+            .from('holidays')
+            .select('*')
+            .eq('is_active', true)
+            .gte('holiday_date', range.start)
+            .lte('holiday_date', range.end),
+        ])
 
-      return {
-        total: 1,
-        sent: 1,
-        failed: 0,
-        message: 'Notifikasi email terkirim ke karyawan.',
-      }
-    } catch (error) {
-      console.warn('Finalization notification warning:', error)
+      if (employeeResult.error) throw employeeResult.error
+      if (confirmationResult.error) throw confirmationResult.error
+      if (logResult.error) throw logResult.error
+      if (holidayResult.error) throw holidayResult.error
 
-      return {
-        total: 1,
-        sent: 0,
-        failed: 1,
-        message: 'Data berhasil diproses, tetapi notifikasi email gagal terkirim.',
-      }
-    }
-  }
-
-  async function sendFullPeriodLockEmail({
-    finalizedBy,
-    lockNote,
-  }: {
-    finalizedBy: string
-    lockNote: string
-  }) {
-    const employeeIds = reports
-      .map((report) => report.employee_id)
-      .filter(Boolean)
-
-    const contacts = await fetchEmployeeContacts(employeeIds)
-    const contactById = new Map(contacts.map((contact) => [contact.id, contact]))
-    const recipients = reports
-      .map((report) => {
-        const contact = contactById.get(report.employee_id)
-        const email = getValidEmail(contact?.email)
-
-        if (!email) return null
-
-        return {
-          report,
-          contact,
-          email,
-        }
-      })
-      .filter(Boolean) as Array<{
-        report: PeriodConfirmation
-        contact: EmployeeContact | undefined
-        email: string
-      }>
-
-    if (recipients.length === 0) {
-      return {
-        total: 0,
-        sent: 0,
-        failed: 0,
-        message: 'Tidak ada email karyawan yang valid untuk dikirimi notifikasi.',
-      }
-    }
-
-    const results = await Promise.allSettled(
-      recipients.map(({ report, contact, email }) =>
-        sendHarmonyEmail({
-          to: email,
-          subject: `Absensi Periode ${periodMonth} Telah Dikunci HR`,
-          title: 'Absensi Telah Dikunci HR',
-          message: [
-            `Yth. ${contact?.full_name || report.full_name || 'Employee'},`,
-            '',
-            `Absensi periode ${getPeriodApprovalLabel(periodMonth)} telah dikunci oleh ${finalizedBy}.`,
-            '',
-            'Data absensi periode ini sudah menjadi read-only. Laporan Ready for HR hanya difinalisasi setelah HR Review berstatus HR Approved.',
-            '',
-            `Catatan HR: ${lockNote || '-'}`,
-          ].join('\n'),
-          actionLabel: 'Buka Absensi HARMONY',
-          actionUrl: `${getNotificationBaseUrl()}/employee/attendance`,
-          footer:
-            'Email ini dikirim otomatis oleh HARMONY setelah HR melakukan lock periode absensi.',
-        })
+      setEmployees(
+        ((employeeResult.data || []) as Employee[]).filter(
+          (employee) => employee.is_active !== false,
+        ),
       )
-    )
+      setConfirmations((confirmationResult.data || []) as Confirmation[])
+      setLogs((logResult.data || []) as Log[])
+      setHolidays((holidayResult.data || []) as AttendanceHoliday[])
+    } catch (error: any) {
+      setErrorMessage(error?.message || 'Data finalisasi HR gagal dimuat.')
+    } finally {
+      setLoading(false)
+    }
+  }
 
-    const sent = results.filter((result) => result.status === 'fulfilled').length
-    const failed = results.length - sent
+  async function getActor() {
+    const { data, error } = await supabase.auth.getUser()
+    if (error || !data.user) throw new Error('Session HR tidak valid. Silakan login ulang.')
+
+    const { data: appUser, error: appUserError } = await supabase
+      .from('app_users')
+      .select('id,email,role,is_active,employee_id')
+      .eq('id', data.user.id)
+      .maybeSingle()
+
+    if (appUserError) throw appUserError
+
+    const role = normalize(appUser?.role)
+    if (
+      !appUser ||
+      appUser.is_active === false ||
+      !['hr', 'admin', 'administrator', 'super_admin'].includes(role)
+    ) {
+      throw new Error('Akses finalisasi hanya untuk HR/Admin aktif.')
+    }
 
     return {
-      total: recipients.length,
-      sent,
-      failed,
-      message:
-        failed > 0
-          ? `Notifikasi email terkirim ke ${sent} dari ${recipients.length} karyawan. ${failed} email gagal terkirim.`
-          : `Notifikasi email terkirim ke ${sent} karyawan.`,
+      id: data.user.id,
+      name:
+        data.user.user_metadata?.full_name ||
+        data.user.user_metadata?.name ||
+        data.user.email ||
+        'HR',
     }
   }
 
-  function buildEmailResultText(result: Awaited<ReturnType<typeof sendFullPeriodLockEmail>>) {
-    if (result.total === 0) return ` ${result.message}`
-
-    return ` ${result.message}`
-  }
-
-
-  async function checkReportHRApproval(report: PeriodConfirmation) {
-    const { data, error } = await supabase
-      .from('attendance_logs')
-      .select('id, hr_approval_status')
-      .eq('employee_id', report.employee_id)
-      .is('deleted_at', null)
-      .gte('attendance_date', report.period_start)
-      .lte('attendance_date', report.period_end)
-
-    if (error) {
-      return {
-        approved: false,
-        total: 0,
-        pending: 0,
-        error: error.message,
-      }
-    }
-
-    const rows = data || []
-    const pending = rows.filter(
-      (item) =>
-        String(item.hr_approval_status || '').trim().toLowerCase() !==
-        'approved'
-    ).length
-
-    return {
-      approved: rows.length > 0 && pending === 0,
-      total: rows.length,
-      pending,
-      error: '',
-    }
-  }
-
-  async function finalizeReport(report: PeriodConfirmation) {
-    setFinalizingId(report.id)
+  async function finalizeEmployee(row: FinalRow) {
     setErrorMessage('')
     setSuccessMessage('')
 
-    if (report.hr_status !== 'ready_for_hr') {
-      setErrorMessage('Laporan hanya bisa difinalisasi jika status masih Ready for HR.')
-      setFinalizingId('')
+    if (!row.eligible || !row.confirmation) {
+      setErrorMessage(`Belum dapat difinalisasi: ${row.reason}.`)
       return
     }
 
-    const hrApprovalCheck = await checkReportHRApproval(report)
-
-    if (hrApprovalCheck.error) {
-      setErrorMessage(`Gagal memeriksa Approval HR: ${hrApprovalCheck.error}`)
-      setFinalizingId('')
+    if (!isUuid(row.employee.id)) {
+      setErrorMessage('ID karyawan tidak valid. Finalisasi diblokir demi keamanan.')
       return
     }
 
-    if (!hrApprovalCheck.approved) {
-      setErrorMessage(
-        `Finalisasi diblokir. HR Review belum selesai. ${hrApprovalCheck.pending} dari ${hrApprovalCheck.total} log belum HR Approved. Buka Data Absensi → HR Review terlebih dahulu.`
-      )
-      setFinalizingId('')
-      return
-    }
-
-    const identity = await getHRIdentity()
-
-    if (identity.error) {
-      setErrorMessage(identity.error)
-      setFinalizingId('')
-      return
-    }
-
-    const finalizedBy = identity.name
-    const now = new Date().toISOString()
-    const lockNote = 'Periode karyawan dikunci setelah finalisasi HR.'
-
-    const { error: headerError } = await supabase
-      .from('attendance_period_confirmations')
-      .update({
-        hr_status: 'finalized',
-        hr_finalized_at: now,
-        hr_finalized_by: finalizedBy,
-        hr_note: 'Laporan absensi periode telah difinalisasi HR.',
-
-        is_locked: true,
-        locked_at: now,
-        locked_by: finalizedBy,
-        locked_by_name: finalizedBy,
-        unlocked_at: null,
-        unlocked_by: null,
-        unlocked_by_name: null,
-        lock_note: lockNote,
-
-        updated_at: now,
-      })
-      .eq('id', report.id)
-
-    if (headerError) {
-      setErrorMessage(headerError.message)
-      setFinalizingId('')
-      return
-    }
-
-    const { error: logError } = await supabase
-      .from('attendance_logs')
-      .update({
-        hr_final_status: 'finalized',
-        hr_finalized_at: now,
-        hr_finalized_by: finalizedBy,
-        hr_approval_status: 'approved',
-        hr_approved_by: finalizedBy,
-        hr_approved_at: now,
-
-        is_locked: true,
-        locked_at: now,
-        locked_by: finalizedBy,
-        locked_by_name: finalizedBy,
-        unlocked_at: null,
-        unlocked_by: null,
-        unlocked_by_name: null,
-        lock_note: lockNote,
-
-        updated_at: now,
-      })
-      .eq('employee_id', report.employee_id)
-      .gte('attendance_date', report.period_start)
-      .lte('attendance_date', report.period_end)
-
-    if (logError) {
-      setErrorMessage(logError.message)
-      setFinalizingId('')
-      return
-    }
-
-    const emailResult = await sendFinalizationEmailToEmployee({
-      report,
-      finalizedBy,
-      lockNote,
-      action: 'single_finalize',
-    })
-
-    setSuccessMessage(
-      `Laporan absensi ${report.full_name || '-'} berhasil difinalisasi dan dikunci.${buildEmailResultText(emailResult)}`
+    const confirmed = window.confirm(
+      `Finalisasi dan kunci absensi ${row.employee.full_name || row.employee.employee_number || 'karyawan'} untuk periode ${range.label}?\n\n` +
+        'Setelah finalisasi, data menjadi read-only. Proses ini tidak memfinalisasi karyawan lain.',
     )
 
-    setFinalizingId('')
-    await fetchReports()
-  }
+    if (!confirmed) return
 
-  async function finalizeAndLockFullPeriod() {
-    setPeriodLocking(true)
-    setErrorMessage('')
-    setSuccessMessage('')
+    setProcessingId(row.employee.id)
 
-    if (reports.length === 0) {
-      setErrorMessage('Belum ada data laporan pada periode ini.')
-      setPeriodLocking(false)
-      return
-    }
+    try {
+      const actor = await getActor()
+      const now = new Date().toISOString()
+      const lockNote = 'Periode karyawan dikunci setelah Finalisasi HR.'
 
-    const identity = await getHRIdentity()
+      // Re-check server state immediately before writing.
+      const { data: currentConfirmation, error: confirmationCheckError } = await supabase
+        .from('attendance_period_confirmations')
+        .select('*')
+        .eq('id', row.confirmation.id)
+        .maybeSingle<Confirmation>()
 
-    if (identity.error) {
-      setErrorMessage(identity.error)
-      setPeriodLocking(false)
-      return
-    }
-
-    const finalizedBy = identity.name
-    const now = new Date().toISOString()
-    const lockNote = 'Seluruh periode dikunci oleh HR.'
-
-    const readyReports = reports.filter((item) => item.hr_status === 'ready_for_hr')
-
-    const notHRApproved: Array<{
-      report: PeriodConfirmation
-      pending: number
-      total: number
-      error: string
-    }> = []
-
-    for (const report of readyReports) {
-      const check = await checkReportHRApproval(report)
-
-      if (!check.approved) {
-        notHRApproved.push({
-          report,
-          pending: check.pending,
-          total: check.total,
-          error: check.error,
-        })
+      if (confirmationCheckError) throw confirmationCheckError
+      if (!currentConfirmation) throw new Error('Konfirmasi periode sudah tidak ditemukan.')
+      if (normalize(currentConfirmation.supervisor_status) !== 'approved') {
+        throw new Error('Finalisasi diblokir karena approval atasan belum final.')
       }
-    }
+      if (normalize(currentConfirmation.hr_status) !== 'ready_for_hr') {
+        throw new Error('Finalisasi diblokir karena status bukan Ready for HR.')
+      }
+      if (currentConfirmation.is_locked) {
+        throw new Error('Periode karyawan sudah dikunci.')
+      }
 
-    if (notHRApproved.length > 0) {
-      const preview = notHRApproved
-        .slice(0, 5)
-        .map(
-          (item) =>
-            item.report.full_name ||
-            item.report.employee_number ||
-            item.report.employee_id
+      const { data: currentLogs, error: logCheckError } = await supabase
+        .from('attendance_logs')
+        .select('id,hr_approval_status,hr_final_status,is_locked')
+        .eq('employee_id', row.employee.id)
+        .is('deleted_at', null)
+        .gte('attendance_date', row.confirmation.period_start || range.start)
+        .lte('attendance_date', row.confirmation.period_end || range.end)
+
+      if (logCheckError) throw logCheckError
+
+      const pendingHR = (currentLogs || []).filter(
+        (log) => normalize(log.hr_approval_status) !== 'approved',
+      )
+
+      if (!(currentLogs || []).length) {
+        throw new Error('Tidak ada attendance_logs untuk difinalisasi.')
+      }
+
+      if (pendingHR.length > 0) {
+        throw new Error(
+          `${pendingHR.length} log belum HR Approved. Selesaikan HR Review terlebih dahulu.`,
         )
-        .join(', ')
+      }
 
-      setErrorMessage(
-        `Lock 1 Periode diblokir. ${notHRApproved.length} laporan Ready for HR belum HR Approved${preview ? `: ${preview}` : ''}. Selesaikan HR Review terlebih dahulu.`
-      )
-      setPeriodLocking(false)
-      return
-    }
-
-    const readyEmployeeIds = readyReports
-      .map((item) => item.employee_id)
-      .filter(Boolean)
-
-    if (readyEmployeeIds.length > 0) {
-      const { error: readyHeaderError } = await supabase
+      const { error: headerError } = await supabase
         .from('attendance_period_confirmations')
         .update({
           hr_status: 'finalized',
           hr_finalized_at: now,
-          hr_finalized_by: finalizedBy,
+          hr_finalized_by: actor.name,
           hr_note: 'Laporan absensi periode telah difinalisasi HR.',
+          is_locked: true,
+          locked_at: now,
+          locked_by: actor.id,
+          locked_by_name: actor.name,
+          lock_note: lockNote,
           updated_at: now,
         })
-        .eq('period_month', periodMonth)
-        .in('employee_id', readyEmployeeIds)
+        .eq('id', row.confirmation.id)
 
-      if (readyHeaderError) {
-        setErrorMessage(readyHeaderError.message)
-        setPeriodLocking(false)
-        return
-      }
+      if (headerError) throw headerError
 
-      const { error: readyLogError } = await supabase
+      const { data: updatedLogs, error: logError } = await supabase
         .from('attendance_logs')
         .update({
           hr_final_status: 'finalized',
           hr_finalized_at: now,
-          hr_finalized_by: finalizedBy,
-          hr_approval_status: 'approved',
-          hr_approved_by: finalizedBy,
-          hr_approved_at: now,
+          hr_finalized_by: actor.name,
+          is_locked: true,
+          locked_at: now,
+          locked_by: actor.id,
+          locked_by_name: actor.name,
+          lock_note: lockNote,
           updated_at: now,
         })
-        .in('employee_id', readyEmployeeIds)
-        .gte('attendance_date', periodRange.start)
-        .lte('attendance_date', periodRange.end)
+        .eq('employee_id', row.employee.id)
+        .is('deleted_at', null)
+        .gte('attendance_date', row.confirmation.period_start || range.start)
+        .lte('attendance_date', row.confirmation.period_end || range.end)
+        .select('id')
 
-      if (readyLogError) {
-        setErrorMessage(readyLogError.message)
-        setPeriodLocking(false)
-        return
-      }
-    }
+      if (logError) throw logError
 
-    const { error: lockHeaderError } = await supabase
-      .from('attendance_period_confirmations')
-      .update({
-        is_locked: true,
-        locked_at: now,
-        locked_by: finalizedBy,
-        locked_by_name: finalizedBy,
-        unlocked_at: null,
-        unlocked_by: null,
-        unlocked_by_name: null,
-        lock_note: lockNote,
-        updated_at: now,
+      // Audit is best-effort; failure must not roll back finalization already written.
+      const { error: auditError } = await supabase.from('attendance_audit_logs').insert({
+        action_type: 'hr_finalize_employee_period',
+        action_label: 'Finalisasi & Lock HR Per Karyawan',
+        actor_id: actor.id,
+        actor_name: actor.name,
+        actor_role: 'hr',
+        period_month: periodMonth,
+        period_start: row.confirmation.period_start || range.start,
+        period_end: row.confirmation.period_end || range.end,
+        total_affected: updatedLogs?.length || 0,
+        note: lockNote,
+        metadata: {
+          employee_id: row.employee.id,
+          employee_number: row.employee.employee_number,
+          safe_per_employee: true,
+        },
+        created_at: now,
       })
-      .eq('period_month', periodMonth)
 
-    if (lockHeaderError) {
-      setErrorMessage(lockHeaderError.message)
-      setPeriodLocking(false)
-      return
-    }
-
-    const { error: lockLogError } = await supabase
-      .from('attendance_logs')
-      .update({
-        is_locked: true,
-        locked_at: now,
-        locked_by: finalizedBy,
-        locked_by_name: finalizedBy,
-        unlocked_at: null,
-        unlocked_by: null,
-        unlocked_by_name: null,
-        lock_note: lockNote,
-        updated_at: now,
-      })
-      .is('deleted_at', null)
-      .gte('attendance_date', periodRange.start)
-      .lte('attendance_date', periodRange.end)
-
-    if (lockLogError) {
-      setErrorMessage(lockLogError.message)
-      setPeriodLocking(false)
-      return
-    }
-
-    const emailResult = await sendFullPeriodLockEmail({
-      finalizedBy,
-      lockNote,
-    })
-
-    setSuccessMessage(
-      `Periode ${getPeriodApprovalLabel(periodMonth)} berhasil dikunci penuh. ${readyReports.length} laporan Ready for HR otomatis difinalisasi, dan seluruh data periode ini menjadi read-only.${buildEmailResultText(emailResult)}`
-    )
-
-    setPeriodLocking(false)
-    await fetchReports()
-  }
-
-  function exportCsv() {
-    const rows = filteredReports.map((item) => ({
-      periode: getPeriodApprovalLabel(item.period_month),
-      periode_mulai: item.period_start,
-      periode_selesai: item.period_end,
-
-      id_karyawan: item.employee_number || '',
-      machine_pin: item.machine_pin || '',
-      nama_karyawan: item.full_name || '',
-      departemen: item.department || '',
-      jabatan: item.position || '',
-
-      hari_kerja: item.total_work_days || 0,
-      jumlah_hari_masuk: item.total_present_days || 0,
-      jumlah_terlambat: item.total_late_days || 0,
-      jumlah_incomplete: item.total_incomplete_days || 0,
-      jumlah_phl: item.total_phl_days || 0,
-      jumlah_kerja_hari_libur: item.total_holiday_work_days || 0,
-
-      jumlah_sakit: item.total_sick_days || 0,
-      jumlah_izin: item.total_permit_days || 0,
-      jumlah_cuti: item.total_leave_days || 0,
-      jumlah_alpa: item.total_absent_days || 0,
-
-      status_employee: item.employee_status || '',
-      status_atasan: item.supervisor_status || '',
-      nama_atasan: item.supervisor_name || '',
-      tanggal_approval_atasan: item.supervisor_approved_at || item.supervisor_rejected_at || '',
-      status_hr: item.hr_status || '',
-      is_locked: item.is_locked ? 'YA' : 'TIDAK',
-      locked_by: item.locked_by_name || item.locked_by || '',
-      locked_at: item.locked_at || '',
-      lock_note: item.lock_note || '',
-      finalized_by: item.hr_finalized_by || '',
-      finalized_at: item.hr_finalized_at || '',
-
-      matang_cuti: item.annual_leave_matured ? 'YA' : 'TIDAK',
-      tanggal_matang_cuti: item.annual_leave_matured_date || '',
-      eligible_tunjangan_cuti: item.leave_allowance_eligible ? 'YA' : 'TIDAK',
-    }))
-
-    const headers = Object.keys(
-      rows[0] || {
-        periode: '',
-        periode_mulai: '',
-        periode_selesai: '',
-        id_karyawan: '',
-        machine_pin: '',
-        nama_karyawan: '',
-        departemen: '',
-        jabatan: '',
-        hari_kerja: '',
-        jumlah_hari_masuk: '',
-        jumlah_terlambat: '',
-        jumlah_incomplete: '',
-        jumlah_phl: '',
-        jumlah_kerja_hari_libur: '',
-        jumlah_sakit: '',
-        jumlah_izin: '',
-        jumlah_cuti: '',
-        jumlah_alpa: '',
-        status_employee: '',
-        status_atasan: '',
-        nama_atasan: '',
-        tanggal_approval_atasan: '',
-        status_hr: '',
-        is_locked: '',
-        locked_by: '',
-        locked_at: '',
-        lock_note: '',
-        finalized_by: '',
-        finalized_at: '',
-        matang_cuti: '',
-        tanggal_matang_cuti: '',
-        eligible_tunjangan_cuti: '',
+      if (auditError) {
+        console.warn('Attendance finalization audit warning:', auditError.message)
       }
-    )
 
-    const csv = [
-      headers.join(','),
-      ...rows.map((row) =>
-        headers
-          .map((header) => {
-            const value = String(row[header as keyof typeof row] ?? '')
-            return `"${value.replace(/"/g, '""')}"`
-          })
-          .join(',')
-      ),
-    ].join('\n')
-
-    const blob = new Blob([csv], {
-      type: 'text/csv;charset=utf-8;',
-    })
-
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-
-    link.href = url
-    link.download = `laporan-final-absensi-${periodMonth}.csv`
-    link.click()
-
-    URL.revokeObjectURL(url)
+      setSuccessMessage(
+        `${row.employee.full_name || 'Karyawan'} berhasil difinalisasi dan dikunci. ${updatedLogs?.length || 0} log menjadi Final HR.`,
+      )
+      await fetchData()
+    } catch (error: any) {
+      setErrorMessage(error?.message || 'Finalisasi HR gagal.')
+    } finally {
+      setProcessingId('')
+    }
   }
 
   return (
     <>
       <Topbar
-        title="Laporan Final Absensi"
-        description="Rekap absensi final setelah employee submit dan atasan melakukan approval."
+        title="Finalisasi Absensi HR"
+        description="Route khusus Finalisasi & Lock. Monitoring, HR Review, Sync, dan Export dipisahkan."
       />
 
-      <section className="space-y-6 p-4 md:p-6">
-        {successMessage && (
-          <div className="rounded-2xl border border-green-200 bg-green-50 p-4 text-sm leading-6 text-green-700">
-            <div className="mb-1 flex items-center gap-2 font-bold">
-              <CheckCircle2 size={18} />
-              Berhasil
-            </div>
-            {successMessage}
-          </div>
-        )}
+      <section className="harmony-page-bg min-h-screen space-y-5 p-4 sm:p-6">
+        {successMessage && <Message tone="success">{successMessage}</Message>}
+        {errorMessage && <Message tone="warning">{errorMessage}</Message>}
 
-        {errorMessage && (
-          <div className="rounded-2xl border border-orange-200 bg-orange-50 p-4 text-sm leading-6 text-orange-700">
-            <div className="mb-1 flex items-center gap-2 font-bold">
-              <AlertTriangle size={18} />
-              Perhatian
-            </div>
-            {errorMessage}
-          </div>
-        )}
-
-        <div className="relative overflow-hidden rounded-[34px] border border-black/5 bg-[#1d1d1f] p-5 text-white shadow-[0_24px_80px_rgba(0,0,0,0.16)] md:p-7">
-          <div className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-[#007aff]/35 blur-3xl" />
-          <div className="pointer-events-none absolute -bottom-28 -left-20 h-72 w-72 rounded-full bg-[#34c759]/20 blur-3xl" />
-
-          <div className="relative flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
+        <section className="relative overflow-hidden rounded-[32px] bg-[#1d1d1f] p-6 text-white shadow-[0_24px_80px_rgba(0,0,0,0.16)]">
+          <div className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-[#007aff]/30 blur-3xl" />
+          <div className="relative grid gap-6 xl:grid-cols-[1fr_auto] xl:items-end">
             <div>
-              <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-4 py-2 text-xs font-semibold text-white/75 backdrop-blur-xl">
-                <FileSpreadsheet size={15} className="text-[#5ac8fa]" />
-                HR Final Attendance Report
+              <Link
+                href="/hr/attendance"
+                className="inline-flex min-h-10 items-center gap-2 rounded-full border border-white/10 bg-white/10 px-4 text-xs font-semibold text-white/75 hover:bg-white/15"
+              >
+                <ArrowLeft size={15} /> Kembali ke Absensi
+              </Link>
+
+              <div className="mt-5 inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-2 text-xs font-semibold text-white/75">
+                <Lock size={15} /> Finalization Only Route
               </div>
 
-              <h1 className="max-w-4xl text-3xl font-semibold tracking-[-0.045em] md:text-5xl">
-                Rekap Final Absensi HR
+              <h1 className="mt-4 text-3xl font-semibold tracking-tight">
+                Finalisasi & Lock Per Karyawan
               </h1>
 
-              <p className="mt-5 max-w-2xl text-sm leading-7 text-white/62">
-                Laporan ini berisi total kehadiran, PHL, sakit, izin, cuti, alpa,
-                serta kontrol lock untuk menutup seluruh periode absensi.
+              <p className="mt-3 max-w-3xl text-sm leading-7 text-white/60">
+                Tidak ada finalisasi massal otomatis. Hanya karyawan yang sudah submit,
+                Approved Atasan, selesai HR Review, dan seluruh log HR Approved yang dapat difinalisasi.
               </p>
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-2 xl:min-w-[720px] xl:grid-cols-6">
-              <HeroMetric label="Ready" value={String(readyCount)} tone="blue" />
-              <HeroMetric label="Final" value={String(finalizedCount)} tone="green" />
-              <HeroMetric label="Locked" value={String(lockedCount)} tone="green" />
-              <HeroMetric label="Open" value={String(openCount)} tone="blue" />
-              <HeroMetric label="Rejected" value={String(rejectedCount)} tone="red" />
-              <HeroMetric label="Matang Cuti" value={String(leaveMaturedCount)} tone="purple" />
+            <div className="grid gap-3 sm:grid-cols-3 xl:min-w-[620px]">
+              <HeroMetric label="Ready Final" value={String(stats.readyFinalize)} />
+              <HeroMetric label="Finalized" value={String(stats.finalized)} />
+              <HeroMetric label="Belum Submit" value={String(stats.notSubmitted)} />
             </div>
           </div>
-        </div>
+        </section>
 
-        <div className="harmony-card overflow-hidden">
-          <div className="flex flex-col gap-4 border-b border-black/5 p-5 md:p-6 xl:flex-row xl:items-center xl:justify-between">
-            <div>
-              <h2 className="text-lg font-semibold text-[#1d1d1f]">
-                Data Laporan Periode
-              </h2>
-
-              <p className="mt-1 text-sm leading-6 text-[#6e6e73]">
-                Pilih periode, finalisasi laporan Ready for HR, lalu lock seluruh periode agar semua employee menjadi read-only.
-              </p>
-            </div>
-
-            <div className="flex flex-col gap-3 md:flex-row md:flex-wrap md:items-center md:justify-end">
+        <section className="harmony-card overflow-hidden">
+          <div className="grid gap-4 border-b border-black/5 p-5 xl:grid-cols-[230px_1fr_auto] xl:items-end">
+            <label className="block">
+              <span className="harmony-label">Periode Cutoff</span>
               <input
                 type="month"
+                min="2026-01"
                 value={periodMonth}
                 onChange={(event) => setPeriodMonth(event.target.value)}
-                className="harmony-input md:w-[180px]"
+                className="harmony-input"
               />
+            </label>
 
-              <select
-                value={statusFilter}
-                onChange={(event) => setStatusFilter(event.target.value)}
-                className="harmony-select md:w-[210px]"
-              >
-                <option value="ready_for_hr">Ready for HR</option>
-                <option value="finalized">Finalized</option>
-                <option value="rejected_by_supervisor">Rejected by Supervisor</option>
-                <option value="all">Semua Status</option>
-              </select>
-
-              <div className="flex min-h-12 w-full items-center gap-3 rounded-[18px] border border-black/5 bg-[#f5f5f7]/85 px-4 shadow-sm md:w-[300px]">
-                <Search size={18} className="shrink-0 text-[#86868b]" />
-                <input
-                  value={searchKeyword}
-                  onChange={(event) => setSearchKeyword(event.target.value)}
-                  placeholder="Cari nama, NIP, unit..."
-                  className="min-h-12 w-full bg-transparent text-sm outline-none placeholder:text-[#9a9aa0]"
-                />
-              </div>
-
-              <button
-                type="button"
-                onClick={fetchReports}
-                className="harmony-button-secondary"
-              >
-                <RefreshCcw size={18} />
-                Refresh
-              </button>
-
-              <button
-                type="button"
-                onClick={exportCsv}
-                disabled={filteredReports.length === 0}
-                className="harmony-button-primary disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                <Download size={18} />
-                Export CSV
-              </button>
-
-              <button
-                type="button"
-                onClick={finalizeAndLockFullPeriod}
-                disabled={reports.length === 0 || periodLocking || allReportsLocked}
-                className="inline-flex min-h-12 items-center justify-center gap-2 rounded-[18px] bg-slate-950 px-5 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
-                title="Finalisasi Ready for HR dan Lock Semua Karyawan pada Periode Ini"
-              >
-                <Lock size={18} />
-                {periodLocking
-                  ? 'Memproses...'
-                  : allReportsLocked
-                    ? 'Periode Locked'
-                    : 'Lock 1 Periode'}
-              </button>
+            <div className="flex min-h-12 items-center gap-2 rounded-2xl border border-black/5 bg-[#f5f5f7] px-4">
+              <Search size={16} className="text-[#86868b]" />
+              <input
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Cari karyawan..."
+                className="w-full bg-transparent text-sm outline-none"
+              />
             </div>
+
+            <button
+              type="button"
+              onClick={fetchData}
+              disabled={loading}
+              className="harmony-button-secondary disabled:opacity-50"
+            >
+              <RefreshCcw size={17} className={loading ? 'animate-spin' : ''} /> Refresh
+            </button>
           </div>
 
-          {!allReportsLocked && reports.length > 0 && (
-            <div className="border-b border-black/5 bg-amber-50 px-5 py-4 text-sm leading-6 text-amber-800 md:px-6">
-              <div className="flex items-start gap-3">
-                <AlertTriangle size={18} className="mt-0.5 shrink-0" />
-                <p>
-                  Tombol <strong>Lock 1 Periode</strong> akan mengunci semua karyawan pada periode ini.
-                  Laporan dengan status <strong>Ready for HR</strong> akan otomatis difinalisasi.
-                  Data yang masih status lain tetap dikunci, tetapi status HR-nya tidak dipaksa menjadi finalized.
-                </p>
-              </div>
+          <div className="grid gap-3 border-b border-black/5 p-5 sm:grid-cols-2 xl:grid-cols-5">
+            <Stat label="Semua Karyawan" value={stats.all} />
+            <Stat label="Approved Atasan" value={stats.supervisorApproved} />
+            <Stat label="HR Review Selesai" value={stats.hrReviewed} />
+            <Stat label="Siap Final" value={stats.readyFinalize} />
+            <Stat label="Locked" value={stats.locked} />
+          </div>
+
+          <div className="flex flex-wrap gap-2 border-b border-black/5 p-5">
+            <Link href={`/hr/attendance/approvals?period=${periodMonth}`} className="harmony-button-secondary">
+              <UserCheck size={16} /> HR Review
+            </Link>
+            <Link href={`/hr/attendance/export?period=${periodMonth}`} className="harmony-button-secondary">
+              <Eye size={16} /> Lihat Laporan
+            </Link>
+          </div>
+
+          {loading ? (
+            <div className="flex items-center gap-3 p-7 text-sm text-[#6e6e73]">
+              <Loader2 size={18} className="animate-spin" /> Memuat status finalisasi...
             </div>
-          )}
-
-          {loading && (
-            <div className="p-6 text-sm text-[#6e6e73]">
-              Memuat laporan final absensi...
-            </div>
-          )}
-
-          {!loading && filteredReports.length === 0 && (
-            <div className="p-6">
-              <div className="rounded-[28px] border border-dashed border-black/10 bg-[#f5f5f7]/70 p-8 text-center">
-                <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-3xl bg-white text-[#007aff] shadow-sm">
-                  <FileSpreadsheet size={24} />
-                </div>
-
-                <h3 className="mt-5 text-lg font-semibold text-[#1d1d1f]">
-                  Belum ada laporan
-                </h3>
-
-                <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-[#6e6e73]">
-                  Data akan muncul setelah employee submit absensi periode dan atasan menyetujui periode tersebut.
-                </p>
-              </div>
-            </div>
-          )}
-
-          {!loading && filteredReports.length > 0 && (
+          ) : (
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[1780px] border-collapse text-left text-xs">
+              <table className="min-w-[1500px] w-full border-collapse text-left text-xs">
                 <thead>
-                  <tr className="border-b border-black/5 bg-[#f5f5f7]/90 uppercase tracking-wide text-[#6e6e73]">
-                    <th className="px-4 py-3 font-semibold">Karyawan</th>
-                    <th className="px-4 py-3 font-semibold">Periode</th>
-                    <th className="px-4 py-3 text-center font-semibold">Hadir</th>
-                    <th className="px-4 py-3 text-center font-semibold">Late</th>
-                    <th className="px-4 py-3 text-center font-semibold">Incomplete</th>
-                    <th className="px-4 py-3 text-center font-semibold">PHL</th>
-                    <th className="px-4 py-3 text-center font-semibold">Sakit</th>
-                    <th className="px-4 py-3 text-center font-semibold">Izin</th>
-                    <th className="px-4 py-3 text-center font-semibold">Cuti</th>
-                    <th className="px-4 py-3 text-center font-semibold">Alpa</th>
-                    <th className="px-4 py-3 font-semibold">Atasan</th>
-                    <th className="px-4 py-3 font-semibold">HR Status</th>
-                    <th className="px-4 py-3 font-semibold">Lock</th>
-                    <th className="px-4 py-3 font-semibold">Matang Cuti</th>
-                    <th className="px-4 py-3 text-center font-semibold">Action</th>
+                  <tr className="border-b border-black/5 bg-[#f5f5f7] text-[#6e6e73]">
+                    <Th>Karyawan</Th>
+                    <Th>Submit</Th>
+                    <Th>Atasan</Th>
+                    <Th>HR Review</Th>
+                    <Th>Hadir Kantor</Th>
+                    <Th>Masalah Data</Th>
+                    <Th>Status Final</Th>
+                    <Th>Aksi</Th>
                   </tr>
                 </thead>
-
                 <tbody>
-                  {filteredReports.map((item) => (
-                    <tr
-                      key={item.id}
-                      className="border-b border-black/5 bg-white transition hover:bg-[#f5f5f7]/70"
-                    >
-                      <td className="px-4 py-3">
-                        <p className="font-semibold text-[#1d1d1f]">
-                          {item.full_name || '-'}
-                        </p>
-                        <p className="mt-1 text-[11px] text-[#6e6e73]">
-                          {item.employee_number || '-'} · {item.department || '-'} · {item.position || '-'}
-                        </p>
-                      </td>
-
-                      <td className="px-4 py-3">
-                        <p className="font-semibold text-[#1d1d1f]">
-                          {getPeriodApprovalLabel(item.period_month)}
-                        </p>
-                        <p className="mt-1 text-[11px] text-[#6e6e73]">
-                          {formatDisplayDate(item.period_start)} - {formatDisplayDate(item.period_end)}
-                        </p>
-                      </td>
-
-                      <NumberCell value={item.total_present_days || 0} tone="green" />
-                      <NumberCell value={item.total_late_days || 0} tone="orange" />
-                      <NumberCell value={item.total_incomplete_days || 0} tone="red" />
-                      <NumberCell value={item.total_phl_days || 0} tone="purple" />
-                      <NumberCell value={item.total_sick_days || 0} tone="purple" />
-                      <NumberCell value={item.total_permit_days || 0} tone="blue" />
-                      <NumberCell value={item.total_leave_days || 0} tone="blue" />
-                      <NumberCell value={item.total_absent_days || 0} tone="red" />
-
-                      <td className="px-4 py-3">
-                        <p className="font-semibold text-[#1d1d1f]">
-                          {item.supervisor_name || '-'}
-                        </p>
-                        <p className="mt-1 text-[11px] text-[#6e6e73]">
-                          {formatDateTime(item.supervisor_approved_at || item.supervisor_rejected_at)}
-                        </p>
-                      </td>
-
-                      <td className="px-4 py-3">
-                        <StatusBadge status={item.hr_status || '-'} />
-                      </td>
-
-                      <td className="px-4 py-3">
-                        <LockBadge report={item} />
-                      </td>
-
-                      <td className="px-4 py-3">
-                        {item.annual_leave_matured ? (
-                          <div className="rounded-2xl bg-green-50 px-3 py-2 text-xs font-bold text-green-700">
-                            Ya
-                            <p className="mt-1 text-[11px] font-semibold">
-                              {formatDisplayDate(item.annual_leave_matured_date || '')}
-                            </p>
-                          </div>
-                        ) : (
-                          <span className="text-xs font-semibold text-[#86868b]">
-                            Tidak
-                          </span>
-                        )}
-                      </td>
-
-                      <td className="px-4 py-3">
-                        <div className="flex items-center justify-center gap-2">
+                  {filteredRows.map((row) => (
+                    <tr key={row.employee.id} className="border-b border-black/5 hover:bg-[#fafafa]">
+                      <Td>
+                        <div className="font-bold text-[#1d1d1f]">{row.employee.full_name || '-'}</div>
+                        <div className="mt-1 text-[11px] text-[#86868b]">
+                          {row.employee.employee_number || '-'} · {row.employee.department || '-'}
+                        </div>
+                      </Td>
+                      <Td><Status value={normalize(row.confirmation?.employee_status) === 'submitted' ? 'Diajukan' : 'Belum Submit'} good={normalize(row.confirmation?.employee_status) === 'submitted'} /></Td>
+                      <Td><Status value={workflowLabel(row.confirmation?.supervisor_status)} good={normalize(row.confirmation?.supervisor_status) === 'approved'} /></Td>
+                      <Td><Status value={row.allHRApproved ? 'HR Approved' : 'Belum Selesai'} good={row.allHRApproved} /></Td>
+                      <Td><strong>{row.summary.officePresent}</strong></Td>
+                      <Td>
+                        <div className="space-y-1 text-[11px] text-[#6e6e73]">
+                          <div>Incomplete: <strong>{row.summary.incomplete}</strong></div>
+                          <div>Tanpa Data: <strong>{row.summary.noRecord}</strong></div>
+                          <div>Konflik: <strong className={row.summary.conflict ? 'text-red-700' : ''}>{row.summary.conflict}</strong></div>
+                        </div>
+                      </Td>
+                      <Td><Status value={row.reason} good={row.eligible || row.finalized} /></Td>
+                      <Td>
+                        <div className="flex flex-wrap gap-2">
+                          {isUuid(row.employee.id) && (
+                            <Link
+                              href={`/hr/attendance/approvals/${encodeURIComponent(row.employee.id)}/${encodeURIComponent(periodMonth)}`}
+                              className="harmony-button-secondary text-xs"
+                            >
+                              <Eye size={15} /> Review
+                            </Link>
+                          )}
                           <button
                             type="button"
-                            onClick={() => openDetail(item)}
-                            className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#e8f2ff] text-[#0059b8] transition hover:bg-blue-100"
-                            title="Detail"
+                            onClick={() => finalizeEmployee(row)}
+                            disabled={!row.eligible || processingId === row.employee.id}
+                            className="harmony-button-primary text-xs disabled:cursor-not-allowed disabled:opacity-40"
+                            title={row.reason}
                           >
-                            <Eye size={15} />
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => finalizeReport(item)}
-                            disabled={item.hr_status !== 'ready_for_hr' || finalizingId === item.id}
-                            className="flex h-9 w-9 items-center justify-center rounded-xl bg-green-50 text-green-700 transition hover:bg-green-100 disabled:cursor-not-allowed disabled:opacity-50"
-                            title="Finalisasi HR Karyawan Ini"
-                          >
-                            <ShieldCheck size={15} />
+                            {processingId === row.employee.id ? (
+                              <Loader2 size={15} className="animate-spin" />
+                            ) : (
+                              <Lock size={15} />
+                            )}
+                            Finalisasi & Kunci
                           </button>
                         </div>
-                      </td>
+                      </Td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
           )}
-        </div>
-
-        {selectedReport && (
-          <DetailModal
-            report={selectedReport}
-            logs={selectedLogs}
-            loading={loadingDetail}
-            onClose={() => {
-              setSelectedReport(null)
-              setSelectedLogs([])
-            }}
-          />
-        )}
+        </section>
       </section>
     </>
   )
 }
 
-function DetailModal({
-  report,
-  logs,
-  loading,
-  onClose,
-}: {
-  report: PeriodConfirmation
-  logs: AttendanceLog[]
-  loading: boolean
-  onClose: () => void
-}) {
+function Message({ tone, children }: { tone: 'success' | 'warning'; children: ReactNode }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-5 backdrop-blur-sm">
-      <div className="flex max-h-[90vh] w-full max-w-6xl flex-col overflow-hidden rounded-[32px] bg-white shadow-[0_30px_90px_rgba(0,0,0,0.24)]">
-        <div className="flex items-start justify-between gap-4 border-b border-black/5 p-6">
-          <div>
-            <h2 className="text-xl font-semibold text-[#1d1d1f]">
-              Detail Laporan Final
-            </h2>
-            <p className="mt-1 text-sm leading-6 text-[#6e6e73]">
-              {report.full_name || '-'} · {getPeriodApprovalLabel(report.period_month)}
-            </p>
-
-            <div className="mt-3">
-              <LockBadge report={report} />
-            </div>
-          </div>
-
-          <button
-            type="button"
-            onClick={onClose}
-            className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#f5f5f7] text-[#1d1d1f] transition hover:bg-[#e8e8ed]"
-          >
-            <X size={18} />
-          </button>
-        </div>
-
-        {loading && (
-          <div className="p-6 text-sm text-[#6e6e73]">
-            Memuat detail harian...
-          </div>
-        )}
-
-        {!loading && (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[1120px] border-collapse text-left text-xs">
-              <thead>
-                <tr className="border-b border-black/5 bg-[#f5f5f7]/90 uppercase tracking-wide text-[#6e6e73]">
-                  <th className="px-4 py-3 font-semibold">Tanggal</th>
-                  <th className="px-4 py-3 font-semibold">In</th>
-                  <th className="px-4 py-3 font-semibold">Out</th>
-                  <th className="px-4 py-3 font-semibold">Manual In</th>
-                  <th className="px-4 py-3 font-semibold">Manual Out</th>
-                  <th className="px-4 py-3 font-semibold">Status</th>
-                  <th className="px-4 py-3 font-semibold">Approval Atasan</th>
-                  <th className="px-4 py-3 font-semibold">Final HR</th>
-                  <th className="px-4 py-3 font-semibold">Lock</th>
-                  <th className="px-4 py-3 font-semibold">PHL</th>
-                  <th className="px-4 py-3 font-semibold">Catatan</th>
-                </tr>
-              </thead>
-
-              <tbody>
-                {logs.length === 0 && (
-                  <tr>
-                    <td
-                      colSpan={11}
-                      className="px-4 py-8 text-center text-sm text-[#6e6e73]"
-                    >
-                      Belum ada detail absensi harian pada periode ini.
-                    </td>
-                  </tr>
-                )}
-
-                {logs.map((log) => (
-                  <tr key={log.id} className="border-b border-black/5">
-                    <td className="px-4 py-3 font-semibold text-[#1d1d1f]">
-                      {formatDisplayDate(log.attendance_date)}
-                    </td>
-                    <td className="px-4 py-3">{log.check_in || '-'}</td>
-                    <td className="px-4 py-3">{log.check_out || '-'}</td>
-                    <td className="px-4 py-3">{log.manual_check_in || '-'}</td>
-                    <td className="px-4 py-3">{log.manual_check_out || '-'}</td>
-                    <td className="px-4 py-3">{formatReadableText(log.status || '-')}</td>
-                    <td className="px-4 py-3">{formatReadableText(log.supervisor_approval_status || '-')}</td>
-                    <td className="px-4 py-3">{formatReadableText(log.hr_final_status || '-')}</td>
-                    <td className="px-4 py-3">
-                      {log.is_locked ? (
-                        <span className="inline-flex rounded-full bg-slate-900 px-3 py-1 text-[11px] font-bold text-white">
-                          Locked
-                        </span>
-                      ) : (
-                        <span className="inline-flex rounded-full bg-[#f5f5f7] px-3 py-1 text-[11px] font-bold text-[#6e6e73]">
-                          Open
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3">
-                      {log.is_phl_candidate ? 'Ya' : '-'}
-                    </td>
-                    <td className="px-4 py-3">
-                      {log.employee_daily_note || log.correction_reason || '-'}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-
-        <div className="flex justify-end border-t border-black/5 p-6">
-          <button
-            type="button"
-            onClick={onClose}
-            className="harmony-button-secondary"
-          >
-            Tutup
-          </button>
-        </div>
+    <div className={`rounded-2xl border p-4 text-sm leading-6 ${tone === 'success' ? 'border-green-200 bg-green-50 text-green-700' : 'border-orange-200 bg-orange-50 text-orange-700'}`}>
+      <div className="flex items-start gap-2">
+        {tone === 'success' ? <CheckCircle2 size={17} className="mt-0.5" /> : <AlertTriangle size={17} className="mt-0.5" />}
+        {children}
       </div>
     </div>
   )
 }
 
-function HeroMetric({
-  label,
-  value,
-  tone,
-}: {
-  label: string
-  value: string
-  tone: 'blue' | 'green' | 'red' | 'purple'
-}) {
-  const className = {
-    blue: 'bg-white/10 text-[#9fd4ff]',
-    green: 'bg-white/10 text-[#a7f5ba]',
-    red: 'bg-white/10 text-red-200',
-    purple: 'bg-white/10 text-[#e9b9ff]',
-  }[tone]
-
+function HeroMetric({ label, value }: { label: string; value: string }) {
   return (
-    <div className={`rounded-[24px] border border-white/10 p-4 backdrop-blur-xl ${className}`}>
-      <p className="text-xs font-semibold uppercase tracking-wide text-white/45">
-        {label}
-      </p>
-      <p className="mt-1 text-2xl font-semibold">
-        {value}
-      </p>
+    <div className="rounded-2xl bg-white/10 p-4">
+      <p className="text-[10px] font-bold uppercase tracking-wide text-white/45">{label}</p>
+      <p className="mt-2 text-2xl font-semibold">{value}</p>
     </div>
   )
 }
 
-function NumberCell({
-  value,
-  tone,
-}: {
-  value: number
-  tone: 'green' | 'orange' | 'red' | 'purple' | 'blue'
-}) {
-  const className = {
-    green: 'bg-green-50 text-green-700',
-    orange: 'bg-orange-50 text-orange-700',
-    red: 'bg-red-50 text-red-700',
-    purple: 'bg-[#f7edfc] text-[#7b2cbf]',
-    blue: 'bg-[#e8f2ff] text-[#0059b8]',
-  }[tone]
-
+function Stat({ label, value }: { label: string; value: number }) {
   return (
-    <td className="px-4 py-3 text-center">
-      <span className={`inline-flex min-w-8 justify-center rounded-xl px-2.5 py-1 text-xs font-bold ${className}`}>
-        {value}
-      </span>
-    </td>
+    <div className="rounded-2xl border border-black/5 bg-[#f5f5f7] p-4">
+      <p className="text-[10px] font-bold uppercase tracking-wide text-[#86868b]">{label}</p>
+      <p className="mt-1 text-xl font-bold text-[#1d1d1f]">{value}</p>
+    </div>
   )
 }
 
-function StatusBadge({
-  status,
-}: {
-  status: string
-}) {
-  const className =
-    status === 'finalized'
-      ? 'bg-green-50 text-green-700'
-      : status === 'ready_for_hr'
-        ? 'bg-[#e8f2ff] text-[#0059b8]'
-        : status === 'rejected_by_supervisor'
-          ? 'bg-red-50 text-red-700'
-          : status === 'waiting_supervisor'
-            ? 'bg-amber-50 text-amber-700'
-            : 'bg-[#f5f5f7] text-[#6e6e73]'
-
+function Status({ value, good }: { value: string; good: boolean }) {
   return (
-    <span className={`inline-flex rounded-full px-3 py-1 text-xs font-bold ${className}`}>
-      {formatHRStatus(status)}
+    <span className={`inline-flex rounded-full px-3 py-1 text-[11px] font-bold ${good ? 'bg-green-50 text-green-700' : 'bg-orange-50 text-orange-700'}`}>
+      {value}
     </span>
   )
 }
 
-function LockBadge({
-  report,
-}: {
-  report: PeriodConfirmation
-}) {
-  if (report.is_locked) {
-    return (
-      <div className="inline-flex max-w-[280px] flex-col rounded-2xl bg-slate-900 px-3 py-2 text-xs font-bold text-white">
-        <span>Locked</span>
-        <span className="mt-1 text-[11px] font-semibold text-white/60">
-          {formatDateTime(report.locked_at)} · {report.locked_by_name || report.locked_by || '-'}
-        </span>
-      </div>
-    )
+function Th({ children }: { children: ReactNode }) {
+  return <th className="whitespace-nowrap px-4 py-3 font-bold">{children}</th>
+}
+
+function Td({ children }: { children: ReactNode }) {
+  return <td className="px-4 py-4 align-top">{children}</td>
+}
+
+function workflowLabel(value: unknown) {
+  const key = normalize(value)
+  const map: Record<string, string> = {
+    pending: 'Pending',
+    approved: 'Disetujui',
+    rejected: 'Ditolak',
+    waiting_supervisor: 'Menunggu Atasan',
+    ready_for_hr: 'Ready for HR',
+    finalized: 'Finalized',
   }
-
-  return (
-    <span className="inline-flex rounded-full bg-[#f5f5f7] px-3 py-1 text-xs font-bold text-[#6e6e73]">
-      Open
-    </span>
-  )
+  return map[key] || String(value || 'Belum')
 }
 
-function formatHRStatus(status: string) {
-  if (status === 'ready_for_hr') return 'Ready for HR'
-  if (status === 'finalized') return 'Finalized'
-  if (status === 'rejected_by_supervisor') return 'Rejected by Supervisor'
-  if (status === 'waiting_supervisor') return 'Waiting Supervisor'
-
-  return status || '-'
-}
-
-function getCurrentPeriodMonth() {
-  const today = new Date()
-  const year = today.getFullYear()
-  const month = String(today.getMonth() + 1).padStart(2, '0')
-
-  return `${year}-${month}`
-}
-
-function getCutoffRange(periodMonth: string) {
-  const [yearText, monthText] = periodMonth.split('-')
-  const year = Number(yearText)
-  const month = Number(monthText)
-
-  const start = new Date(year, month - 1, 11)
-  const end = new Date(year, month, 10)
-
-  return {
-    start: formatDateToISO(start),
-    end: formatDateToISO(end),
-  }
-}
-
-function getPeriodApprovalLabel(periodMonth: string) {
-  const range = getCutoffRange(periodMonth)
-  const start = new Date(`${range.start}T00:00:00`)
-  const end = new Date(`${range.end}T00:00:00`)
-
-  const monthNumber = String(start.getMonth() + 1).padStart(2, '0')
-  const startDay = String(start.getDate()).padStart(2, '0')
-  const endDay = String(end.getDate()).padStart(2, '0')
-  const startMonth = start.toLocaleDateString('en-US', { month: 'short' }).toUpperCase()
-  const endMonth = end.toLocaleDateString('en-US', { month: 'short' }).toUpperCase()
-  const endYear = String(end.getFullYear()).slice(-2)
-
-  return `${monthNumber}) PY-P-${startDay} ${startMonth} - ${endDay} ${endMonth} ${endYear}`
-}
-
-function formatDateToISO(date: Date) {
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-
-  return `${year}-${month}-${day}`
-}
-
-function formatDisplayDate(value: string) {
-  if (!value) return '-'
-
-  const date = new Date(`${value}T00:00:00`)
-
-  if (Number.isNaN(date.getTime())) return value
-
-  return date.toLocaleDateString('id-ID', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  })
-}
-
-function formatDateTime(value: string | null | undefined) {
-  if (!value) return '-'
-
-  const date = new Date(value)
-
-  if (Number.isNaN(date.getTime())) return value
-
-  return date.toLocaleString('id-ID', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
-}
-
-function formatReadableText(value: string) {
-  if (!value || value === '-') return '-'
-
-  return value
-    .replaceAll('_', ' ')
-    .replace(/\b\w/g, (character) => character.toUpperCase())
+function normalize(value: unknown) {
+  return String(value || '').trim().toLowerCase()
 }

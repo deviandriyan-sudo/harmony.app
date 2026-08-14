@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useParams, usePathname } from "next/navigation";
+import { useParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import {
@@ -22,6 +22,12 @@ import {
 
 import { Topbar } from "@/components/layout/Topbar";
 import { supabase } from "@/lib/supabase";
+import {
+  getEmployeeLogs,
+  isUuid,
+  summarizeAttendancePeriod,
+  type AttendanceHoliday,
+} from "@/lib/attendance-reporting";
 
 type AppUser = {
   id: string;
@@ -29,6 +35,7 @@ type AppUser = {
   role: string;
   employee_id: string | null;
   is_active: boolean | null;
+  join_date?: string | null;
 };
 
 type Employee = {
@@ -40,6 +47,7 @@ type Employee = {
   position: string | null;
   email: string | null;
   is_active: boolean | null;
+  join_date?: string | null;
 };
 
 type PeriodConfirmation = {
@@ -78,12 +86,17 @@ type PeriodConfirmation = {
 type AttendanceLog = {
   id: string;
   employee_id: string | null;
+  employee_number?: string | null;
+  machine_pin?: string | null;
   attendance_date: string;
   check_in: string | null;
   check_out: string | null;
   manual_check_in: string | null;
   manual_check_out: string | null;
+  requested_check_in?: string | null;
+  requested_check_out?: string | null;
   status: string | null;
+  source?: string | null;
 
   employee_confirmation_status: string | null;
   employee_daily_note: string | null;
@@ -102,6 +115,7 @@ type AttendanceLog = {
   absence_request_type: string | null;
   absence_request_label: string | null;
   absence_request_status: string | null;
+  absence_request_source?: string | null;
 
   is_phl_candidate: boolean | null;
   phl_proof_url: string | null;
@@ -111,6 +125,8 @@ type AttendanceLog = {
 
   is_locked: boolean | null;
   deleted_at: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
 };
 
 type HRIdentity = {
@@ -122,21 +138,16 @@ type HRIdentity = {
 
 export default function HRAttendanceSafeReviewPage() {
   const params = useParams();
-  const pathname = usePathname();
 
-  const route = useMemo(
-    () => resolveAttendanceReviewRoute(params, pathname),
-    [params, pathname],
-  );
-
-  const employeeId = route.employeeId;
-  const periodMonth = route.periodMonth;
+  const employeeId = getParam(params, "employeeId");
+  const periodMonth = normalizePeriodMonth(getParam(params, "period"));
 
   const [identity, setIdentity] = useState<HRIdentity | null>(null);
   const [employee, setEmployee] = useState<Employee | null>(null);
   const [confirmation, setConfirmation] =
     useState<PeriodConfirmation | null>(null);
   const [logs, setLogs] = useState<AttendanceLog[]>([]);
+  const [holidays, setHolidays] = useState<AttendanceHoliday[]>([]);
 
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
@@ -157,9 +168,14 @@ export default function HRAttendanceSafeReviewPage() {
   const periodEnd =
     confirmation?.period_end || fallbackRange.end;
 
+  const approvalLogs = useMemo(
+    () => logs.filter((log) => String(log.employee_id || "").trim() === employeeId),
+    [logs, employeeId],
+  );
+
   const hrApproved =
-    logs.length > 0 &&
-    logs.every(
+    approvalLogs.length > 0 &&
+    approvalLogs.every(
       (log) => normalize(log.hr_approval_status) === "approved",
     );
 
@@ -180,7 +196,7 @@ export default function HRAttendanceSafeReviewPage() {
   const canApprove =
     Boolean(identity) &&
     Boolean(confirmation) &&
-    logs.length > 0 &&
+    approvalLogs.length > 0 &&
     supervisorApproved &&
     readyForHR &&
     !finalized &&
@@ -190,53 +206,44 @@ export default function HRAttendanceSafeReviewPage() {
   const canRevoke =
     Boolean(identity) &&
     Boolean(confirmation) &&
-    logs.length > 0 &&
+    approvalLogs.length > 0 &&
     hrApproved &&
     readyForHR &&
     !finalized &&
     !locked;
 
-  const metrics = useMemo(() => {
-    const present = logs.filter((log) =>
-      ["present", "hadir", "late", "incomplete"].includes(
-        normalize(log.status),
-      ),
-    ).length;
+  const attendanceSummary = useMemo(
+    () =>
+      summarizeAttendancePeriod({
+        logs,
+        holidays,
+        periodStart,
+        periodEnd,
+        employmentStart: employee?.join_date,
+      }),
+    [logs, holidays, periodStart, periodEnd, employee?.join_date],
+  );
 
-    const leave = logs.filter((log) =>
-      [
-        "leave",
-        "annual_leave",
-        "marriage_leave",
-        "maternity_leave",
-        "miscarriage_leave",
-        "bereavement_leave",
-        "worship_leave",
-        "menstrual_leave",
-        "pregnancy_check_leave",
-      ].includes(normalize(log.status)),
-    ).length;
-
-    const absence = logs.filter((log) =>
-      ["absent", "alpa", "alpha", "sick", "permit"].includes(
-        normalize(log.status),
-      ),
-    ).length;
-
-    const phl = logs.filter(
-      (log) =>
-        Boolean(log.is_phl_candidate) ||
-        normalize(log.status).includes("phl"),
-    ).length;
-
-    return {
+  const metrics = useMemo(
+    () => ({
       total: logs.length,
-      present,
-      leave,
-      absence,
-      phl,
-    };
-  }, [logs]);
+      officePresent: attendanceSummary.officePresent,
+      outsideWork:
+        attendanceSummary.manualExternal + attendanceSummary.offdayWork,
+      information:
+        attendanceSummary.leave +
+        attendanceSummary.phlClaim +
+        attendanceSummary.sick +
+        attendanceSummary.permit +
+        attendanceSummary.officialTravel +
+        attendanceSummary.absent +
+        attendanceSummary.incomplete +
+        attendanceSummary.pendingRequest +
+        attendanceSummary.noRecord +
+        attendanceSummary.conflict,
+    }),
+    [logs.length, attendanceSummary],
+  );
 
   useEffect(() => {
     fetchData();
@@ -247,9 +254,9 @@ export default function HRAttendanceSafeReviewPage() {
     setErrorMessage("");
 
     try {
-      if (!employeeId || !isValidPeriodMonth(periodMonth)) {
+      if (!employeeId || !isUuid(employeeId) || !isValidPeriodMonth(periodMonth)) {
         throw new Error(
-          "Parameter route tidak valid. Format route harus /hr/attendance/approvals/[employeeId]/[YYYY-MM].",
+          "Parameter route tidak valid. Pilih karyawan dari Queue HR Review; URL detail harus memakai UUID karyawan asli dan periode YYYY-MM.",
         );
       }
 
@@ -286,35 +293,45 @@ export default function HRAttendanceSafeReviewPage() {
           .maybeSingle<PeriodConfirmation>();
 
       if (confirmationError) throw confirmationError;
-      if (!confirmationData) {
-        throw new Error(
-          "Konfirmasi periode karyawan belum tersedia.",
-        );
-      }
 
-      setConfirmation(confirmationData);
+      setConfirmation(confirmationData || null);
 
       const start =
-        confirmationData.period_start || fallbackRange.start;
+        confirmationData?.period_start || fallbackRange.start;
       const end =
-        confirmationData.period_end || fallbackRange.end;
+        confirmationData?.period_end || fallbackRange.end;
 
-      const { data: logData, error: logError } = await supabase
-        .from("attendance_logs")
-        .select("*")
-        .eq("employee_id", employeeId)
-        .is("deleted_at", null)
-        .gte("attendance_date", start)
-        .lte("attendance_date", end)
-        .order("attendance_date", { ascending: true });
+      const [logResult, holidayResult] = await Promise.all([
+        supabase
+          .from("attendance_logs")
+          .select("*")
+          .is("deleted_at", null)
+          .gte("attendance_date", start)
+          .lte("attendance_date", end)
+          .order("attendance_date", { ascending: true }),
+        supabase
+          .from("holidays")
+          .select("*")
+          .eq("is_active", true)
+          .gte("holiday_date", start)
+          .lte("holiday_date", end),
+      ]);
 
-      if (logError) throw logError;
+      if (logResult.error) throw logResult.error;
+      if (holidayResult.error) throw holidayResult.error;
 
-      setLogs((logData || []) as AttendanceLog[]);
+      const employeeLogs = getEmployeeLogs(
+        employeeData,
+        (logResult.data || []) as AttendanceLog[],
+      );
+
+      setLogs(employeeLogs);
+      setHolidays((holidayResult.data || []) as AttendanceHoliday[]);
     } catch (error: any) {
       setEmployee(null);
       setConfirmation(null);
       setLogs([]);
+      setHolidays([]);
       setErrorMessage(
         error?.message || "Data HR Review gagal dimuat.",
       );
@@ -350,9 +367,9 @@ export default function HRAttendanceSafeReviewPage() {
       return;
     }
 
-    if (logs.length === 0) {
+    if (approvalLogs.length === 0) {
       setErrorMessage(
-        "Tidak ada attendance_logs pada periode ini.",
+        "Data absensi dapat dilihat, tetapi belum ada attendance_logs yang terhubung ke employee_id ini. Approval HR diblokir demi keamanan.",
       );
       return;
     }
@@ -535,7 +552,7 @@ export default function HRAttendanceSafeReviewPage() {
     <>
       <Topbar
         title="HR Review Absensi"
-        description="Review HR setelah approval atasan dan sebelum Finalisasi/Lock."
+        description="Monitoring seluruh data employee; approval HR hanya aktif setelah approval atasan dan sebelum Finalisasi/Lock."
       />
 
       <section className="space-y-5 p-4 sm:p-5 xl:p-6">
@@ -589,21 +606,15 @@ export default function HRAttendanceSafeReviewPage() {
             </div>
 
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:min-w-[620px]">
-              <HeroMetric label="Log" value={String(metrics.total)} />
-              <HeroMetric label="Hadir" value={String(metrics.present)} />
+              <HeroMetric label="Log DB" value={String(metrics.total)} />
+              <HeroMetric label="Hadir Kantor" value={String(metrics.officePresent)} />
               <HeroMetric
-                label="Keterangan"
-                value={String(metrics.leave + metrics.absence)}
+                label="Manual / Kerja Libur"
+                value={String(metrics.outsideWork)}
               />
               <HeroMetric
-                label="HR"
-                value={
-                  finalized
-                    ? "Final"
-                    : hrApproved
-                      ? "Approved"
-                      : "Review"
-                }
+                label="Keterangan"
+                value={String(metrics.information)}
               />
             </div>
           </div>
@@ -649,9 +660,17 @@ export default function HRAttendanceSafeReviewPage() {
               />
             </div>
 
-            {!supervisorApproved && (
+            {!confirmation && (
+              <div className="rounded-[26px] border border-blue-200 bg-blue-50 p-5 text-sm leading-6 text-blue-700">
+                <div className="font-bold">Belum Submit Periode.</div>
+                Data fingerprint/manual yang sudah ada tetap ditampilkan untuk monitoring HR.
+                Tombol Approve HR baru aktif setelah employee submit dan atasan menyetujui periode.
+              </div>
+            )}
+
+            {confirmation && !supervisorApproved && (
               <div className="rounded-[26px] border border-orange-200 bg-orange-50 p-5 text-sm leading-6 text-orange-700">
-                HR Review belum dapat diproses karena periode belum
+                HR Review tetap dapat dibuka dan datanya dapat diperiksa, tetapi approval belum dapat diproses karena periode belum
                 <strong> Approved</strong> oleh atasan.
               </div>
             )}
@@ -694,9 +713,13 @@ export default function HRAttendanceSafeReviewPage() {
               </div>
 
               <div className="grid gap-3 p-4 2xl:hidden">
-                {logs.map((log) => (
-                  <MobileLogCard key={log.id} log={log} />
-                ))}
+                {logs.length === 0 ? (
+                  <div className="rounded-2xl border border-dashed border-black/10 bg-[#f5f5f7] p-5 text-sm text-[#6e6e73]">
+                    Belum ada attendance_logs pada periode ini. Karyawan tetap tampil di Queue HR Review untuk monitoring.
+                  </div>
+                ) : (
+                  logs.map((log) => <MobileLogCard key={log.id} log={log} />)
+                )}
               </div>
 
               <div className="hidden overflow-x-auto 2xl:block">
@@ -1148,67 +1171,8 @@ function getParam(
   return String(value || "");
 }
 
-function safeDecodeURIComponent(value: string) {
-  try {
-    return decodeURIComponent(String(value || ""));
-  } catch {
-    return String(value || "");
-  }
-}
-
-function resolveAttendanceReviewRoute(
-  params: ReturnType<typeof useParams>,
-  pathname: string | null,
-) {
-  const paramEmployeeId =
-    getParam(params, "employeeId") ||
-    getParam(params, "employee_id") ||
-    getParam(params, "id");
-
-  const paramPeriod =
-    getParam(params, "period") ||
-    getParam(params, "periodMonth") ||
-    getParam(params, "period_month") ||
-    getParam(params, "month");
-
-  if (paramEmployeeId && isValidPeriodMonth(normalizePeriodMonth(paramPeriod))) {
-    return {
-      employeeId: safeDecodeURIComponent(paramEmployeeId),
-      periodMonth: normalizePeriodMonth(paramPeriod),
-    };
-  }
-
-  const segments = String(pathname || "")
-    .split("/")
-    .map((segment) => segment.trim())
-    .filter(Boolean);
-
-  const approvalsIndex = segments.findIndex(
-    (segment) => segment.toLowerCase() === "approvals",
-  );
-
-  if (approvalsIndex >= 0) {
-    const pathEmployeeId = safeDecodeURIComponent(segments[approvalsIndex + 1] || "");
-    const pathPeriod = normalizePeriodMonth(
-      safeDecodeURIComponent(segments[approvalsIndex + 2] || ""),
-    );
-
-    if (pathEmployeeId && isValidPeriodMonth(pathPeriod)) {
-      return {
-        employeeId: pathEmployeeId,
-        periodMonth: pathPeriod,
-      };
-    }
-  }
-
-  return {
-    employeeId: safeDecodeURIComponent(paramEmployeeId),
-    periodMonth: normalizePeriodMonth(paramPeriod),
-  };
-}
-
 function normalizePeriodMonth(value: string) {
-  const decoded = safeDecodeURIComponent(String(value || ""));
+  const decoded = decodeURIComponent(String(value || ""));
   const match = decoded.match(/^(\d{4})-(\d{2})$/);
 
   if (!match) return decoded;

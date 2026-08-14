@@ -25,6 +25,14 @@ import {
 import { Topbar } from "@/components/layout/Topbar";
 import { supabase } from "@/lib/supabase";
 import { sendHarmonyEmail } from "@/lib/notifications";
+import {
+  getActiveHarmonyTypesForScope,
+  getHarmonyRequestTypeMeta,
+  getHarmonyRequestTypesCache,
+  groupHarmonyTypes,
+  refreshHarmonyRequestTypes,
+  type HarmonyRequestTypeDefinition,
+} from "@/lib/harmony-request-types";
 
 type AppUser = {
   id: string;
@@ -187,23 +195,7 @@ type AttendancePeriodConfirmation = {
   lock_note?: string | null;
 };
 
-type DailyType =
-  | "present"
-  | "manual_attendance"
-  | "annual_leave"
-  | "marriage_leave"
-  | "maternity_leave"
-  | "miscarriage_leave"
-  | "bereavement_leave"
-  | "child_circumcision_leave"
-  | "worship_leave"
-  | "menstrual_leave"
-  | "pregnancy_check_leave"
-  | "phl_claim"
-  | "official_travel"
-  | "sick"
-  | "permit"
-  | "absent";
+type DailyType = string;
 
 type RowDraft = {
   daily_type: DailyType;
@@ -280,6 +272,9 @@ export default function EmployeeAttendancePage() {
   const [holidays, setHolidays] = useState<Holiday[]>([]);
   const [periodConfirmation, setPeriodConfirmation] =
     useState<AttendancePeriodConfirmation | null>(null);
+  const [requestTypes, setRequestTypes] = useState<HarmonyRequestTypeDefinition[]>(
+    () => getHarmonyRequestTypesCache(),
+  );
 
   const [periodMonth, setPeriodMonth] = useState(getCurrentPeriodMonth());
   const [loading, setLoading] = useState(true);
@@ -431,6 +426,11 @@ export default function EmployeeAttendancePage() {
 
     setSelectedDates([]);
     setRowDrafts({});
+
+    // Semua dropdown kehadiran/ketidakhadiran memakai master yang sama.
+    // Fallback bawaan tetap tersedia bila endpoint master sedang gagal.
+    const refreshedRequestTypes = await refreshHarmonyRequestTypes();
+    setRequestTypes(refreshedRequestTypes);
 
     const { data: authData, error: authError } = await supabase.auth.getUser();
 
@@ -2596,6 +2596,7 @@ export default function EmployeeAttendancePage() {
           <EditAttendanceModal
             row={selectedRow}
             draft={getDraft(selectedRow)}
+            requestTypes={requestTypes}
             locked={isPeriodLocked}
             saving={savingInlineManualDate === selectedRow.date}
             onChange={(field, value) =>
@@ -2892,6 +2893,7 @@ function LiveManualStatusBox({
 function EditAttendanceModal({
   row,
   draft,
+  requestTypes,
   locked,
   saving,
   onChange,
@@ -2900,6 +2902,7 @@ function EditAttendanceModal({
 }: {
   row: CalendarDayRow;
   draft: RowDraft;
+  requestTypes: HarmonyRequestTypeDefinition[];
   locked: boolean;
   saving: boolean;
   onChange: (field: keyof RowDraft, value: string | File | null) => void;
@@ -2967,37 +2970,25 @@ function EditAttendanceModal({
               }
               className="harmony-select disabled:cursor-not-allowed disabled:opacity-60"
             >
-              <option value="present">Hadir Normal</option>
-              <option value="manual_attendance">
-                Hadir Manual / Koreksi Jam
-              </option>
+              {groupHarmonyTypes(
+                getActiveHarmonyTypesForScope(requestTypes, "attendance"),
+              ).map(([group, items]) => (
+                <optgroup key={group} label={group}>
+                  {items.map((item) => (
+                    <option key={item.code} value={item.code}>
+                      {item.label}
+                    </option>
+                  ))}
+                </optgroup>
+              ))}
 
-              <optgroup label="Cuti">
-                <option value="annual_leave">Cuti Tahunan</option>
-                <option value="marriage_leave">Cuti Menikah</option>
-                <option value="maternity_leave">Cuti Melahirkan</option>
-                <option value="miscarriage_leave">Cuti Keguguran</option>
-                <option value="bereavement_leave">Cuti Duka</option>
-                <option value="child_circumcision_leave">
-                  Cuti Khitan / Baptis Anak
+              {!getActiveHarmonyTypesForScope(requestTypes, "attendance").some(
+                (item) => item.code === draft.daily_type,
+              ) && (
+                <option value={draft.daily_type}>
+                  {getHarmonyRequestTypeMeta(draft.daily_type).label} (historis)
                 </option>
-                <option value="worship_leave">Cuti Ibadah</option>
-                <option value="menstrual_leave">Cuti Haid</option>
-                <option value="pregnancy_check_leave">
-                  Pemeriksaan Kehamilan
-                </option>
-              </optgroup>
-
-              <optgroup label="PHL">
-                <option value="phl_claim">Klaim PHL</option>
-              </optgroup>
-
-              <optgroup label="Keterangan Lain">
-                <option value="official_travel">Tugas Luar / Dinas</option>
-                <option value="sick">Sakit</option>
-                <option value="permit">Izin</option>
-                <option value="absent">Alpa / Tidak Hadir</option>
-              </optgroup>
+              )}
             </select>
           </label>
 
@@ -3531,25 +3522,22 @@ function isOffDayWithoutAttendance(row: CalendarDayRow, draft?: RowDraft) {
 }
 
 function inferDailyType(row: CalendarDayRow): DailyType {
-  const type = row.log?.absence_request_type || row.log?.status || "";
+  const type = String(row.log?.absence_request_type || row.log?.status || "").trim();
 
-  if (type === "annual_leave") return "annual_leave";
-  if (type === "marriage_leave") return "marriage_leave";
-  if (type === "maternity_leave") return "maternity_leave";
-  if (type === "miscarriage_leave") return "miscarriage_leave";
-  if (type === "bereavement_leave") return "bereavement_leave";
-  if (type === "child_circumcision_leave") return "child_circumcision_leave";
-  if (type === "worship_leave") return "worship_leave";
-  if (type === "menstrual_leave") return "menstrual_leave";
-  if (type === "pregnancy_check_leave") return "pregnancy_check_leave";
-  if (type === "phl_claim") return "phl_claim";
-  if (type === "manual_attendance") return "manual_attendance";
-  if (type === "sick") return "sick";
-  if (type === "permit" || type === "permission") return "permit";
-  if (type === "official_travel") return "official_travel";
-  if (type === "absent" || type === "alpa") return "absent";
-  if (row.log?.manual_check_in || row.log?.manual_check_out)
+  if (type) {
+    const knownType = getHarmonyRequestTypesCache().find(
+      (item) => item.code === type,
+    );
+
+    if (knownType) return knownType.code;
+  }
+
+  if (type === "permission") return "permit";
+  if (type === "alpa") return "absent";
+
+  if (row.log?.manual_check_in || row.log?.manual_check_out) {
     return "manual_attendance";
+  }
 
   if (!row.log?.id && (row.is_weekend || row.holiday_name)) {
     return "present";
@@ -3835,247 +3823,38 @@ function calculatePeriodTotals(
 }
 
 function getDailyTypeMeta(type: DailyType): DailyTypeMeta {
-  const map: Record<DailyType, DailyTypeMeta> = {
-    present: {
-      label: "Hadir Normal",
-      status: "present",
-      correctionType: "attendance_confirmation",
-      absenceRequestType: null,
-      absenceRequestLabel: null,
-      requiresProof: false,
-      requiresManualTime: false,
-      isLeaveLike: false,
-      isAbsenceLike: false,
-      isPHLClaim: false,
-    },
-    manual_attendance: {
-      label: "Hadir Manual / Koreksi Jam",
-      status: "present",
-      correctionType: "manual_check",
-      absenceRequestType: "manual_attendance",
-      absenceRequestLabel: "Hadir Manual / Koreksi Jam",
-      requiresProof: true,
-      requiresManualTime: true,
-      isLeaveLike: false,
-      isAbsenceLike: false,
-      isPHLClaim: false,
-    },
-    annual_leave: {
-      label: "Cuti Tahunan",
-      status: "leave",
-      correctionType: "annual_leave",
-      absenceRequestType: "annual_leave",
-      absenceRequestLabel: "Cuti Tahunan",
-      requiresProof: false,
-      requiresManualTime: false,
-      isLeaveLike: true,
-      isAbsenceLike: true,
-      isPHLClaim: false,
-    },
-    marriage_leave: {
-      label: "Cuti Menikah",
-      status: "leave",
-      correctionType: "marriage_leave",
-      absenceRequestType: "marriage_leave",
-      absenceRequestLabel: "Cuti Menikah",
-      requiresProof: true,
-      requiresManualTime: false,
-      isLeaveLike: true,
-      isAbsenceLike: true,
-      isPHLClaim: false,
-    },
-    maternity_leave: {
-      label: "Cuti Melahirkan",
-      status: "leave",
-      correctionType: "maternity_leave",
-      absenceRequestType: "maternity_leave",
-      absenceRequestLabel: "Cuti Melahirkan",
-      requiresProof: true,
-      requiresManualTime: false,
-      isLeaveLike: true,
-      isAbsenceLike: true,
-      isPHLClaim: false,
-    },
-    miscarriage_leave: {
-      label: "Cuti Keguguran",
-      status: "leave",
-      correctionType: "miscarriage_leave",
-      absenceRequestType: "miscarriage_leave",
-      absenceRequestLabel: "Cuti Keguguran",
-      requiresProof: true,
-      requiresManualTime: false,
-      isLeaveLike: true,
-      isAbsenceLike: true,
-      isPHLClaim: false,
-    },
-    bereavement_leave: {
-      label: "Cuti Duka",
-      status: "leave",
-      correctionType: "bereavement_leave",
-      absenceRequestType: "bereavement_leave",
-      absenceRequestLabel: "Cuti Duka",
-      requiresProof: true,
-      requiresManualTime: false,
-      isLeaveLike: true,
-      isAbsenceLike: true,
-      isPHLClaim: false,
-    },
-    child_circumcision_leave: {
-      label: "Cuti Khitan / Baptis Anak",
-      status: "leave",
-      correctionType: "child_circumcision_leave",
-      absenceRequestType: "child_circumcision_leave",
-      absenceRequestLabel: "Cuti Khitan / Baptis Anak",
-      requiresProof: true,
-      requiresManualTime: false,
-      isLeaveLike: true,
-      isAbsenceLike: true,
-      isPHLClaim: false,
-    },
-    worship_leave: {
-      label: "Cuti Ibadah",
-      status: "leave",
-      correctionType: "worship_leave",
-      absenceRequestType: "worship_leave",
-      absenceRequestLabel: "Cuti Ibadah",
-      requiresProof: true,
-      requiresManualTime: false,
-      isLeaveLike: true,
-      isAbsenceLike: true,
-      isPHLClaim: false,
-    },
-    menstrual_leave: {
-      label: "Cuti Haid",
-      status: "leave",
-      correctionType: "menstrual_leave",
-      absenceRequestType: "menstrual_leave",
-      absenceRequestLabel: "Cuti Haid",
-      requiresProof: false,
-      requiresManualTime: false,
-      isLeaveLike: true,
-      isAbsenceLike: true,
-      isPHLClaim: false,
-    },
-    pregnancy_check_leave: {
-      label: "Pemeriksaan Kehamilan",
-      status: "leave",
-      correctionType: "pregnancy_check_leave",
-      absenceRequestType: "pregnancy_check_leave",
-      absenceRequestLabel: "Pemeriksaan Kehamilan",
-      requiresProof: true,
-      requiresManualTime: false,
-      isLeaveLike: true,
-      isAbsenceLike: true,
-      isPHLClaim: false,
-    },
-    phl_claim: {
-      label: "Klaim PHL",
-      status: "phl_claim",
-      correctionType: "phl_claim",
-      absenceRequestType: "phl_claim",
-      absenceRequestLabel: "Klaim PHL",
-      requiresProof: false,
-      requiresManualTime: false,
-      isLeaveLike: false,
-      isAbsenceLike: true,
-      isPHLClaim: true,
-    },
-    official_travel: {
-      label: "Tugas Luar / Dinas",
-      status: "official_travel",
-      correctionType: "official_travel",
-      absenceRequestType: "official_travel",
-      absenceRequestLabel: "Tugas Luar / Dinas",
-      requiresProof: true,
-      requiresManualTime: false,
-      isLeaveLike: false,
-      isAbsenceLike: true,
-      isPHLClaim: false,
-    },
-    sick: {
-      label: "Sakit",
-      status: "sick",
-      correctionType: "sick",
-      absenceRequestType: "sick",
-      absenceRequestLabel: "Sakit",
-      requiresProof: true,
-      requiresManualTime: false,
-      isLeaveLike: false,
-      isAbsenceLike: true,
-      isPHLClaim: false,
-    },
-    permit: {
-      label: "Izin",
-      status: "permit",
-      correctionType: "permit",
-      absenceRequestType: "permit",
-      absenceRequestLabel: "Izin",
-      requiresProof: false,
-      requiresManualTime: false,
-      isLeaveLike: false,
-      isAbsenceLike: true,
-      isPHLClaim: false,
-    },
-    absent: {
-      label: "Alpa / Tidak Hadir",
-      status: "absent",
-      correctionType: "absent",
-      absenceRequestType: "absent",
-      absenceRequestLabel: "Alpa / Tidak Hadir",
-      requiresProof: false,
-      requiresManualTime: false,
-      isLeaveLike: false,
-      isAbsenceLike: true,
-      isPHLClaim: false,
-    },
-  };
+  const master = getHarmonyRequestTypeMeta(type);
+  const attendanceOnly =
+    master.request_category === "attendance" && !master.is_absence_like;
 
-  return map[type];
+  return {
+    label: master.label,
+    status: master.attendance_status || master.code || "absent",
+    correctionType: master.correction_type || master.code || "other",
+    absenceRequestType: attendanceOnly ? null : master.code,
+    absenceRequestLabel: attendanceOnly ? null : master.label,
+    requiresProof: Boolean(master.requires_proof),
+    requiresManualTime: Boolean(master.requires_manual_time),
+    isLeaveLike: Boolean(master.is_leave_like),
+    isAbsenceLike: Boolean(master.is_absence_like),
+    isPHLClaim: Boolean(master.is_phl_claim),
+  };
 }
 
 function getDailyTypeDescription(type: DailyType) {
-  if (type === "phl_claim") {
-    return "Klaim PHL artinya karyawan menggunakan saldo PHL yang sudah pernah didapat dari bekerja pada weekend/libur.";
+  const meta = getHarmonyRequestTypeMeta(type);
+
+  if (meta.description) return meta.description;
+
+  if (meta.requires_manual_time) {
+    return "Jenis ini membutuhkan jam manual dan mengikuti validasi attendance HARMONY.";
   }
 
-  if (type === "manual_attendance") {
-    return "Digunakan jika data mesin tidak lengkap atau tidak ada, namun karyawan benar-benar hadir dan perlu mengisi jam manual.";
+  if (meta.requires_proof) {
+    return "Jenis ini membutuhkan bukti/dokumen pendukung untuk proses validasi.";
   }
 
-  if (type === "annual_leave") {
-    return "Digunakan jika karyawan mengambil cuti tahunan.";
-  }
-
-  if (
-    type === "marriage_leave" ||
-    type === "maternity_leave" ||
-    type === "miscarriage_leave" ||
-    type === "bereavement_leave" ||
-    type === "child_circumcision_leave" ||
-    type === "worship_leave" ||
-    type === "menstrual_leave" ||
-    type === "pregnancy_check_leave"
-  ) {
-    return "Digunakan untuk cuti khusus. Beberapa jenis cuti membutuhkan bukti/dokumen pendukung.";
-  }
-
-  if (type === "official_travel") {
-    return "Digunakan jika karyawan sedang tugas luar/dinas sehingga tidak memungkinkan scan fingerprint.";
-  }
-
-  if (type === "sick") {
-    return "Digunakan jika karyawan sakit. Surat keterangan dokter atau bukti pendukung wajib dilampirkan.";
-  }
-
-  if (type === "permit") {
-    return "Digunakan untuk izin tidak masuk kerja sesuai persetujuan atasan.";
-  }
-
-  if (type === "absent") {
-    return "Digunakan jika karyawan tidak hadir tanpa keterangan khusus.";
-  }
-
-  return "Digunakan untuk konfirmasi kehadiran normal.";
+  return "Jenis kehadiran/ketidakhadiran ini mengikuti master HARMONY dan proses approval yang berlaku.";
 }
 
 function appendCorrectionNote(existing: string | null, next: string) {

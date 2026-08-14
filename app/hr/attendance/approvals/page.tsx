@@ -1,214 +1,201 @@
-"use client";
+'use client'
 
-import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import Link from 'next/link'
+import { useEffect, useMemo, useState } from 'react'
+import type { ReactNode } from 'react'
 import {
   AlertTriangle,
-  CheckCircle2,
-  Clock3,
+  Eye,
   Loader2,
   RefreshCcw,
   Search,
   ShieldCheck,
   UserCheck,
-  UserRound,
-} from "lucide-react";
+} from 'lucide-react'
 
-import { Topbar } from "@/components/layout/Topbar";
-import { supabase } from "@/lib/supabase";
-
-type AppUser = {
-  id: string;
-  email: string;
-  role: string;
-  employee_id: string | null;
-  is_active: boolean | null;
-};
+import { Topbar } from '@/components/layout/Topbar'
+import { supabase } from '@/lib/supabase'
+import {
+  getCurrentPeriodMonthWita,
+  getCutoffRange,
+  getEmployeeLogs,
+  isUuid,
+  summarizeAttendancePeriod,
+  type AttendanceHoliday,
+  type AttendanceReportingLog,
+} from '@/lib/attendance-reporting'
 
 type Employee = {
-  id: string;
-  employee_number: string | null;
-  machine_pin: string | null;
-  full_name: string | null;
-  department: string | null;
-  position: string | null;
-  email: string | null;
-  is_active: boolean | null;
-};
+  id: string
+  employee_number?: string | null
+  machine_pin?: string | null
+  full_name?: string | null
+  department?: string | null
+  position?: string | null
+  join_date?: string | null
+  is_active?: boolean | null
+}
 
-type PeriodConfirmation = {
-  id: string;
-  employee_id: string;
-  employee_number: string | null;
-  machine_pin: string | null;
-  full_name: string | null;
-  department: string | null;
-  position: string | null;
-  period_month: string;
-  period_start: string;
-  period_end: string;
-  employee_status: string | null;
-  employee_submitted_at: string | null;
-  supervisor_status: string | null;
-  supervisor_name: string | null;
-  supervisor_approved_at: string | null;
-  supervisor_rejected_at: string | null;
-  supervisor_note: string | null;
-  hr_status: string | null;
-  hr_finalized_at: string | null;
-  hr_finalized_by: string | null;
-  hr_note: string | null;
-  is_locked: boolean | null;
-  locked_at: string | null;
-  locked_by: string | null;
-  locked_by_name: string | null;
-};
+type Confirmation = {
+  id?: string | null
+  employee_id?: string | null
+  employee_status?: string | null
+  employee_submitted_at?: string | null
+  supervisor_status?: string | null
+  supervisor_name?: string | null
+  supervisor_approved_at?: string | null
+  supervisor_rejected_at?: string | null
+  hr_status?: string | null
+  is_locked?: boolean | null
+}
 
-type ReviewRow = {
-  confirmation: PeriodConfirmation;
-  employee: Employee | null;
-};
+type Log = AttendanceReportingLog & {
+  hr_final_status?: string | null
+  is_locked?: boolean | null
+}
 
-export default function HRAttendanceApprovalQueuePage() {
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [rows, setRows] = useState<ReviewRow[]>([]);
-  const [search, setSearch] = useState("");
-  const [errorMessage, setErrorMessage] = useState("");
+type QueueRow = {
+  employee: Employee
+  confirmation: Confirmation | null
+  logs: Log[]
+  summary: ReturnType<typeof summarizeAttendancePeriod>
+  process: 'not_submitted' | 'waiting_supervisor' | 'ready_hr' | 'hr_reviewed' | 'finalized'
+}
 
-  useEffect(() => {
-    fetchQueue();
-  }, []);
+export default function HRAttendanceReviewQueuePage() {
+  const [periodMonth, setPeriodMonth] = useState(getCurrentPeriodMonthWita())
+  const [employees, setEmployees] = useState<Employee[]>([])
+  const [confirmations, setConfirmations] = useState<Confirmation[]>([])
+  const [logs, setLogs] = useState<Log[]>([])
+  const [holidays, setHolidays] = useState<AttendanceHoliday[]>([])
+  const [search, setSearch] = useState('')
+  const [filter, setFilter] = useState('all')
+  const [loading, setLoading] = useState(true)
+  const [errorMessage, setErrorMessage] = useState('')
+
+  const range = useMemo(() => getCutoffRange(periodMonth), [periodMonth])
+
+  const confirmationMap = useMemo(() => {
+    const map = new Map<string, Confirmation>()
+    confirmations.forEach((item) => {
+      if (item.employee_id) map.set(item.employee_id, item)
+    })
+    return map
+  }, [confirmations])
+
+  const rows = useMemo<QueueRow[]>(() => {
+    return employees.map((employee) => {
+      const confirmation = confirmationMap.get(employee.id) || null
+      const employeeLogs = getEmployeeLogs(employee, logs)
+      const summary = summarizeAttendancePeriod({
+        logs: employeeLogs,
+        holidays,
+        periodStart: range.start,
+        periodEnd: range.end,
+        employmentStart: employee.join_date,
+      })
+
+      const employeeStatus = normalize(confirmation?.employee_status)
+      const supervisorStatus = normalize(confirmation?.supervisor_status)
+      const hrStatus = normalize(confirmation?.hr_status)
+      const allHRApproved =
+        employeeLogs.length > 0 &&
+        employeeLogs.every((log) => normalize(log.hr_approval_status) === 'approved')
+
+      let process: QueueRow['process'] = 'not_submitted'
+      if (hrStatus === 'finalized') process = 'finalized'
+      else if (allHRApproved && hrStatus === 'ready_for_hr') process = 'hr_reviewed'
+      else if (supervisorStatus === 'approved' || hrStatus === 'ready_for_hr') process = 'ready_hr'
+      else if (employeeStatus === 'submitted') process = 'waiting_supervisor'
+
+      return { employee, confirmation, logs: employeeLogs, summary, process }
+    })
+  }, [employees, confirmationMap, logs, holidays, range.start, range.end])
 
   const filteredRows = useMemo(() => {
-    const keyword = search.trim().toLowerCase();
-
-    if (!keyword) return rows;
-
-    return rows.filter(({ confirmation, employee }) =>
-      [
-        employee?.full_name,
-        employee?.employee_number,
-        employee?.machine_pin,
-        employee?.department,
-        employee?.position,
-        confirmation.full_name,
-        confirmation.employee_number,
-        confirmation.department,
-        confirmation.position,
-        confirmation.period_month,
+    const keyword = search.trim().toLowerCase()
+    return rows.filter((row) => {
+      if (filter !== 'all' && row.process !== filter) return false
+      if (!keyword) return true
+      return [
+        row.employee.full_name,
+        row.employee.employee_number,
+        row.employee.machine_pin,
+        row.employee.department,
+        row.employee.position,
       ]
         .filter(Boolean)
-        .some((value) => String(value).toLowerCase().includes(keyword)),
-    );
-  }, [rows, search]);
+        .join(' ')
+        .toLowerCase()
+        .includes(keyword)
+    })
+  }, [rows, search, filter])
 
-  const readyCount = rows.filter(
-    ({ confirmation }) =>
-      normalize(confirmation.supervisor_status) === "approved" &&
-      normalize(confirmation.hr_status) === "ready_for_hr" &&
-      !confirmation.is_locked,
-  ).length;
+  const stats = useMemo(() => {
+    const result = {
+      all: rows.length,
+      notSubmitted: 0,
+      waitingSupervisor: 0,
+      readyHR: 0,
+      reviewed: 0,
+      finalized: 0,
+    }
+    rows.forEach((row) => {
+      if (row.process === 'not_submitted') result.notSubmitted += 1
+      if (row.process === 'waiting_supervisor') result.waitingSupervisor += 1
+      if (row.process === 'ready_hr') result.readyHR += 1
+      if (row.process === 'hr_reviewed') result.reviewed += 1
+      if (row.process === 'finalized') result.finalized += 1
+    })
+    return result
+  }, [rows])
 
-  const reviewedCount = rows.filter(
-    ({ confirmation }) =>
-      normalize(confirmation.supervisor_status) === "approved" &&
-      normalize(confirmation.hr_status) === "ready_for_hr" &&
-      Boolean(confirmation.hr_note),
-  ).length;
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const queryPeriod = new URLSearchParams(window.location.search).get('period')
+      if (queryPeriod && /^\d{4}-(0[1-9]|1[0-2])$/.test(queryPeriod) && queryPeriod !== periodMonth) {
+        setPeriodMonth(queryPeriod)
+        return
+      }
+    }
+    fetchData()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [periodMonth])
 
-  const lockedCount = rows.filter(({ confirmation }) =>
-    Boolean(confirmation.is_locked),
-  ).length;
-
-  async function fetchQueue(fromRefresh = false) {
-    if (fromRefresh) setRefreshing(true);
-    else setLoading(true);
-
-    setErrorMessage("");
-
+  async function fetchData() {
+    setLoading(true)
+    setErrorMessage('')
     try {
-      const { data: authData, error: authError } = await supabase.auth.getUser();
+      const [employeeResult, confirmationResult, logResult, holidayResult] = await Promise.all([
+        supabase.from('employees').select('*').order('full_name', { ascending: true }),
+        supabase.from('attendance_period_confirmations').select('*').eq('period_month', periodMonth),
+        supabase
+          .from('attendance_logs')
+          .select('*')
+          .is('deleted_at', null)
+          .gte('attendance_date', range.start)
+          .lte('attendance_date', range.end),
+        supabase
+          .from('holidays')
+          .select('*')
+          .eq('is_active', true)
+          .gte('holiday_date', range.start)
+          .lte('holiday_date', range.end),
+      ])
 
-      if (authError || !authData.user) {
-        throw new Error("Session HR tidak ditemukan. Silakan login ulang.");
-      }
+      if (employeeResult.error) throw employeeResult.error
+      if (confirmationResult.error) throw confirmationResult.error
+      if (logResult.error) throw logResult.error
+      if (holidayResult.error) throw holidayResult.error
 
-      let appUser: AppUser | null = null;
-
-      const byId = await supabase
-        .from("app_users")
-        .select("id, email, role, employee_id, is_active")
-        .eq("id", authData.user.id)
-        .maybeSingle<AppUser>();
-
-      if (!byId.error && byId.data) {
-        appUser = byId.data;
-      } else if (authData.user.email) {
-        const byEmail = await supabase
-          .from("app_users")
-          .select("id, email, role, employee_id, is_active")
-          .ilike("email", authData.user.email)
-          .maybeSingle<AppUser>();
-
-        if (!byEmail.error) appUser = byEmail.data;
-      }
-
-      const role = normalize(appUser?.role);
-
-      if (
-        !appUser ||
-        appUser.is_active === false ||
-        !["hr", "admin", "administrator", "super_admin"].includes(role)
-      ) {
-        throw new Error("Akses ditolak. Halaman ini hanya untuk HR/Admin aktif.");
-      }
-
-      const { data: confirmationData, error: confirmationError } = await supabase
-        .from("attendance_period_confirmations")
-        .select("*")
-        .in("supervisor_status", ["approved"])
-        .in("hr_status", ["ready_for_hr", "finalized"])
-        .order("period_month", { ascending: false })
-        .order("full_name", { ascending: true });
-
-      if (confirmationError) throw confirmationError;
-
-      const confirmations = (confirmationData || []) as PeriodConfirmation[];
-      const employeeIds = Array.from(
-        new Set(confirmations.map((item) => item.employee_id).filter(Boolean)),
-      );
-
-      let employees: Employee[] = [];
-
-      if (employeeIds.length > 0) {
-        const { data: employeeData, error: employeeError } = await supabase
-          .from("employees")
-          .select(
-            "id, employee_number, machine_pin, full_name, department, position, email, is_active",
-          )
-          .in("id", employeeIds);
-
-        if (employeeError) throw employeeError;
-        employees = (employeeData || []) as Employee[];
-      }
-
-      const employeeMap = new Map(employees.map((item) => [item.id, item]));
-
-      setRows(
-        confirmations.map((confirmation) => ({
-          confirmation,
-          employee: employeeMap.get(confirmation.employee_id) || null,
-        })),
-      );
+      setEmployees(((employeeResult.data || []) as Employee[]).filter((item) => item.is_active !== false))
+      setConfirmations((confirmationResult.data || []) as Confirmation[])
+      setLogs((logResult.data || []) as Log[])
+      setHolidays((holidayResult.data || []) as AttendanceHoliday[])
     } catch (error: any) {
-      setRows([]);
-      setErrorMessage(
-        error?.message || "Queue HR Review belum berhasil dimuat.",
-      );
+      setErrorMessage(error?.message || 'Queue HR Review gagal dimuat.')
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      setLoading(false)
     }
   }
 
@@ -216,348 +203,166 @@ export default function HRAttendanceApprovalQueuePage() {
     <>
       <Topbar
         title="HR Review Absensi"
-        description="Daftar periode yang sudah disetujui atasan dan siap direview HR sebelum Finalisasi/Lock."
+        description="Semua karyawan tetap terlihat. Tombol approval hanya aktif ketika workflow sudah memenuhi syarat."
       />
 
-      <section className="space-y-5 p-4 sm:p-5 xl:p-6">
+      <section className="harmony-page-bg min-h-screen space-y-5 p-4 sm:p-6">
         {errorMessage && (
-          <div className="rounded-2xl border border-orange-200 bg-orange-50 p-4 text-sm leading-6 text-orange-700">
-            <div className="mb-1 flex items-center gap-2 font-bold">
-              <AlertTriangle size={18} />
-              Perhatian
-            </div>
-            {errorMessage}
+          <div className="rounded-2xl border border-orange-200 bg-orange-50 p-4 text-sm text-orange-700">
+            <span className="inline-flex items-start gap-2"><AlertTriangle size={17} className="mt-0.5" />{errorMessage}</span>
           </div>
         )}
 
-        <div className="relative overflow-hidden rounded-[32px] border border-black/5 bg-[#1d1d1f] p-5 text-white shadow-[0_24px_80px_rgba(0,0,0,0.16)] sm:p-6">
-          <div className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-[#007aff]/35 blur-3xl" />
-
-          <div className="relative flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
-            <div className="min-w-0">
-              <div className="mb-4 flex w-fit items-center gap-2 rounded-full border border-white/10 bg-white/10 px-4 py-2 text-xs font-semibold text-white/75">
-                <ShieldCheck size={15} className="text-[#5ac8fa]" />
-                Safe HR Approval Queue
+        <section className="relative overflow-hidden rounded-[32px] bg-[#1d1d1f] p-6 text-white">
+          <div className="pointer-events-none absolute -right-20 -top-20 h-64 w-64 rounded-full bg-[#007aff]/30 blur-3xl" />
+          <div className="relative grid gap-5 xl:grid-cols-[1fr_auto] xl:items-end">
+            <div>
+              <div className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1.5 text-xs font-bold text-white/70">
+                <ShieldCheck size={15} /> Safe HR Review Queue
               </div>
-
-              <h1 className="text-2xl font-semibold tracking-[-0.04em] sm:text-3xl xl:text-4xl">
-                HR Review Absensi
-              </h1>
-
-              <p className="mt-3 max-w-3xl text-sm leading-7 text-white/60">
-                Pilih karyawan dan periode dari daftar ini. Halaman detail HR
-                Review hanya dapat dibuka dengan employee ID dan periode yang
-                valid, sehingga route kosong tidak lagi menampilkan error
-                parameter.
+              <h1 className="mt-4 text-3xl font-semibold">Review Absensi Karyawan</h1>
+              <p className="mt-2 max-w-3xl text-sm leading-7 text-white/60">
+                Belum submit, menunggu atasan, Ready for HR, sudah direview, dan finalized semuanya ada di satu queue. Tidak ada URL placeholder UUID.
               </p>
+              <p className="mt-2 text-xs font-semibold text-white/70">{range.label}</p>
             </div>
-
-            <div className="grid gap-3 sm:grid-cols-3 xl:min-w-[520px]">
-              <HeroMetric label="Ready for HR" value={String(readyCount)} />
-              <HeroMetric label="Sudah Direview" value={String(reviewedCount)} />
-              <HeroMetric label="Locked" value={String(lockedCount)} />
-            </div>
+            <Link href="/hr/attendance/data" className="rounded-2xl bg-white px-4 py-3 text-xs font-bold text-[#1d1d1f]">
+              Kembali ke Data Absensi
+            </Link>
           </div>
+        </section>
+
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
+          <Metric label="Semua" value={stats.all} />
+          <Metric label="Belum Submit" value={stats.notSubmitted} />
+          <Metric label="Menunggu Atasan" value={stats.waitingSupervisor} />
+          <Metric label="Ready HR" value={stats.readyHR} />
+          <Metric label="HR Reviewed" value={stats.reviewed} />
+          <Metric label="Finalized" value={stats.finalized} />
         </div>
 
-        <div className="harmony-card overflow-hidden">
-          <div className="flex flex-col gap-4 border-b border-black/5 p-5 sm:p-6 lg:flex-row lg:items-center lg:justify-between">
-            <div>
-              <h2 className="text-lg font-semibold text-[#1d1d1f]">
-                Queue HR Review
-              </h2>
-              <p className="mt-1 text-sm leading-6 text-[#6e6e73]">
-                Menampilkan periode yang sudah Approved oleh atasan dan masuk
-                proses HR.
-              </p>
-            </div>
-
-            <div className="flex flex-col gap-3 sm:flex-row">
-              <div className="flex min-h-11 items-center gap-2 rounded-2xl border border-black/5 bg-[#f5f5f7] px-4 sm:w-72">
+        <section className="harmony-card overflow-hidden">
+          <div className="grid gap-3 border-b border-black/5 p-5 md:grid-cols-[180px_220px_1fr_auto] md:items-end">
+            <label>
+              <span className="harmony-label">Periode</span>
+              <input type="month" min="2026-01" value={periodMonth} onChange={(event) => setPeriodMonth(event.target.value)} className="harmony-input" />
+            </label>
+            <label>
+              <span className="harmony-label">Filter</span>
+              <select value={filter} onChange={(event) => setFilter(event.target.value)} className="harmony-select">
+                <option value="all">Semua Status</option>
+                <option value="not_submitted">Belum Submit</option>
+                <option value="waiting_supervisor">Menunggu Atasan</option>
+                <option value="ready_hr">Ready for HR</option>
+                <option value="hr_reviewed">HR Reviewed</option>
+                <option value="finalized">Finalized</option>
+              </select>
+            </label>
+            <label>
+              <span className="harmony-label">Cari</span>
+              <div className="flex min-h-12 items-center gap-2 rounded-2xl border border-black/5 bg-[#f5f5f7] px-4">
                 <Search size={16} className="text-[#86868b]" />
-                <input
-                  value={search}
-                  onChange={(event) => setSearch(event.target.value)}
-                  placeholder="Cari karyawan / periode..."
-                  className="w-full bg-transparent text-sm outline-none"
-                />
+                <input value={search} onChange={(event) => setSearch(event.target.value)} className="w-full bg-transparent text-sm outline-none" placeholder="Nama, NIP, PIN, unit..." />
               </div>
-
-              <button
-                type="button"
-                onClick={() => fetchQueue(true)}
-                disabled={refreshing}
-                className="harmony-button-secondary disabled:opacity-50"
-              >
-                <RefreshCcw
-                  size={17}
-                  className={refreshing ? "animate-spin" : ""}
-                />
-                Refresh
-              </button>
-            </div>
+            </label>
+            <button type="button" onClick={fetchData} disabled={loading} className="harmony-button-secondary disabled:opacity-50">
+              {loading ? <Loader2 size={16} className="animate-spin" /> : <RefreshCcw size={16} />} Refresh
+            </button>
           </div>
 
-          <div className="p-4 sm:p-6">
-            {loading ? (
-              <div className="flex items-center gap-3 rounded-2xl bg-[#f5f5f7] p-5 text-sm text-[#6e6e73]">
-                <Loader2 size={18} className="animate-spin" />
-                Memuat queue HR Review...
-              </div>
-            ) : filteredRows.length === 0 ? (
-              <div className="rounded-[24px] border border-dashed border-black/10 bg-[#f5f5f7]/70 p-8 text-center">
-                <CheckCircle2 size={26} className="mx-auto text-green-600" />
-                <p className="mt-3 font-bold text-[#1d1d1f]">
-                  Tidak ada queue HR Review
-                </p>
-                <p className="mt-1 text-sm leading-6 text-[#6e6e73]">
-                  Periode akan muncul setelah employee submit dan atasan
-                  memberikan approval.
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {filteredRows.map(({ confirmation, employee }) => {
-                  const employeeId = confirmation.employee_id;
-                  const periodMonth = normalizePeriodMonth(
-                    confirmation.period_month,
-                  );
-                  const canOpen =
-                    Boolean(employeeId) && isValidPeriodMonth(periodMonth);
-
+          <div className="overflow-x-auto">
+            <table className="min-w-[1350px] w-full text-left text-xs">
+              <thead>
+                <tr className="border-b border-black/5 bg-[#f5f5f7] text-[#6e6e73]">
+                  <Th>Karyawan</Th>
+                  <Th>Proses</Th>
+                  <Th>Log</Th>
+                  <Th>Hadir Kantor</Th>
+                  <Th>Kerja Libur</Th>
+                  <Th>Keterangan Approved</Th>
+                  <Th>Incomplete</Th>
+                  <Th>Tanpa Data</Th>
+                  <Th>Konflik</Th>
+                  <Th>Aksi</Th>
+                </tr>
+              </thead>
+              <tbody>
+                {loading ? (
+                  <tr><td colSpan={10} className="p-8 text-center text-[#6e6e73]">Memuat queue...</td></tr>
+                ) : filteredRows.length === 0 ? (
+                  <tr><td colSpan={10} className="p-8 text-center text-[#6e6e73]">Tidak ada data sesuai filter.</td></tr>
+                ) : filteredRows.map((row) => {
+                  const approvedAbsence = row.summary.leave + row.summary.phlClaim + row.summary.sick + row.summary.permit + row.summary.officialTravel
                   return (
-                    <article
-                      key={confirmation.id}
-                      className="rounded-[24px] border border-black/5 bg-white p-5 shadow-sm"
-                    >
-                      <div className="grid gap-5 xl:grid-cols-[1fr_auto] xl:items-center">
-                        <div className="min-w-0">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <StatusBadge
-                              label={formatStatus(confirmation.supervisor_status)}
-                              tone="green"
-                            />
-                            <StatusBadge
-                              label={formatHRStatus(confirmation)}
-                              tone={confirmation.is_locked ? "red" : "blue"}
-                            />
-                            <span className="rounded-full bg-[#f5f5f7] px-3 py-1 text-xs font-bold text-[#6e6e73]">
-                              {periodMonth || "Periode tidak valid"}
-                            </span>
-                          </div>
-
-                          <div className="mt-4 flex items-start gap-3">
-                            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#e8f2ff] text-[#007aff]">
-                              <UserRound size={19} />
-                            </div>
-
-                            <div className="min-w-0">
-                              <h3 className="truncate font-bold text-[#1d1d1f]">
-                                {employee?.full_name ||
-                                  confirmation.full_name ||
-                                  "Karyawan"}
-                              </h3>
-                              <p className="mt-1 text-xs leading-5 text-[#6e6e73]">
-                                {employee?.employee_number ||
-                                  confirmation.employee_number ||
-                                  employee?.machine_pin ||
-                                  confirmation.machine_pin ||
-                                  "-"}{" "}
-                                ·{" "}
-                                {employee?.department ||
-                                  confirmation.department ||
-                                  "-"}{" "}
-                                · {employee?.position || confirmation.position || "-"}
-                              </p>
-                            </div>
-                          </div>
-
-                          <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                            <InfoBox
-                              label="Periode"
-                              value={`${formatDate(confirmation.period_start)} - ${formatDate(confirmation.period_end)}`}
-                            />
-                            <InfoBox
-                              label="Approval Atasan"
-                              value={formatDateTime(
-                                confirmation.supervisor_approved_at,
-                              )}
-                            />
-                            <InfoBox
-                              label="Atasan"
-                              value={confirmation.supervisor_name || "-"}
-                            />
-                            <InfoBox
-                              label="Proses HR"
-                              value={formatHRStatus(confirmation)}
-                            />
-                          </div>
-                        </div>
-
-                        <div className="xl:min-w-[180px]">
-                          {canOpen ? (
-                            <Link
-                              href={`/hr/attendance/approvals/${encodeURIComponent(
-                                employeeId,
-                              )}/${encodeURIComponent(periodMonth)}`}
-                              className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-2xl bg-[#1d1d1f] px-5 text-sm font-bold text-white transition hover:bg-black"
-                            >
-                              <UserCheck size={17} />
-                              Buka HR Review
-                            </Link>
-                          ) : (
-                            <button
-                              type="button"
-                              disabled
-                              className="inline-flex min-h-11 w-full cursor-not-allowed items-center justify-center gap-2 rounded-2xl bg-[#f5f5f7] px-5 text-sm font-bold text-[#86868b]"
-                            >
-                              <AlertTriangle size={17} />
-                              Route Tidak Valid
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    </article>
-                  );
+                    <tr key={row.employee.id} className="border-b border-black/5 hover:bg-[#f5f5f7]/60">
+                      <Td>
+                        <p className="font-bold text-[#1d1d1f]">{row.employee.full_name || '-'}</p>
+                        <p className="mt-1 text-[11px] text-[#86868b]">{row.employee.employee_number || '-'} · PIN {row.employee.machine_pin || '-'} · {row.employee.department || '-'}</p>
+                      </Td>
+                      <Td><ProcessBadge process={row.process} /></Td>
+                      <Num value={row.logs.length} />
+                      <Num value={row.summary.officePresent} tone="green" />
+                      <Num value={row.summary.offdayWork} tone="purple" />
+                      <Num value={approvedAbsence} tone="blue" />
+                      <Num value={row.summary.incomplete} tone="orange" />
+                      <Num value={row.summary.noRecord} tone="red" />
+                      <Num value={row.summary.conflict} tone={row.summary.conflict ? 'red' : 'neutral'} />
+                      <Td>
+                        {isUuid(row.employee.id) ? (
+                          <Link
+                            href={`/hr/attendance/approvals/${encodeURIComponent(row.employee.id)}/${encodeURIComponent(periodMonth)}`}
+                            className="inline-flex min-h-9 items-center gap-2 rounded-2xl border border-blue-200 bg-blue-50 px-3 font-bold text-blue-700 hover:bg-blue-100"
+                          >
+                            {row.process === 'ready_hr' ? <UserCheck size={14} /> : <Eye size={14} />}
+                            {row.process === 'ready_hr' ? 'HR Review' : 'Lihat Data'}
+                          </Link>
+                        ) : (
+                          <span className="text-red-600">ID bukan UUID valid</span>
+                        )}
+                      </Td>
+                    </tr>
+                  )
                 })}
-              </div>
-            )}
+              </tbody>
+            </table>
           </div>
+        </section>
+
+        <div className="rounded-2xl border border-blue-100 bg-blue-50 p-4 text-xs leading-6 text-blue-700">
+          <strong>Flow aman:</strong> karyawan yang belum submit tetap bisa dibuka untuk melihat fingerprint/raw data. Namun tombol <strong>Approve HR</strong> pada detail tetap terkunci sampai periodenya sudah <strong>Approved Atasan / Ready for HR</strong>.
         </div>
       </section>
     </>
-  );
+  )
 }
 
-function HeroMetric({
-  label,
-  value,
-}: {
-  label: string;
-  value: string;
-}) {
-  return (
-    <div className="rounded-2xl border border-white/10 bg-white/10 p-4 backdrop-blur-xl">
-      <p className="text-[10px] font-bold uppercase tracking-wide text-white/45">
-        {label}
-      </p>
-      <p className="mt-2 text-xl font-semibold text-white">{value}</p>
-    </div>
-  );
+function Metric({ label, value }: { label: string; value: number }) {
+  return <div className="harmony-card p-4"><p className="text-[10px] font-bold uppercase tracking-wide text-[#86868b]">{label}</p><p className="mt-2 text-2xl font-bold text-[#1d1d1f]">{value}</p></div>
 }
 
-function StatusBadge({
-  label,
-  tone,
-}: {
-  label: string;
-  tone: "green" | "blue" | "red";
-}) {
-  const className = {
-    green: "bg-green-50 text-green-700",
-    blue: "bg-blue-50 text-blue-700",
-    red: "bg-red-50 text-red-700",
-  }[tone];
-
-  return (
-    <span className={`inline-flex rounded-full px-3 py-1 text-xs font-bold ${className}`}>
-      {label}
-    </span>
-  );
+function ProcessBadge({ process }: { process: QueueRow['process'] }) {
+  const config = {
+    not_submitted: ['Belum Submit', 'bg-orange-50 text-orange-700'],
+    waiting_supervisor: ['Menunggu Atasan', 'bg-orange-50 text-orange-700'],
+    ready_hr: ['Ready for HR', 'bg-blue-50 text-blue-700'],
+    hr_reviewed: ['HR Reviewed', 'bg-green-50 text-green-700'],
+    finalized: ['Finalized', 'bg-slate-900 text-white'],
+  }[process]
+  return <span className={`inline-flex rounded-full px-3 py-1 font-bold ${config[1]}`}>{config[0]}</span>
 }
 
-function InfoBox({
-  label,
-  value,
-}: {
-  label: string;
-  value: string;
-}) {
-  return (
-    <div className="rounded-2xl bg-[#f5f5f7]/80 p-3">
-      <p className="text-[10px] font-bold uppercase tracking-wide text-[#86868b]">
-        {label}
-      </p>
-      <p className="mt-1 text-xs font-semibold text-[#1d1d1f]">{value}</p>
-    </div>
-  );
+function Th({ children }: { children: ReactNode }) { return <th className="px-4 py-3 font-bold">{children}</th> }
+function Td({ children }: { children: ReactNode }) { return <td className="px-4 py-4 align-top">{children}</td> }
+function Num({ value, tone = 'neutral' }: { value: number; tone?: 'neutral' | 'green' | 'blue' | 'purple' | 'orange' | 'red' }) {
+  const cls = {
+    neutral: 'bg-[#f5f5f7] text-[#6e6e73]',
+    green: 'bg-green-50 text-green-700',
+    blue: 'bg-blue-50 text-blue-700',
+    purple: 'bg-purple-50 text-purple-700',
+    orange: 'bg-orange-50 text-orange-700',
+    red: 'bg-red-50 text-red-700',
+  }[tone]
+  return <td className="px-4 py-4 align-top"><span className={`inline-flex min-w-8 justify-center rounded-xl px-2.5 py-1 font-bold ${cls}`}>{value}</span></td>
 }
 
-function normalize(value: unknown) {
-  return String(value || "")
-    .trim()
-    .toLowerCase();
-}
-
-function normalizePeriodMonth(value: string) {
-  const decoded = safeDecodeURIComponent(String(value || ""));
-  const match = decoded.match(/^(\d{4})-(\d{2})$/);
-
-  if (!match) return decoded;
-  return `${match[1]}-${match[2]}`;
-}
-
-function safeDecodeURIComponent(value: string) {
-  try {
-    return decodeURIComponent(value);
-  } catch {
-    return value;
-  }
-}
-
-function isValidPeriodMonth(value: string) {
-  return /^\d{4}-(0[1-9]|1[0-2])$/.test(value);
-}
-
-function formatStatus(value: string | null) {
-  const key = normalize(value);
-
-  if (key === "approved") return "Approved Atasan";
-  if (key === "pending") return "Menunggu Atasan";
-  if (key === "rejected") return "Ditolak Atasan";
-  return value || "-";
-}
-
-function formatHRStatus(confirmation: PeriodConfirmation) {
-  if (confirmation.is_locked) return "Locked";
-
-  const status = normalize(confirmation.hr_status);
-
-  if (status === "finalized") return "Finalized";
-  if (status === "ready_for_hr") {
-    return confirmation.hr_note ? "Sudah Direview HR" : "Ready for HR";
-  }
-
-  return confirmation.hr_status || "-";
-}
-
-function formatDate(value: string | null) {
-  if (!value) return "-";
-
-  const raw = value.slice(0, 10);
-  const date = new Date(`${raw}T00:00:00`);
-
-  if (Number.isNaN(date.getTime())) return value;
-
-  return date.toLocaleDateString("id-ID", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  });
-}
-
-function formatDateTime(value: string | null) {
-  if (!value) return "-";
-
-  const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) return value;
-
-  return date.toLocaleString("id-ID", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
+function normalize(value: unknown) { return String(value || '').trim().toLowerCase() }
