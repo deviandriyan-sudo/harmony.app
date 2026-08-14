@@ -1352,7 +1352,18 @@ export default function EmployeeAttendancePage() {
       return;
     }
 
-    // Tombol centang hanya checklist review employee. Saat Submit Periode ditekan,
+    // Checklist sekarang benar-benar menjadi gate verifikasi employee.
+    // Employee harus mencentang seluruh kalender periode sebelum submit/resubmit.
+    if (!allRowsSelected) {
+      const message =
+        `Verifikasi belum lengkap. Centang semua ${selectableRows.length} hari pada periode ini terlebih dahulu sebelum ${isSupervisorRejected ? "mengirim ulang" : "submit"} ke atasan.`;
+      setErrorMessage(message);
+      setSubmittingPeriod(false);
+      window.alert(message);
+      return;
+    }
+
+    // Tombol centang adalah checklist review employee. Saat Submit Periode ditekan,
     // SELURUH tanggal relevan dalam periode dikirim ke atasan agar tidak pernah
     // terjadi kasus hanya 1 tanggal yang terkirim tetapi header periode sudah submitted.
     const rowsToSubmit = calendarRows.filter((row) => {
@@ -1371,15 +1382,27 @@ export default function EmployeeAttendancePage() {
       return;
     }
 
+    // Pada resubmit setelah reject, data periode lama yang sudah pernah dikirim
+    // tidak boleh gagal hanya karena aturan validasi baru (mis. cuti approved lama
+    // tidak memiliki employee_daily_note atau proof di attendance_logs).
+    // Kita validasi kondisi aktualnya: jam lengkap / absence existing / data baru.
     const validationErrors = rowsToSubmit
-      .map((row) => validateRowBeforeSubmit(row))
+      .map((row) =>
+        isSupervisorRejected
+          ? validateRowBeforeResubmit(row)
+          : validateRowBeforeSubmit(row),
+      )
       .filter(Boolean);
 
     if (validationErrors.length > 0) {
-      setErrorMessage(
-        `Submit seluruh periode belum dapat dilakukan. Lengkapi data berikut terlebih dahulu: ${validationErrors.join(" ")}`,
-      );
+      const message =
+        `Submit seluruh periode belum dapat dilakukan. Masih ada data yang harus dilengkapi: ${validationErrors.join(" ")}`;
+      setErrorMessage(message);
       setSubmittingPeriod(false);
+      window.alert(message);
+      if (typeof window !== "undefined") {
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      }
       return;
     }
 
@@ -1777,6 +1800,65 @@ export default function EmployeeAttendancePage() {
     }
 
     return Array.from(recipients);
+  }
+
+  function validateRowBeforeResubmit(row: CalendarDayRow) {
+    const draft = getDraft(row);
+    const meta = getDailyTypeMeta(draft.daily_type);
+    const label = formatDisplayDate(row.date);
+
+    // Hari libur/weekend kosong tidak perlu dibuat sebagai log attendance.
+    if (isOffDayWithoutAttendance(row, draft)) {
+      return "";
+    }
+
+    const effectiveIn = getEffectiveCheckIn(row, draft);
+    const effectiveOut = getEffectiveCheckOut(row, draft);
+    const hasExistingAbsence = Boolean(
+      row.log?.absence_request_type ||
+        row.log?.absence_request_label ||
+        row.log?.absence_request_status,
+    );
+
+    // Cuti/izin/sakit/tugas luar/PHL yang SUDAH tersimpan dari submit sebelumnya
+    // tidak diwajibkan mengulang note/proof hanya untuk resubmit periode.
+    if (meta.isAbsenceLike && hasExistingAbsence) {
+      return "";
+    }
+
+    // Kehadiran fingerprint/manual dengan pasangan jam lengkap aman untuk resubmit.
+    if (effectiveIn && effectiveOut) {
+      return "";
+    }
+
+    // Jika salah satu jam masih kosong, employee memang harus melengkapinya.
+    if (effectiveIn || effectiveOut) {
+      if (!effectiveIn) {
+        return `${label}: check in masih kosong. Klik Lengkapi lalu isi jam masuk.`;
+      }
+
+      if (!effectiveOut) {
+        return `${label}: check out masih kosong. Klik Lengkapi lalu isi jam pulang.`;
+      }
+    }
+
+    // Data absence BARU yang dibuat saat revisi tetap memakai validasi normal.
+    if (meta.isAbsenceLike) {
+      return validateRowBeforeSubmit(row);
+    }
+
+    // Weekday yang benar-benar tidak punya data tetap harus dijelaskan.
+    if (!row.log?.id && !row.is_weekend && !row.holiday_name) {
+      return `${label}: belum ada data kehadiran/keterangan. Klik Lengkapi.`;
+    }
+
+    // Log existing yang pernah disubmit tetapi tidak memiliki jam/absence dapat
+    // berasal dari data lama. Jangan diam-diam dianggap valid jika memang kosong.
+    if (row.log?.id && !effectiveIn && !effectiveOut && !hasExistingAbsence) {
+      return `${label}: data masih kosong. Klik Lengkapi sebelum kirim ulang.`;
+    }
+
+    return "";
   }
 
   function validateRowBeforeSubmit(row: CalendarDayRow) {
@@ -2303,9 +2385,9 @@ export default function EmployeeAttendancePage() {
                   </h3>
 
                   <p className="mt-1 text-sm leading-6 text-[#6e6e73]">
-                    Centang harian hanya sebagai checklist pengecekan. Tombol
-                    Submit Periode selalu mengirim seluruh data relevan dari
-                    tanggal 11 sampai 10, bukan hanya tanggal yang dicentang.
+                    Centang seluruh hari sebagai tanda verifikasi employee. Setelah
+                    checklist 100%, tombol Submit/Kirim Ulang akan mengirim seluruh
+                    data relevan periode tanggal 11 sampai 10 ke atasan.
                   </p>
 
                   <p className="mt-1 text-xs font-semibold text-[#007aff]">
@@ -2353,6 +2435,7 @@ export default function EmployeeAttendancePage() {
                     onClick={handleSubmitPeriod}
                     disabled={
                       !isPeriodComplete ||
+                      !allRowsSelected ||
                       isReadOnlyPeriod ||
                       submittingPeriod
                     }
