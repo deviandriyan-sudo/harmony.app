@@ -1,6 +1,12 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import {
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from 'react'
+
 import {
   AlertTriangle,
   CheckCircle2,
@@ -13,47 +19,156 @@ import {
   XCircle,
 } from 'lucide-react'
 
-import { supabase } from '@/lib/supabase'
-import { Topbar } from '@/components/layout/Topbar'
-import { sendHarmonyEmail } from '@/lib/notifications'
+import {
+  supabase,
+} from '@/lib/supabase'
+
+import {
+  Topbar,
+} from '@/components/layout/Topbar'
+
+import {
+  sendHarmonyEmail,
+} from '@/lib/notifications'
 
 type LeavePostponeRequest = {
   id: string
-  employee_id?: string | null
-  employee_number?: string | null
-  full_name?: string | null
-  department?: string | null
-  source_cycle_id?: string | null
-  remaining_days?: number | null
-  requested_days?: number | null
-  request_date?: string | null
-  old_cycle_end?: string | null
-  next_matured_at?: string | null
-  postpone_deadline?: string | null
-  new_expired_at?: string | null
-  reason?: string | null
-  approval_status?: string | null
-  supervisor_1?: string | null
-  supervisor_1_status?: string | null
-  supervisor_1_notes?: string | null
-  supervisor_2?: string | null
-  supervisor_2_status?: string | null
-  supervisor_2_notes?: string | null
-  hr_status?: string | null
-  hr_notes?: string | null
-  is_active?: boolean | null
-  created_at?: string | null
-}
 
+  employee_id?:
+    | string
+    | null
+
+  employee_number?:
+    | string
+    | null
+
+  full_name?:
+    | string
+    | null
+
+  department?:
+    | string
+    | null
+
+  source_cycle_id?:
+    | string
+    | null
+
+  remaining_days?:
+    | number
+    | null
+
+  requested_days?:
+    | number
+    | null
+
+  request_date?:
+    | string
+    | null
+
+  old_cycle_end?:
+    | string
+    | null
+
+  next_matured_at?:
+    | string
+    | null
+
+  postpone_deadline?:
+    | string
+    | null
+
+  new_expired_at?:
+    | string
+    | null
+
+  reason?:
+    | string
+    | null
+
+  approval_status?:
+    | string
+    | null
+
+  supervisor_1?:
+    | string
+    | null
+
+  supervisor_1_status?:
+    | string
+    | null
+
+  supervisor_1_notes?:
+    | string
+    | null
+
+  supervisor_2?:
+    | string
+    | null
+
+  supervisor_2_status?:
+    | string
+    | null
+
+  supervisor_2_notes?:
+    | string
+    | null
+
+  hr_status?:
+    | string
+    | null
+
+  hr_notes?:
+    | string
+    | null
+
+  lifecycle_status?:
+    | string
+    | null
+
+  auto_expired_at?:
+    | string
+    | null
+
+  lifecycle_last_reconciled_at?:
+    | string
+    | null
+
+  is_active?:
+    | boolean
+    | null
+
+  created_at?:
+    | string
+    | null
+}
 
 type EmployeeEmailTarget = {
   id: string
-  full_name?: string | null
-  employee_number?: string | null
-  machine_pin?: string | null
-  email?: string | null
-  department?: string | null
-  position?: string | null
+
+  full_name?:
+    | string
+    | null
+
+  employee_number?:
+    | string
+    | null
+
+  machine_pin?:
+    | string
+    | null
+
+  email?:
+    | string
+    | null
+
+  department?:
+    | string
+    | null
+
+  position?:
+    | string
+    | null
 }
 
 type FilterStatus =
@@ -62,143 +177,374 @@ type FilterStatus =
   | 'approved'
   | 'rejected'
   | 'cancelled'
+  | 'expired'
   | 'all'
 
-function normalize(value?: string | null) {
-  return String(value || '').trim().toLowerCase()
+function normalize(
+  value?:
+    | string
+    | null,
+) {
+  return String(
+    value || '',
+  )
+    .trim()
+    .toLowerCase()
 }
 
-function parseDate(value?: string | null) {
-  if (!value) return null
+function parseDate(
+  value?:
+    | string
+    | null,
+) {
+  if (!value) {
+    return null
+  }
 
-  const date = new Date(`${value}T00:00:00`)
+  const date =
+    new Date(
+      `${value.slice(
+        0,
+        10,
+      )}T00:00:00`,
+    )
 
-  if (Number.isNaN(date.getTime())) return null
+  if (
+    Number.isNaN(
+      date.getTime(),
+    )
+  ) {
+    return null
+  }
 
   return date
 }
 
-function formatDate(value?: string | null) {
-  if (!value) return '-'
-
-  const date = parseDate(value)
-
-  if (!date) return value
-
-  return new Intl.DateTimeFormat('id-ID', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  }).format(date)
-}
-
-function formatDateTime(value?: string | null) {
-  if (!value) return '-'
-
-  const date = new Date(value)
-
-  if (Number.isNaN(date.getTime())) return value
-
-  return new Intl.DateTimeFormat('id-ID', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(date)
-}
-
-function getStatusLabel(status?: string | null) {
-  const value = normalize(status)
-
-  const map: Record<string, string> = {
-    pending_supervisor: 'Menunggu Atasan',
-    pending_supervisor_2: 'Menunggu Atasan 2',
-    pending_hr: 'Menunggu HR',
-    approved: 'Disetujui',
-    rejected: 'Ditolak',
-    cancelled: 'Dibatalkan',
-    waiting_supervisor: 'Menunggu Atasan',
-    pending: 'Pending',
-    skipped: 'Dilewati',
+function formatDate(
+  value?:
+    | string
+    | null,
+) {
+  if (!value) {
+    return '-'
   }
 
-  return map[value] || status || '-'
+  const date =
+    parseDate(value)
+
+  if (!date) {
+    return value
+  }
+
+  return new Intl.DateTimeFormat(
+    'id-ID',
+    {
+      day:
+        '2-digit',
+
+      month:
+        'short',
+
+      year:
+        'numeric',
+    },
+  ).format(date)
 }
 
-function statusClass(status?: string | null) {
-  const value = normalize(status)
+function formatDateTime(
+  value?:
+    | string
+    | null,
+) {
+  if (!value) {
+    return '-'
+  }
 
-  if (value === 'approved') return 'border-emerald-200 bg-emerald-50 text-emerald-700'
-  if (value === 'rejected' || value === 'cancelled') return 'border-red-200 bg-red-50 text-red-700'
-  if (value === 'pending_hr') return 'border-blue-200 bg-blue-50 text-blue-700'
-  if (value === 'skipped') return 'border-slate-200 bg-slate-50 text-slate-500'
+  const date =
+    new Date(value)
+
+  if (
+    Number.isNaN(
+      date.getTime(),
+    )
+  ) {
+    return value
+  }
+
+  return new Intl.DateTimeFormat(
+    'id-ID',
+    {
+      day:
+        '2-digit',
+
+      month:
+        'short',
+
+      year:
+        'numeric',
+
+      hour:
+        '2-digit',
+
+      minute:
+        '2-digit',
+    },
+  ).format(date)
+}
+
+function getStatusLabel(
+  status?:
+    | string
+    | null,
+) {
+  const value =
+    normalize(status)
+
+  const map:
+    Record<
+      string,
+      string
+    > = {
+    pending_supervisor:
+      'Menunggu Atasan',
+
+    pending_supervisor_2:
+      'Menunggu Atasan 2',
+
+    pending_hr:
+      'Menunggu HR',
+
+    approved:
+      'Disetujui',
+
+    rejected:
+      'Ditolak',
+
+    cancelled:
+      'Dibatalkan',
+
+    expired:
+      'Expired',
+
+    active:
+      'Aktif',
+
+    waiting_supervisor:
+      'Menunggu Atasan',
+
+    pending:
+      'Pending',
+
+    skipped:
+      'Dilewati',
+  }
+
+  return (
+    map[value] ||
+    status ||
+    '-'
+  )
+}
+
+function statusClass(
+  status?:
+    | string
+    | null,
+) {
+  const value =
+    normalize(status)
+
+  if (
+    value ===
+    'approved'
+  ) {
+    return 'border-emerald-200 bg-emerald-50 text-emerald-700'
+  }
+
+  if (
+    value ===
+      'rejected' ||
+    value ===
+      'cancelled' ||
+    value ===
+      'expired'
+  ) {
+    return 'border-red-200 bg-red-50 text-red-700'
+  }
+
+  if (
+    value ===
+    'pending_hr'
+  ) {
+    return 'border-blue-200 bg-blue-50 text-blue-700'
+  }
+
+  if (
+    value ===
+    'skipped'
+  ) {
+    return 'border-slate-200 bg-slate-50 text-slate-500'
+  }
 
   return 'border-amber-200 bg-amber-50 text-amber-700'
 }
 
-function isSupervisorApproved(item: LeavePostponeRequest) {
+function isSupervisorApproved(
+  item:
+    LeavePostponeRequest,
+) {
   const supervisor1Ok =
     !item.supervisor_1 ||
-    normalize(item.supervisor_1_status) === 'approved' ||
-    normalize(item.supervisor_1_status) === 'skipped'
+    normalize(
+      item.supervisor_1_status,
+    ) === 'approved' ||
+    normalize(
+      item.supervisor_1_status,
+    ) === 'skipped'
 
   const supervisor2Ok =
     !item.supervisor_2 ||
-    normalize(item.supervisor_2_status) === 'approved' ||
-    normalize(item.supervisor_2_status) === 'skipped'
+    normalize(
+      item.supervisor_2_status,
+    ) === 'approved' ||
+    normalize(
+      item.supervisor_2_status,
+    ) === 'skipped'
 
-  return supervisor1Ok && supervisor2Ok
-}
-
-function isReadyForHR(item: LeavePostponeRequest) {
   return (
-    isSupervisorApproved(item) &&
-    normalize(item.approval_status) === 'pending_hr' &&
-    normalize(item.hr_status) === 'pending'
+    supervisor1Ok &&
+    supervisor2Ok
   )
 }
 
-
-function getPostponeEmployeeName(postpone: LeavePostponeRequest, employee?: EmployeeEmailTarget | null) {
-  return employee?.full_name || postpone.full_name || 'Employee'
+function isReadyForHR(
+  item:
+    LeavePostponeRequest,
+) {
+  return (
+    isSupervisorApproved(
+      item,
+    ) &&
+    normalize(
+      item.approval_status,
+    ) === 'pending_hr' &&
+    normalize(
+      item.hr_status,
+    ) === 'pending'
+  )
 }
 
-function getPostponeEmployeeNumber(postpone: LeavePostponeRequest, employee?: EmployeeEmailTarget | null) {
-  return employee?.employee_number || employee?.machine_pin || postpone.employee_number || '-'
+function getPostponeEmployeeName(
+  postpone:
+    LeavePostponeRequest,
+
+  employee?:
+    | EmployeeEmailTarget
+    | null,
+) {
+  return (
+    employee?.full_name ||
+    postpone.full_name ||
+    'Employee'
+  )
 }
 
-async function findPostponeEmployee(postpone: LeavePostponeRequest) {
-  const columns = 'id, full_name, employee_number, machine_pin, email, department, position'
+function getPostponeEmployeeNumber(
+  postpone:
+    LeavePostponeRequest,
 
-  if (postpone.employee_id) {
-    const { data } = await supabase
-      .from('employees')
-      .select(columns)
-      .eq('id', postpone.employee_id)
-      .maybeSingle<EmployeeEmailTarget>()
+  employee?:
+    | EmployeeEmailTarget
+    | null,
+) {
+  return (
+    employee?.employee_number ||
+    employee?.machine_pin ||
+    postpone.employee_number ||
+    '-'
+  )
+}
 
-    if (data) return data
+async function findPostponeEmployee(
+  postpone:
+    LeavePostponeRequest,
+) {
+  const columns =
+    'id, full_name, employee_number, machine_pin, email, department, position'
+
+  if (
+    postpone.employee_id
+  ) {
+    const {
+      data,
+    } =
+      await supabase
+        .from(
+          'employees',
+        )
+        .select(
+          columns,
+        )
+        .eq(
+          'id',
+          postpone.employee_id,
+        )
+        .maybeSingle<EmployeeEmailTarget>()
+
+    if (data) {
+      return data
+    }
   }
 
-  if (postpone.employee_number) {
-    const { data } = await supabase
-      .from('employees')
-      .select(columns)
-      .eq('employee_number', postpone.employee_number)
-      .maybeSingle<EmployeeEmailTarget>()
+  if (
+    postpone.employee_number
+  ) {
+    const {
+      data,
+    } =
+      await supabase
+        .from(
+          'employees',
+        )
+        .select(
+          columns,
+        )
+        .eq(
+          'employee_number',
+          postpone.employee_number,
+        )
+        .maybeSingle<EmployeeEmailTarget>()
 
-    if (data) return data
+    if (data) {
+      return data
+    }
   }
 
-  if (postpone.full_name) {
-    const { data } = await supabase
-      .from('employees')
-      .select(columns)
-      .ilike('full_name', postpone.full_name)
-      .limit(1)
+  if (
+    postpone.full_name
+  ) {
+    const {
+      data,
+    } =
+      await supabase
+        .from(
+          'employees',
+        )
+        .select(
+          columns,
+        )
+        .ilike(
+          'full_name',
+          postpone.full_name,
+        )
+        .limit(1)
 
-    if (data?.[0]) return data[0] as EmployeeEmailTarget
+    if (
+      data?.[0]
+    ) {
+      return data[0] as
+        EmployeeEmailTarget
+    }
   }
 
   return null
@@ -210,24 +556,65 @@ function buildPostponeEmailMessage({
   decisionLabel,
   note,
 }: {
-  postpone: LeavePostponeRequest
-  employee: EmployeeEmailTarget | null
+  postpone:
+    LeavePostponeRequest
+
+  employee:
+    | EmployeeEmailTarget
+    | null
+
   decisionLabel: string
   note: string
 }) {
   return [
-    `Pengajuan postpone cuti atas nama ${getPostponeEmployeeName(postpone, employee)} telah ${decisionLabel} oleh HR.`,
+    `Pengajuan postpone cuti atas nama ${getPostponeEmployeeName(
+      postpone,
+      employee,
+    )} telah ${decisionLabel} oleh HR.`,
+
     '',
-    `NIP/ID: ${getPostponeEmployeeNumber(postpone, employee)}`,
-    `Departemen: ${employee?.department || postpone.department || '-'}`,
-    `Sisa cuti awal: ${postpone.remaining_days || 0} hari`,
-    `Jumlah postpone: ${postpone.requested_days || 0} hari`,
-    `Akhir cycle lama: ${formatDate(postpone.old_cycle_end)}`,
-    `Batas pengajuan: ${formatDate(postpone.postpone_deadline)}`,
-    `Berlaku sampai: ${formatDate(postpone.new_expired_at)}`,
+
+    `NIP/ID: ${getPostponeEmployeeNumber(
+      postpone,
+      employee,
+    )}`,
+
+    `Departemen: ${
+      employee?.department ||
+      postpone.department ||
+      '-'
+    }`,
+
+    `Sisa cuti awal: ${
+      postpone.remaining_days ||
+      0
+    } hari`,
+
+    `Jumlah postpone: ${
+      postpone.requested_days ||
+      0
+    } hari`,
+
+    `Akhir cycle lama: ${formatDate(
+      postpone.old_cycle_end,
+    )}`,
+
+    `Batas pengajuan: ${formatDate(
+      postpone.postpone_deadline,
+    )}`,
+
+    `Berlaku sampai (anniversary + 6 bulan): ${formatDate(
+      postpone.new_expired_at,
+    )}`,
+
     '',
-    `Catatan HR: ${note || '-'}`,
+
+    `Catatan HR: ${
+      note || '-'
+    }`,
+
     '',
+
     'Silakan cek kembali status pengajuan melalui menu Cuti & Izin di HARMONY.',
   ].join('\n')
 }
@@ -237,133 +624,340 @@ async function notifyPostponeDecisionByEmail({
   decision,
   note,
 }: {
-  postpone: LeavePostponeRequest
-  decision: 'approved' | 'rejected' | 'cancelled'
+  postpone:
+    LeavePostponeRequest
+
+  decision:
+    | 'approved'
+    | 'rejected'
+    | 'cancelled'
+
   note: string
 }) {
   try {
-    const employee = await findPostponeEmployee(postpone)
-    const recipientEmail = employee?.email || ''
+    const employee =
+      await findPostponeEmployee(
+        postpone,
+      )
 
-    if (!recipientEmail) {
+    const recipientEmail =
+      employee?.email ||
+      ''
+
+    if (
+      !recipientEmail
+    ) {
       return {
-        success: false,
-        message: 'Email karyawan tidak ditemukan pada tabel employees.',
+        success:
+          false,
+
+        message:
+          'Email karyawan tidak ditemukan pada tabel employees.',
       }
     }
 
     const decisionLabelMap = {
-      approved: 'disetujui',
-      rejected: 'ditolak',
-      cancelled: 'dibatalkan',
+      approved:
+        'disetujui',
+
+      rejected:
+        'ditolak',
+
+      cancelled:
+        'dibatalkan',
     }
 
     const titleMap = {
-      approved: 'Postpone Cuti Disetujui HR',
-      rejected: 'Postpone Cuti Ditolak HR',
-      cancelled: 'Postpone Cuti Dibatalkan HR',
+      approved:
+        'Postpone Cuti Disetujui HR',
+
+      rejected:
+        'Postpone Cuti Ditolak HR',
+
+      cancelled:
+        'Postpone Cuti Dibatalkan HR',
     }
 
     const subjectMap = {
-      approved: '[HARMONY] Postpone Cuti Disetujui HR',
-      rejected: '[HARMONY] Postpone Cuti Ditolak HR',
-      cancelled: '[HARMONY] Postpone Cuti Dibatalkan HR',
+      approved:
+        '[HARMONY] Postpone Cuti Disetujui HR',
+
+      rejected:
+        '[HARMONY] Postpone Cuti Ditolak HR',
+
+      cancelled:
+        '[HARMONY] Postpone Cuti Dibatalkan HR',
     }
 
     await sendHarmonyEmail({
-      to: recipientEmail,
-      subject: subjectMap[decision],
-      title: titleMap[decision],
-      message: buildPostponeEmailMessage({
-        postpone,
-        employee,
-        decisionLabel: decisionLabelMap[decision],
-        note,
-      }),
-      actionLabel: 'Lihat Pengajuan Postpone',
-      actionUrl: `${window.location.origin}/employee/leave/postpone`,
+      to:
+        recipientEmail,
+
+      subject:
+        subjectMap[
+          decision
+        ],
+
+      title:
+        titleMap[
+          decision
+        ],
+
+      message:
+        buildPostponeEmailMessage({
+          postpone,
+          employee,
+
+          decisionLabel:
+            decisionLabelMap[
+              decision
+            ],
+
+          note,
+        }),
+
+      actionLabel:
+        'Lihat Pengajuan Postpone',
+
+      actionUrl:
+        `${window.location.origin}/employee/leave/postpone`,
     })
 
     return {
       success: true,
-      message: `Email notifikasi terkirim ke ${recipientEmail}.`,
+
+      message:
+        `Email notifikasi terkirim ke ${recipientEmail}.`,
     }
   } catch (error: any) {
     return {
-      success: false,
-      message: error?.message || 'Email notifikasi gagal dikirim.',
+      success:
+        false,
+
+      message:
+        error?.message ||
+        'Email notifikasi gagal dikirim.',
     }
   }
 }
 
 export default function HRLeavePostponePage() {
-  const [postpones, setPostpones] = useState<LeavePostponeRequest[]>([])
-  const [search, setSearch] = useState('')
-  const [filterStatus, setFilterStatus] = useState<FilterStatus>('pending_hr')
-  const [loading, setLoading] = useState(true)
-  const [savingId, setSavingId] = useState<string | null>(null)
+  const [
+    postpones,
+    setPostpones,
+  ] =
+    useState<
+      LeavePostponeRequest[]
+    >([])
 
-  const [message, setMessage] = useState<{
-    type: 'success' | 'error' | 'info'
-    text: string
+  const [
+    search,
+    setSearch,
+  ] = useState('')
+
+  const [
+    filterStatus,
+    setFilterStatus,
+  ] =
+    useState<FilterStatus>(
+      'pending_hr',
+    )
+
+  const [
+    loading,
+    setLoading,
+  ] = useState(true)
+
+  const [
+    savingId,
+    setSavingId,
+  ] =
+    useState<
+      string | null
+    >(null)
+
+  const [
+    message,
+    setMessage,
+  ] = useState<{
+    type:
+      | 'success'
+      | 'error'
+      | 'info'
+
+    text:
+      string
   } | null>(null)
 
-  const filteredPostpones = useMemo(() => {
-    const keyword = normalize(search)
+  const filteredPostpones =
+    useMemo(() => {
+      const keyword =
+        normalize(search)
 
-    return postpones
-      .filter((item) => {
-        if (filterStatus === 'all') return true
+      return postpones
+        .filter(
+          (item) => {
+            if (
+              filterStatus ===
+              'all'
+            ) {
+              return true
+            }
 
-        if (filterStatus === 'pending_hr') {
-          return isReadyForHR(item)
-        }
+            if (
+              filterStatus ===
+              'pending_hr'
+            ) {
+              return isReadyForHR(
+                item,
+              )
+            }
 
-        if (filterStatus === 'waiting_supervisor') {
-          return (
-            normalize(item.approval_status) === 'pending_supervisor' ||
-            normalize(item.approval_status) === 'pending_supervisor_2' ||
-            normalize(item.hr_status) === 'waiting_supervisor'
-          )
-        }
+            if (
+              filterStatus ===
+              'waiting_supervisor'
+            ) {
+              return (
+                normalize(
+                  item.approval_status,
+                ) ===
+                  'pending_supervisor' ||
+                normalize(
+                  item.approval_status,
+                ) ===
+                  'pending_supervisor_2' ||
+                normalize(
+                  item.hr_status,
+                ) ===
+                  'waiting_supervisor'
+              )
+            }
 
-        return normalize(item.approval_status) === filterStatus
-      })
-      .filter((item) => {
-        if (!keyword) return true
+            if (
+              filterStatus ===
+              'expired'
+            ) {
+              return (
+                normalize(
+                  item.lifecycle_status,
+                ) ===
+                'expired'
+              )
+            }
 
-        const haystack = [
-          item.full_name,
-          item.employee_number,
-          item.department,
-          item.approval_status,
-          item.hr_status,
-          item.reason,
-          item.supervisor_1,
-          item.supervisor_2,
-        ]
-          .join(' ')
-          .toLowerCase()
+            return (
+              normalize(
+                item.approval_status,
+              ) ===
+              filterStatus
+            )
+          },
+        )
+        .filter(
+          (item) => {
+            if (!keyword) {
+              return true
+            }
 
-        return haystack.includes(keyword)
-      })
-      .sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')))
-  }, [postpones, search, filterStatus])
+            const haystack =
+              [
+                item.full_name,
+                item.employee_number,
+                item.department,
+                item.approval_status,
+                item.hr_status,
+                item.reason,
+                item.supervisor_1,
+                item.supervisor_2,
+              ]
+                .join(' ')
+                .toLowerCase()
 
-  const stats = useMemo(() => {
-    return {
-      total: postpones.length,
-      waitingSupervisor: postpones.filter(
-        (item) =>
-          normalize(item.approval_status) === 'pending_supervisor' ||
-          normalize(item.approval_status) === 'pending_supervisor_2' ||
-          normalize(item.hr_status) === 'waiting_supervisor'
-      ).length,
-      pendingHR: postpones.filter((item) => isReadyForHR(item)).length,
-      approved: postpones.filter((item) => normalize(item.approval_status) === 'approved').length,
-      rejected: postpones.filter((item) => normalize(item.approval_status) === 'rejected').length,
-    }
-  }, [postpones])
+            return haystack.includes(
+              keyword,
+            )
+          },
+        )
+        .sort(
+          (
+            a,
+            b,
+          ) =>
+            String(
+              b.created_at ||
+                '',
+            ).localeCompare(
+              String(
+                a.created_at ||
+                  '',
+              ),
+            ),
+        )
+    }, [
+      postpones,
+      search,
+      filterStatus,
+    ])
+
+  const stats =
+    useMemo(() => {
+      return {
+        total:
+          postpones.length,
+
+        waitingSupervisor:
+          postpones.filter(
+            (item) =>
+              normalize(
+                item.approval_status,
+              ) ===
+                'pending_supervisor' ||
+              normalize(
+                item.approval_status,
+              ) ===
+                'pending_supervisor_2' ||
+              normalize(
+                item.hr_status,
+              ) ===
+                'waiting_supervisor',
+          ).length,
+
+        pendingHR:
+          postpones.filter(
+            (item) =>
+              isReadyForHR(
+                item,
+              ),
+          ).length,
+
+        approved:
+          postpones.filter(
+            (item) =>
+              normalize(
+                item.approval_status,
+              ) ===
+              'approved',
+          ).length,
+
+        expired:
+          postpones.filter(
+            (item) =>
+              normalize(
+                item.lifecycle_status,
+              ) ===
+              'expired',
+          ).length,
+
+        rejected:
+          postpones.filter(
+            (item) =>
+              normalize(
+                item.approval_status,
+              ) ===
+              'rejected',
+          ).length,
+      }
+    }, [postpones])
 
   useEffect(() => {
     fetchData()
@@ -374,245 +968,456 @@ export default function HRLeavePostponePage() {
     setMessage(null)
 
     try {
-      const { data, error } = await supabase
-        .from('leave_postpone_requests')
-        .select('*')
-        .order('created_at', { ascending: false })
+      const {
+        error:
+          lifecycleError,
+      } =
+        await supabase.rpc(
+          'harmony_reconcile_leave_lifecycle',
+          {
+            p_employee_id:
+              null,
+          },
+        )
 
-      if (error) throw error
+      if (
+        lifecycleError
+      ) {
+        console.warn(
+          'Postpone lifecycle reconcile warning:',
+          lifecycleError.message,
+        )
+      }
 
-      setPostpones((data || []) as LeavePostponeRequest[])
+      const {
+        data,
+        error,
+      } =
+        await supabase
+          .from(
+            'leave_postpone_requests',
+          )
+          .select('*')
+          .order(
+            'created_at',
+            {
+              ascending:
+                false,
+            },
+          )
+
+      if (error) {
+        throw error
+      }
+
+      setPostpones(
+        (
+          data ||
+          []
+        ) as LeavePostponeRequest[],
+      )
     } catch (error: any) {
       setMessage({
-        type: 'error',
-        text: error?.message || 'Gagal mengambil data postpone cuti.',
+        type:
+          'error',
+
+        text:
+          error?.message ||
+          'Gagal mengambil data postpone cuti.',
       })
     } finally {
       setLoading(false)
     }
   }
 
-  async function applyCarryForwardToCycle(postpone: LeavePostponeRequest) {
-    if (!postpone.source_cycle_id) {
-      return {
-        error: 'Source cycle tidak ditemukan.',
-      }
-    }
-
-    const requestedDays = Number(postpone.requested_days || 0)
-
-    const { error } = await supabase
-      .from('annual_leave_cycles')
-      .update({
-        carry_forward_days: requestedDays,
-        carry_forward_used_days: 0,
-        carry_forward_remaining_days: requestedDays,
-        carry_forward_expired_at: postpone.new_expired_at,
-        status: 'carried_forward',
-        notes: 'Carry forward approved melalui pengajuan postpone.',
-        edited_by: 'HR',
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', postpone.source_cycle_id)
-
-    if (error) {
-      return {
-        error: error.message,
-      }
-    }
-
-    return {
-      error: null,
-    }
-  }
-
-  async function handleApproveHR(postpone: LeavePostponeRequest) {
-    if (!isReadyForHR(postpone)) {
+  async function handleApproveHR(
+    postpone:
+      LeavePostponeRequest,
+  ) {
+    if (
+      !isReadyForHR(
+        postpone,
+      )
+    ) {
       setMessage({
-        type: 'error',
-        text: 'Pengajuan belum bisa di-approve HR karena approval atasan belum selesai.',
+        type:
+          'error',
+
+        text:
+          'Pengajuan belum bisa di-approve HR karena approval atasan belum selesai.',
       })
+
       return
     }
 
-    const note = window.prompt(
-      'Catatan final approval HR:',
-      'Disetujui HR. Sisa cuti dibawa sebagai saldo postpone/carry forward.'
+    const note =
+      window.prompt(
+        'Catatan final approval HR:',
+
+        'Disetujui HR. Saldo postpone dipisahkan dari cuti tahunan matang dan akan expired otomatis.',
+      )
+
+    if (
+      note ===
+      null
+    ) {
+      return
+    }
+
+    setSavingId(
+      postpone.id,
     )
 
-    if (note === null) return
-
-    setSavingId(postpone.id)
     setMessage(null)
 
     try {
-      const applyResult = await applyCarryForwardToCycle(postpone)
+      const {
+        data,
+        error,
+      } =
+        await supabase.rpc(
+          'hr_approve_leave_postpone_atomic',
+          {
+            p_request_id:
+              postpone.id,
 
-      if (applyResult.error) {
-        throw new Error(applyResult.error)
+            p_approved_by:
+              'HR Administrator',
+
+            p_note:
+              note ||
+              'Disetujui HR.',
+          },
+        )
+
+      if (error) {
+        throw error
       }
 
-      const { error } = await supabase
-        .from('leave_postpone_requests')
-        .update({
-          approval_status: 'approved',
-          hr_status: 'approved',
-          hr_notes: note || 'Disetujui HR.',
-          hr_approved_at: new Date().toISOString(),
-          edited_by: 'HR',
-          updated_at: new Date().toISOString(),
+      const result =
+        (
+          data ||
+          {}
+        ) as {
+          success?:
+            boolean
+
+          already_approved?:
+            boolean
+
+          lifecycle_status?:
+            string
+
+          message?:
+            string
+        }
+
+      if (
+        !result.success
+      ) {
+        throw new Error(
+          result.message ||
+            'Approval postpone gagal.',
+        )
+      }
+
+      const notification =
+        await notifyPostponeDecisionByEmail({
+          postpone,
+
+          decision:
+            'approved',
+
+          note:
+            note ||
+            'Disetujui HR. Saldo postpone dipisahkan dari cuti tahunan matang.',
         })
-        .eq('id', postpone.id)
-
-      if (error) throw error
-
-      const notification = await notifyPostponeDecisionByEmail({
-        postpone,
-        decision: 'approved',
-        note: note || 'Disetujui HR. Sisa cuti dibawa sebagai saldo postpone/carry forward.',
-      })
 
       setMessage({
-        type: 'success',
-        text: notification.success
-          ? `Postpone berhasil disetujui HR. Saldo carry forward sudah diterapkan. ${notification.message}`
-          : `Postpone berhasil disetujui HR dan saldo carry forward sudah diterapkan, tetapi email belum terkirim: ${notification.message}`,
+        type:
+          'success',
+
+        text:
+          notification.success
+            ? `${result.message || 'Postpone berhasil disetujui HR.'} ${notification.message}`
+            : `${result.message || 'Postpone berhasil disetujui HR.'} Namun email belum terkirim: ${notification.message}`,
       })
 
       await fetchData()
     } catch (error: any) {
       setMessage({
-        type: 'error',
-        text: error?.message || 'Gagal approve postpone oleh HR.',
+        type:
+          'error',
+
+        text:
+          error?.message ||
+          'Gagal approve postpone oleh HR.',
       })
     } finally {
       setSavingId(null)
     }
   }
 
-  async function handleRejectHR(postpone: LeavePostponeRequest) {
-    if (normalize(postpone.approval_status) === 'approved') {
+  async function handleRejectHR(
+    postpone:
+      LeavePostponeRequest,
+  ) {
+    if (
+      normalize(
+        postpone.approval_status,
+      ) ===
+      'approved'
+    ) {
       setMessage({
-        type: 'error',
-        text: 'Postpone yang sudah approved tidak bisa reject langsung. Gunakan Cancel.',
+        type:
+          'error',
+
+        text:
+          'Postpone yang sudah approved tidak bisa reject langsung. Gunakan Cancel.',
       })
+
       return
     }
 
-    const note = window.prompt('Alasan HR menolak pengajuan postpone:')
+    const note =
+      window.prompt(
+        'Alasan HR menolak pengajuan postpone:',
+      )
 
-    if (note === null) return
-
-    if (!note.trim()) {
-      setMessage({
-        type: 'error',
-        text: 'Alasan penolakan wajib diisi.',
-      })
+    if (
+      note ===
+      null
+    ) {
       return
     }
 
-    setSavingId(postpone.id)
+    if (
+      note
+        .trim()
+        .length < 3
+    ) {
+      setMessage({
+        type:
+          'error',
+
+        text:
+          'Alasan penolakan minimal 3 karakter.',
+      })
+
+      return
+    }
+
+    setSavingId(
+      postpone.id,
+    )
+
     setMessage(null)
 
     try {
-      const { error } = await supabase
-        .from('leave_postpone_requests')
-        .update({
-          approval_status: 'rejected',
-          hr_status: 'rejected',
-          hr_notes: note,
-          hr_rejected_at: new Date().toISOString(),
-          edited_by: 'HR',
-          updated_at: new Date().toISOString(),
+      const {
+        data,
+        error,
+      } =
+        await supabase.rpc(
+          'hr_reject_leave_postpone_atomic',
+          {
+            p_request_id:
+              postpone.id,
+
+            p_rejected_by:
+              'HR Administrator',
+
+            p_note:
+              note.trim(),
+          },
+        )
+
+      if (error) {
+        throw error
+      }
+
+      const result =
+        (
+          data ||
+          {}
+        ) as {
+          success?:
+            boolean
+
+          message?:
+            string
+        }
+
+      if (
+        !result.success
+      ) {
+        throw new Error(
+          result.message ||
+            'Reject postpone gagal.',
+        )
+      }
+
+      const notification =
+        await notifyPostponeDecisionByEmail({
+          postpone,
+
+          decision:
+            'rejected',
+
+          note:
+            note.trim(),
         })
-        .eq('id', postpone.id)
-
-      if (error) throw error
-
-      const notification = await notifyPostponeDecisionByEmail({
-        postpone,
-        decision: 'rejected',
-        note,
-      })
 
       setMessage({
-        type: 'success',
-        text: notification.success
-          ? `Postpone berhasil ditolak oleh HR. ${notification.message}`
-          : `Postpone berhasil ditolak oleh HR, tetapi email belum terkirim: ${notification.message}`,
+        type:
+          'success',
+
+        text:
+          notification.success
+            ? `${result.message || 'Postpone berhasil ditolak HR.'} ${notification.message}`
+            : `${result.message || 'Postpone berhasil ditolak HR.'} Namun email belum terkirim: ${notification.message}`,
       })
 
       await fetchData()
     } catch (error: any) {
       setMessage({
-        type: 'error',
-        text: error?.message || 'Gagal reject postpone oleh HR.',
+        type:
+          'error',
+
+        text:
+          error?.message ||
+          'Gagal reject postpone oleh HR.',
       })
     } finally {
       setSavingId(null)
     }
   }
 
-  async function handleCancel(postpone: LeavePostponeRequest) {
-    const confirmCancel = window.confirm(
-      'Batalkan postpone ini? Jika sebelumnya sudah approved, saldo carry forward akan dihapus dari cycle.'
+  async function handleCancel(
+    postpone:
+      LeavePostponeRequest,
+  ) {
+    const reason =
+      window.prompt(
+        'Alasan pembatalan postpone:',
+
+        'Dibatalkan oleh HR.',
+      )
+
+    if (
+      reason ===
+      null
+    ) {
+      return
+    }
+
+    if (
+      reason
+        .trim()
+        .length < 3
+    ) {
+      setMessage({
+        type:
+          'error',
+
+        text:
+          'Alasan pembatalan minimal 3 karakter.',
+      })
+
+      return
+    }
+
+    const confirmCancel =
+      window.confirm(
+        'Batalkan postpone ini? Jika saldo postpone sudah pernah dipakai, sistem akan memblokir pembatalan agar histori saldo tidak rusak.',
+      )
+
+    if (
+      !confirmCancel
+    ) {
+      return
+    }
+
+    setSavingId(
+      postpone.id,
     )
 
-    if (!confirmCancel) return
-
-    setSavingId(postpone.id)
     setMessage(null)
 
     try {
-      const { error } = await supabase
-        .from('leave_postpone_requests')
-        .update({
-          approval_status: 'cancelled',
-          hr_status: 'cancelled',
-          is_active: false,
-          hr_notes: postpone.hr_notes || 'Postpone cancelled by HR.',
-          hr_cancelled_at: new Date().toISOString(),
-          edited_by: 'HR',
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', postpone.id)
+      const {
+        data,
+        error,
+      } =
+        await supabase.rpc(
+          'hr_cancel_leave_postpone_atomic',
+          {
+            p_request_id:
+              postpone.id,
 
-      if (error) throw error
+            p_cancelled_by:
+              'HR Administrator',
 
-      if (postpone.source_cycle_id && normalize(postpone.approval_status) === 'approved') {
-        await supabase
-          .from('annual_leave_cycles')
-          .update({
-            carry_forward_days: 0,
-            carry_forward_used_days: 0,
-            carry_forward_remaining_days: 0,
-            carry_forward_expired_at: null,
-            status: 'active',
-            notes: 'Carry forward cancelled by HR.',
-            edited_by: 'HR',
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', postpone.source_cycle_id)
+            p_note:
+              reason.trim(),
+          },
+        )
+
+      if (error) {
+        throw error
       }
 
-      const notification = await notifyPostponeDecisionByEmail({
-        postpone,
-        decision: 'cancelled',
-        note: postpone.hr_notes || 'Postpone cancelled by HR.',
-      })
+      const result =
+        (
+          data ||
+          {}
+        ) as {
+          success?:
+            boolean
+
+          message?:
+            string
+        }
+
+      if (
+        !result.success
+      ) {
+        throw new Error(
+          result.message ||
+            'Cancel postpone gagal.',
+        )
+      }
+
+      const notification =
+        await notifyPostponeDecisionByEmail({
+          postpone,
+
+          decision:
+            'cancelled',
+
+          note:
+            reason.trim(),
+        })
 
       setMessage({
-        type: 'success',
-        text: notification.success
-          ? `Postpone berhasil dibatalkan. ${notification.message}`
-          : `Postpone berhasil dibatalkan, tetapi email belum terkirim: ${notification.message}`,
+        type:
+          'success',
+
+        text:
+          notification.success
+            ? `${result.message || 'Postpone berhasil dibatalkan.'} ${notification.message}`
+            : `${result.message || 'Postpone berhasil dibatalkan.'} Namun email belum terkirim: ${notification.message}`,
       })
 
       await fetchData()
     } catch (error: any) {
       setMessage({
-        type: 'error',
-        text: error?.message || 'Gagal cancel postpone.',
+        type:
+          'error',
+
+        text:
+          error?.message ||
+          'Gagal cancel postpone.',
       })
     } finally {
       setSavingId(null)
@@ -623,24 +1428,80 @@ export default function HRLeavePostponePage() {
     <>
       <Topbar
         title="Postpone Cuti"
-        description="Final approval HR untuk carry forward sisa cuti tahunan yang sudah disetujui atasan."
+        description="Final approval HR untuk postpone/carry forward. Expiry dihitung otomatis 6 bulan setelah anniversary cuti berikutnya."
       />
 
       <main className="space-y-6 p-4 sm:p-6">
         <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-          <SummaryCard title="Total" value={stats.total} icon={<RotateCcw size={20} />} />
-          <SummaryCard title="Menunggu Atasan" value={stats.waitingSupervisor} icon={<Clock3 size={20} />} />
-          <SummaryCard title="Menunggu HR" value={stats.pendingHR} icon={<ShieldCheck size={20} />} />
-          <SummaryCard title="Approved" value={stats.approved} icon={<CheckCircle2 size={20} />} />
-          <SummaryCard title="Rejected" value={stats.rejected} icon={<XCircle size={20} />} />
+          <SummaryCard
+            title="Total"
+            value={
+              stats.total
+            }
+            icon={
+              <RotateCcw
+                size={20}
+              />
+            }
+          />
+
+          <SummaryCard
+            title="Menunggu Atasan"
+            value={
+              stats.waitingSupervisor
+            }
+            icon={
+              <Clock3
+                size={20}
+              />
+            }
+          />
+
+          <SummaryCard
+            title="Menunggu HR"
+            value={
+              stats.pendingHR
+            }
+            icon={
+              <ShieldCheck
+                size={20}
+              />
+            }
+          />
+
+          <SummaryCard
+            title="Approved"
+            value={
+              stats.approved
+            }
+            icon={
+              <CheckCircle2
+                size={20}
+              />
+            }
+          />
+
+          <SummaryCard
+            title="Rejected"
+            value={
+              stats.rejected
+            }
+            icon={
+              <XCircle
+                size={20}
+              />
+            }
+          />
         </section>
 
         {message && (
           <section
             className={`rounded-2xl border px-4 py-3 text-sm font-semibold ${
-              message.type === 'success'
+              message.type ===
+              'success'
                 ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-                : message.type === 'info'
+                : message.type ===
+                    'info'
                   ? 'border-blue-200 bg-blue-50 text-blue-700'
                   : 'border-red-200 bg-red-50 text-red-700'
             }`}
@@ -654,11 +1515,18 @@ export default function HRLeavePostponePage() {
             <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
               <div>
                 <h2 className="text-lg font-bold text-[#1d1d1f]">
-                  Daftar Pengajuan Postpone
+                  Daftar Pengajuan
+                  Postpone
                 </h2>
 
                 <p className="mt-1 text-sm leading-6 text-[#6e6e73]">
-                  HR hanya bisa final approve setelah seluruh approval atasan selesai.
+                  HR hanya bisa final
+                  approve setelah
+                  seluruh approval
+                  atasan selesai.
+                  Expiry ditentukan
+                  server: anniversary
+                  berikutnya + 6 bulan.
                 </p>
               </div>
 
@@ -667,33 +1535,107 @@ export default function HRLeavePostponePage() {
                   <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
 
                   <input
-                    value={search}
-                    onChange={(event) => setSearch(event.target.value)}
+                    value={
+                      search
+                    }
+                    onChange={(
+                      event,
+                    ) =>
+                      setSearch(
+                        event
+                          .target
+                          .value,
+                      )
+                    }
                     placeholder="Cari nama, NIK, status..."
                     className="h-11 w-full rounded-2xl border border-slate-200 bg-white pl-11 pr-4 text-sm outline-none focus:border-blue-400"
                   />
                 </div>
 
                 <select
-                  value={filterStatus}
-                  onChange={(event) => setFilterStatus(event.target.value as FilterStatus)}
+                  value={
+                    filterStatus
+                  }
+                  onChange={(
+                    event,
+                  ) =>
+                    setFilterStatus(
+                      event
+                        .target
+                        .value as FilterStatus,
+                    )
+                  }
                   className="h-11 rounded-2xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700 outline-none focus:border-blue-400"
                 >
-                  <option value="pending_hr">Menunggu HR</option>
-                  <option value="waiting_supervisor">Menunggu Atasan</option>
-                  <option value="approved">Approved</option>
-                  <option value="rejected">Rejected</option>
-                  <option value="cancelled">Cancelled</option>
-                  <option value="all">Semua</option>
+                  <option value="pending_hr">
+                    Menunggu HR
+                  </option>
+
+                  <option value="waiting_supervisor">
+                    Menunggu Atasan
+                  </option>
+
+                  <option value="approved">
+                    Approved
+                  </option>
+
+                  <option value="rejected">
+                    Rejected
+                  </option>
+
+                  <option value="cancelled">
+                    Cancelled
+                  </option>
+
+                  <option value="expired">
+                    Expired
+                  </option>
+
+                  <option value="all">
+                    Semua
+                  </option>
                 </select>
 
                 <button
                   type="button"
-                  onClick={fetchData}
-                  disabled={loading}
+                  onClick={() => {
+                    window.location.href =
+                      '/hr/leave/administration'
+                  }}
+                  className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl border border-blue-200 bg-blue-50 px-4 text-sm font-bold text-blue-700 shadow-sm transition hover:bg-blue-100"
+                >
+                  <ShieldCheck
+                    size={16}
+                  />
+
+                  Administrasi Saldo
+                </button>
+
+                <button
+                  type="button"
+                  onClick={
+                    fetchData
+                  }
+                  disabled={
+                    loading
+                  }
                   className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:opacity-60"
                 >
-                  {loading ? <Loader2 size={16} className="animate-spin" /> : <RefreshCcw size={16} />}
+                  {loading ? (
+                    <Loader2
+                      size={
+                        16
+                      }
+                      className="animate-spin"
+                    />
+                  ) : (
+                    <RefreshCcw
+                      size={
+                        16
+                      }
+                    />
+                  )}
+
                   Refresh
                 </button>
               </div>
@@ -703,13 +1645,20 @@ export default function HRLeavePostponePage() {
           {loading ? (
             <div className="flex min-h-[300px] items-center justify-center">
               <div className="flex items-center gap-2 text-sm font-semibold text-slate-500">
-                <Loader2 size={18} className="animate-spin" />
-                Memuat data postpone...
+                <Loader2
+                  size={18}
+                  className="animate-spin"
+                />
+
+                Memuat data
+                postpone...
               </div>
             </div>
-          ) : filteredPostpones.length === 0 ? (
+          ) : filteredPostpones.length ===
+            0 ? (
             <div className="p-10 text-center text-sm text-[#6e6e73]">
-              Data postpone cuti tidak ditemukan.
+              Data postpone cuti
+              tidak ditemukan.
             </div>
           ) : (
             <>
@@ -717,45 +1666,106 @@ export default function HRLeavePostponePage() {
                 <table className="w-full min-w-[1320px] border-collapse text-left text-sm">
                   <thead>
                     <tr className="border-b border-slate-100 bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
-                      <th className="px-5 py-4 font-bold">Employee</th>
-                      <th className="px-5 py-4 font-bold">Cycle</th>
-                      <th className="px-5 py-4 text-center font-bold">Sisa</th>
-                      <th className="px-5 py-4 text-center font-bold">Diajukan</th>
-                      <th className="px-5 py-4 font-bold">Expired</th>
-                      <th className="px-5 py-4 font-bold">Atasan 1</th>
-                      <th className="px-5 py-4 font-bold">Atasan 2</th>
-                      <th className="px-5 py-4 font-bold">HR</th>
-                      <th className="px-5 py-4 font-bold">Status</th>
-                      <th className="px-5 py-4 text-right font-bold">Action</th>
+                      <th className="px-5 py-4 font-bold">
+                        Employee
+                      </th>
+
+                      <th className="px-5 py-4 font-bold">
+                        Cycle
+                      </th>
+
+                      <th className="px-5 py-4 text-center font-bold">
+                        Sisa
+                      </th>
+
+                      <th className="px-5 py-4 text-center font-bold">
+                        Diajukan
+                      </th>
+
+                      <th className="px-5 py-4 font-bold">
+                        Expired
+                      </th>
+
+                      <th className="px-5 py-4 font-bold">
+                        Atasan 1
+                      </th>
+
+                      <th className="px-5 py-4 font-bold">
+                        Atasan 2
+                      </th>
+
+                      <th className="px-5 py-4 font-bold">
+                        HR
+                      </th>
+
+                      <th className="px-5 py-4 font-bold">
+                        Status
+                      </th>
+
+                      <th className="px-5 py-4 text-right font-bold">
+                        Action
+                      </th>
                     </tr>
                   </thead>
 
                   <tbody>
-                    {filteredPostpones.map((item) => (
-                      <PostponeRow
-                        key={item.id}
-                        item={item}
-                        savingId={savingId}
-                        onApprove={handleApproveHR}
-                        onReject={handleRejectHR}
-                        onCancel={handleCancel}
-                      />
-                    ))}
+                    {filteredPostpones.map(
+                      (
+                        item,
+                      ) => (
+                        <PostponeRow
+                          key={
+                            item.id
+                          }
+                          item={
+                            item
+                          }
+                          savingId={
+                            savingId
+                          }
+                          onApprove={
+                            handleApproveHR
+                          }
+                          onReject={
+                            handleRejectHR
+                          }
+                          onCancel={
+                            handleCancel
+                          }
+                        />
+                      ),
+                    )}
                   </tbody>
                 </table>
               </div>
 
               <div className="space-y-3 p-4 xl:hidden">
-                {filteredPostpones.map((item) => (
-                  <PostponeMobileCard
-                    key={item.id}
-                    item={item}
-                    savingId={savingId}
-                    onApprove={handleApproveHR}
-                    onReject={handleRejectHR}
-                    onCancel={handleCancel}
-                  />
-                ))}
+                {filteredPostpones.map(
+                  (
+                    item,
+                  ) => (
+                    <PostponeMobileCard
+                      key={
+                        item.id
+                      }
+                      item={
+                        item
+                      }
+                      savingId={
+                        savingId
+                      }
+                      onApprove={
+                        handleApproveHR
+                      }
+                      onReject={
+                        handleRejectHR
+                      }
+                      onCancel={
+                        handleCancel
+                      }
+                    />
+                  ),
+                )}
               </div>
             </>
           )}
@@ -772,7 +1782,7 @@ function SummaryCard({
 }: {
   title: string
   value: number
-  icon: React.ReactNode
+  icon: ReactNode
 }) {
   return (
     <div className="rounded-[24px] border border-black/5 bg-white p-5 shadow-sm">
@@ -781,6 +1791,7 @@ function SummaryCard({
           <p className="text-xs font-bold uppercase tracking-wide text-[#6e6e73]">
             {title}
           </p>
+
           <p className="mt-2 text-2xl font-black text-[#1d1d1f]">
             {value}
           </p>
@@ -797,11 +1808,19 @@ function SummaryCard({
 function StatusBadge({
   status,
 }: {
-  status?: string | null
+  status?:
+    | string
+    | null
 }) {
   return (
-    <span className={`inline-flex rounded-full border px-3 py-1 text-xs font-bold ${statusClass(status)}`}>
-      {getStatusLabel(status)}
+    <span
+      className={`inline-flex rounded-full border px-3 py-1 text-xs font-bold ${statusClass(
+        status,
+      )}`}
+    >
+      {getStatusLabel(
+        status,
+      )}
     </span>
   )
 }
@@ -813,112 +1832,227 @@ function PostponeRow({
   onReject,
   onCancel,
 }: {
-  item: LeavePostponeRequest
-  savingId: string | null
-  onApprove: (item: LeavePostponeRequest) => void
-  onReject: (item: LeavePostponeRequest) => void
-  onCancel: (item: LeavePostponeRequest) => void
+  item:
+    LeavePostponeRequest
+
+  savingId:
+    | string
+    | null
+
+  onApprove:
+    (
+      item:
+        LeavePostponeRequest,
+    ) => void
+
+  onReject:
+    (
+      item:
+        LeavePostponeRequest,
+    ) => void
+
+  onCancel:
+    (
+      item:
+        LeavePostponeRequest,
+    ) => void
 }) {
-  const readyForHR = isReadyForHR(item)
-  const approved = normalize(item.approval_status) === 'approved'
-  const cancelled = normalize(item.approval_status) === 'cancelled'
-  const saving = savingId === item.id
+  const readyForHR =
+    isReadyForHR(item)
+
+  const approved =
+    normalize(
+      item.approval_status,
+    ) === 'approved'
+
+  const cancelled =
+    normalize(
+      item.approval_status,
+    ) === 'cancelled'
+
+  const saving =
+    savingId ===
+    item.id
 
   return (
     <tr className="border-b border-slate-100 align-top transition hover:bg-slate-50">
       <td className="px-5 py-4">
         <div className="font-bold text-[#1d1d1f]">
-          {item.full_name || '-'}
+          {item.full_name ||
+            '-'}
         </div>
+
         <div className="mt-1 text-xs text-[#6e6e73]">
-          {item.employee_number || '-'} · {item.department || '-'}
+          {item.employee_number ||
+            '-'}{' '}
+          ·{' '}
+          {item.department ||
+            '-'}
         </div>
+
         <div className="mt-1 text-xs text-slate-400">
-          Submit: {formatDateTime(item.created_at)}
+          Submit:{' '}
+          {formatDateTime(
+            item.created_at,
+          )}
         </div>
       </td>
 
       <td className="px-5 py-4">
         <div className="text-sm font-semibold text-[#1d1d1f]">
-          End: {formatDate(item.old_cycle_end)}
+          End:{' '}
+          {formatDate(
+            item.old_cycle_end,
+          )}
         </div>
+
         <div className="mt-1 text-xs text-[#6e6e73]">
-          Deadline: {formatDate(item.postpone_deadline)}
+          Deadline:{' '}
+          {formatDate(
+            item.postpone_deadline,
+          )}
         </div>
       </td>
 
       <td className="px-5 py-4 text-center font-bold">
-        {item.remaining_days || 0}
+        {item.remaining_days ||
+          0}
       </td>
 
       <td className="px-5 py-4 text-center font-bold text-blue-700">
-        {item.requested_days || 0}
+        {item.requested_days ||
+          0}
       </td>
 
       <td className="px-5 py-4">
-        {formatDate(item.new_expired_at)}
-      </td>
-
-      <td className="px-5 py-4">
-        <div className="mb-1 text-xs text-[#6e6e73]">
-          {item.supervisor_1 || '-'}
-        </div>
-        <StatusBadge status={item.supervisor_1_status} />
+        {formatDate(
+          item.new_expired_at,
+        )}
       </td>
 
       <td className="px-5 py-4">
         <div className="mb-1 text-xs text-[#6e6e73]">
-          {item.supervisor_2 || '-'}
+          {item.supervisor_1 ||
+            '-'}
         </div>
-        <StatusBadge status={item.supervisor_2_status} />
+
+        <StatusBadge
+          status={
+            item.supervisor_1_status
+          }
+        />
       </td>
 
       <td className="px-5 py-4">
-        <StatusBadge status={item.hr_status} />
+        <div className="mb-1 text-xs text-[#6e6e73]">
+          {item.supervisor_2 ||
+            '-'}
+        </div>
+
+        <StatusBadge
+          status={
+            item.supervisor_2_status
+          }
+        />
       </td>
 
       <td className="px-5 py-4">
-        <StatusBadge status={item.approval_status} />
+        <StatusBadge
+          status={
+            item.hr_status
+          }
+        />
+      </td>
+
+      <td className="px-5 py-4">
+        <StatusBadge
+          status={
+            item.approval_status
+          }
+        />
       </td>
 
       <td className="px-5 py-4 text-right">
         <div className="flex justify-end gap-2">
           <button
             type="button"
-            onClick={() => onReject(item)}
-            disabled={saving || approved || cancelled}
+            onClick={() =>
+              onReject(
+                item,
+              )
+            }
+            disabled={
+              saving ||
+              approved ||
+              cancelled
+            }
             className="inline-flex items-center gap-1 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-bold text-red-700 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            <XCircle size={14} />
+            <XCircle
+              size={14}
+            />
+
             Reject
           </button>
 
           <button
             type="button"
-            onClick={() => onApprove(item)}
-            disabled={saving || !readyForHR || approved || cancelled}
+            onClick={() =>
+              onApprove(
+                item,
+              )
+            }
+            disabled={
+              saving ||
+              !readyForHR ||
+              approved ||
+              cancelled
+            }
             className="inline-flex items-center gap-1 rounded-xl bg-[#1d1d1f] px-3 py-2 text-xs font-bold text-white transition hover:bg-black disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {saving ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
+            {saving ? (
+              <Loader2
+                size={14}
+                className="animate-spin"
+              />
+            ) : (
+              <CheckCircle2
+                size={14}
+              />
+            )}
+
             Approve HR
           </button>
 
           <button
             type="button"
-            onClick={() => onCancel(item)}
-            disabled={saving || cancelled}
+            onClick={() =>
+              onCancel(
+                item,
+              )
+            }
+            disabled={
+              saving ||
+              cancelled
+            }
             className="inline-flex items-center gap-1 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-bold text-amber-700 transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            <AlertTriangle size={14} />
+            <AlertTriangle
+              size={14}
+            />
+
             Cancel
           </button>
         </div>
 
-        {!readyForHR && !approved && !cancelled && (
-          <p className="mt-2 text-xs font-semibold text-amber-600">
-            Menunggu approval atasan.
-          </p>
-        )}
+        {!readyForHR &&
+          !approved &&
+          !cancelled && (
+            <p className="mt-2 text-xs font-semibold text-amber-600">
+              Menunggu approval
+              atasan.
+            </p>
+          )}
       </td>
     </tr>
   )
@@ -931,79 +2065,200 @@ function PostponeMobileCard({
   onReject,
   onCancel,
 }: {
-  item: LeavePostponeRequest
-  savingId: string | null
-  onApprove: (item: LeavePostponeRequest) => void
-  onReject: (item: LeavePostponeRequest) => void
-  onCancel: (item: LeavePostponeRequest) => void
+  item:
+    LeavePostponeRequest
+
+  savingId:
+    | string
+    | null
+
+  onApprove:
+    (
+      item:
+        LeavePostponeRequest,
+    ) => void
+
+  onReject:
+    (
+      item:
+        LeavePostponeRequest,
+    ) => void
+
+  onCancel:
+    (
+      item:
+        LeavePostponeRequest,
+    ) => void
 }) {
-  const readyForHR = isReadyForHR(item)
-  const approved = normalize(item.approval_status) === 'approved'
-  const cancelled = normalize(item.approval_status) === 'cancelled'
-  const saving = savingId === item.id
+  const readyForHR =
+    isReadyForHR(item)
+
+  const approved =
+    normalize(
+      item.approval_status,
+    ) === 'approved'
+
+  const cancelled =
+    normalize(
+      item.approval_status,
+    ) === 'cancelled'
+
+  const saving =
+    savingId ===
+    item.id
 
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="font-bold text-[#1d1d1f]">
-            {item.full_name || '-'}
+            {item.full_name ||
+              '-'}
           </p>
+
           <p className="mt-1 text-xs text-[#6e6e73]">
-            {item.employee_number || '-'} · {item.department || '-'}
+            {item.employee_number ||
+              '-'}{' '}
+            ·{' '}
+            {item.department ||
+              '-'}
           </p>
         </div>
 
-        <StatusBadge status={item.approval_status} />
+        <StatusBadge
+          status={
+            item.approval_status
+          }
+        />
       </div>
 
       <div className="mt-4 grid grid-cols-2 gap-2 text-xs">
-        <MiniInfo label="Sisa" value={`${item.remaining_days || 0} hari`} />
-        <MiniInfo label="Diajukan" value={`${item.requested_days || 0} hari`} />
-        <MiniInfo label="End Cycle" value={formatDate(item.old_cycle_end)} />
-        <MiniInfo label="Expired" value={formatDate(item.new_expired_at)} />
+        <MiniInfo
+          label="Sisa"
+          value={`${item.remaining_days || 0} hari`}
+        />
+
+        <MiniInfo
+          label="Diajukan"
+          value={`${item.requested_days || 0} hari`}
+        />
+
+        <MiniInfo
+          label="End Cycle"
+          value={formatDate(
+            item.old_cycle_end,
+          )}
+        />
+
+        <MiniInfo
+          label="Expired"
+          value={formatDate(
+            item.new_expired_at,
+          )}
+        />
       </div>
 
       <div className="mt-4 grid gap-2 text-xs">
-        <MiniInfo label="Atasan 1" value={`${item.supervisor_1 || '-'} · ${getStatusLabel(item.supervisor_1_status)}`} />
-        <MiniInfo label="Atasan 2" value={`${item.supervisor_2 || '-'} · ${getStatusLabel(item.supervisor_2_status)}`} />
-        <MiniInfo label="HR" value={getStatusLabel(item.hr_status)} />
+        <MiniInfo
+          label="Atasan 1"
+          value={`${item.supervisor_1 || '-'} · ${getStatusLabel(
+            item.supervisor_1_status,
+          )}`}
+        />
+
+        <MiniInfo
+          label="Atasan 2"
+          value={`${item.supervisor_2 || '-'} · ${getStatusLabel(
+            item.supervisor_2_status,
+          )}`}
+        />
+
+        <MiniInfo
+          label="HR"
+          value={getStatusLabel(
+            item.hr_status,
+          )}
+        />
       </div>
 
-      {!readyForHR && !approved && !cancelled && (
-        <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-3 text-xs font-bold text-amber-700">
-          Menunggu approval atasan. HR belum bisa final approve.
-        </div>
-      )}
+      {!readyForHR &&
+        !approved &&
+        !cancelled && (
+          <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-3 text-xs font-bold text-amber-700">
+            Menunggu approval
+            atasan. HR belum bisa
+            final approve.
+          </div>
+        )}
 
       <div className="mt-4 grid gap-2 sm:grid-cols-3">
         <button
           type="button"
-          onClick={() => onReject(item)}
-          disabled={saving || approved || cancelled}
+          onClick={() =>
+            onReject(
+              item,
+            )
+          }
+          disabled={
+            saving ||
+            approved ||
+            cancelled
+          }
           className="inline-flex items-center justify-center gap-1 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-bold text-red-700 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          <XCircle size={14} />
+          <XCircle
+            size={14}
+          />
+
           Reject
         </button>
 
         <button
           type="button"
-          onClick={() => onApprove(item)}
-          disabled={saving || !readyForHR || approved || cancelled}
+          onClick={() =>
+            onApprove(
+              item,
+            )
+          }
+          disabled={
+            saving ||
+            !readyForHR ||
+            approved ||
+            cancelled
+          }
           className="inline-flex items-center justify-center gap-1 rounded-xl bg-[#1d1d1f] px-3 py-2 text-xs font-bold text-white transition hover:bg-black disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {saving ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
+          {saving ? (
+            <Loader2
+              size={14}
+              className="animate-spin"
+            />
+          ) : (
+            <CheckCircle2
+              size={14}
+            />
+          )}
+
           Approve HR
         </button>
 
         <button
           type="button"
-          onClick={() => onCancel(item)}
-          disabled={saving || cancelled}
+          onClick={() =>
+            onCancel(
+              item,
+            )
+          }
+          disabled={
+            saving ||
+            cancelled
+          }
           className="inline-flex items-center justify-center gap-1 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-bold text-amber-700 transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          <AlertTriangle size={14} />
+          <AlertTriangle
+            size={14}
+          />
+
           Cancel
         </button>
       </div>
@@ -1023,6 +2278,7 @@ function MiniInfo({
       <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400">
         {label}
       </p>
+
       <p className="mt-1 font-bold text-slate-700">
         {value}
       </p>

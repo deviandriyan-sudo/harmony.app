@@ -26,6 +26,13 @@ import {
 import { Topbar } from '@/components/layout/Topbar'
 import { supabase } from '@/lib/supabase'
 import { sendHarmonyEmail } from '@/lib/notifications'
+import {
+  getActiveHarmonyTypesForScope,
+  getHarmonyRequestTypeMeta,
+  groupHarmonyTypes,
+  refreshHarmonyRequestTypes,
+  type HarmonyRequestTypeDefinition,
+} from '@/lib/harmony-request-types'
 
 type AppUser = {
   id: string
@@ -57,14 +64,29 @@ type AnnualLeaveSummary = {
   machine_pin: string | null
   full_name: string | null
   department: string | null
-  position: string | null
+  position_name: string | null
   email: string | null
-  total_earned_days: number | null
-  total_used_days: number | null
-  total_postponed_days: number | null
-  total_remaining_days: number | null
-  latest_matured_date: string | null
-  active_cycle_count: number | null
+  join_date: string | null
+
+  annual_regular_days: number | null
+  postpone_active_days: number | null
+  postpone_expired_days: number | null
+  annual_manual_adjustment_days: number | null
+  annual_total_available_days: number | null
+
+  latest_matured_at: string | null
+  current_cycle_end: string | null
+  next_postpone_expiry: string | null
+
+  postpone_pending_count: number | null
+  postpone_active_count: number | null
+  postpone_expired_count: number | null
+
+  phl_active_ledger_days: number | null
+  phl_expired_days: number | null
+  next_phl_expiry: string | null
+  phl_total_available_days: number | null
+  phl_legacy_or_adjustment_days: number | null
 }
 
 type PHLRecord = {
@@ -80,7 +102,6 @@ type PHLRecord = {
   reason: string | null
   source: string | null
 }
-
 
 type MyPHLBalanceSummary = {
   success: boolean
@@ -128,21 +149,7 @@ type Holiday = {
   is_active: boolean | null
 }
 
-type RequestType =
-  | 'annual_leave'
-  | 'sick'
-  | 'permit'
-  | 'official_travel'
-  | 'phl_claim'
-  | 'other_leave'
-  | 'marriage_leave'
-  | 'maternity_leave'
-  | 'miscarriage_leave'
-  | 'bereavement_leave'
-  | 'child_circumcision_leave'
-  | 'worship_leave'
-  | 'menstrual_leave'
-  | 'pregnancy_check_leave'
+type RequestType = string
 
 type FormState = {
   request_type: RequestType
@@ -165,7 +172,6 @@ const initialForm: FormState = {
   handover_note: '',
   proof_file: null,
 }
-
 
 type LeaveNotificationResult = {
   success: boolean
@@ -295,7 +301,6 @@ async function notifyLeaveRequestSubmitted({
   }
 }
 
-
 export default function EmployeeLeavePage() {
   const [appUser, setAppUser] = useState<AppUser | null>(null)
   const [employee, setEmployee] = useState<Employee | null>(null)
@@ -308,6 +313,7 @@ export default function EmployeeLeavePage() {
   const [myPHLBalance, setMyPHLBalance] = useState<MyPHLBalanceSummary | null>(null)
   const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>([])
   const [holidays, setHolidays] = useState<Holiday[]>([])
+  const [requestTypes, setRequestTypes] = useState<HarmonyRequestTypeDefinition[]>([])
 
   const [form, setForm] = useState<FormState>(initialForm)
   const [formOpen, setFormOpen] = useState(false)
@@ -318,11 +324,28 @@ export default function EmployeeLeavePage() {
   const [successMessage, setSuccessMessage] = useState('')
   const [errorMessage, setErrorMessage] = useState('')
 
-  const annualRemainingFromSummary = Number(annualLeave?.total_remaining_days || 0)
-  const annualRemaining = Number(
-    employee?.annual_leave_balance ?? annualRemainingFromSummary
+  const annualRegularRemaining = Number(
+    annualLeave?.annual_regular_days || 0
   )
-  const annualBalanceUsesHROverride = employee?.annual_leave_balance !== null && employee?.annual_leave_balance !== undefined
+
+  const postponeActiveRemaining = Number(
+    annualLeave?.postpone_active_days || 0
+  )
+
+  const postponeExpiredDays = Number(
+    annualLeave?.postpone_expired_days || 0
+  )
+
+  const annualManualAdjustment = Number(
+    annualLeave?.annual_manual_adjustment_days || 0
+  )
+
+  const annualRemaining = Number(
+    annualLeave?.annual_total_available_days || 0
+  )
+
+  const annualBalanceUsesHROverride =
+    Math.abs(annualManualAdjustment) > 0.0001
 
   const phlRemainingFromRecords = useMemo(() => {
     return phlRecords.reduce((sum, item) => {
@@ -333,20 +356,16 @@ export default function EmployeeLeavePage() {
   const phlRemaining = Number(
     myPHLBalance?.total_available_days ?? phlRemainingFromRecords
   )
-  const phlBalanceUsesHROverride = Number(myPHLBalance?.legacy_balance || 0) > 0
+
+  const phlBalanceUsesHROverride =
+    Number(myPHLBalance?.legacy_balance || 0) > 0
 
   const pendingCount = useMemo(() => {
     return leaveRequests.filter((item) => {
-      return isPendingStatus(item.status) || isPendingStatus(item.supervisor_status) || isPendingStatus(item.hr_status)
-    }).length
-  }, [leaveRequests])
-
-  const approvedCount = useMemo(() => {
-    return leaveRequests.filter((item) => {
       return (
-        normalizeText(item.status) === 'approved' ||
-        normalizeText(item.supervisor_status) === 'approved' ||
-        normalizeText(item.hr_status) === 'approved'
+        isPendingStatus(item.status) ||
+        isPendingStatus(item.supervisor_status) ||
+        isPendingStatus(item.hr_status)
       )
     }).length
   }, [leaveRequests])
@@ -354,30 +373,36 @@ export default function EmployeeLeavePage() {
   const calculatedDays = useMemo(() => {
     if (!form.start_date || !form.end_date) return 0
 
-    return countWorkingDays(form.start_date, form.end_date, holidays)
-  }, [form.start_date, form.end_date, holidays])
+    return countWorkingDays(
+      form.start_date,
+      form.end_date,
+      holidays
+    )
+  }, [
+    form.start_date,
+    form.end_date,
+    holidays,
+  ])
 
-  const selectedRequestMeta = getRequestMeta(form.request_type)
+  const selectedRequestMeta =
+    getRequestMeta(form.request_type)
 
   const requiresProof =
-    form.request_type === 'sick' ||
-    form.request_type === 'official_travel' ||
-    form.request_type === 'phl_claim' ||
-    form.request_type === 'other_leave' ||
-    form.request_type === 'marriage_leave' ||
-    form.request_type === 'maternity_leave' ||
-    form.request_type === 'miscarriage_leave' ||
-    form.request_type === 'bereavement_leave' ||
-    form.request_type === 'child_circumcision_leave' ||
-    form.request_type === 'worship_leave' ||
-    form.request_type === 'pregnancy_check_leave'
+    Boolean(selectedRequestMeta.requires_proof)
 
   const handoverEmployeeOptions = useMemo(() => {
     return employeeDirectory
       .filter((item) => item.is_active !== false)
       .filter((item) => item.id !== employee?.id)
-      .sort((a, b) => String(a.full_name || '').localeCompare(String(b.full_name || '')))
-  }, [employeeDirectory, employee?.id])
+      .sort((a, b) =>
+        String(a.full_name || '').localeCompare(
+          String(b.full_name || '')
+        )
+      )
+  }, [
+    employeeDirectory,
+    employee?.id,
+  ])
 
   const selectedHandoverEmployee = useMemo(() => {
     return (
@@ -391,7 +416,10 @@ export default function EmployeeLeavePage() {
         )
       }) || null
     )
-  }, [employeeDirectory, form.handover_to])
+  }, [
+    employeeDirectory,
+    form.handover_to,
+  ])
 
   useEffect(() => {
     fetchData()
@@ -402,15 +430,23 @@ export default function EmployeeLeavePage() {
     setSuccessMessage('')
     setErrorMessage('')
 
-    const { data: authData, error: authError } = await supabase.auth.getUser()
+    const {
+      data: authData,
+      error: authError,
+    } = await supabase.auth.getUser()
 
     if (authError || !authData.user) {
-      setErrorMessage('Session user belum ditemukan. Silakan login ulang.')
+      setErrorMessage(
+        'Session user belum ditemukan. Silakan login ulang.'
+      )
       setLoading(false)
       return
     }
 
-    const { data: appUserData, error: appUserError } = await supabase
+    const {
+      data: appUserData,
+      error: appUserError,
+    } = await supabase
       .from('app_users')
       .select('*')
       .eq('id', authData.user.id)
@@ -423,14 +459,19 @@ export default function EmployeeLeavePage() {
     }
 
     if (!appUserData?.employee_id) {
-      setErrorMessage('Akun belum terhubung ke data employee. Silakan hubungi HR.')
+      setErrorMessage(
+        'Akun belum terhubung ke data employee. Silakan hubungi HR.'
+      )
       setLoading(false)
       return
     }
 
     setAppUser(appUserData)
 
-    const { data: employeeData, error: employeeError } = await supabase
+    const {
+      data: employeeData,
+      error: employeeError,
+    } = await supabase
       .from('employees')
       .select('*')
       .eq('id', appUserData.employee_id)
@@ -450,6 +491,11 @@ export default function EmployeeLeavePage() {
 
     setEmployee(employeeData)
 
+    const loadedRequestTypes =
+      await refreshHarmonyRequestTypes()
+
+    setRequestTypes(loadedRequestTypes)
+
     await Promise.all([
       fetchSupervisorData(employeeData),
       fetchAnnualLeaveSummary(employeeData.id),
@@ -461,108 +507,180 @@ export default function EmployeeLeavePage() {
     setLoading(false)
   }
 
-  async function fetchSupervisorData(employeeData: Employee) {
+  async function fetchSupervisorData(
+    employeeData: Employee
+  ) {
     const { data } = await supabase
       .from('employees')
       .select('*')
       .eq('is_active', true)
 
-    const employeeList = (data || []) as Employee[]
+    const employeeList =
+      (data || []) as Employee[]
 
     setEmployeeDirectory(employeeList)
 
-    const supervisorOneKey = normalizeText(employeeData.supervisor_1)
-    const supervisorTwoKey = normalizeText(employeeData.supervisor_2)
+    const supervisorOneKey =
+      normalizeText(employeeData.supervisor_1)
 
-    const foundOne = employeeList.find((item) => {
-      return (
-        normalizeText(item.id) === supervisorOneKey ||
-        normalizeText(item.full_name) === supervisorOneKey ||
-        normalizeText(item.employee_number) === supervisorOneKey ||
-        normalizeText(item.machine_pin) === supervisorOneKey ||
-        normalizeText(item.email) === supervisorOneKey
-      )
-    }) || null
+    const supervisorTwoKey =
+      normalizeText(employeeData.supervisor_2)
 
-    const foundTwo = employeeList.find((item) => {
-      return (
-        normalizeText(item.id) === supervisorTwoKey ||
-        normalizeText(item.full_name) === supervisorTwoKey ||
-        normalizeText(item.employee_number) === supervisorTwoKey ||
-        normalizeText(item.machine_pin) === supervisorTwoKey ||
-        normalizeText(item.email) === supervisorTwoKey
-      )
-    }) || null
+    const foundOne =
+      employeeList.find((item) => {
+        return (
+          normalizeText(item.id) === supervisorOneKey ||
+          normalizeText(item.full_name) === supervisorOneKey ||
+          normalizeText(item.employee_number) === supervisorOneKey ||
+          normalizeText(item.machine_pin) === supervisorOneKey ||
+          normalizeText(item.email) === supervisorOneKey
+        )
+      }) || null
+
+    const foundTwo =
+      employeeList.find((item) => {
+        return (
+          normalizeText(item.id) === supervisorTwoKey ||
+          normalizeText(item.full_name) === supervisorTwoKey ||
+          normalizeText(item.employee_number) === supervisorTwoKey ||
+          normalizeText(item.machine_pin) === supervisorTwoKey ||
+          normalizeText(item.email) === supervisorTwoKey
+        )
+      }) || null
 
     setSupervisorOne(foundOne)
     setSupervisorTwo(foundTwo)
   }
 
-  async function fetchAnnualLeaveSummary(employeeId: string) {
-    await supabase.rpc('sync_employee_annual_leave_balance', {
-      p_employee_id: employeeId,
-      p_reference_date: getTodayISO(),
-    })
+  async function fetchAnnualLeaveSummary(
+    employeeId: string
+  ) {
+    const {
+      error: reconcileError,
+    } = await supabase.rpc(
+      'harmony_reconcile_leave_lifecycle',
+      {
+        p_employee_id: employeeId,
+      }
+    )
 
-    const { data } = await supabase
-      .from('employee_annual_leave_summary')
+    if (reconcileError) {
+      console.warn(
+        'Leave lifecycle reconcile warning:',
+        reconcileError.message
+      )
+    }
+
+    const {
+      data,
+      error,
+    } = await supabase
+      .from('harmony_leave_balance_summary')
       .select('*')
       .eq('employee_id', employeeId)
       .maybeSingle<AnnualLeaveSummary>()
 
+    if (error) {
+      console.warn(
+        'Leave lifecycle summary warning:',
+        error.message
+      )
+
+      setAnnualLeave(null)
+      return
+    }
+
     setAnnualLeave(data || null)
   }
 
-  async function fetchPHLBalance(employeeId: string) {
-    const [{ data: recordData }, { data: summaryData, error: summaryError }] =
-      await Promise.all([
-        supabase
-          .from('phl_records')
-          .select('*')
-          .eq('employee_id', employeeId)
-          .eq('status', 'approved')
-          .gt('remaining_days', 0)
-          .gte('expired_at', getTodayISO())
-          .order('expired_at', { ascending: true }),
-        supabase.rpc('get_my_phl_balance_summary'),
-      ])
+  async function fetchPHLBalance(
+    employeeId: string
+  ) {
+    const [
+      {
+        data: recordData,
+      },
+      {
+        data: summaryData,
+        error: summaryError,
+      },
+    ] = await Promise.all([
+      supabase
+        .from('phl_records')
+        .select('*')
+        .eq('employee_id', employeeId)
+        .eq('status', 'approved')
+        .gt('remaining_days', 0)
+        .gte('expired_at', getTodayISO())
+        .order('expired_at', {
+          ascending: true,
+        }),
+
+      supabase.rpc(
+        'get_my_phl_balance_summary'
+      ),
+    ])
 
     setPhlRecords(recordData || [])
 
     if (summaryError) {
-      console.warn('Ringkasan saldo PHL V4 gagal dimuat:', summaryError.message)
+      console.warn(
+        'Ringkasan saldo PHL V4 gagal dimuat:',
+        summaryError.message
+      )
+
       setMyPHLBalance(null)
       return
     }
 
-    setMyPHLBalance((summaryData || null) as MyPHLBalanceSummary | null)
+    setMyPHLBalance(
+      (summaryData || null) as MyPHLBalanceSummary | null
+    )
   }
 
-  async function fetchLeaveRequests(employeeId: string) {
+  async function fetchLeaveRequests(
+    employeeId: string
+  ) {
     const { data } = await supabase
       .from('leave_requests')
       .select('*')
       .eq('employee_id', employeeId)
-      .order('created_at', { ascending: false })
+      .order('created_at', {
+        ascending: false,
+      })
 
     setLeaveRequests(data || [])
   }
 
   async function fetchHolidays() {
-    const year = new Date().getFullYear()
+    const year =
+      new Date().getFullYear()
 
     const { data } = await supabase
       .from('holidays')
       .select('*')
       .eq('is_active', true)
-      .gte('holiday_date', `${year - 1}-01-01`)
-      .lte('holiday_date', `${year + 1}-12-31`)
-      .order('holiday_date', { ascending: true })
+      .gte(
+        'holiday_date',
+        `${year - 1}-01-01`
+      )
+      .lte(
+        'holiday_date',
+        `${year + 1}-12-31`
+      )
+      .order('holiday_date', {
+        ascending: true,
+      })
 
     setHolidays(data || [])
   }
 
-  function updateForm<K extends keyof FormState>(key: K, value: FormState[K]) {
+  function updateForm<
+    K extends keyof FormState,
+  >(
+    key: K,
+    value: FormState[K]
+  ) {
     setForm((prev) => ({
       ...prev,
       [key]: value,
@@ -585,7 +703,9 @@ export default function EmployeeLeavePage() {
     setFormOpen(false)
   }
 
-  async function uploadProofFile(file: File | null) {
+  async function uploadProofFile(
+    file: File | null
+  ) {
     if (!file) {
       return {
         url: '',
@@ -596,15 +716,21 @@ export default function EmployeeLeavePage() {
       }
     }
 
-    const cleanName = file.name
-      .replace(/\s+/g, '-')
-      .replace(/[^a-zA-Z0-9.-]/g, '')
+    const cleanName =
+      file.name
+        .replace(/\s+/g, '-')
+        .replace(
+          /[^a-zA-Z0-9.-]/g,
+          ''
+        )
 
-    const path = `leave-requests/${Date.now()}-${crypto.randomUUID()}-${cleanName || 'file'}`
+    const path =
+      `leave-requests/${Date.now()}-${crypto.randomUUID()}-${cleanName || 'file'}`
 
-    const { error } = await supabase.storage
-      .from('leave-attachments')
-      .upload(path, file)
+    const { error } =
+      await supabase.storage
+        .from('leave-attachments')
+        .upload(path, file)
 
     if (error) {
       return {
@@ -616,9 +742,10 @@ export default function EmployeeLeavePage() {
       }
     }
 
-    const { data } = supabase.storage
-      .from('leave-attachments')
-      .getPublicUrl(path)
+    const { data } =
+      supabase.storage
+        .from('leave-attachments')
+        .getPublicUrl(path)
 
     return {
       url: data.publicUrl,
@@ -630,13 +757,25 @@ export default function EmployeeLeavePage() {
   }
 
   async function checkLockedPeriod() {
-    if (!employee || !form.start_date || !form.end_date) return false
+    if (
+      !employee ||
+      !form.start_date ||
+      !form.end_date
+    ) {
+      return false
+    }
 
-    const { data, error } = await supabase.rpc('is_employee_date_range_locked', {
-      p_employee_id: employee.id,
-      p_start_date: form.start_date,
-      p_end_date: form.end_date,
-    })
+    const {
+      data,
+      error,
+    } = await supabase.rpc(
+      'is_employee_date_range_locked',
+      {
+        p_employee_id: employee.id,
+        p_start_date: form.start_date,
+        p_end_date: form.end_date,
+      }
+    )
 
     if (error) {
       return false
@@ -645,7 +784,9 @@ export default function EmployeeLeavePage() {
     return Boolean(data)
   }
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(
+    event: FormEvent<HTMLFormElement>
+  ) {
     event.preventDefault()
 
     setSubmitting(true)
@@ -653,82 +794,138 @@ export default function EmployeeLeavePage() {
     setErrorMessage('')
 
     if (!appUser || !employee) {
-      setErrorMessage('Data user belum lengkap.')
+      setErrorMessage(
+        'Data user belum lengkap.'
+      )
+
       setSubmitting(false)
       return
     }
 
-    if (!form.start_date || !form.end_date) {
-      setErrorMessage('Tanggal mulai dan tanggal selesai wajib diisi.')
+    if (
+      !form.start_date ||
+      !form.end_date
+    ) {
+      setErrorMessage(
+        'Tanggal mulai dan tanggal selesai wajib diisi.'
+      )
+
       setSubmitting(false)
       return
     }
 
-    if (form.end_date < form.start_date) {
-      setErrorMessage('Tanggal selesai tidak boleh lebih awal dari tanggal mulai.')
+    if (
+      form.end_date <
+      form.start_date
+    ) {
+      setErrorMessage(
+        'Tanggal selesai tidak boleh lebih awal dari tanggal mulai.'
+      )
+
       setSubmitting(false)
       return
     }
 
     if (calculatedDays <= 0) {
-      setErrorMessage('Jumlah hari pengajuan harus lebih dari 0 hari kerja.')
+      setErrorMessage(
+        'Jumlah hari pengajuan harus lebih dari 0 hari kerja.'
+      )
+
       setSubmitting(false)
       return
     }
 
     if (!form.reason.trim()) {
-      setErrorMessage('Alasan pengajuan wajib diisi.')
+      setErrorMessage(
+        'Alasan pengajuan wajib diisi.'
+      )
+
       setSubmitting(false)
       return
     }
 
     if (!form.job_pending.trim()) {
-      setErrorMessage('Job pending wajib diisi agar pekerjaan tetap terpantau saat karyawan tidak masuk.')
+      setErrorMessage(
+        'Job pending wajib diisi agar pekerjaan tetap terpantau saat karyawan tidak masuk.'
+      )
+
       setSubmitting(false)
       return
     }
 
     if (!form.handover_to.trim()) {
-      setErrorMessage('Kolom penerima job pending wajib diisi.')
+      setErrorMessage(
+        'Kolom penerima job pending wajib diisi.'
+      )
+
       setSubmitting(false)
       return
     }
 
-    if (requiresProof && !form.proof_file) {
-      setErrorMessage(`${selectedRequestMeta.label} wajib melampirkan bukti/dokumen pendukung.`)
+    if (
+      requiresProof &&
+      !form.proof_file
+    ) {
+      setErrorMessage(
+        `${selectedRequestMeta.label} wajib melampirkan bukti/dokumen pendukung.`
+      )
+
       setSubmitting(false)
       return
     }
 
-    const isLocked = await checkLockedPeriod()
+    const isLocked =
+      await checkLockedPeriod()
 
     if (isLocked) {
-      setErrorMessage('Tanggal pengajuan masuk periode absensi yang sudah dikunci HR. Hubungi HR jika perlu revisi.')
+      setErrorMessage(
+        'Tanggal pengajuan masuk periode absensi yang sudah dikunci HR. Hubungi HR jika perlu revisi.'
+      )
+
       setSubmitting(false)
       return
     }
 
-    if (form.request_type === 'annual_leave' && calculatedDays > annualRemaining) {
-      setErrorMessage(`Saldo cuti tahunan tidak cukup. Sisa saldo saat ini ${annualRemaining} hari.`)
+    if (
+      form.request_type === 'annual_leave' &&
+      calculatedDays > annualRemaining
+    ) {
+      setErrorMessage(
+        `Saldo cuti tahunan tidak cukup. Sisa saldo saat ini ${annualRemaining} hari.`
+      )
+
       setSubmitting(false)
       return
     }
 
-    if (form.request_type === 'phl_claim' && calculatedDays > phlRemaining) {
-      setErrorMessage(`Saldo PHL tidak cukup. Sisa saldo PHL saat ini ${phlRemaining} hari.`)
+    if (
+      form.request_type === 'phl_claim' &&
+      calculatedDays > phlRemaining
+    ) {
+      setErrorMessage(
+        `Saldo PHL tidak cukup. Sisa saldo PHL saat ini ${phlRemaining} hari.`
+      )
+
       setSubmitting(false)
       return
     }
 
-    const uploaded = await uploadProofFile(form.proof_file)
+    const uploaded =
+      await uploadProofFile(
+        form.proof_file
+      )
 
     if (uploaded.error) {
-      setErrorMessage(uploaded.error)
+      setErrorMessage(
+        uploaded.error
+      )
+
       setSubmitting(false)
       return
     }
 
-    const now = new Date().toISOString()
+    const now =
+      new Date().toISOString()
 
     const payload = {
       employee_id: employee.id,
@@ -739,64 +936,131 @@ export default function EmployeeLeavePage() {
       position: employee.position,
       email: employee.email || appUser.email,
 
-      request_category: selectedRequestMeta.category,
-      leave_type: selectedRequestMeta.label,
-      request_type: form.request_type,
+      request_category:
+        selectedRequestMeta.category,
 
-      start_date: form.start_date,
-      end_date: form.end_date,
-      total_days: calculatedDays,
+      leave_type:
+        selectedRequestMeta.label,
 
-      reason: form.reason.trim(),
-      job_pending: form.job_pending.trim(),
-      handover_to: form.handover_to.trim(),
-      handover_note: form.handover_note.trim() || null,
+      request_type:
+        form.request_type,
 
-      proof_file_url: uploaded.url || null,
-      proof_file_name: uploaded.name || null,
-      proof_file_size: uploaded.size || null,
-      proof_file_type: uploaded.type || null,
+      start_date:
+        form.start_date,
+
+      end_date:
+        form.end_date,
+
+      total_days:
+        calculatedDays,
+
+      reason:
+        form.reason.trim(),
+
+      job_pending:
+        form.job_pending.trim(),
+
+      handover_to:
+        form.handover_to.trim(),
+
+      handover_note:
+        form.handover_note.trim() || null,
+
+      proof_file_url:
+        uploaded.url || null,
+
+      proof_file_name:
+        uploaded.name || null,
+
+      proof_file_size:
+        uploaded.size || null,
+
+      proof_file_type:
+        uploaded.type || null,
 
       status: 'pending',
-      supervisor_status: 'pending',
-      supervisor_id: supervisorOne?.id || null,
-      supervisor_name: supervisorOne?.full_name || employee.supervisor_1 || null,
-      hr_status: 'pending',
-      source: 'employee_self_service',
 
-      is_locked: false,
-      updated_at: now,
-      created_at: now,
+      supervisor_status:
+        'pending',
+
+      supervisor_id:
+        supervisorOne?.id || null,
+
+      supervisor_name:
+        supervisorOne?.full_name ||
+        employee.supervisor_1 ||
+        null,
+
+      hr_status:
+        'pending',
+
+      source:
+        'employee_self_service',
+
+      is_locked:
+        false,
+
+      updated_at:
+        now,
+
+      created_at:
+        now,
     }
 
-    const { data: insertedRequest, error } = await supabase
+    const {
+      data: insertedRequest,
+      error,
+    } = await supabase
       .from('leave_requests')
       .insert(payload)
       .select('*')
       .single<LeaveRequest>()
 
     if (error) {
-      setErrorMessage(error.message)
+      setErrorMessage(
+        error.message
+      )
+
       setSubmitting(false)
       return
     }
 
-    const notificationResult = await notifyLeaveRequestSubmitted({
-      requester: employee,
-      supervisorOne,
-      supervisorTwo,
+    const notificationResult =
+      await notifyLeaveRequestSubmitted({
+        requester: employee,
 
-      requestId: insertedRequest?.id,
-      requestTypeLabel: selectedRequestMeta.label,
-      startDate: form.start_date,
-      endDate: form.end_date,
-      totalDays: calculatedDays,
+        supervisorOne,
+        supervisorTwo,
 
-      reason: form.reason.trim(),
-      jobPending: form.job_pending.trim(),
-      handoverTo: selectedHandoverEmployee?.full_name || form.handover_to.trim(),
-      handoverNote: form.handover_note.trim() || null,
-    })
+        requestId:
+          insertedRequest?.id,
+
+        requestTypeLabel:
+          selectedRequestMeta.label,
+
+        startDate:
+          form.start_date,
+
+        endDate:
+          form.end_date,
+
+        totalDays:
+          calculatedDays,
+
+        reason:
+          form.reason.trim(),
+
+        jobPending:
+          form.job_pending.trim(),
+
+        handoverTo:
+          selectedHandoverEmployee?.full_name ||
+          form.handover_to.trim(),
+
+        handoverNote:
+          form.handover_note.trim() ||
+          null,
+      })
 
     setSuccessMessage(
       notificationResult.success
@@ -820,30 +1084,51 @@ export default function EmployeeLeavePage() {
     <>
       <Topbar
         title="Cuti & Izin"
-        description="Ajukan cuti, izin, sakit, tugas luar, klaim PHL, dan postpone sisa cuti tahunan."
+        description="Ajukan cuti, izin, sakit, tugas luar, klaim PHL, jenis ketidakhadiran custom, dan postpone sisa cuti tahunan."
       />
 
       <section className="space-y-6 p-4 sm:p-6">
         {successMessage && (
-          <AlertBox tone="green" title="Berhasil" icon={<CheckCircle2 size={18} />}>
+          <AlertBox
+            tone="green"
+            title="Berhasil"
+            icon={
+              <CheckCircle2
+                size={18}
+              />
+            }
+          >
             {successMessage}
           </AlertBox>
         )}
 
         {errorMessage && (
-          <AlertBox tone="orange" title="Perhatian" icon={<AlertTriangle size={18} />}>
+          <AlertBox
+            tone="orange"
+            title="Perhatian"
+            icon={
+              <AlertTriangle
+                size={18}
+              />
+            }
+          >
             {errorMessage}
           </AlertBox>
         )}
 
         <div className="relative overflow-hidden rounded-[34px] border border-black/5 bg-[#1d1d1f] p-5 text-white shadow-[0_24px_80px_rgba(0,0,0,0.16)] sm:p-7">
           <div className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-[#007aff]/35 blur-3xl" />
+
           <div className="pointer-events-none absolute -bottom-28 -left-20 h-72 w-72 rounded-full bg-[#34c759]/20 blur-3xl" />
 
           <div className="relative flex flex-col gap-7">
             <div>
               <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-4 py-2 text-xs font-semibold text-white/75 backdrop-blur-xl">
-                <CalendarDays size={15} className="text-[#5ac8fa]" />
+                <CalendarDays
+                  size={15}
+                  className="text-[#5ac8fa]"
+                />
+
                 Employee Leave Request
               </div>
 
@@ -852,32 +1137,77 @@ export default function EmployeeLeavePage() {
               </h1>
 
               <p className="mt-5 max-w-3xl text-sm leading-7 text-white/62">
-                Ajukan cuti, izin, sakit, tugas luar, klaim PHL, dan pantau status approval dalam satu dashboard.
+                Ajukan cuti, izin,
+                sakit, tugas luar,
+                klaim PHL, dan pantau
+                status approval dalam
+                satu dashboard.
               </p>
             </div>
 
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-              <HeroMetric label="Cuti Tahunan" value={`${annualRemaining} hari`} />
-              <HeroMetric label="Saldo PHL" value={`${phlRemaining} hari`} />
-              <HeroMetric label="Pending" value={String(pendingCount)} />
-              <HeroMetric label="Approved" value={String(approvedCount)} />
+              <HeroMetric
+                label="Total Cuti Tersedia"
+                value={`${annualRemaining} hari`}
+              />
+
+              <HeroMetric
+                label="Postpone Aktif"
+                value={`${postponeActiveRemaining} hari`}
+              />
+
+              <HeroMetric
+                label="Saldo PHL"
+                value={`${phlRemaining} hari`}
+              />
+
+              <HeroMetric
+                label="Pending"
+                value={String(
+                  pendingCount
+                )}
+              />
             </div>
           </div>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
           <SummaryCard
-            title="Sisa Cuti Tahunan"
-            value={`${annualRemaining} hari`}
+            title="Cuti Tahunan Matang"
+            value={`${annualRegularRemaining} hari`}
             description={
-              annualBalanceUsesHROverride
-                ? 'Mengikuti saldo dari HR Master Employee'
-                : annualLeave?.latest_matured_date
-                  ? `Matang terakhir: ${formatDisplayDate(annualLeave.latest_matured_date)}`
-                  : 'Belum ada cycle cuti aktif'
+              annualLeave?.latest_matured_at
+                ? `Matang terakhir: ${formatDisplayDate(
+                    annualLeave.latest_matured_at
+                  )}`
+                : 'Belum mencapai anniversary hak cuti'
             }
-            icon={<WalletCards size={22} />}
+            icon={
+              <WalletCards
+                size={22}
+              />
+            }
             tone="blue"
+          />
+
+          <SummaryCard
+            title="Postpone Aktif"
+            value={`${postponeActiveRemaining} hari`}
+            description={
+              postponeActiveRemaining > 0
+                ? `Berlaku sampai: ${formatDisplayDate(
+                    annualLeave?.next_postpone_expiry || ''
+                  )}`
+                : postponeExpiredDays > 0
+                  ? `${postponeExpiredDays} hari postpone sudah expired dan tidak dihitung`
+                  : 'Belum ada saldo postpone aktif'
+            }
+            icon={
+              <RotateCcw
+                size={22}
+              />
+            }
+            tone="purple"
           />
 
           <SummaryCard
@@ -888,7 +1218,11 @@ export default function EmployeeLeavePage() {
                 ? 'Mengikuti saldo dari HR Master Employee'
                 : 'Saldo PHL aktif dan belum expired'
             }
-            icon={<Plane size={22} />}
+            icon={
+              <Plane
+                size={22}
+              />
+            }
             tone="purple"
           />
 
@@ -896,17 +1230,69 @@ export default function EmployeeLeavePage() {
             title="Menunggu Approval"
             value={`${pendingCount}`}
             description="Pengajuan yang belum final"
-            icon={<Clock3 size={22} />}
+            icon={
+              <Clock3
+                size={22}
+              />
+            }
             tone="orange"
           />
 
           <SummaryCard
             title="Atasan Approval"
-            value={supervisorOne?.full_name || employee?.supervisor_1 || '-'}
-            description={supervisorTwo?.full_name ? `Atasan 2: ${supervisorTwo.full_name}` : 'Atasan dari data karyawan'}
-            icon={<UserCheck size={22} />}
+            value={
+              supervisorOne?.full_name ||
+              employee?.supervisor_1 ||
+              '-'
+            }
+            description={
+              supervisorTwo?.full_name
+                ? `Atasan 2: ${supervisorTwo.full_name}`
+                : 'Atasan dari data karyawan'
+            }
+            icon={
+              <UserCheck
+                size={22}
+              />
+            }
             tone="green"
           />
+        </div>
+
+        <div className="rounded-[26px] border border-blue-100 bg-[#f7fbff] p-5 text-sm leading-6 text-[#41607d]">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="font-bold text-[#1d1d1f]">
+                Total Cuti Tersedia:{' '}
+                {annualRemaining} hari
+              </p>
+
+              <p className="mt-1">
+                {annualRegularRemaining}{' '}
+                hari cuti tahunan matang
+                {' + '}
+                {postponeActiveRemaining}{' '}
+                hari postpone aktif
+
+                {annualBalanceUsesHROverride
+                  ? ` ${annualManualAdjustment >= 0 ? '+' : '-'} ${Math.abs(
+                      annualManualAdjustment
+                    )} hari adjustment HR`
+                  : ''}
+
+                . Postpone expired tidak
+                lagi mengurangi saldo
+                secara manual.
+              </p>
+            </div>
+
+            {postponeExpiredDays > 0 && (
+              <span className="inline-flex shrink-0 rounded-full bg-red-50 px-3 py-1.5 text-xs font-bold text-red-700">
+                {postponeExpiredDays}{' '}
+                hari postpone expired
+              </span>
+            )}
+          </div>
         </div>
 
         <div className="harmony-card overflow-hidden">
@@ -917,7 +1303,11 @@ export default function EmployeeLeavePage() {
               </h2>
 
               <p className="mt-1 text-sm leading-6 text-[#6e6e73]">
-                Buka form pengajuan lewat modal, akses postpone cuti, atau refresh saldo dan riwayat.
+                Buka form pengajuan
+                lewat modal, akses
+                postpone cuti, atau
+                refresh saldo dan
+                riwayat.
               </p>
             </div>
 
@@ -945,7 +1335,17 @@ export default function EmployeeLeavePage() {
                 disabled={loading}
                 className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-black/5 bg-white px-4 text-sm font-bold text-[#1d1d1f] shadow-sm transition hover:bg-[#f5f5f7] disabled:opacity-60"
               >
-                {loading ? <Loader2 size={18} className="animate-spin" /> : <RefreshCcw size={18} />}
+                {loading ? (
+                  <Loader2
+                    size={18}
+                    className="animate-spin"
+                  />
+                ) : (
+                  <RefreshCcw
+                    size={18}
+                  />
+                )}
+
                 Refresh
               </button>
             </div>
@@ -977,6 +1377,7 @@ export default function EmployeeLeavePage() {
             calculatedDays={calculatedDays}
             requiresProof={requiresProof}
             selectedRequestMeta={selectedRequestMeta}
+            requestTypes={requestTypes}
             annualRemaining={annualRemaining}
             phlRemaining={phlRemaining}
             handoverEmployeeOptions={handoverEmployeeOptions}
@@ -1001,6 +1402,7 @@ function LeaveRequestModal({
   calculatedDays,
   requiresProof,
   selectedRequestMeta,
+  requestTypes,
   annualRemaining,
   phlRemaining,
   handoverEmployeeOptions,
@@ -1018,12 +1420,18 @@ function LeaveRequestModal({
   calculatedDays: number
   requiresProof: boolean
   selectedRequestMeta: ReturnType<typeof getRequestMeta>
+  requestTypes: HarmonyRequestTypeDefinition[]
   annualRemaining: number
   phlRemaining: number
   handoverEmployeeOptions: Employee[]
   selectedHandoverEmployee: Employee | null
-  onUpdate: <K extends keyof FormState>(key: K, value: FormState[K]) => void
-  onSubmit: (event: FormEvent<HTMLFormElement>) => void
+  onUpdate: <K extends keyof FormState>(
+    key: K,
+    value: FormState[K]
+  ) => void
+  onSubmit: (
+    event: FormEvent<HTMLFormElement>
+  ) => void
   onClose: () => void
 }) {
   return (
@@ -1032,11 +1440,15 @@ function LeaveRequestModal({
         <div className="flex items-start justify-between gap-4 border-b border-black/5 p-5 sm:p-6">
           <div>
             <h2 className="text-xl font-semibold text-[#1d1d1f]">
-              Form Pengajuan Cuti / Izin / PHL
+              Form Pengajuan Cuti /
+              Izin / PHL
             </h2>
 
             <p className="mt-1 text-sm leading-6 text-[#6e6e73]">
-              Isi data pengajuan. Sabtu, Minggu, dan hari libur aktif tidak dihitung sebagai jatah cuti.
+              Isi data pengajuan.
+              Sabtu, Minggu, dan hari
+              libur aktif tidak dihitung
+              sebagai jatah cuti.
             </p>
           </div>
 
@@ -1050,12 +1462,20 @@ function LeaveRequestModal({
           </button>
         </div>
 
-        <form onSubmit={onSubmit} className="flex min-h-0 flex-1 flex-col">
+        <form
+          onSubmit={onSubmit}
+          className="flex min-h-0 flex-1 flex-col"
+        >
           <div className="min-h-0 flex-1 space-y-5 overflow-y-auto p-5 sm:p-6">
             {loading && (
               <div className="flex items-center gap-3 rounded-2xl border border-black/5 bg-[#f5f5f7]/70 p-4 text-sm text-[#6e6e73]">
-                <Loader2 size={18} className="animate-spin" />
-                Memuat data saldo, atasan, dan riwayat...
+                <Loader2
+                  size={18}
+                  className="animate-spin"
+                />
+
+                Memuat data saldo,
+                atasan, dan riwayat...
               </div>
             )}
 
@@ -1066,49 +1486,76 @@ function LeaveRequestModal({
             />
 
             <label className="block">
-              <span className="harmony-label">Jenis Pengajuan</span>
+              <span className="harmony-label">
+                Jenis Pengajuan
+              </span>
 
               <select
                 value={form.request_type}
-                onChange={(event) => onUpdate('request_type', event.target.value as RequestType)}
+                onChange={(event) =>
+                  onUpdate(
+                    'request_type',
+                    event.target.value as RequestType
+                  )
+                }
                 className="harmony-select"
               >
-                <option value="annual_leave">Cuti Tahunan</option>
-                <option value="marriage_leave">Cuti Menikah</option>
-                <option value="maternity_leave">Cuti Melahirkan</option>
-                <option value="miscarriage_leave">Cuti Keguguran</option>
-                <option value="bereavement_leave">Cuti Duka</option>
-                <option value="child_circumcision_leave">Cuti Khitan / Baptis Anak</option>
-                <option value="worship_leave">Cuti Ibadah</option>
-                <option value="menstrual_leave">Cuti Haid</option>
-                <option value="pregnancy_check_leave">Pemeriksaan Kehamilan</option>
-                <option value="sick">Sakit</option>
-                <option value="permit">Izin</option>
-                <option value="official_travel">Tugas Luar / Dinas</option>
-                <option value="phl_claim">Klaim PHL</option>
-                <option value="other_leave">Cuti Lainnya</option>
+                {groupHarmonyTypes(
+                  getActiveHarmonyTypesForScope(
+                    requestTypes,
+                    'leave'
+                  )
+                ).map(([group, items]) => (
+                  <optgroup
+                    key={group}
+                    label={group}
+                  >
+                    {items.map((item) => (
+                      <option
+                        key={item.code}
+                        value={item.code}
+                      >
+                        {item.label}
+                      </option>
+                    ))}
+                  </optgroup>
+                ))}
               </select>
             </label>
 
             <div className="grid gap-4 md:grid-cols-2">
               <label className="block">
-                <span className="harmony-label">Tanggal Mulai</span>
+                <span className="harmony-label">
+                  Tanggal Mulai
+                </span>
 
                 <input
                   type="date"
                   value={form.start_date}
-                  onChange={(event) => onUpdate('start_date', event.target.value)}
+                  onChange={(event) =>
+                    onUpdate(
+                      'start_date',
+                      event.target.value
+                    )
+                  }
                   className="harmony-input"
                 />
               </label>
 
               <label className="block">
-                <span className="harmony-label">Tanggal Selesai</span>
+                <span className="harmony-label">
+                  Tanggal Selesai
+                </span>
 
                 <input
                   type="date"
                   value={form.end_date}
-                  onChange={(event) => onUpdate('end_date', event.target.value)}
+                  onChange={(event) =>
+                    onUpdate(
+                      'end_date',
+                      event.target.value
+                    )
+                  }
                   className="harmony-input"
                 />
               </label>
@@ -1125,7 +1572,7 @@ function LeaveRequestModal({
               <InfoTile
                 label="Saldo Cuti"
                 value={`${annualRemaining} hari`}
-                description="Sisa cuti tahunan"
+                description="Cuti matang + postpone aktif"
                 tone="green"
               />
 
@@ -1138,11 +1585,18 @@ function LeaveRequestModal({
             </div>
 
             <label className="block">
-              <span className="harmony-label">Alasan Pengajuan</span>
+              <span className="harmony-label">
+                Alasan Pengajuan
+              </span>
 
               <textarea
                 value={form.reason}
-                onChange={(event) => onUpdate('reason', event.target.value)}
+                onChange={(event) =>
+                  onUpdate(
+                    'reason',
+                    event.target.value
+                  )
+                }
                 placeholder="Tuliskan alasan pengajuan secara singkat dan jelas."
                 className="harmony-textarea"
               />
@@ -1156,60 +1610,123 @@ function LeaveRequestModal({
 
                 <div>
                   <h3 className="font-semibold text-[#1d1d1f]">
-                    Job Pending & Serah Terima
+                    Job Pending &
+                    Serah Terima
                   </h3>
 
                   <p className="text-xs leading-5 text-[#6e6e73]">
-                    Wajib diisi agar pekerjaan tetap terpantau selama karyawan tidak masuk.
+                    Wajib diisi agar
+                    pekerjaan tetap
+                    terpantau selama
+                    karyawan tidak
+                    masuk.
                   </p>
                 </div>
               </div>
 
               <div className="grid gap-4">
                 <label className="block">
-                  <span className="harmony-label">Job Pending</span>
+                  <span className="harmony-label">
+                    Job Pending
+                  </span>
 
                   <textarea
                     value={form.job_pending}
-                    onChange={(event) => onUpdate('job_pending', event.target.value)}
+                    onChange={(event) =>
+                      onUpdate(
+                        'job_pending',
+                        event.target.value
+                      )
+                    }
                     placeholder="Contoh: follow up dokumen, pekerjaan yang harus dicek, atau pekerjaan yang belum selesai."
                     className="harmony-textarea"
                   />
                 </label>
 
                 <label className="block">
-                  <span className="harmony-label">Penerima Job Pending</span>
+                  <span className="harmony-label">
+                    Penerima Job Pending
+                  </span>
 
                   <select
                     value={form.handover_to}
-                    onChange={(event) => onUpdate('handover_to', event.target.value)}
+                    onChange={(event) =>
+                      onUpdate(
+                        'handover_to',
+                        event.target.value
+                      )
+                    }
                     className="harmony-select"
                   >
-                    <option value="">Pilih karyawan penerima tugas</option>
+                    <option value="">
+                      Pilih karyawan
+                      penerima tugas
+                    </option>
 
-                    {handoverEmployeeOptions.map((item) => (
-                      <option key={item.id} value={item.id}>
-                        {formatEmployeeOption(item)}
-                      </option>
-                    ))}
+                    {handoverEmployeeOptions.map(
+                      (item) => (
+                        <option
+                          key={item.id}
+                          value={item.id}
+                        >
+                          {formatEmployeeOption(
+                            item
+                          )}
+                        </option>
+                      )
+                    )}
                   </select>
                 </label>
 
                 {selectedHandoverEmployee && (
                   <div className="grid gap-3 rounded-2xl bg-white p-4 text-xs sm:grid-cols-4">
-                    <AutoReadInfo label="Nama" value={selectedHandoverEmployee.full_name || '-'} />
-                    <AutoReadInfo label="NIP" value={selectedHandoverEmployee.employee_number || '-'} />
-                    <AutoReadInfo label="Unit" value={selectedHandoverEmployee.department || '-'} />
-                    <AutoReadInfo label="Email" value={selectedHandoverEmployee.email || '-'} />
+                    <AutoReadInfo
+                      label="Nama"
+                      value={
+                        selectedHandoverEmployee.full_name ||
+                        '-'
+                      }
+                    />
+
+                    <AutoReadInfo
+                      label="NIP"
+                      value={
+                        selectedHandoverEmployee.employee_number ||
+                        '-'
+                      }
+                    />
+
+                    <AutoReadInfo
+                      label="Unit"
+                      value={
+                        selectedHandoverEmployee.department ||
+                        '-'
+                      }
+                    />
+
+                    <AutoReadInfo
+                      label="Email"
+                      value={
+                        selectedHandoverEmployee.email ||
+                        '-'
+                      }
+                    />
                   </div>
                 )}
 
                 <label className="block">
-                  <span className="harmony-label">Catatan Serah Terima</span>
+                  <span className="harmony-label">
+                    Catatan Serah Terima
+                  </span>
 
                   <textarea
                     value={form.handover_note}
-                    onChange={(event) => onUpdate('handover_note', event.target.value)}
+                    onChange={(event) =>
+                      onUpdate(
+                        'handover_note',
+                        event.target.value
+                      )
+                    }
                     placeholder="Opsional: arahan tambahan untuk penerima job pending."
                     className="harmony-textarea"
                   />
@@ -1231,7 +1748,8 @@ function LeaveRequestModal({
                   </p>
 
                   <p className="mt-1 text-xs font-bold text-[#007aff]">
-                    {form.proof_file?.name || 'Belum ada file dipilih'}
+                    {form.proof_file?.name ||
+                      'Belum ada file dipilih'}
                   </p>
                 </div>
 
@@ -1243,7 +1761,13 @@ function LeaveRequestModal({
                     type="file"
                     accept=".pdf,.jpg,.jpeg,.png,.webp"
                     className="hidden"
-                    onChange={(event) => onUpdate('proof_file', event.target.files?.[0] || null)}
+                    onChange={(event) =>
+                      onUpdate(
+                        'proof_file',
+                        event.target.files?.[0] ||
+                          null
+                      )
+                    }
                   />
                 </label>
               </div>
@@ -1252,16 +1776,32 @@ function LeaveRequestModal({
 
           <div className="flex flex-col gap-3 border-t border-black/5 bg-white p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
             <p className="text-xs leading-5 text-[#6e6e73]">
-              Pengajuan akan dikirim ke atasan/HR dan tersinkron ke riwayat setelah berhasil submit.
+              Pengajuan akan dikirim
+              ke atasan/HR dan
+              tersinkron ke riwayat
+              setelah berhasil submit.
             </p>
 
             <button
               type="submit"
-              disabled={submitting || loading}
+              disabled={
+                submitting ||
+                loading
+              }
               className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-[#1d1d1f] px-5 text-sm font-bold text-white transition hover:bg-black disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {submitting ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
-              {submitting ? 'Mengirim...' : `Ajukan ${selectedRequestMeta.label}`}
+              {submitting ? (
+                <Loader2
+                  size={18}
+                  className="animate-spin"
+                />
+              ) : (
+                <Send size={18} />
+              )}
+
+              {submitting
+                ? 'Mengirim...'
+                : `Ajukan ${selectedRequestMeta.label}`}
             </button>
           </div>
         </form>
@@ -1285,16 +1825,21 @@ function HistorySection({
         <div className="flex flex-col gap-3 border-b border-black/5 p-5 sm:p-6 md:flex-row md:items-center md:justify-between">
           <div>
             <h2 className="text-lg font-semibold text-[#1d1d1f]">
-              Riwayat Pengajuan Cuti / Izin / PHL
+              Riwayat Pengajuan Cuti /
+              Izin / PHL
             </h2>
 
             <p className="mt-1 text-sm leading-6 text-[#6e6e73]">
-              Pantau status pengajuan, approval atasan, HR, dan periode cuti/izin/PHL yang sudah diajukan.
+              Pantau status pengajuan,
+              approval atasan, HR, dan
+              periode cuti/izin/PHL
+              yang sudah diajukan.
             </p>
           </div>
 
           <div className="rounded-full bg-[#f5f5f7] px-4 py-2 text-xs font-bold text-[#6e6e73]">
-            {leaveRequests.length} pengajuan
+            {leaveRequests.length}{' '}
+            pengajuan
           </div>
         </div>
 
@@ -1303,9 +1848,14 @@ function HistorySection({
             <LoadingState />
           ) : leaveRequests.length > 0 ? (
             <div className="space-y-3">
-              {leaveRequests.map((request) => (
-                <HistoryCard key={request.id} request={request} />
-              ))}
+              {leaveRequests.map(
+                (request) => (
+                  <HistoryCard
+                    key={request.id}
+                    request={request}
+                  />
+                )
+              )}
             </div>
           ) : (
             <EmptyState
@@ -1323,7 +1873,9 @@ function HistorySection({
           </h3>
 
           <p className="mt-1 text-sm leading-6 text-[#6e6e73]">
-            PHL berlaku maksimal 90 hari kalender dari tanggal PHL.
+            PHL berlaku maksimal 90
+            hari kalender dari tanggal
+            PHL.
           </p>
         </div>
 
@@ -1332,9 +1884,14 @@ function HistorySection({
             <LoadingState />
           ) : phlRecords.length > 0 ? (
             <div className="space-y-3">
-              {phlRecords.map((record) => (
-                <PHLBalanceCard key={record.id} record={record} />
-              ))}
+              {phlRecords.map(
+                (record) => (
+                  <PHLBalanceCard
+                    key={record.id}
+                    record={record}
+                  />
+                )
+              )}
             </div>
           ) : (
             <EmptyState
@@ -1348,17 +1905,40 @@ function HistorySection({
   )
 }
 
-function HistoryCard({ request }: { request: LeaveRequest }) {
-  const label = request.leave_type || getRequestMeta((request.request_type || 'annual_leave') as RequestType).label
-  const statusValue = request.hr_status || request.supervisor_status || request.status || 'pending'
-  const tone = getStatusTone(statusValue)
+function HistoryCard({
+  request,
+}: {
+  request: LeaveRequest
+}) {
+  const label =
+    request.leave_type ||
+    getRequestMeta(
+      (
+        request.request_type ||
+        'annual_leave'
+      ) as RequestType
+    ).label
+
+  const statusValue =
+    request.hr_status ||
+    request.supervisor_status ||
+    request.status ||
+    'pending'
+
+  const tone =
+    getStatusTone(statusValue)
 
   return (
     <article className="rounded-[26px] border border-black/5 bg-white p-4 shadow-sm transition hover:bg-[#fbfbfd] sm:p-5">
       <div className="grid gap-4 xl:grid-cols-[1fr_auto] xl:items-start">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <StatusBadge label={formatStatus(statusValue)} tone={tone} />
+            <StatusBadge
+              label={formatStatus(
+                statusValue
+              )}
+              tone={tone}
+            />
 
             <span className="rounded-full bg-[#f5f5f7] px-3 py-1 text-xs font-bold text-[#1d1d1f]">
               {label}
@@ -1366,33 +1946,78 @@ function HistoryCard({ request }: { request: LeaveRequest }) {
           </div>
 
           <h3 className="mt-3 text-base font-bold text-[#1d1d1f]">
-            {formatDisplayDate(request.start_date || '')} - {formatDisplayDate(request.end_date || '')}
+            {formatDisplayDate(
+              request.start_date || ''
+            )}{' '}
+            -{' '}
+            {formatDisplayDate(
+              request.end_date || ''
+            )}
           </h3>
 
           <p className="mt-1 text-sm leading-6 text-[#6e6e73]">
-            {request.reason || 'Tidak ada alasan tertulis.'}
+            {request.reason ||
+              'Tidak ada alasan tertulis.'}
           </p>
 
           <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <SmallInfo label="Jumlah Hari" value={`${request.total_days || 0} hari`} />
-            <SmallInfo label="Atasan" value={request.supervisor_name || '-'} />
-            <SmallInfo label="Submit" value={formatDateTime(request.created_at || '')} />
-            <SmallInfo label="HR Status" value={formatStatus(request.hr_status || '-')} />
+            <SmallInfo
+              label="Jumlah Hari"
+              value={`${request.total_days || 0} hari`}
+            />
+
+            <SmallInfo
+              label="Atasan"
+              value={
+                request.supervisor_name ||
+                '-'
+              }
+            />
+
+            <SmallInfo
+              label="Submit"
+              value={formatDateTime(
+                request.created_at || ''
+              )}
+            />
+
+            <SmallInfo
+              label="HR Status"
+              value={formatStatus(
+                request.hr_status || '-'
+              )}
+            />
           </div>
 
-          {(request.job_pending || request.handover_to || request.handover_note) && (
+          {(request.job_pending ||
+            request.handover_to ||
+            request.handover_note) && (
             <div className="mt-4 rounded-2xl bg-[#f5f5f7]/80 p-4">
               <p className="text-xs font-bold uppercase tracking-wide text-[#86868b]">
                 Job Pending
               </p>
 
               <p className="mt-2 text-sm leading-6 text-[#1d1d1f]">
-                {request.job_pending || '-'}
+                {request.job_pending ||
+                  '-'}
               </p>
 
               <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                <SmallInfo label="Dialihkan Kepada" value={request.handover_to || '-'} />
-                <SmallInfo label="Catatan" value={request.handover_note || '-'} />
+                <SmallInfo
+                  label="Dialihkan Kepada"
+                  value={
+                    request.handover_to ||
+                    '-'
+                  }
+                />
+
+                <SmallInfo
+                  label="Catatan"
+                  value={
+                    request.handover_note ||
+                    '-'
+                  }
+                />
               </div>
             </div>
           )}
@@ -1401,12 +2026,17 @@ function HistoryCard({ request }: { request: LeaveRequest }) {
         <div className="flex flex-col gap-2 xl:min-w-[170px]">
           {request.proof_file_url ? (
             <a
-              href={request.proof_file_url}
+              href={
+                request.proof_file_url
+              }
               target="_blank"
               rel="noreferrer"
               className="inline-flex min-h-10 items-center justify-center gap-2 rounded-2xl bg-[#e8f2ff] px-4 text-xs font-bold text-[#0059b8] transition hover:bg-blue-100"
             >
-              <FileText size={15} />
+              <FileText
+                size={15}
+              />
+
               Lihat Bukti
             </a>
           ) : (
@@ -1420,22 +2050,32 @@ function HistoryCard({ request }: { request: LeaveRequest }) {
   )
 }
 
-function PHLBalanceCard({ record }: { record: PHLRecord }) {
+function PHLBalanceCard({
+  record,
+}: {
+  record: PHLRecord
+}) {
   return (
     <div className="rounded-[24px] border border-black/5 bg-[#f7edfc]/50 p-4">
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-sm font-bold text-[#1d1d1f]">
-            {formatDisplayDate(record.phl_date || '')}
+            {formatDisplayDate(
+              record.phl_date || ''
+            )}
           </p>
 
           <p className="mt-1 text-xs leading-5 text-[#6e6e73]">
-            Expired: {formatDisplayDate(record.expired_at || '')}
+            Expired:{' '}
+            {formatDisplayDate(
+              record.expired_at || ''
+            )}
           </p>
         </div>
 
         <span className="rounded-full bg-white px-3 py-1 text-xs font-bold text-[#7b2cbf]">
-          {record.remaining_days || 0} hari
+          {record.remaining_days || 0}{' '}
+          hari
         </span>
       </div>
 
@@ -1462,23 +2102,49 @@ function EmployeeIdentity({
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex min-w-0 items-center gap-3">
           <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white text-[#007aff] shadow-sm">
-            <UserRound size={20} />
+            <UserRound
+              size={20}
+            />
           </div>
 
           <div className="min-w-0">
             <h3 className="truncate text-sm font-bold text-[#1d1d1f]">
-              {employee?.full_name || employee?.email || 'Employee'}
+              {employee?.full_name ||
+                employee?.email ||
+                'Employee'}
             </h3>
 
             <p className="mt-1 truncate text-xs text-[#6e6e73]">
-              {employee?.employee_number || '-'} · {employee?.department || '-'} · {employee?.position || '-'}
+              {employee?.employee_number ||
+                '-'}{' '}
+              ·{' '}
+              {employee?.department ||
+                '-'}{' '}
+              ·{' '}
+              {employee?.position ||
+                '-'}
             </p>
           </div>
         </div>
 
         <div className="grid gap-3 text-xs sm:grid-cols-2 lg:min-w-[420px]">
-          <AutoReadInfo label="Atasan 1" value={supervisorOne?.full_name || employee?.supervisor_1 || '-'} />
-          <AutoReadInfo label="Atasan 2" value={supervisorTwo?.full_name || employee?.supervisor_2 || '-'} />
+          <AutoReadInfo
+            label="Atasan 1"
+            value={
+              supervisorOne?.full_name ||
+              employee?.supervisor_1 ||
+              '-'
+            }
+          />
+
+          <AutoReadInfo
+            label="Atasan 2"
+            value={
+              supervisorTwo?.full_name ||
+              employee?.supervisor_2 ||
+              '-'
+            }
+          />
         </div>
       </div>
     </div>
@@ -1502,7 +2168,9 @@ function AlertBox({
       : 'border-orange-200 bg-orange-50 text-orange-700'
 
   return (
-    <div className={`rounded-2xl border p-4 text-sm leading-6 ${className}`}>
+    <div
+      className={`rounded-2xl border p-4 text-sm leading-6 ${className}`}
+    >
       <div className="mb-1 flex items-center gap-2 font-bold">
         {icon}
         {title}
@@ -1524,20 +2192,33 @@ function SummaryCard({
   value: string
   description: string
   icon: ReactNode
-  tone: 'blue' | 'green' | 'orange' | 'purple'
+  tone:
+    | 'blue'
+    | 'green'
+    | 'orange'
+    | 'purple'
 }) {
   const toneClass = {
-    blue: 'bg-[#e8f2ff] text-[#007aff]',
-    green: 'bg-green-50 text-green-700',
-    orange: 'bg-orange-50 text-orange-700',
-    purple: 'bg-[#f7edfc] text-[#7b2cbf]',
+    blue:
+      'bg-[#e8f2ff] text-[#007aff]',
+
+    green:
+      'bg-green-50 text-green-700',
+
+    orange:
+      'bg-orange-50 text-orange-700',
+
+    purple:
+      'bg-[#f7edfc] text-[#7b2cbf]',
   }[tone]
 
   return (
     <div className="harmony-card harmony-hover-lift p-5 sm:p-6">
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0 flex-1">
-          <p className="text-sm text-[#6e6e73]">{title}</p>
+          <p className="text-sm text-[#6e6e73]">
+            {title}
+          </p>
 
           <h3 className="mt-2 break-words text-2xl font-semibold leading-tight tracking-tight text-[#1d1d1f] sm:text-[28px]">
             {value}
@@ -1548,7 +2229,11 @@ function SummaryCard({
           </p>
         </div>
 
-        <div className={`rounded-2xl p-3 ${toneClass}`}>{icon}</div>
+        <div
+          className={`rounded-2xl p-3 ${toneClass}`}
+        >
+          {icon}
+        </div>
       </div>
     </div>
   )
@@ -1563,8 +2248,13 @@ function HeroMetric({
 }) {
   return (
     <div className="rounded-[22px] border border-white/10 bg-white/10 p-4 backdrop-blur-xl">
-      <p className="text-xs font-semibold text-white/50">{label}</p>
-      <p className="mt-1 break-words text-xl font-semibold text-white">{value}</p>
+      <p className="text-xs font-semibold text-white/50">
+        {label}
+      </p>
+
+      <p className="mt-1 break-words text-xl font-semibold text-white">
+        {value}
+      </p>
     </div>
   )
 }
@@ -1574,19 +2264,38 @@ function StatusBadge({
   tone,
 }: {
   label: string
-  tone: 'green' | 'orange' | 'red' | 'blue' | 'purple' | 'neutral'
+  tone:
+    | 'green'
+    | 'orange'
+    | 'red'
+    | 'blue'
+    | 'purple'
+    | 'neutral'
 }) {
   const className = {
-    green: 'bg-green-50 text-green-700',
-    orange: 'bg-orange-50 text-orange-700',
-    red: 'bg-red-50 text-red-700',
-    blue: 'bg-[#e8f2ff] text-[#0059b8]',
-    purple: 'bg-[#f7edfc] text-[#7b2cbf]',
-    neutral: 'bg-[#f5f5f7] text-[#6e6e73]',
+    green:
+      'bg-green-50 text-green-700',
+
+    orange:
+      'bg-orange-50 text-orange-700',
+
+    red:
+      'bg-red-50 text-red-700',
+
+    blue:
+      'bg-[#e8f2ff] text-[#0059b8]',
+
+    purple:
+      'bg-[#f7edfc] text-[#7b2cbf]',
+
+    neutral:
+      'bg-[#f5f5f7] text-[#6e6e73]',
   }[tone]
 
   return (
-    <span className={`inline-flex rounded-full px-3 py-1 text-xs font-bold ${className}`}>
+    <span
+      className={`inline-flex rounded-full px-3 py-1 text-xs font-bold ${className}`}
+    >
       {label}
     </span>
   )
@@ -1601,16 +2310,26 @@ function InfoTile({
   label: string
   value: string
   description: string
-  tone: 'blue' | 'green' | 'purple'
+  tone:
+    | 'blue'
+    | 'green'
+    | 'purple'
 }) {
   const className = {
-    blue: 'bg-[#e8f2ff] text-[#0059b8]',
-    green: 'bg-green-50 text-green-700',
-    purple: 'bg-[#f7edfc] text-[#7b2cbf]',
+    blue:
+      'bg-[#e8f2ff] text-[#0059b8]',
+
+    green:
+      'bg-green-50 text-green-700',
+
+    purple:
+      'bg-[#f7edfc] text-[#7b2cbf]',
   }[tone]
 
   return (
-    <div className={`rounded-[22px] p-4 ${className}`}>
+    <div
+      className={`rounded-[22px] p-4 ${className}`}
+    >
       <p className="text-xs font-bold uppercase tracking-wide opacity-70">
         {label}
       </p>
@@ -1638,6 +2357,7 @@ function AutoReadInfo({
       <p className="font-bold uppercase tracking-wide text-[#86868b]">
         {label}
       </p>
+
       <p className="mt-1 truncate font-semibold text-[#1d1d1f]">
         {value}
       </p>
@@ -1668,7 +2388,11 @@ function SmallInfo({
 function LoadingState() {
   return (
     <div className="flex items-center gap-3 rounded-[24px] border border-black/5 bg-[#f5f5f7]/70 p-5 text-sm text-[#6e6e73]">
-      <Loader2 size={18} className="animate-spin" />
+      <Loader2
+        size={18}
+        className="animate-spin"
+      />
+
       Memuat data...
     </div>
   )
@@ -1694,114 +2418,226 @@ function EmptyState({
   )
 }
 
-function formatEmployeeOption(employee: Employee) {
-  const name = employee.full_name || employee.email || 'Tanpa Nama'
-  const employeeNumber = employee.employee_number || employee.machine_pin || 'Tanpa NIP'
-  const department = employee.department || 'Tanpa Unit'
-  const email = employee.email || 'Tanpa Email'
+function formatEmployeeOption(
+  employee: Employee
+) {
+  const name =
+    employee.full_name ||
+    employee.email ||
+    'Tanpa Nama'
+
+  const employeeNumber =
+    employee.employee_number ||
+    employee.machine_pin ||
+    'Tanpa NIP'
+
+  const department =
+    employee.department ||
+    'Tanpa Unit'
+
+  const email =
+    employee.email ||
+    'Tanpa Email'
 
   return `${name} · ${employeeNumber} · ${department} · ${email}`
 }
 
-function getRequestMeta(type: RequestType) {
-  const map = {
-    annual_leave: { label: 'Cuti Tahunan', category: 'leave' },
-    marriage_leave: { label: 'Cuti Menikah', category: 'leave' },
-    maternity_leave: { label: 'Cuti Melahirkan', category: 'leave' },
-    miscarriage_leave: { label: 'Cuti Keguguran', category: 'leave' },
-    bereavement_leave: { label: 'Cuti Duka', category: 'leave' },
-    child_circumcision_leave: { label: 'Cuti Khitan / Baptis Anak', category: 'leave' },
-    worship_leave: { label: 'Cuti Ibadah', category: 'leave' },
-    menstrual_leave: { label: 'Cuti Haid', category: 'leave' },
-    pregnancy_check_leave: { label: 'Pemeriksaan Kehamilan', category: 'leave' },
-    sick: { label: 'Sakit', category: 'sick' },
-    permit: { label: 'Izin', category: 'permit' },
-    official_travel: { label: 'Tugas Luar / Dinas', category: 'official_travel' },
-    phl_claim: { label: 'Klaim PHL', category: 'phl_claim' },
-    other_leave: { label: 'Cuti Lainnya', category: 'leave' },
-  }
+function getRequestMeta(
+  type: RequestType
+) {
+  const meta =
+    getHarmonyRequestTypeMeta(type)
 
-  return map[type]
+  return {
+    ...meta,
+    category:
+      meta.request_category,
+  }
 }
 
-function countWorkingDays(start: string, end: string, holidays: Holiday[]) {
-  if (!start || !end || end < start) return 0
+function countWorkingDays(
+  start: string,
+  end: string,
+  holidays: Holiday[]
+) {
+  if (
+    !start ||
+    !end ||
+    end < start
+  ) {
+    return 0
+  }
 
-  const holidaySet = new Set(
-    holidays
-      .filter((item) => item.is_active !== false)
-      .map((item) => item.holiday_date)
-  )
+  const holidaySet =
+    new Set(
+      holidays
+        .filter(
+          (item) =>
+            item.is_active !==
+            false
+        )
+        .map(
+          (item) =>
+            item.holiday_date
+        )
+    )
 
-  const current = new Date(`${start}T00:00:00`)
-  const endDate = new Date(`${end}T00:00:00`)
+  const current =
+    new Date(
+      `${start}T00:00:00`
+    )
+
+  const endDate =
+    new Date(
+      `${end}T00:00:00`
+    )
 
   let total = 0
 
-  while (current <= endDate) {
-    const iso = formatDateToISO(current)
-    const day = current.getDay()
-    const weekend = day === 0 || day === 6
-    const holiday = holidaySet.has(iso)
+  while (
+    current <= endDate
+  ) {
+    const iso =
+      formatDateToISO(
+        current
+      )
 
-    if (!weekend && !holiday) {
+    const day =
+      current.getDay()
+
+    const weekend =
+      day === 0 ||
+      day === 6
+
+    const holiday =
+      holidaySet.has(iso)
+
+    if (
+      !weekend &&
+      !holiday
+    ) {
       total += 1
     }
 
-    current.setDate(current.getDate() + 1)
+    current.setDate(
+      current.getDate() +
+        1
+    )
   }
 
   return total
 }
 
 function getTodayISO() {
-  return formatDateToISO(new Date())
+  return formatDateToISO(
+    new Date()
+  )
 }
 
-function formatDateToISO(date: Date) {
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
+function formatDateToISO(
+  date: Date
+) {
+  const year =
+    date.getFullYear()
+
+  const month =
+    String(
+      date.getMonth() + 1
+    ).padStart(
+      2,
+      '0'
+    )
+
+  const day =
+    String(
+      date.getDate()
+    ).padStart(
+      2,
+      '0'
+    )
 
   return `${year}-${month}-${day}`
 }
 
-function formatDisplayDate(value: string) {
-  if (!value) return '-'
+function formatDisplayDate(
+  value: string
+) {
+  if (!value) {
+    return '-'
+  }
 
-  const date = new Date(`${value}T00:00:00`)
+  const date =
+    new Date(
+      `${value}T00:00:00`
+    )
 
-  if (Number.isNaN(date.getTime())) return value
+  if (
+    Number.isNaN(
+      date.getTime()
+    )
+  ) {
+    return value
+  }
 
-  return date.toLocaleDateString('id-ID', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  })
+  return date.toLocaleDateString(
+    'id-ID',
+    {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+    }
+  )
 }
 
-function formatDateTime(value: string) {
-  if (!value) return '-'
+function formatDateTime(
+  value: string
+) {
+  if (!value) {
+    return '-'
+  }
 
-  const date = new Date(value)
+  const date =
+    new Date(value)
 
-  if (Number.isNaN(date.getTime())) return '-'
+  if (
+    Number.isNaN(
+      date.getTime()
+    )
+  ) {
+    return '-'
+  }
 
-  return date.toLocaleString('id-ID', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
+  return date.toLocaleString(
+    'id-ID',
+    {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    }
+  )
 }
 
-function normalizeText(value?: string | null) {
-  return String(value || '').trim().toLowerCase()
+function normalizeText(
+  value?:
+    | string
+    | null
+) {
+  return String(
+    value || ''
+  )
+    .trim()
+    .toLowerCase()
 }
 
-function isPendingStatus(value?: string | null) {
-  const normalized = normalizeText(value)
+function isPendingStatus(
+  value?:
+    | string
+    | null
+) {
+  const normalized =
+    normalizeText(value)
 
   return (
     normalized === 'pending' ||
@@ -1811,35 +2647,107 @@ function isPendingStatus(value?: string | null) {
   )
 }
 
-function formatStatus(value?: string | null) {
-  const normalized = normalizeText(value)
+function formatStatus(
+  value?:
+    | string
+    | null
+) {
+  const normalized =
+    normalizeText(value)
 
-  const map: Record<string, string> = {
-    pending: 'Menunggu Approval',
-    waiting_supervisor: 'Menunggu Atasan',
-    pending_supervisor: 'Menunggu Atasan',
-    pending_hr: 'Menunggu HR',
-    approved: 'Disetujui',
-    rejected: 'Ditolak',
-    cancelled: 'Dibatalkan',
-    leave: 'Cuti',
-    sick: 'Sakit',
-    permit: 'Izin',
-    official_travel: 'Tugas Luar',
-    phl_claim: 'Klaim PHL',
+  const map:
+    Record<
+      string,
+      string
+    > = {
+    pending:
+      'Menunggu Approval',
+
+    waiting_supervisor:
+      'Menunggu Atasan',
+
+    pending_supervisor:
+      'Menunggu Atasan',
+
+    pending_hr:
+      'Menunggu HR',
+
+    approved:
+      'Disetujui',
+
+    rejected:
+      'Ditolak',
+
+    cancelled:
+      'Dibatalkan',
+
+    leave:
+      'Cuti',
+
+    sick:
+      'Sakit',
+
+    permit:
+      'Izin',
+
+    official_travel:
+      'Tugas Luar',
+
+    phl_claim:
+      'Klaim PHL',
   }
 
-  return map[normalized] || value || '-'
+  return (
+    map[normalized] ||
+    value ||
+    '-'
+  )
 }
 
-function getStatusTone(status?: string | null): 'green' | 'orange' | 'red' | 'blue' | 'purple' | 'neutral' {
-  const value = normalizeText(status)
+function getStatusTone(
+  status?:
+    | string
+    | null
+):
+  | 'green'
+  | 'orange'
+  | 'red'
+  | 'blue'
+  | 'purple'
+  | 'neutral' {
+  const value =
+    normalizeText(status)
 
-  if (value === 'approved') return 'green'
-  if (value === 'rejected' || value === 'cancelled') return 'red'
-  if (value === 'pending_hr') return 'blue'
-  if (value === 'phl_claim') return 'purple'
-  if (isPendingStatus(value)) return 'orange'
+  if (
+    value === 'approved'
+  ) {
+    return 'green'
+  }
+
+  if (
+    value === 'rejected' ||
+    value === 'cancelled'
+  ) {
+    return 'red'
+  }
+
+  if (
+    value === 'pending_hr'
+  ) {
+    return 'blue'
+  }
+
+  if (
+    value === 'phl_claim'
+  ) {
+    return 'purple'
+  }
+
+  if (
+    isPendingStatus(value)
+  ) {
+    return 'orange'
+  }
 
   return 'neutral'
 }
