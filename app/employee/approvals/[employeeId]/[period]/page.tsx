@@ -622,6 +622,42 @@ export default function EmployeeApprovalDetailPage() {
       return
     }
 
+    // Reject satu tanggal berarti SATU PERIODE dikembalikan ke employee.
+    // Header periode ikut dibuat rejected supaya UI employee langsung editable.
+    // Fallback employee_id + period_month menjaga data lama/edge-case bila state
+    // periodConfirmation belum terisi tetapi log yang direview valid.
+    if (action === 'reject') {
+      const periodRejectPayload = {
+        supervisor_status: 'rejected',
+        supervisor_id: appUser?.employee_id || null,
+        supervisor_name: supervisorName,
+        supervisor_approved_at: null,
+        supervisor_rejected_at: now,
+        supervisor_note:
+          note || `Absensi ${formatDisplayDate(log.attendance_date)} ditolak oleh atasan.`,
+        hr_status: 'rejected_by_supervisor',
+        updated_at: now,
+      }
+
+      const periodRejectQuery = supabase
+        .from('attendance_period_confirmations')
+        .update(periodRejectPayload)
+
+      const { error: periodRejectError } = periodConfirmation?.id
+        ? await periodRejectQuery.eq('id', periodConfirmation.id)
+        : await periodRejectQuery
+            .eq('employee_id', employeeId)
+            .eq('period_month', periodMonth)
+
+      if (periodRejectError) {
+        setErrorMessage(
+          `Tanggal berhasil ditolak, tetapi periode gagal dibuka untuk revisi: ${periodRejectError.message}`,
+        )
+        setProcessingId('')
+        return
+      }
+    }
+
     let emailInfo = ''
 
     try {
@@ -639,7 +675,7 @@ export default function EmployeeApprovalDetailPage() {
     setSuccessMessage(
       action === 'approve'
         ? `Absensi ${formatDisplayDate(log.attendance_date)} berhasil disetujui. ${emailInfo}`
-        : `Absensi ${formatDisplayDate(log.attendance_date)} berhasil ditolak. ${emailInfo}`
+        : `Absensi ${formatDisplayDate(log.attendance_date)} berhasil ditolak. Seluruh periode dikembalikan ke employee untuk revisi dan dapat disubmit ulang. ${emailInfo}`
     )
 
     setProcessingId('')
@@ -903,7 +939,7 @@ export default function EmployeeApprovalDetailPage() {
       emailInfo = `Email notifikasi belum terkirim: ${emailError?.message || 'Terjadi kendala saat mengirim email.'}`
     }
 
-    setSuccessMessage(`Periode absensi berhasil ditolak dan dikembalikan ke employee. ${emailInfo}`)
+    setSuccessMessage(`Periode absensi berhasil ditolak dan dikembalikan ke employee. Employee sekarang dapat memperbaiki/melengkapi data lalu mengirim ulang seluruh periode. ${emailInfo}`)
     setRejectTarget(null)
     setRejectReason('')
     setProcessingPeriod(false)

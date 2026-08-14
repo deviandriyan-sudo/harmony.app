@@ -342,15 +342,36 @@ export default function EmployeeAttendancePage() {
 
   const isPeriodLocked = periodLockInfo.isLocked;
 
+  // Fallback penting untuk data lama:
+  // beberapa reject harian terdahulu hanya mengubah attendance_logs dan belum
+  // mengubah header attendance_period_confirmations. Jika SATU saja tanggal
+  // sudah ditolak atasan, seluruh periode harus dibuka kembali untuk revisi.
+  const rejectedDailyLog =
+    logs.find(
+      (item) =>
+        item.supervisor_approval_status === "rejected" ||
+        item.hr_final_status === "rejected_by_supervisor",
+    ) || null;
+
+  const isSupervisorRejected =
+    periodConfirmation?.supervisor_status === "rejected" ||
+    periodConfirmation?.hr_status === "rejected_by_supervisor" ||
+    Boolean(rejectedDailyLog);
+
+  // Reject atasan harus mengembalikan periode ke employee untuk revisi.
+  // employee_status boleh tetap "submitted" untuk histori, tetapi selama status
+  // supervisor rejected ATAU ada reject harian, halaman tidak boleh read-only.
   const submittedPeriod =
-    periodConfirmation?.employee_status === "submitted" ||
-    periodConfirmation?.supervisor_status === "pending" ||
-    periodConfirmation?.supervisor_status === "approved" ||
-    periodConfirmation?.hr_status === "ready_for_hr" ||
-    periodConfirmation?.hr_status === "finalized";
+    !isSupervisorRejected &&
+    (periodConfirmation?.employee_status === "submitted" ||
+      periodConfirmation?.supervisor_status === "pending" ||
+      periodConfirmation?.supervisor_status === "approved" ||
+      periodConfirmation?.hr_status === "ready_for_hr" ||
+      periodConfirmation?.hr_status === "finalized");
 
   const isProcessReadOnly = submittedPeriod && !isPeriodLocked;
   const isReadOnlyPeriod = submittedPeriod || isPeriodLocked;
+  const isPeriodComplete = getTodayISO() >= periodRange.end;
 
   const calendarRows = useMemo(() => {
     const dates = getDateRange(periodRange.start, periodRange.end);
@@ -1323,26 +1344,70 @@ export default function EmployeeAttendancePage() {
       return;
     }
 
-    if (selectedRows.length === 0) {
-      setErrorMessage("Pilih minimal 1 hari absensi sebelum submit ke atasan.");
+    if (!isPeriodComplete) {
+      setErrorMessage(
+        `Periode ${formatDisplayDate(periodRange.start)} s.d. ${formatDisplayDate(periodRange.end)} belum selesai. Submit periode penuh baru dapat dilakukan pada/ setelah ${formatDisplayDate(periodRange.end)}.`,
+      );
       setSubmittingPeriod(false);
       return;
     }
 
-    const validationErrors = selectedRows
+    // Tombol centang hanya checklist review employee. Saat Submit Periode ditekan,
+    // SELURUH tanggal relevan dalam periode dikirim ke atasan agar tidak pernah
+    // terjadi kasus hanya 1 tanggal yang terkirim tetapi header periode sudah submitted.
+    const rowsToSubmit = calendarRows.filter((row) => {
+      if (employee.join_date && row.date < employee.join_date) return false;
+
+      const draft = getDraft(row);
+
+      // Sabtu/Minggu/libur tanpa aktivitas tidak perlu dibuat menjadi attendance_log.
+      // Namun jika ada fingerprint/manual/keterangan, tanggal tetap ikut dikirim.
+      return !isOffDayWithoutAttendance(row, draft);
+    });
+
+    if (rowsToSubmit.length === 0) {
+      setErrorMessage("Tidak ada data periode yang dapat dikirim ke atasan.");
+      setSubmittingPeriod(false);
+      return;
+    }
+
+    const validationErrors = rowsToSubmit
       .map((row) => validateRowBeforeSubmit(row))
       .filter(Boolean);
 
     if (validationErrors.length > 0) {
-      setErrorMessage(validationErrors.join(" "));
+      setErrorMessage(
+        `Submit seluruh periode belum dapat dilakukan. Lengkapi data berikut terlebih dahulu: ${validationErrors.join(" ")}`,
+      );
+      setSubmittingPeriod(false);
+      return;
+    }
+
+    const confirmed = window.confirm(
+      [
+        isSupervisorRejected
+          ? "Kirim ulang seluruh periode setelah revisi?"
+          : "Submit seluruh periode ke atasan?",
+        "",
+        `Periode: ${formatDisplayDate(periodRange.start)} s.d. ${formatDisplayDate(periodRange.end)}`,
+        `Tanggal yang dikirim: ${rowsToSubmit.length} hari relevan.`,
+        "",
+        "Centang harian hanya berfungsi sebagai checklist pengecekan. Walaupun hanya 1 tanggal yang dicentang, tombol Submit Periode akan mengirim SELURUH data periode yang relevan.",
+        "",
+        "Pastikan seluruh jam, keterangan, cuti/izin/sakit, PHL, tugas luar, dan bukti sudah benar.",
+      ].join("\n"),
+    );
+
+    if (!confirmed) {
       setSubmittingPeriod(false);
       return;
     }
 
     const batchId = crypto.randomUUID();
+    const confirmationId = periodConfirmation?.id || batchId;
     const now = new Date().toISOString();
 
-    for (const row of selectedRows) {
+    for (const row of rowsToSubmit) {
       const draft = getDraft(row);
       const meta = getDailyTypeMeta(draft.daily_type);
       const hasExistingLog = Boolean(row.log?.id);
@@ -1447,6 +1512,9 @@ export default function EmployeeAttendancePage() {
         supervisor_approval_status: "pending",
         supervisor_approved_by: null,
         supervisor_approved_at: null,
+        supervisor_reviewed_by: null,
+        supervisor_reviewed_at: null,
+        supervisor_note: null,
 
         hr_approval_status: "pending",
         hr_approved_by: null,
@@ -1455,7 +1523,7 @@ export default function EmployeeAttendancePage() {
 
         correction_notes: appendCorrectionNote(
           row.log?.correction_notes || null,
-          `Employee submit absensi periode ${formatDisplayDate(periodRange.start)} s.d. ${formatDisplayDate(periodRange.end)} dengan keterangan: ${meta.label}.`,
+          `${isSupervisorRejected ? "Employee RESUBMIT setelah reject atasan" : "Employee submit"} absensi periode ${formatDisplayDate(periodRange.start)} s.d. ${formatDisplayDate(periodRange.end)} dengan keterangan: ${meta.label}.`,
         ),
 
         updated_at: now,
@@ -1497,7 +1565,7 @@ export default function EmployeeAttendancePage() {
       .from("attendance_period_confirmations")
       .upsert(
         {
-          id: batchId,
+          id: confirmationId,
 
           employee_id: employee.id,
           employee_number: employee.employee_number,
@@ -1515,7 +1583,12 @@ export default function EmployeeAttendancePage() {
           employee_submitted_by: appUser.email,
 
           supervisor_status: "pending",
+          supervisor_approved_at: null,
+          supervisor_rejected_at: null,
+          supervisor_name: null,
+          supervisor_note: null,
           hr_status: "waiting_supervisor",
+          hr_note: null,
 
           total_work_days: totals.totalWorkDays,
           total_present_days: totals.present,
@@ -1549,12 +1622,12 @@ export default function EmployeeAttendancePage() {
     const notificationResult = await sendAttendanceSubmitNotification({
       batchId,
       totals,
-      submittedRows: selectedRows.length,
+      submittedRows: rowsToSubmit.length,
     });
 
     setSuccessMessage(
       [
-        `Absensi periode ${formatDisplayDate(periodRange.start)} s.d. ${formatDisplayDate(periodRange.end)} berhasil dikirim ke atasan.`,
+        `${isSupervisorRejected ? "Revisi absensi" : "Absensi"} periode ${formatDisplayDate(periodRange.start)} s.d. ${formatDisplayDate(periodRange.end)} berhasil ${isSupervisorRejected ? "dikirim ulang" : "dikirim"} ke atasan sebagai SATU PERIODE penuh.`,
         notificationResult.sent
           ? `Notifikasi email sudah dikirim ke ${notificationResult.totalRecipients} atasan.`
           : `Data berhasil tersimpan, tetapi email notifikasi belum terkirim: ${notificationResult.message}`,
@@ -1932,6 +2005,56 @@ export default function EmployeeAttendancePage() {
         )}
 
 
+        {isSupervisorRejected && !isPeriodLocked && (
+          <div className="rounded-[28px] border border-red-200 bg-red-50 p-5 text-sm leading-6 text-red-700">
+            <div className="mb-2 flex items-center gap-2 font-bold">
+              <AlertTriangle size={18} />
+              Periode ditolak atasan — dibuka kembali untuk revisi
+            </div>
+
+            <p>
+              Atasan mengembalikan periode ini. Kamu dapat membuka tombol
+              Lengkapi, memperbaiki jam/keterangan/bukti, melakukan Reset bila
+              diperlukan, lalu menekan Submit Periode untuk mengirim ulang
+              SELURUH periode ke atasan.
+            </p>
+
+            <div className="mt-4 grid gap-3 md:grid-cols-3">
+              <LockInfo
+                label="Ditolak oleh"
+                value={
+                  periodConfirmation?.supervisor_name ||
+                  rejectedDailyLog?.supervisor_reviewed_by ||
+                  rejectedDailyLog?.supervisor_approved_by ||
+                  "Atasan"
+                }
+              />
+              <LockInfo
+                label="Tanggal reject"
+                value={formatDateTime(
+                  periodConfirmation?.supervisor_rejected_at ||
+                    rejectedDailyLog?.supervisor_reviewed_at ||
+                    rejectedDailyLog?.updated_at ||
+                    "",
+                )}
+              />
+              <LockInfo
+                label="Alasan reject"
+                value={
+                  periodConfirmation?.supervisor_note ||
+                  rejectedDailyLog?.supervisor_note ||
+                  rejectedDailyLog?.correction_notes ||
+                  (rejectedDailyLog
+                    ? `Absensi ${formatDisplayDate(
+                        rejectedDailyLog.attendance_date,
+                      )} perlu direvisi.`
+                    : "Perlu revisi data absensi.")
+                }
+              />
+            </div>
+          </div>
+        )}
+
         {!isPeriodLocked && !isProcessReadOnly && periodLockInfo.unlockedAt && (
           <div className="rounded-[28px] border border-green-200 bg-green-50 p-5 text-sm leading-6 text-green-700">
             <div className="mb-2 flex items-center gap-2 font-bold">
@@ -2125,9 +2248,11 @@ export default function EmployeeAttendancePage() {
                       value={
                         isPeriodLocked
                           ? "Locked by HR"
-                          : isProcessReadOnly
-                            ? "Read Only"
-                            : "Unlocked"
+                          : isSupervisorRejected
+                            ? "Revisi Aktif"
+                            : isProcessReadOnly
+                              ? "Read Only"
+                              : "Unlocked"
                       }
                     />
                   </div>
@@ -2178,15 +2303,27 @@ export default function EmployeeAttendancePage() {
                   </h3>
 
                   <p className="mt-1 text-sm leading-6 text-[#6e6e73]">
-                    Centang hari yang sudah dicek. Hari kerja, Sabtu, Minggu,
-                    libur nasional, dan libur perusahaan tetap bisa diberi
-                    keterangan manual lewat tombol Lengkapi.
+                    Centang harian hanya sebagai checklist pengecekan. Tombol
+                    Submit Periode selalu mengirim seluruh data relevan dari
+                    tanggal 11 sampai 10, bukan hanya tanggal yang dicentang.
                   </p>
 
                   <p className="mt-1 text-xs font-semibold text-[#007aff]">
-                    Dipilih: {selectedRows.length} dari {selectableRows.length}{" "}
-                    hari yang perlu dikonfirmasi.
+                    Checklist review: {selectedRows.length} dari {selectableRows.length}{" "}
+                    hari. Submit tetap mencakup seluruh periode.
                   </p>
+
+                  {!isPeriodComplete && !isReadOnlyPeriod && (
+                    <p className="mt-2 text-xs font-bold text-orange-700">
+                      Periode belum selesai. Submit periode penuh tersedia mulai {formatDisplayDate(periodRange.end)}.
+                    </p>
+                  )}
+
+                  {isSupervisorRejected && !isReadOnlyPeriod && (
+                    <p className="mt-2 text-xs font-bold text-red-700">
+                      Mode revisi aktif. Lengkapi data yang ditolak lalu kirim ulang seluruh periode.
+                    </p>
+                  )}
 
                   {isReadOnlyPeriod && (
                     <p className="mt-2 text-xs font-bold text-orange-700">
@@ -2215,7 +2352,7 @@ export default function EmployeeAttendancePage() {
                     type="button"
                     onClick={handleSubmitPeriod}
                     disabled={
-                      selectedRows.length === 0 ||
+                      !isPeriodComplete ||
                       isReadOnlyPeriod ||
                       submittingPeriod
                     }
@@ -2223,8 +2360,10 @@ export default function EmployeeAttendancePage() {
                   >
                     <Send size={18} />
                     {submittingPeriod
-                      ? "Mengirim..."
-                      : "Submit Periode ke Atasan"}
+                      ? "Mengirim Seluruh Periode..."
+                      : isSupervisorRejected
+                        ? "Kirim Ulang Seluruh Periode"
+                        : "Submit Seluruh Periode ke Atasan"}
                   </button>
                 </div>
               </div>

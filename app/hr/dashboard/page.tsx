@@ -15,6 +15,7 @@ import {
   Download,
   Fingerprint,
   Landmark,
+  KeyRound,
   Layers,
   Loader2,
   Lock,
@@ -528,6 +529,7 @@ function QuickActionsPanel() {
         <QuickAction title="Final Report" description="Rekap final HR dan export laporan." href="/hr/attendance/final-report" icon={<Download size={17} />} tone="purple" />
         <QuickAction title="Cuti & Izin" description="Approval, bukti, jenis cuti, saldo." href="/hr/leave" icon={<CalendarDays size={17} />} tone="orange" />
         <QuickAction title="Master Karyawan" description="Data karyawan, homebase, jabatan tambahan." href="/hr/employees" icon={<Users size={17} />} tone="blue" />
+        <QuickAction title="Reset Password Karyawan" description="Generate, tampilkan, copy, dan reset password baru untuk karyawan yang lupa." href="/hr/settings" icon={<KeyRound size={17} />} tone="green" />
         <QuickAction title="User Management" description="Akun Google, role, aktif/nonaktif user." href="/hr/users" icon={<UserCog size={17} />} tone="purple" />
       </div>
     </div>
