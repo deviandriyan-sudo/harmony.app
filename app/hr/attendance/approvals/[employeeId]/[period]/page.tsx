@@ -85,6 +85,7 @@ type PeriodConfirmation = {
 
 type AttendanceLog = {
   id: string;
+  is_placeholder?: boolean;
   employee_id: string | null;
   employee_number?: string | null;
   machine_pin?: string | null;
@@ -167,6 +168,11 @@ export default function HRAttendanceSafeReviewPage() {
     confirmation?.period_start || fallbackRange.start;
   const periodEnd =
     confirmation?.period_end || fallbackRange.end;
+
+  const reviewRows = useMemo(
+    () => buildFullPeriodReviewRows(logs, holidays, periodStart, periodEnd),
+    [logs, holidays, periodStart, periodEnd],
+  );
 
   const approvalLogs = useMemo(
     () => logs.filter((log) => String(log.employee_id || "").trim() === employeeId),
@@ -713,12 +719,12 @@ export default function HRAttendanceSafeReviewPage() {
               </div>
 
               <div className="grid gap-3 p-4 2xl:hidden">
-                {logs.length === 0 ? (
+                {reviewRows.length === 0 ? (
                   <div className="rounded-2xl border border-dashed border-black/10 bg-[#f5f5f7] p-5 text-sm text-[#6e6e73]">
-                    Belum ada attendance_logs pada periode ini. Karyawan tetap tampil di Queue HR Review untuk monitoring.
+                    Periode belum memiliki rentang tanggal yang valid.
                   </div>
                 ) : (
-                  logs.map((log) => <MobileLogCard key={log.id} log={log} />)
+                  reviewRows.map((log) => <MobileLogCard key={log.id} log={log} />)
                 )}
               </div>
 
@@ -738,10 +744,12 @@ export default function HRAttendanceSafeReviewPage() {
                   </thead>
 
                   <tbody>
-                    {logs.map((log) => (
+                    {reviewRows.map((log) => (
                       <tr
                         key={log.id}
-                        className="border-b border-black/5 hover:bg-[#f8f8fa]"
+                        className={`border-b border-black/5 hover:bg-[#f8f8fa] ${
+                          log.is_placeholder ? "bg-[#fafafa]" : ""
+                        }`}
                       >
                         <td className="px-4 py-4 font-bold text-[#1d1d1f]">
                           {formatDisplayDate(log.attendance_date)}
@@ -764,19 +772,25 @@ export default function HRAttendanceSafeReviewPage() {
                         <td className="px-4 py-4 text-[#6e6e73]">
                           {log.absence_request_label ||
                             log.employee_daily_note ||
-                            "-"}
+                            (log.is_placeholder ? "Belum ada log absensi." : "-")}
                         </td>
                         <td className="px-4 py-4">
                           <StatusPill
-                            value={log.supervisor_approval_status || "-"}
+                            value={
+                              log.is_placeholder
+                                ? "-"
+                                : log.supervisor_approval_status || "-"
+                            }
                           />
                         </td>
                         <td className="px-4 py-4">
                           <StatusPill
                             value={
-                              normalize(log.hr_approval_status) === "approved"
-                                ? "HR Approved"
-                                : log.hr_approval_status || "Pending HR"
+                              log.is_placeholder
+                                ? "-"
+                                : normalize(log.hr_approval_status) === "approved"
+                                  ? "HR Approved"
+                                  : log.hr_approval_status || "Pending HR"
                             }
                           />
                         </td>
@@ -877,9 +891,11 @@ function MobileLogCard({ log }: { log: AttendanceLog }) {
 
         <StatusPill
           value={
-            normalize(log.hr_approval_status) === "approved"
-              ? "HR Approved"
-              : log.hr_approval_status || "Pending HR"
+            log.is_placeholder
+              ? "-"
+              : normalize(log.hr_approval_status) === "approved"
+                ? "HR Approved"
+                : log.hr_approval_status || "Pending HR"
           }
         />
       </div>
@@ -895,14 +911,14 @@ function MobileLogCard({ log }: { log: AttendanceLog }) {
         />
         <MiniInfo
           label="Atasan"
-          value={formatStatus(log.supervisor_approval_status)}
+          value={log.is_placeholder ? "-" : formatStatus(log.supervisor_approval_status)}
         />
         <MiniInfo
           label="Keterangan"
           value={
             log.absence_request_label ||
             log.employee_daily_note ||
-            "-"
+            (log.is_placeholder ? "Belum ada log absensi." : "-")
           }
         />
       </div>
@@ -1159,6 +1175,139 @@ async function writeAudit({
   if (error) {
     console.warn("HR attendance audit warning:", error.message);
   }
+}
+
+function buildFullPeriodReviewRows(
+  logs: AttendanceLog[],
+  holidays: AttendanceHoliday[],
+  periodStart: string,
+  periodEnd: string,
+) {
+  if (!periodStart || !periodEnd || periodStart > periodEnd) {
+    return [...logs].sort((a, b) =>
+      String(a.attendance_date || "").localeCompare(String(b.attendance_date || "")),
+    );
+  }
+
+  const grouped = new Map<string, AttendanceLog[]>();
+
+  logs.forEach((log) => {
+    const date = normalizeISODate(log.attendance_date);
+    if (!date) return;
+
+    const existing = grouped.get(date) || [];
+    existing.push(log);
+    grouped.set(date, existing);
+  });
+
+  const holidayMap = new Map<string, AttendanceHoliday>();
+
+  holidays.forEach((holiday) => {
+    const date = normalizeISODate(holiday.holiday_date);
+    if (!date || holiday.is_active === false) return;
+    holidayMap.set(date, holiday);
+  });
+
+  const rows: AttendanceLog[] = [];
+
+  for (const date of getInclusiveDateRange(periodStart, periodEnd)) {
+    const dayLogs = grouped.get(date) || [];
+
+    if (dayLogs.length > 0) {
+      rows.push(
+        ...dayLogs.sort((a, b) =>
+          String(a.created_at || a.updated_at || "").localeCompare(
+            String(b.created_at || b.updated_at || ""),
+          ),
+        ),
+      );
+      continue;
+    }
+
+    const holiday = holidayMap.get(date);
+    const weekend = isWeekendDate(date);
+    const placeholderStatus = holiday
+      ? "Holiday"
+      : weekend
+        ? "Off Day"
+        : "No Data";
+    const placeholderNote = holiday?.holiday_name
+      ? String(holiday.holiday_name)
+      : weekend
+        ? "Hari libur akhir pekan."
+        : "Belum ada log absensi.";
+
+    rows.push(createPlaceholderAttendanceLog(date, placeholderStatus, placeholderNote));
+  }
+
+  return rows;
+}
+
+function createPlaceholderAttendanceLog(
+  attendanceDate: string,
+  status: string,
+  note: string,
+): AttendanceLog {
+  return {
+    id: `placeholder-${attendanceDate}`,
+    is_placeholder: true,
+    employee_id: null,
+    attendance_date: attendanceDate,
+    check_in: null,
+    check_out: null,
+    manual_check_in: null,
+    manual_check_out: null,
+    status,
+    employee_confirmation_status: null,
+    employee_daily_note: note,
+    supervisor_approval_status: null,
+    supervisor_approved_by: null,
+    supervisor_approved_at: null,
+    supervisor_note: null,
+    hr_approval_status: null,
+    hr_approved_by: null,
+    hr_approved_at: null,
+    hr_note: null,
+    hr_final_status: null,
+    absence_request_type: null,
+    absence_request_label: null,
+    absence_request_status: null,
+    is_phl_candidate: null,
+    phl_proof_url: null,
+    phl_proof_name: null,
+    absence_proof_url: null,
+    absence_proof_name: null,
+    is_locked: null,
+    deleted_at: null,
+  };
+}
+
+function getInclusiveDateRange(start: string, end: string) {
+  const result: string[] = [];
+  const cursor = new Date(`${start}T00:00:00`);
+  const finish = new Date(`${end}T00:00:00`);
+
+  if (Number.isNaN(cursor.getTime()) || Number.isNaN(finish.getTime())) {
+    return result;
+  }
+
+  while (cursor <= finish) {
+    result.push(toISODate(cursor));
+    cursor.setDate(cursor.getDate() + 1);
+  }
+
+  return result;
+}
+
+function isWeekendDate(value: string) {
+  const date = new Date(`${value}T00:00:00`);
+  const day = date.getDay();
+  return day === 0 || day === 6;
+}
+
+function normalizeISODate(value: unknown) {
+  const raw = String(value || "").slice(0, 10);
+  return /^\d{4}-\d{2}-\d{2}$/.test(raw) ? raw : "";
 }
 
 function getParam(
