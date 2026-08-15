@@ -20,6 +20,7 @@ import {
 
 import { Topbar } from "@/components/layout/Topbar";
 import { supabase } from "@/lib/supabase";
+import { useAttendancePeriodQuery } from "@/lib/use-attendance-period";
 
 type AuditLog = {
   id: string;
@@ -59,7 +60,7 @@ type ActionFilter =
 export default function AttendanceAuditPage() {
   const [logs, setLogs] = useState<AuditLog[]>([]);
 
-  const [periodMonth, setPeriodMonth] = useState(getCurrentPeriodMonth());
+  const { periodMonth, setPeriodMonth, periodReady } = useAttendancePeriodQuery();
   const [actionFilter, setActionFilter] = useState<ActionFilter>("all");
   const [searchKeyword, setSearchKeyword] = useState("");
 
@@ -127,8 +128,9 @@ export default function AttendanceAuditPage() {
   }, [logs]);
 
   useEffect(() => {
+    if (!periodReady) return;
     fetchAuditLogs();
-  }, [periodMonth]);
+  }, [periodMonth, periodReady]);
 
   async function fetchAuditLogs() {
     setLoading(true);
@@ -228,7 +230,7 @@ export default function AttendanceAuditPage() {
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-3">
                 <Link
-                  href="/hr/attendance"
+                  href={`/hr/attendance?period=${periodMonth}`}
                   className="inline-flex min-h-10 items-center gap-2 rounded-full border border-white/10 bg-white/10 px-4 text-xs font-semibold text-white/75 backdrop-blur-xl transition hover:bg-white/15"
                 >
                   <ArrowLeft size={15} />

@@ -20,9 +20,9 @@ import { supabase } from '@/lib/supabase'
 import {
   formatDateID,
   formatDateTimeID,
-  getCurrentPeriodMonthWita,
   getCutoffRange,
 } from '@/lib/attendance-reporting'
+import { useAttendancePeriodQuery } from '@/lib/use-attendance-period'
 import {
   buildAttendanceReportingRows,
   loadAttendanceReportingDataset,
@@ -40,7 +40,7 @@ type ReportFilter =
   | 'no_record'
 
 export default function HRAttendanceExportPage() {
-  const [periodMonth, setPeriodMonth] = useState(getCurrentPeriodMonthWita())
+  const { periodMonth, setPeriodMonth, periodReady } = useAttendancePeriodQuery()
   const [dataset, setDataset] = useState<AttendanceReportingDataset | null>(null)
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState<ReportFilter>('all')
@@ -134,22 +134,16 @@ export default function HRAttendanceExportPage() {
   }, [filteredRows])
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const params = new URLSearchParams(window.location.search)
-      const queryPeriod = params.get('period')
-      const querySearch = params.get('q')
-
-      if (querySearch && !search) setSearch(querySearch)
-
-      if (queryPeriod && /^\d{4}-(0[1-9]|1[0-2])$/.test(queryPeriod) && queryPeriod !== periodMonth) {
-        setPeriodMonth(queryPeriod)
-        return
-      }
-    }
-
+    if (!periodReady) return
     fetchData()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [periodMonth])
+  }, [periodMonth, periodReady])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const querySearch = new URLSearchParams(window.location.search).get('q')
+    if (querySearch) setSearch(querySearch)
+  }, [])
 
   async function fetchData() {
     setLoading(true)

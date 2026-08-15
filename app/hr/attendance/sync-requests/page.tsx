@@ -15,16 +15,16 @@ import {
 import { Topbar } from '@/components/layout/Topbar'
 import { supabase } from '@/lib/supabase'
 import {
-  getCurrentPeriodMonthWita,
   getCutoffRange,
 } from '@/lib/attendance-reporting'
+import { useAttendancePeriodQuery } from '@/lib/use-attendance-period'
 import {
   loadAttendanceReportingDataset,
   type AttendanceReportingDataset,
 } from '@/lib/attendance-reporting-data'
 
 export default function HRAttendanceSyncPage() {
-  const [periodMonth, setPeriodMonth] = useState(getCurrentPeriodMonthWita())
+  const { periodMonth, setPeriodMonth, periodReady } = useAttendancePeriodQuery()
   const [dataset, setDataset] = useState<AttendanceReportingDataset | null>(null)
   const [loading, setLoading] = useState(true)
   const [syncing, setSyncing] = useState(false)
@@ -41,16 +41,10 @@ export default function HRAttendanceSyncPage() {
   }, [dataset])
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const queryPeriod = new URLSearchParams(window.location.search).get('period')
-      if (queryPeriod && /^\d{4}-(0[1-9]|1[0-2])$/.test(queryPeriod) && queryPeriod !== periodMonth) {
-        setPeriodMonth(queryPeriod)
-        return
-      }
-    }
+    if (!periodReady) return
     fetchData()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [periodMonth])
+  }, [periodMonth, periodReady])
 
   async function fetchData() {
     setLoading(true)
