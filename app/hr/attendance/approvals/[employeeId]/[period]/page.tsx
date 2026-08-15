@@ -582,7 +582,7 @@ export default function HRAttendanceSafeReviewPage() {
           <div className="relative flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
             <div className="min-w-0">
               <Link
-                href="/hr/attendance/data"
+                href={`/hr/attendance/data?period=${periodMonth}`}
                 className="mb-5 inline-flex min-h-10 items-center gap-2 rounded-full border border-white/10 bg-white/10 px-4 text-xs font-semibold text-white/75 transition hover:bg-white/15"
               >
                 <ArrowLeft size={15} />

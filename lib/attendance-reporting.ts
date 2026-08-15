@@ -1,8 +1,12 @@
 export type AttendanceReportingLog = {
   id?: string | null
+  upload_id?: string | null
   employee_id?: string | null
   employee_number?: string | null
   machine_pin?: string | null
+  full_name?: string | null
+  department?: string | null
+  position?: string | null
   attendance_date?: string | null
   check_in?: string | null
   check_out?: string | null
@@ -13,6 +17,9 @@ export type AttendanceReportingLog = {
   status?: string | null
   attendance_status?: string | null
   source?: string | null
+  notes?: string | null
+  employee_daily_note?: string | null
+  correction_reason?: string | null
   absence_request_type?: string | null
   absence_request_label?: string | null
   absence_request_status?: string | null
@@ -20,9 +27,12 @@ export type AttendanceReportingLog = {
   employee_confirmation_status?: string | null
   supervisor_approval_status?: string | null
   hr_approval_status?: string | null
+  hr_final_status?: string | null
   is_phl_candidate?: boolean | null
   updated_at?: string | null
   created_at?: string | null
+  deleted_at?: string | null
+  is_locked?: boolean | null
 }
 
 export type AttendanceHoliday = {
@@ -32,15 +42,47 @@ export type AttendanceHoliday = {
   is_active?: boolean | null
 }
 
+export type AttendanceReportingRequest = {
+  id?: string | null
+  source_table?: 'leave_requests' | 'phl_records' | 'attendance_logs' | string
+  employee_id?: string | null
+  employee_number?: string | null
+  machine_pin?: string | null
+  start_date?: string | null
+  end_date?: string | null
+  request_type?: string | null
+  request_label?: string | null
+  request_category?: string | null
+  status?: string | null
+  supervisor_status?: string | null
+  hr_status?: string | null
+  reason?: string | null
+  source?: string | null
+  proof_url?: string | null
+  created_at?: string | null
+  updated_at?: string | null
+}
+
+export type AttendanceRequestTypeMeta = {
+  code?: string | null
+  label?: string | null
+  request_category?: string | null
+  attendance_status?: string | null
+  is_leave_like?: boolean | null
+  is_absence_like?: boolean | null
+  is_phl_claim?: boolean | null
+  is_active?: boolean | null
+}
+
 export type AttendanceDayBucket =
   | 'office_present'
-  | 'manual_external'
+  | 'manual_present'
+  | 'official_travel'
   | 'offday_work'
   | 'leave'
   | 'phl_claim'
   | 'sick'
   | 'permit'
-  | 'official_travel'
   | 'absent'
   | 'incomplete'
   | 'pending_request'
@@ -50,19 +92,42 @@ export type AttendanceDayBucket =
 
 export type AttendanceDayClassification = {
   date: string
+  dayName: string
   bucket: AttendanceDayBucket
   label: string
   isWeekend: boolean
   isHoliday: boolean
   holidayName: string
-  hasMachineTime: boolean
-  hasManualTime: boolean
+
+  machineCheckIn: string
+  machineCheckOut: string
+  manualCheckIn: string
+  manualCheckOut: string
   effectiveCheckIn: string
   effectiveCheckOut: string
+  hasMachineTime: boolean
+  hasManualTime: boolean
+  completeTime: boolean
+
+  sourceLabel: string
   isLate: boolean
+  manualApproved: boolean
+
+  requestId: string
   requestCode: string
   requestLabel: string
+  requestCategory: string
+  requestStatus: string
+  requestSource: string
+  requestReason: string
   requestApproved: boolean
+  requestPending: boolean
+
+  workAttendanceRecorded: boolean
+  compensationReady: boolean
+  transportBasis: boolean
+  mealBasis: boolean
+
   note: string
 }
 
@@ -70,19 +135,29 @@ export type AttendancePeriodSummary = {
   scheduledWorkdays: number
   officePresent: number
   late: number
+  manualPresent: number
+  /** Backward-compatible alias for older HR review route. */
   manualExternal: number
+  officialTravel: number
   offdayWork: number
+
+  recordedWorkAttendance: number
+  verifiedWorkAttendance: number
+  transportBasisDays: number
+  mealBasisDays: number
+  manualPendingVerification: number
+
   leave: number
   phlClaim: number
   sick: number
   permit: number
-  officialTravel: number
   absent: number
   incomplete: number
   pendingRequest: number
   conflict: number
   noRecord: number
   offday: number
+
   classifiedDays: AttendanceDayClassification[]
 }
 
@@ -111,11 +186,40 @@ const APPROVED_WORDS = new Set([
   'active',
 ])
 
+const REJECTED_WORDS = new Set([
+  'rejected',
+  'cancelled',
+  'canceled',
+  'declined',
+  'void',
+])
+
+const WORK_ASSIGNMENT_TOKENS = [
+  'official_travel',
+  'business_trip',
+  'tugas_luar',
+  'tugas_dinas',
+  'surat_tugas',
+  'dinas_luar',
+  'perjalanan_dinas',
+  'luar_kota',
+  'luar_daerah',
+  'kerja_luar',
+  'kerja_lapangan',
+  'field_work',
+  'site_visit',
+  'kunjungan_kerja',
+  'kunjungan_dinas',
+]
+
 export function normalizeAttendanceText(value: unknown) {
   return String(value ?? '')
     .trim()
     .toLowerCase()
+    .replace(/[\/\\-]+/g, '_')
+    .replace(/[^a-z0-9_\s]/g, '')
     .replace(/\s+/g, '_')
+    .replace(/_+/g, '_')
 }
 
 export function isUuid(value: unknown) {
@@ -210,10 +314,19 @@ export function formatDateTimeID(value: string | null | undefined) {
   }).format(date)
 }
 
+export function formatDayNameID(value: string) {
+  const date = new Date(`${value}T00:00:00`)
+  if (Number.isNaN(date.getTime())) return '-'
+
+  return new Intl.DateTimeFormat('id-ID', {
+    weekday: 'long',
+  }).format(date)
+}
+
 export function buildHolidayMap(holidays: AttendanceHoliday[]) {
   const map = new Map<string, AttendanceHoliday>()
   holidays.forEach((holiday) => {
-    const date = String(holiday.holiday_date || '').slice(0, 10)
+    const date = normalizeISODate(holiday.holiday_date)
     if (!date || holiday.is_active === false) return
     map.set(date, holiday)
   })
@@ -244,14 +357,42 @@ export function getEmployeeLogs<T extends AttendanceReportingLog>(
   })
 }
 
+export function getEmployeeRequests<T extends AttendanceReportingRequest>(
+  employee: {
+    id?: string | null
+    employee_number?: string | null
+    machine_pin?: string | null
+  },
+  requests: T[],
+) {
+  const employeeId = String(employee.id || '').trim()
+  const employeeNumber = String(employee.employee_number || '').trim()
+  const machinePin = String(employee.machine_pin || '').trim()
+
+  return requests.filter((request) => {
+    const requestEmployeeId = String(request.employee_id || '').trim()
+    const requestEmployeeNumber = String(request.employee_number || '').trim()
+    const requestMachinePin = String(request.machine_pin || '').trim()
+
+    if (employeeId && requestEmployeeId === employeeId) return true
+    if (machinePin && requestMachinePin === machinePin) return true
+    if (employeeNumber && requestEmployeeNumber === employeeNumber) return true
+    return false
+  })
+}
+
 export function summarizeAttendancePeriod({
   logs,
+  requests = [],
+  requestTypes = [],
   holidays,
   periodStart,
   periodEnd,
   employmentStart,
 }: {
   logs: AttendanceReportingLog[]
+  requests?: AttendanceReportingRequest[]
+  requestTypes?: AttendanceRequestTypeMeta[]
   holidays: AttendanceHoliday[]
   periodStart: string
   periodEnd: string
@@ -265,13 +406,21 @@ export function summarizeAttendancePeriod({
     scheduledWorkdays: 0,
     officePresent: 0,
     late: 0,
+    manualPresent: 0,
     manualExternal: 0,
+    officialTravel: 0,
     offdayWork: 0,
+
+    recordedWorkAttendance: 0,
+    verifiedWorkAttendance: 0,
+    transportBasisDays: 0,
+    mealBasisDays: 0,
+    manualPendingVerification: 0,
+
     leave: 0,
     phlClaim: 0,
     sick: 0,
     permit: 0,
-    officialTravel: 0,
     absent: 0,
     incomplete: 0,
     pendingRequest: 0,
@@ -283,7 +432,8 @@ export function summarizeAttendancePeriod({
 
   if (!start || !cappedEnd || start > cappedEnd) return result
 
-  const grouped = groupLogsByDate(logs)
+  const groupedLogs = groupLogsByDate(logs)
+  const groupedRequests = groupRequestsByDate(requests, start, cappedEnd)
 
   for (const date of getDateRange(start, cappedEnd)) {
     const isWeekend = isWeekendISO(date)
@@ -294,7 +444,9 @@ export function summarizeAttendancePeriod({
 
     const classification = classifyAttendanceDay({
       date,
-      logs: grouped.get(date) || [],
+      logs: groupedLogs.get(date) || [],
+      requests: groupedRequests.get(date) || [],
+      requestTypes,
       holiday,
     })
 
@@ -305,11 +457,19 @@ export function summarizeAttendancePeriod({
         result.officePresent += 1
         if (classification.isLate) result.late += 1
         break
-      case 'manual_external':
+      case 'manual_present':
+        result.manualPresent += 1
         result.manualExternal += 1
+        if (!classification.compensationReady) result.manualPendingVerification += 1
+        break
+      case 'official_travel':
+        result.officialTravel += 1
         break
       case 'offday_work':
         result.offdayWork += 1
+        if (classification.hasManualTime && !classification.hasMachineTime && !classification.compensationReady) {
+          result.manualPendingVerification += 1
+        }
         break
       case 'leave':
         result.leave += 1
@@ -322,9 +482,6 @@ export function summarizeAttendancePeriod({
         break
       case 'permit':
         result.permit += 1
-        break
-      case 'official_travel':
-        result.officialTravel += 1
         break
       case 'absent':
         result.absent += 1
@@ -345,6 +502,11 @@ export function summarizeAttendancePeriod({
         result.offday += 1
         break
     }
+
+    if (classification.workAttendanceRecorded) result.recordedWorkAttendance += 1
+    if (classification.compensationReady) result.verifiedWorkAttendance += 1
+    if (classification.transportBasis) result.transportBasisDays += 1
+    if (classification.mealBasis) result.mealBasisDays += 1
   }
 
   return result
@@ -353,233 +515,235 @@ export function summarizeAttendancePeriod({
 export function classifyAttendanceDay({
   date,
   logs,
+  requests = [],
+  requestTypes = [],
   holiday,
 }: {
   date: string
   logs: AttendanceReportingLog[]
+  requests?: AttendanceReportingRequest[]
+  requestTypes?: AttendanceRequestTypeMeta[]
   holiday?: AttendanceHoliday
 }): AttendanceDayClassification {
   const isWeekend = isWeekendISO(date)
   const isHoliday = Boolean(holiday)
   const holidayName = String(holiday?.holiday_name || '')
 
-  if (!logs.length) {
-    return makeDay({
-      date,
-      bucket: isWeekend || isHoliday ? 'offday' : 'no_record',
-      isWeekend,
-      isHoliday,
-      holidayName,
-      note: isWeekend || isHoliday ? 'Hari libur tanpa aktivitas kerja.' : 'Belum ada log fingerprint/manual/request approved.',
-    })
-  }
-
-  const ordered = [...logs].sort((a, b) => {
+  const orderedLogs = [...logs].sort((a, b) => {
     const left = String(a.updated_at || a.created_at || '')
     const right = String(b.updated_at || b.created_at || '')
     return right.localeCompare(left)
   })
 
-  const machineIn = firstNonEmpty(ordered.map((log) => log.check_in))
-  const machineOut = firstNonEmpty(ordered.map((log) => log.check_out))
-  const manualIn = firstNonEmpty(
-    ordered.flatMap((log) => [log.manual_check_in, log.requested_check_in]),
+  const machineCheckIn = pickEarliestTime(orderedLogs.map((log) => log.check_in))
+  const machineCheckOut = pickLatestTime(orderedLogs.map((log) => log.check_out))
+  const manualCheckIn = pickEarliestTime(
+    orderedLogs.flatMap((log) => [log.manual_check_in, log.requested_check_in]),
   )
-  const manualOut = firstNonEmpty(
-    ordered.flatMap((log) => [log.manual_check_out, log.requested_check_out]),
+  const manualCheckOut = pickLatestTime(
+    orderedLogs.flatMap((log) => [log.manual_check_out, log.requested_check_out]),
   )
 
-  const effectiveCheckIn = machineIn || manualIn
-  const effectiveCheckOut = machineOut || manualOut
-  const hasMachineTime = Boolean(machineIn || machineOut)
-  const hasManualTime = Boolean(manualIn || manualOut)
+  const effectiveCheckIn = machineCheckIn || manualCheckIn
+  const effectiveCheckOut = machineCheckOut || manualCheckOut
+  const hasMachineTime = Boolean(machineCheckIn || machineCheckOut)
+  const hasManualTime = Boolean(manualCheckIn || manualCheckOut)
   const hasAnyTime = Boolean(effectiveCheckIn || effectiveCheckOut)
   const completeTime = Boolean(effectiveCheckIn && effectiveCheckOut)
-  const isLate = ordered.some((log) => normalizeAttendanceText(log.status) === 'late')
+  const pureManual = hasManualTime && !hasMachineTime
+  const isLate = orderedLogs.some((log) => normalizeAttendanceText(log.status) === 'late')
+  const manualApproved = isManualAttendanceApproved(orderedLogs)
 
-  const request = resolveRequest(ordered)
-  const approvedRequest = request.category && request.approved
-  const pendingRequest = request.category && !request.approved
+  const embeddedRequests = orderedLogs
+    .map(logToEmbeddedRequest)
+    .filter((request): request is AttendanceReportingRequest => Boolean(request))
 
-  // Approved absence + fingerprint on the same date is a reporting conflict.
-  // This prevents the same date from silently being counted as both office presence and leave.
-  if (approvedRequest && hasMachineTime) {
-    return makeDay({
-      date,
-      bucket: 'conflict',
-      isWeekend,
-      isHoliday,
-      holidayName,
+  const request = resolveRequest([...requests, ...embeddedRequests], requestTypes)
+  const approvedNonWorkRequest =
+    request.approved &&
+    ['leave', 'phl_claim', 'sick', 'permit', 'absent'].includes(request.category)
+  const approvedWorkRequest = request.approved && request.category === 'official_travel'
+
+  const base = {
+    date,
+    dayName: formatDayNameID(date),
+    isWeekend,
+    isHoliday,
+    holidayName,
+    machineCheckIn,
+    machineCheckOut,
+    manualCheckIn,
+    manualCheckOut,
+    effectiveCheckIn,
+    effectiveCheckOut,
+    hasMachineTime,
+    hasManualTime,
+    completeTime,
+    sourceLabel: resolveSourceLabel({
       hasMachineTime,
       hasManualTime,
-      effectiveCheckIn,
-      effectiveCheckOut,
-      isLate,
-      requestCode: request.code,
+      approvedWorkRequest,
       requestLabel: request.label,
-      requestApproved: true,
-      note: `Ada fingerprint dan request approved (${request.label || request.code}) pada tanggal yang sama. Perlu review HR.`,
-    })
+    }),
+    isLate,
+    manualApproved,
+    requestId: request.id,
+    requestCode: request.code,
+    requestLabel: request.label,
+    requestCategory: request.category,
+    requestStatus: request.status,
+    requestSource: request.source,
+    requestReason: request.reason,
+    requestApproved: request.approved,
+    requestPending: request.pending,
   }
 
-  if (approvedRequest) {
-    return makeDay({
-      date,
-      bucket: request.category as AttendanceDayBucket,
-      isWeekend,
-      isHoliday,
-      holidayName,
-      hasMachineTime,
-      hasManualTime,
-      effectiveCheckIn,
-      effectiveCheckOut,
-      isLate,
-      requestCode: request.code,
-      requestLabel: request.label,
-      requestApproved: true,
-      note: `Request approved: ${request.label || request.code}.`,
-    })
-  }
-
-  if (pendingRequest && !hasAnyTime) {
-    return makeDay({
-      date,
-      bucket: 'pending_request',
-      isWeekend,
-      isHoliday,
-      holidayName,
-      requestCode: request.code,
-      requestLabel: request.label,
-      requestApproved: false,
-      note: `Request ${request.label || request.code} belum final/approved.`,
-    })
-  }
-
+  // Sabtu/Minggu/libur tidak otomatis dihitung sebagai cuti/ST hanya karena request rentang
+  // melewati hari libur. Hari libur baru menjadi hari kerja bila ada aktivitas waktu nyata.
   if (isWeekend || isHoliday) {
-    if (hasAnyTime) {
+    if (hasAnyTime && !completeTime) {
       return makeDay({
-        date,
+        ...base,
+        bucket: 'incomplete',
+        note: 'Ada aktivitas pada hari libur, tetapi jam masuk/pulang belum lengkap.',
+      })
+    }
+
+    if (completeTime) {
+      const compensationReady = hasMachineTime || manualApproved
+      return makeDay({
+        ...base,
         bucket: 'offday_work',
-        isWeekend,
-        isHoliday,
-        holidayName,
-        hasMachineTime,
-        hasManualTime,
-        effectiveCheckIn,
-        effectiveCheckOut,
-        isLate,
-        requestCode: request.code,
-        requestLabel: request.label,
-        requestApproved: request.approved,
-        note: 'Aktivitas kerja pada Sabtu/Minggu/libur. Tidak dihitung sebagai Hadir Kantor reguler.',
+        workAttendanceRecorded: true,
+        compensationReady,
+        transportBasis: compensationReady,
+        mealBasis: compensationReady,
+        note: approvedWorkRequest
+          ? `Kerja pada hari libur dalam ${request.label || 'ST/Tugas Luar'} dengan jam kehadiran tersedia.`
+          : pureManual
+            ? 'Kerja Sabtu/Minggu/libur tercatat manual. Dasar tunjangan aktif setelah manual attendance disetujui.'
+            : 'Kerja Sabtu/Minggu/libur dengan data mesin/fingerprint lengkap.',
       })
     }
 
     return makeDay({
-      date,
+      ...base,
       bucket: 'offday',
-      isWeekend,
-      isHoliday,
-      holidayName,
-      note: 'Hari libur tanpa aktivitas kerja.',
+      note: approvedWorkRequest
+        ? `Rentang ${request.label || 'ST/Tugas Luar'} melewati hari libur tanpa jam kerja; tidak otomatis dihitung sebagai hari kehadiran.`
+        : 'Hari libur tanpa aktivitas kerja.',
     })
   }
 
-  const pureManual = hasManualTime && !hasMachineTime
-  if (pureManual && completeTime) {
+  // ST / Tugas Luar / kerja luar kota adalah aktivitas kerja, bukan ketidakhadiran.
+  // Approved request pada hari kerja dihitung sebagai kehadiran kerja walaupun tidak ada fingerprint.
+  if (approvedWorkRequest) {
     return makeDay({
-      date,
-      bucket: 'manual_external',
-      isWeekend,
-      isHoliday,
-      holidayName,
-      hasMachineTime,
-      hasManualTime,
-      effectiveCheckIn,
-      effectiveCheckOut,
-      isLate,
-      requestCode: request.code,
-      requestLabel: request.label,
-      requestApproved: request.approved,
-      note: 'Jam lengkap hanya berasal dari absensi manual. Dipisahkan dari Hadir Kantor fingerprint.',
+      ...base,
+      bucket: 'official_travel',
+      workAttendanceRecorded: true,
+      compensationReady: true,
+      transportBasis: true,
+      mealBasis: true,
+      note: completeTime
+        ? `${request.label || 'ST/Tugas Luar'} approved dan terdapat jam kehadiran ${hasMachineTime ? 'mesin' : 'manual'}.`
+        : `${request.label || 'ST/Tugas Luar'} approved. Dihitung sebagai kehadiran kerja untuk dasar laporan/tunjangan walaupun tidak ada fingerprint kantor.`,
     })
   }
 
-  if (completeTime) {
+  // Cuti/sakit/izin/PHL approved yang bertabrakan dengan jam kerja nyata harus direview,
+  // agar tidak double-count sebagai hadir sekaligus tidak hadir.
+  if (approvedNonWorkRequest && hasAnyTime) {
     return makeDay({
-      date,
+      ...base,
+      bucket: 'conflict',
+      note: `Ada jam kehadiran dan request approved (${request.label || request.code}) pada tanggal yang sama. HR perlu menentukan data yang benar sebelum payroll.`,
+    })
+  }
+
+  if (approvedNonWorkRequest) {
+    return makeDay({
+      ...base,
+      bucket: request.category as AttendanceDayBucket,
+      note: `Request approved: ${request.label || request.code}.`,
+    })
+  }
+
+  // Kehadiran kantor: minimal ada sumber mesin dan pasangan jam efektif lengkap.
+  // Manual boleh melengkapi salah satu sisi fingerprint tanpa mengubahnya menjadi pure manual.
+  if (completeTime && hasMachineTime) {
+    return makeDay({
+      ...base,
       bucket: 'office_present',
-      isWeekend,
-      isHoliday,
-      holidayName,
-      hasMachineTime,
-      hasManualTime,
-      effectiveCheckIn,
-      effectiveCheckOut,
-      isLate,
-      requestCode: request.code,
-      requestLabel: request.label,
-      requestApproved: request.approved,
+      workAttendanceRecorded: true,
+      compensationReady: true,
+      transportBasis: true,
+      mealBasis: true,
       note: hasManualTime
-        ? 'Kehadiran reguler dengan fingerprint dan/atau koreksi manual pelengkap.'
-        : 'Kehadiran reguler dengan jam masuk dan pulang lengkap.',
+        ? 'Kehadiran kantor dengan fingerprint dan koreksi manual pelengkap.'
+        : 'Kehadiran kantor dengan fingerprint/jam mesin lengkap.',
+    })
+  }
+
+  // Pure manual selalu ikut laporan kehadiran tercatat. Untuk dasar tunjangan, manual harus sudah approved.
+  if (completeTime && pureManual) {
+    return makeDay({
+      ...base,
+      bucket: 'manual_present',
+      workAttendanceRecorded: true,
+      compensationReady: manualApproved,
+      transportBasis: manualApproved,
+      mealBasis: manualApproved,
+      note: manualApproved
+        ? 'Kehadiran manual/lapangan lengkap dan sudah terverifikasi approval.'
+        : 'Kehadiran manual/lapangan lengkap tetapi belum terverifikasi approval; tetap muncul di laporan namun belum masuk dasar tunjangan final.',
     })
   }
 
   if (hasAnyTime) {
     return makeDay({
-      date,
+      ...base,
       bucket: 'incomplete',
-      isWeekend,
-      isHoliday,
-      holidayName,
-      hasMachineTime,
-      hasManualTime,
-      effectiveCheckIn,
-      effectiveCheckOut,
-      isLate,
-      requestCode: request.code,
-      requestLabel: request.label,
-      requestApproved: request.approved,
       note: 'Hanya salah satu sisi jam masuk/pulang tersedia.',
     })
   }
 
-  const normalizedStatuses = ordered.map((log) => normalizeAttendanceText(log.status))
+  if (request.pending) {
+    return makeDay({
+      ...base,
+      bucket: 'pending_request',
+      note: `Request ${request.label || request.code} belum final/approved.`,
+    })
+  }
+
+  const normalizedStatuses = orderedLogs.map((log) => normalizeAttendanceText(log.status))
   if (normalizedStatuses.some((status) => ['absent', 'alpa', 'alpha'].includes(status))) {
     return makeDay({
-      date,
+      ...base,
       bucket: 'absent',
-      isWeekend,
-      isHoliday,
-      holidayName,
       note: 'Status absensi menunjukkan alpa/tidak hadir.',
     })
   }
 
   return makeDay({
-    date,
+    ...base,
     bucket: 'no_record',
-    isWeekend,
-    isHoliday,
-    holidayName,
-    requestCode: request.code,
-    requestLabel: request.label,
-    requestApproved: request.approved,
-    note: 'Belum ada jam kehadiran yang dapat dihitung sebagai hadir.',
+    note: logs.length
+      ? 'Ada row attendance, tetapi tidak ada pasangan jam atau request final yang dapat dihitung sebagai kehadiran.'
+      : 'Belum ada fingerprint, manual attendance, atau request kerja/ketidakhadiran final.',
   })
 }
 
 export function attendanceBucketLabel(bucket: AttendanceDayBucket) {
   const labels: Record<AttendanceDayBucket, string> = {
     office_present: 'Hadir Kantor',
-    manual_external: 'Manual / Luar Kantor',
+    manual_present: 'Hadir Manual / Lapangan',
+    official_travel: 'ST / Tugas Luar / Luar Kota',
     offday_work: 'Kerja Sabtu/Minggu/Libur',
     leave: 'Cuti',
     phl_claim: 'Klaim PHL',
     sick: 'Sakit',
     permit: 'Izin',
-    official_travel: 'Tugas Luar',
     absent: 'Alpa',
     incomplete: 'Incomplete',
     pending_request: 'Request Pending',
@@ -590,59 +754,176 @@ export function attendanceBucketLabel(bucket: AttendanceDayBucket) {
   return labels[bucket]
 }
 
-function resolveRequest(logs: AttendanceReportingLog[]) {
-  for (const log of logs) {
-    const code = normalizeAttendanceText(log.absence_request_type || log.status)
-    const label = String(log.absence_request_label || '').trim()
-    const category = requestCategory(code, label)
+export function isWorkAttendanceBucket(bucket: AttendanceDayBucket) {
+  return ['office_present', 'manual_present', 'official_travel', 'offday_work'].includes(bucket)
+}
 
-    if (!category) continue
+function resolveRequest(
+  requests: AttendanceReportingRequest[],
+  requestTypes: AttendanceRequestTypeMeta[],
+) {
+  const normalized = requests
+    .map((request) => normalizeRequest(request, requestTypes))
+    .filter((request) => request.category)
 
+  if (!normalized.length) {
     return {
-      code,
-      label: label || requestCodeLabel(code),
-      category,
-      approved: isRequestApproved(log),
+      id: '',
+      code: '',
+      label: '',
+      category: '',
+      status: '',
+      source: '',
+      reason: '',
+      approved: false,
+      pending: false,
     }
   }
 
-  return { code: '', label: '', category: '', approved: false }
+  // Final approved request has priority over pending/history.
+  const approved = normalized.find((request) => request.approved)
+  if (approved) return approved
+
+  const pending = normalized.find((request) => request.pending)
+  if (pending) return pending
+
+  return normalized[0]
 }
 
-function isRequestApproved(log: AttendanceReportingLog) {
-  const requestStatus = normalizeAttendanceText(log.absence_request_status)
-  const hrStatus = normalizeAttendanceText(log.hr_approval_status)
-  const source = normalizeAttendanceText(log.absence_request_source || log.source)
+function normalizeRequest(
+  request: AttendanceReportingRequest,
+  requestTypes: AttendanceRequestTypeMeta[],
+) {
+  const code = normalizeAttendanceText(request.request_type)
+  const label = String(request.request_label || '').trim()
+  const rawCategory = normalizeAttendanceText(request.request_category)
+  const meta = requestTypes.find((item) => normalizeAttendanceText(item.code) === code)
 
-  if (APPROVED_WORDS.has(requestStatus)) return true
-  // Supervisor approval alone is not final reporting truth.
-  // Final absence categories require HR/request final approval or an approved sync source.
-  if (hrStatus === 'approved') return true
-  if (source.includes('approved') || source.includes('sync')) return true
+  const category = requestCategory({
+    code,
+    label,
+    rawCategory,
+    meta,
+  })
+
+  const status = normalizeAttendanceText(request.hr_status || request.status || request.supervisor_status)
+  const approved = isRequestApproved(request)
+  const pending = isRequestPending(request)
+
+  return {
+    id: String(request.id || ''),
+    code,
+    label: label || String(meta?.label || requestCodeLabel(code)),
+    category,
+    status,
+    source: String(request.source_table || request.source || ''),
+    reason: String(request.reason || ''),
+    approved,
+    pending,
+  }
+}
+
+function isRequestApproved(request: AttendanceReportingRequest) {
+  const hrStatus = normalizeAttendanceText(request.hr_status)
+  const status = normalizeAttendanceText(request.status)
+  const source = normalizeAttendanceText(request.source)
+
+  if (APPROVED_WORDS.has(hrStatus)) return true
+  if (APPROVED_WORDS.has(status)) return true
+  if (source.includes('approved') || source.includes('synced')) return true
   return false
 }
 
-function requestCategory(code: string, rawLabel: string): AttendanceDayBucket | '' {
-  const label = normalizeAttendanceText(rawLabel)
+function isRequestPending(request: AttendanceReportingRequest) {
+  const hrStatus = normalizeAttendanceText(request.hr_status)
+  const status = normalizeAttendanceText(request.status)
+  const supervisorStatus = normalizeAttendanceText(request.supervisor_status)
 
-  if (code === 'phl_claim' || code === 'claim_phl' || label.includes('klaim_phl')) {
+  if ([hrStatus, status, supervisorStatus].some((value) => REJECTED_WORDS.has(value))) {
+    return false
+  }
+
+  if (isRequestApproved(request)) return false
+
+  return Boolean(
+    [hrStatus, status, supervisorStatus].some((value) =>
+      ['pending', 'submitted', 'waiting_supervisor', 'pending_supervisor', 'waiting_hr', 'pending_hr', 'approved'].includes(value),
+    ),
+  )
+}
+
+function requestCategory({
+  code,
+  label,
+  rawCategory,
+  meta,
+}: {
+  code: string
+  label: string
+  rawCategory: string
+  meta?: AttendanceRequestTypeMeta
+}): AttendanceDayBucket | '' {
+  const normalizedLabel = normalizeAttendanceText(label)
+  const metaCategory = normalizeAttendanceText(meta?.request_category)
+  const metaAttendance = normalizeAttendanceText(meta?.attendance_status)
+
+  if (meta?.is_phl_claim || code === 'phl_claim' || code === 'claim_phl' || normalizedLabel.includes('klaim_phl')) {
     return 'phl_claim'
   }
 
-  if (LEAVE_CODES.has(code) || label.includes('cuti')) return 'leave'
-  if (code === 'sick' || label.includes('sakit')) return 'sick'
-  if (['permit', 'permission', 'izin'].includes(code) || label.includes('izin')) return 'permit'
-  if (
-    ['official_travel', 'business_trip', 'dinas', 'tugas_luar'].includes(code) ||
-    label.includes('tugas_luar') ||
-    label.includes('dinas')
-  ) {
+  if (meta?.is_leave_like || LEAVE_CODES.has(code) || rawCategory === 'leave' || metaCategory === 'leave' || normalizedLabel.includes('cuti')) {
+    return 'leave'
+  }
+
+  if (isWorkAssignment({ code, label: normalizedLabel, rawCategory, metaCategory, metaAttendance })) {
     return 'official_travel'
   }
-  if (['absent', 'alpa', 'alpha'].includes(code) || label.includes('alpa')) return 'absent'
 
-  // manual_attendance is intentionally not an absence bucket.
+  if (code === 'sick' || rawCategory === 'sick' || metaCategory === 'sick' || normalizedLabel.includes('sakit')) return 'sick'
+
+  if (
+    ['permit', 'permission', 'izin'].includes(code) ||
+    ['permit', 'permission', 'izin'].includes(rawCategory) ||
+    ['permit', 'permission', 'izin'].includes(metaCategory) ||
+    normalizedLabel.includes('izin')
+  ) {
+    return 'permit'
+  }
+
+  if (
+    ['absent', 'alpa', 'alpha', 'absence'].includes(code) ||
+    ['absent', 'alpa', 'alpha', 'absence'].includes(rawCategory) ||
+    ['absent', 'alpa', 'alpha', 'absence'].includes(metaCategory) ||
+    normalizedLabel.includes('alpa')
+  ) {
+    return 'absent'
+  }
+
+  // Custom type yang berstatus absence tetapi tidak dikenali secara spesifik tetap dianggap permit,
+  // agar tidak pernah dihitung sebagai kehadiran kerja/tunjangan secara otomatis.
+  if (meta?.is_absence_like) return 'permit'
+
   return ''
+}
+
+function isWorkAssignment({
+  code,
+  label,
+  rawCategory,
+  metaCategory,
+  metaAttendance,
+}: {
+  code: string
+  label: string
+  rawCategory: string
+  metaCategory: string
+  metaAttendance: string
+}) {
+  const exactValues = new Set([code, rawCategory, metaCategory, metaAttendance])
+  if ([...exactValues].some((value) => WORK_ASSIGNMENT_TOKENS.includes(value))) return true
+  if (code === 'st') return true
+
+  return WORK_ASSIGNMENT_TOKENS.some((token) => label.includes(token))
 }
 
 function requestCodeLabel(code: string) {
@@ -650,9 +931,67 @@ function requestCodeLabel(code: string) {
   if (LEAVE_CODES.has(code)) return 'Cuti'
   if (code === 'sick') return 'Sakit'
   if (['permit', 'permission', 'izin'].includes(code)) return 'Izin'
-  if (['official_travel', 'business_trip', 'dinas', 'tugas_luar'].includes(code)) return 'Tugas Luar'
+  if (WORK_ASSIGNMENT_TOKENS.includes(code) || code === 'st') return 'ST / Tugas Luar'
   if (['absent', 'alpa', 'alpha'].includes(code)) return 'Alpa'
   return code || '-'
+}
+
+function logToEmbeddedRequest(log: AttendanceReportingLog): AttendanceReportingRequest | null {
+  const code = String(log.absence_request_type || '').trim()
+  const label = String(log.absence_request_label || '').trim()
+
+  if (!code && !label) return null
+
+  return {
+    id: log.id,
+    source_table: 'attendance_logs',
+    employee_id: log.employee_id,
+    employee_number: log.employee_number,
+    machine_pin: log.machine_pin,
+    start_date: log.attendance_date,
+    end_date: log.attendance_date,
+    request_type: code,
+    request_label: label,
+    status: log.absence_request_status,
+    supervisor_status: log.supervisor_approval_status,
+    hr_status: log.hr_approval_status || log.hr_final_status,
+    reason: log.employee_daily_note || log.correction_reason || log.notes,
+    source: log.absence_request_source || log.source,
+    created_at: log.created_at,
+    updated_at: log.updated_at,
+  }
+}
+
+function isManualAttendanceApproved(logs: AttendanceReportingLog[]) {
+  return logs.some((log) => {
+    const supervisor = normalizeAttendanceText(log.supervisor_approval_status)
+    const hr = normalizeAttendanceText(log.hr_approval_status)
+    const final = normalizeAttendanceText(log.hr_final_status)
+
+    return (
+      supervisor === 'approved' ||
+      hr === 'approved' ||
+      ['ready_for_hr', 'finalized', 'approved'].includes(final)
+    )
+  })
+}
+
+function resolveSourceLabel({
+  hasMachineTime,
+  hasManualTime,
+  approvedWorkRequest,
+  requestLabel,
+}: {
+  hasMachineTime: boolean
+  hasManualTime: boolean
+  approvedWorkRequest: boolean
+  requestLabel: string
+}) {
+  const sources: string[] = []
+  if (hasMachineTime) sources.push('Mesin/Fingerprint')
+  if (hasManualTime) sources.push('Manual')
+  if (approvedWorkRequest) sources.push(requestLabel || 'ST/Tugas Luar Approved')
+  return sources.length ? sources.join(' + ') : '-'
 }
 
 function makeDay(
@@ -661,19 +1000,42 @@ function makeDay(
 ): AttendanceDayClassification {
   return {
     date: input.date,
+    dayName: input.dayName || formatDayNameID(input.date),
     bucket: input.bucket,
     label: attendanceBucketLabel(input.bucket),
     isWeekend: input.isWeekend,
     isHoliday: input.isHoliday,
     holidayName: input.holidayName,
-    hasMachineTime: Boolean(input.hasMachineTime),
-    hasManualTime: Boolean(input.hasManualTime),
+
+    machineCheckIn: String(input.machineCheckIn || ''),
+    machineCheckOut: String(input.machineCheckOut || ''),
+    manualCheckIn: String(input.manualCheckIn || ''),
+    manualCheckOut: String(input.manualCheckOut || ''),
     effectiveCheckIn: String(input.effectiveCheckIn || ''),
     effectiveCheckOut: String(input.effectiveCheckOut || ''),
+    hasMachineTime: Boolean(input.hasMachineTime),
+    hasManualTime: Boolean(input.hasManualTime),
+    completeTime: Boolean(input.completeTime),
+
+    sourceLabel: String(input.sourceLabel || '-'),
     isLate: Boolean(input.isLate),
+    manualApproved: Boolean(input.manualApproved),
+
+    requestId: String(input.requestId || ''),
     requestCode: String(input.requestCode || ''),
     requestLabel: String(input.requestLabel || ''),
+    requestCategory: String(input.requestCategory || ''),
+    requestStatus: String(input.requestStatus || ''),
+    requestSource: String(input.requestSource || ''),
+    requestReason: String(input.requestReason || ''),
     requestApproved: Boolean(input.requestApproved),
+    requestPending: Boolean(input.requestPending),
+
+    workAttendanceRecorded: Boolean(input.workAttendanceRecorded),
+    compensationReady: Boolean(input.compensationReady),
+    transportBasis: Boolean(input.transportBasis),
+    mealBasis: Boolean(input.mealBasis),
+
     note: input.note,
   }
 }
@@ -687,6 +1049,28 @@ function groupLogsByDate(logs: AttendanceReportingLog[]) {
     existing.push(log)
     map.set(date, existing)
   })
+  return map
+}
+
+function groupRequestsByDate(
+  requests: AttendanceReportingRequest[],
+  start: string,
+  end: string,
+) {
+  const map = new Map<string, AttendanceReportingRequest[]>()
+
+  requests.forEach((request) => {
+    const requestStart = maxISODate(normalizeISODate(request.start_date) || start, start)
+    const requestEnd = minISODate(normalizeISODate(request.end_date) || requestStart, end)
+    if (!requestStart || !requestEnd || requestStart > requestEnd) return
+
+    for (const date of getDateRange(requestStart, requestEnd)) {
+      const existing = map.get(date) || []
+      existing.push(request)
+      map.set(date, existing)
+    }
+  })
+
   return map
 }
 
@@ -718,6 +1102,12 @@ function maxISODate(a: string, b: string) {
   return a > b ? a : b
 }
 
+function minISODate(a: string, b: string) {
+  if (!a) return b
+  if (!b) return a
+  return a < b ? a : b
+}
+
 function toISODate(date: Date) {
   const year = date.getFullYear()
   const month = String(date.getMonth() + 1).padStart(2, '0')
@@ -725,10 +1115,44 @@ function toISODate(date: Date) {
   return `${year}-${month}-${day}`
 }
 
-function firstNonEmpty(values: Array<string | null | undefined>) {
-  for (const value of values) {
-    const normalized = String(value || '').trim()
-    if (normalized) return normalized
-  }
-  return ''
+function normalizeClock(value: unknown) {
+  const raw = String(value || '').trim()
+  if (!raw) return ''
+
+  const match = raw.match(/^(\d{1,2}):(\d{2})(?::\d{2})?$/)
+  if (!match) return raw
+
+  const hour = Math.min(Math.max(Number(match[1]), 0), 23)
+  const minute = Math.min(Math.max(Number(match[2]), 0), 59)
+  return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`
+}
+
+function clockMinutes(value: string) {
+  const match = value.match(/^(\d{2}):(\d{2})$/)
+  if (!match) return null
+  return Number(match[1]) * 60 + Number(match[2])
+}
+
+function pickEarliestTime(values: Array<string | null | undefined>) {
+  const normalized = values.map(normalizeClock).filter(Boolean)
+  if (!normalized.length) return ''
+
+  return normalized.sort((a, b) => {
+    const left = clockMinutes(a)
+    const right = clockMinutes(b)
+    if (left === null || right === null) return a.localeCompare(b)
+    return left - right
+  })[0]
+}
+
+function pickLatestTime(values: Array<string | null | undefined>) {
+  const normalized = values.map(normalizeClock).filter(Boolean)
+  if (!normalized.length) return ''
+
+  return normalized.sort((a, b) => {
+    const left = clockMinutes(a)
+    const right = clockMinutes(b)
+    if (left === null || right === null) return b.localeCompare(a)
+    return right - left
+  })[0]
 }

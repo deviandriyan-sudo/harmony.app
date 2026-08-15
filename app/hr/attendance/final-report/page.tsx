@@ -463,7 +463,7 @@ export default function HRAttendanceFinalReportPage() {
     <>
       <Topbar
         title="Finalisasi Absensi HR"
-        description="Route khusus Finalisasi & Lock. Monitoring, HR Review, Sync, dan Export dipisahkan."
+        description="Finalisasi & lock per karyawan. Jalankan Sync agar approved request termaterialisasi sebelum finalisasi; reporting dapat dibuka kapan saja."
       />
 
       <section className="harmony-page-bg min-h-screen space-y-5 p-4 sm:p-6">
@@ -475,7 +475,7 @@ export default function HRAttendanceFinalReportPage() {
           <div className="relative grid gap-6 xl:grid-cols-[1fr_auto] xl:items-end">
             <div>
               <Link
-                href="/hr/attendance"
+                href={`/hr/attendance?period=${periodMonth}`}
                 className="inline-flex min-h-10 items-center gap-2 rounded-full border border-white/10 bg-white/10 px-4 text-xs font-semibold text-white/75 hover:bg-white/15"
               >
                 <ArrowLeft size={15} /> Kembali ke Absensi

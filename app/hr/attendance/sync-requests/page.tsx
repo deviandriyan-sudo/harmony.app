@@ -6,8 +6,10 @@ import {
   AlertTriangle,
   ArrowLeft,
   CheckCircle2,
+  FileSpreadsheet,
   Loader2,
   RefreshCcw,
+  ShieldCheck,
 } from 'lucide-react'
 
 import { Topbar } from '@/components/layout/Topbar'
@@ -16,59 +18,87 @@ import {
   getCurrentPeriodMonthWita,
   getCutoffRange,
 } from '@/lib/attendance-reporting'
+import {
+  loadAttendanceReportingDataset,
+  type AttendanceReportingDataset,
+} from '@/lib/attendance-reporting-data'
 
 export default function HRAttendanceSyncPage() {
   const [periodMonth, setPeriodMonth] = useState(getCurrentPeriodMonthWita())
-  const [processing, setProcessing] = useState(false)
-  const [successMessage, setSuccessMessage] = useState('')
-  const [errorMessage, setErrorMessage] = useState('')
+  const [dataset, setDataset] = useState<AttendanceReportingDataset | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [syncing, setSyncing] = useState(false)
+  const [message, setMessage] = useState<{ type: 'success' | 'error' | 'info'; text: string } | null>(null)
 
   const range = useMemo(() => getCutoffRange(periodMonth), [periodMonth])
 
+  const requestStats = useMemo(() => {
+    const requests = dataset?.requests || []
+    const approved = requests.filter((request) => isApproved(request.hr_status) || isApproved(request.status))
+    const travel = approved.filter((request) => isWorkAssignment(request.request_type, request.request_label, request.request_category))
+    const absence = approved.length - travel.length
+    return { all: requests.length, approved: approved.length, travel: travel.length, absence }
+  }, [dataset])
+
   useEffect(() => {
-    if (typeof window === 'undefined') return
-    const queryPeriod = new URLSearchParams(window.location.search).get('period')
-    if (queryPeriod && /^\d{4}-(0[1-9]|1[0-2])$/.test(queryPeriod)) {
-      setPeriodMonth(queryPeriod)
+    if (typeof window !== 'undefined') {
+      const queryPeriod = new URLSearchParams(window.location.search).get('period')
+      if (queryPeriod && /^\d{4}-(0[1-9]|1[0-2])$/.test(queryPeriod) && queryPeriod !== periodMonth) {
+        setPeriodMonth(queryPeriod)
+        return
+      }
     }
-  }, [])
+    fetchData()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [periodMonth])
+
+  async function fetchData() {
+    setLoading(true)
+    try {
+      setDataset(await loadAttendanceReportingDataset(supabase, periodMonth))
+    } catch (error: any) {
+      setDataset(null)
+      setMessage({ type: 'error', text: error?.message || 'Sumber approved request gagal dibaca.' })
+    } finally {
+      setLoading(false)
+    }
+  }
 
   async function handleSync() {
-    setProcessing(true)
-    setSuccessMessage('')
-    setErrorMessage('')
+    const confirmed = window.confirm(
+      `Sinkron approved request periode ${range.label} ke attendance_logs?\n\n` +
+        `Laporan HR sebenarnya sudah membaca approved request langsung. Sync ini hanya materialisasi untuk kompatibilitas HR Review/finalisasi/audit.`,
+    )
+
+    if (!confirmed) return
+
+    setSyncing(true)
+    setMessage(null)
 
     try {
-      const confirmed = window.confirm(
-        `Sinkron approved request ke attendance_logs untuk periode ${range.label}?\n\n` +
-          'Proses ini hanya menyinkronkan pengajuan yang sudah approved. Tidak melakukan finalisasi dan tidak melakukan lock.',
-      )
-
-      if (!confirmed) return
-
-      const { data, error } = await supabase.rpc(
-        'sync_approved_leave_requests_to_attendance',
-        { p_period_month: periodMonth },
-      )
+      const { data, error } = await supabase.rpc('sync_approved_leave_requests_to_attendance', {
+        p_period_month: periodMonth,
+      })
 
       if (error) throw error
 
-      const message =
-        typeof data === 'object' && data && 'message' in data
-          ? String((data as { message?: unknown }).message || '')
-          : ''
+      setMessage({
+        type: 'success',
+        text:
+          data?.message ||
+          `Approved request ${range.label} berhasil disinkronkan ke attendance_logs. Laporan tetap menggunakan cross-check sumber asli agar tidak ada ST/tugas luar yang hilang.`,
+      })
 
-      setSuccessMessage(
-        message ||
-          `Approved request periode ${range.label} berhasil disinkronkan ke attendance_logs.`,
-      )
+      await fetchData()
     } catch (error: any) {
-      setErrorMessage(
-        error?.message ||
-          'Sinkron approved request gagal. Pastikan RPC sync_approved_leave_requests_to_attendance tersedia.',
-      )
+      setMessage({
+        type: 'error',
+        text:
+          error?.message ||
+          'Sinkron gagal. Jangan finalisasi dulu. Laporan masih dapat dibuka karena membaca leave_requests/PHL langsung.',
+      })
     } finally {
-      setProcessing(false)
+      setSyncing(false)
     }
   }
 
@@ -76,112 +106,89 @@ export default function HRAttendanceSyncPage() {
     <>
       <Topbar
         title="Sinkron Approved Request"
-        description="Sinkronisasi cuti, izin, sakit, tugas luar, dan klaim PHL yang sudah approved ke attendance_logs."
+        description="Materialisasi approved request untuk workflow; bukan sumber tunggal laporan kehadiran."
       />
 
       <section className="harmony-page-bg min-h-screen space-y-5 p-4 sm:p-6">
-        {successMessage && (
-          <div className="rounded-2xl border border-green-200 bg-green-50 p-4 text-sm leading-6 text-green-700">
-            <div className="mb-1 flex items-center gap-2 font-bold">
-              <CheckCircle2 size={17} />
-              Berhasil
-            </div>
-            {successMessage}
-          </div>
-        )}
-
-        {errorMessage && (
-          <div className="rounded-2xl border border-orange-200 bg-orange-50 p-4 text-sm leading-6 text-orange-700">
-            <div className="mb-1 flex items-center gap-2 font-bold">
-              <AlertTriangle size={17} />
-              Perhatian
-            </div>
-            {errorMessage}
-          </div>
-        )}
+        {message && <MessageBox type={message.type} text={message.text} />}
+        {dataset?.warnings.map((warning) => <MessageBox key={warning} type="info" text={warning} />)}
 
         <section className="relative overflow-hidden rounded-[32px] bg-[#1d1d1f] p-6 text-white shadow-[0_24px_80px_rgba(0,0,0,0.16)]">
-          <div className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-[#007aff]/30 blur-3xl" />
-
-          <div className="relative">
-            <Link
-              href="/hr/attendance"
-              className="inline-flex min-h-10 items-center gap-2 rounded-full border border-white/10 bg-white/10 px-4 text-xs font-semibold text-white/75 hover:bg-white/15"
-            >
-              <ArrowLeft size={15} />
-              Kembali ke Absensi
-            </Link>
-
-            <div className="mt-5 inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-2 text-xs font-semibold text-white/75">
-              <RefreshCcw size={15} />
-              Safe Request Sync
+          <div className="grid gap-6 xl:grid-cols-[1fr_auto] xl:items-end">
+            <div>
+              <Link href={`/hr/attendance?period=${periodMonth}`} className="inline-flex min-h-10 items-center gap-2 rounded-full bg-white/10 px-4 text-xs font-semibold text-white/75">
+                <ArrowLeft size={15} /> Kembali
+              </Link>
+              <h1 className="mt-5 text-3xl font-semibold">Sinkron Workflow</h1>
+              <p className="mt-2 max-w-3xl text-sm leading-7 text-white/60">
+                Approved cuti, sakit, izin, ST/tugas luar, dan klaim PHL dimaterialisasi ke attendance_logs. Laporan tidak lagi bergantung pada langkah ini karena sumber request asli juga dibaca langsung.
+              </p>
             </div>
 
-            <h1 className="mt-4 text-3xl font-semibold tracking-tight">
-              Sinkron Approved Request
-            </h1>
-
-            <p className="mt-3 max-w-3xl text-sm leading-7 text-white/60">
-              Route ini hanya melakukan sinkronisasi request approved. Tidak melakukan
-              HR Review, Finalisasi, atau Lock sehingga fungsi antar-route tidak lagi tumpang tindih.
-            </p>
+            <div className="rounded-2xl bg-white/10 p-4 xl:min-w-[330px]">
+              <p className="text-[10px] font-bold uppercase tracking-wide text-white/45">Periode</p>
+              <input type="month" min="2026-01" value={periodMonth} onChange={(event) => setPeriodMonth(event.target.value)} className="mt-1 w-full bg-transparent text-sm font-semibold text-white outline-none" />
+              <p className="mt-1 text-xs text-white/55">{range.label}</p>
+            </div>
           </div>
         </section>
 
-        <section className="harmony-card p-5 sm:p-6">
-          <div className="grid gap-5 lg:grid-cols-[280px_1fr] lg:items-end">
-            <label className="block">
-              <span className="harmony-label">Periode Cutoff</span>
-              <input
-                type="month"
-                min="2026-01"
-                value={periodMonth}
-                onChange={(event) => setPeriodMonth(event.target.value)}
-                className="harmony-input"
-              />
-            </label>
+        <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <Metric label="Request Terbaca" value={requestStats.all} />
+          <Metric label="Approved" value={requestStats.approved} />
+          <Metric label="ST/Tugas Luar" value={requestStats.travel} />
+          <Metric label="Cuti/Sakit/Izin/PHL" value={requestStats.absence} />
+        </section>
 
-            <div className="rounded-2xl border border-black/5 bg-[#f5f5f7] p-4">
-              <p className="text-[11px] font-bold uppercase tracking-wide text-[#86868b]">
-                Rentang yang akan disinkron
-              </p>
-              <p className="mt-1 text-sm font-semibold text-[#1d1d1f]">
-                {range.label}
-              </p>
+        <section className="harmony-card p-5 sm:p-6">
+          <div className="rounded-[24px] border border-blue-100 bg-blue-50 p-5 text-sm leading-7 text-blue-800">
+            <div className="flex items-start gap-3">
+              <ShieldCheck size={18} className="mt-1 shrink-0" />
+              <div>
+                <strong>Kenapa masih ada menu Sync?</strong>
+                <p className="mt-1">
+                  Karena HR Review/finalisasi lama memakai attendance_logs sebagai ledger harian. Reporting baru tidak menunggu Sync,
+                  tetapi finalisasi tetap sebaiknya melakukan Sync agar attendance_logs dan sumber approved request konsisten untuk audit.
+                </p>
+              </div>
             </div>
           </div>
 
-          <div className="mt-5 rounded-[24px] border border-blue-100 bg-blue-50 p-4 text-sm leading-6 text-blue-700">
-            Jalankan sinkron setelah approval cuti/izin/PHL selesai. Setelah berhasil,
-            cek <strong>Data Absensi</strong> atau <strong>Laporan Absensi</strong> untuk memastikan
-            kategorinya sudah masuk ke tanggal yang benar.
-          </div>
-
-          <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-            <button
-              type="button"
-              onClick={handleSync}
-              disabled={processing}
-              className="harmony-button-primary disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {processing ? (
-                <Loader2 size={17} className="animate-spin" />
-              ) : (
-                <RefreshCcw size={17} />
-              )}
-              {processing ? 'Menyinkronkan...' : 'Sinkron Sekarang'}
+          <div className="mt-5 flex flex-wrap gap-3">
+            <button type="button" onClick={handleSync} disabled={syncing || loading} className="harmony-button-primary disabled:opacity-50">
+              {syncing ? <Loader2 size={17} className="animate-spin" /> : <RefreshCcw size={17} />}
+              {syncing ? 'Menyinkronkan...' : 'Sinkron Approved Request'}
             </button>
 
             <Link href={`/hr/attendance/data?period=${periodMonth}`} className="harmony-button-secondary">
-              Buka Data Absensi
+              Data Absensi
             </Link>
-
+            <Link href={`/hr/attendance/final-report?period=${periodMonth}`} className="harmony-button-secondary">
+              Finalisasi
+            </Link>
             <Link href={`/hr/attendance/export?period=${periodMonth}`} className="harmony-button-secondary">
-              Buka Laporan Absensi
+              <FileSpreadsheet size={16} /> Laporan
             </Link>
           </div>
         </section>
       </section>
     </>
   )
+}
+
+function Metric({ label, value }: { label: string; value: number }) {
+  return <div className="rounded-[22px] border border-black/5 bg-white p-5 shadow-sm"><p className="text-[10px] font-bold uppercase tracking-wide text-[#86868b]">{label}</p><p className="mt-2 text-3xl font-bold text-[#1d1d1f]">{value}</p></div>
+}
+
+function MessageBox({ type, text }: { type: 'success' | 'error' | 'info'; text: string }) {
+  const cls = type === 'success' ? 'border-green-200 bg-green-50 text-green-700' : type === 'error' ? 'border-orange-200 bg-orange-50 text-orange-700' : 'border-blue-200 bg-blue-50 text-blue-700'
+  return <div className={`rounded-2xl border p-4 text-sm leading-6 ${cls}`}><div className="flex items-start gap-2">{type === 'success' ? <CheckCircle2 size={17} className="mt-0.5" /> : <AlertTriangle size={17} className="mt-0.5" />}{text}</div></div>
+}
+
+function normalize(value: unknown) { return String(value || '').trim().toLowerCase() }
+function isApproved(value: unknown) { return ['approved', 'finalized', 'final', 'hr_approved'].includes(normalize(value)) }
+
+function isWorkAssignment(code: unknown, label: unknown, category: unknown) {
+  const text = [code, label, category].map((value) => normalize(value).replace(/[\s/-]+/g, '_')).join('_')
+  return ['official_travel', 'business_trip', 'tugas_luar', 'surat_tugas', 'dinas', 'perjalanan_dinas', 'luar_kota', 'kerja_luar', 'lapangan'].some((token) => text.includes(token))
 }
