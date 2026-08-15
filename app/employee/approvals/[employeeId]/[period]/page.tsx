@@ -964,7 +964,7 @@ export default function EmployeeApprovalDetailPage() {
     periodStart: string,
     periodEnd: string
   ) {
-    const { error } = await supabase.rpc('sync_phl_balance_from_attendance', {
+    const { error } = await supabase.rpc('harmony_sync_phl_balance_from_attendance_v2', {
       p_employee_id: targetEmployeeId,
       p_period_start: periodStart,
       p_period_end: periodEnd,
