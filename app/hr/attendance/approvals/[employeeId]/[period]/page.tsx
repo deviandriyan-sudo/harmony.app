@@ -175,8 +175,18 @@ export default function HRAttendanceSafeReviewPage() {
   );
 
   const approvalLogs = useMemo(
-    () => logs.filter((log) => String(log.employee_id || "").trim() === employeeId),
+    () =>
+      logs.filter(
+        (log) =>
+          String(log.employee_id || "").trim() === employeeId &&
+          hasMeaningfulAttendanceData(log),
+      ),
     [logs, employeeId],
+  );
+
+  const approvalLogIds = useMemo(
+    () => approvalLogs.map((log) => log.id).filter(Boolean),
+    [approvalLogs],
   );
 
   const hrApproved =
@@ -415,8 +425,7 @@ export default function HRAttendanceSafeReviewPage() {
           })
           .eq("employee_id", employeeId)
           .is("deleted_at", null)
-          .gte("attendance_date", periodStart)
-          .lte("attendance_date", periodEnd)
+          .in("id", approvalLogIds)
           .select("id");
 
       if (logError) throw logError;
@@ -507,8 +516,7 @@ export default function HRAttendanceSafeReviewPage() {
           })
           .eq("employee_id", employeeId)
           .is("deleted_at", null)
-          .gte("attendance_date", periodStart)
-          .lte("attendance_date", periodEnd)
+          .in("id", approvalLogIds)
           .select("id");
 
       if (logError) throw logError;
@@ -1212,10 +1220,11 @@ function buildFullPeriodReviewRows(
 
   for (const date of getInclusiveDateRange(periodStart, periodEnd)) {
     const dayLogs = grouped.get(date) || [];
+    const meaningfulDayLogs = dayLogs.filter(hasMeaningfulAttendanceData);
 
-    if (dayLogs.length > 0) {
+    if (meaningfulDayLogs.length > 0) {
       rows.push(
-        ...dayLogs.sort((a, b) =>
+        ...meaningfulDayLogs.sort((a, b) =>
           String(a.created_at || a.updated_at || "").localeCompare(
             String(b.created_at || b.updated_at || ""),
           ),
@@ -1241,6 +1250,64 @@ function buildFullPeriodReviewRows(
   }
 
   return rows;
+}
+
+function hasMeaningfulAttendanceData(log: AttendanceLog) {
+  if (log.is_placeholder) return false;
+
+  const hasTime = [
+    log.check_in,
+    log.check_out,
+    log.manual_check_in,
+    log.manual_check_out,
+    log.requested_check_in,
+    log.requested_check_out,
+  ].some((value) => hasText(value));
+
+  if (hasTime) return true;
+
+  const hasAbsenceRequest = [
+    log.absence_request_type,
+    log.absence_request_label,
+    log.absence_request_status,
+    log.absence_request_source,
+  ].some((value) => hasText(value));
+
+  if (hasAbsenceRequest) return true;
+
+  const hasProof = [
+    log.phl_proof_url,
+    log.phl_proof_name,
+    log.absence_proof_url,
+    log.absence_proof_name,
+  ].some((value) => hasText(value));
+
+  if (hasProof || log.is_phl_candidate === true) return true;
+
+  // Status kehadiran tanpa evidence tidak boleh mengubah row kosong menjadi Present.
+  // Status ketidakhadiran yang eksplisit tetap dipertahankan sebagai data bermakna.
+  const status = normalize(log.status);
+  const meaningfulStatusTokens = [
+    "leave",
+    "cuti",
+    "sick",
+    "sakit",
+    "permit",
+    "izin",
+    "absent",
+    "alpa",
+    "official_travel",
+    "tugas_luar",
+    "dinas",
+    "phl",
+  ];
+
+  return meaningfulStatusTokens.some((token) => status.includes(token));
+}
+
+function hasText(value: unknown) {
+  const text = String(value ?? "").trim();
+  return text !== "" && text !== "-" && text.toLowerCase() !== "null";
 }
 
 function createPlaceholderAttendanceLog(
