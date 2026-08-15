@@ -622,32 +622,24 @@ export default function EmployeeApprovalDetailPage() {
       return
     }
 
-    // Reject satu tanggal berarti SATU PERIODE dikembalikan ke employee.
-    // Header periode ikut dibuat rejected supaya UI employee langsung editable.
-    // Fallback employee_id + period_month menjaga data lama/edge-case bila state
-    // periodConfirmation belum terisi tetapi log yang direview valid.
-    if (action === 'reject') {
-      const periodRejectPayload = {
-        supervisor_status: 'rejected',
-        supervisor_id: appUser?.employee_id || null,
-        supervisor_name: supervisorName,
-        supervisor_approved_at: null,
-        supervisor_rejected_at: now,
-        supervisor_note:
-          note || `Absensi ${formatDisplayDate(log.attendance_date)} ditolak oleh atasan.`,
-        hr_status: 'rejected_by_supervisor',
-        updated_at: now,
-      }
-
-      const periodRejectQuery = supabase
+    // Reject satu tanggal berarti periode dikembalikan ke employee untuk revisi.
+    // Ini penting karena halaman employee memakai status header periode untuk
+    // menentukan read-only/editable. Approval harian lain tetap tersimpan sebagai
+    // histori sampai employee melakukan resubmit seluruh periode.
+    if (action === 'reject' && periodConfirmation) {
+      const { error: periodRejectError } = await supabase
         .from('attendance_period_confirmations')
-        .update(periodRejectPayload)
-
-      const { error: periodRejectError } = periodConfirmation?.id
-        ? await periodRejectQuery.eq('id', periodConfirmation.id)
-        : await periodRejectQuery
-            .eq('employee_id', employeeId)
-            .eq('period_month', periodMonth)
+        .update({
+          supervisor_status: 'rejected',
+          supervisor_id: appUser?.employee_id || null,
+          supervisor_name: supervisorName,
+          supervisor_approved_at: null,
+          supervisor_rejected_at: now,
+          supervisor_note: note || `Absensi ${formatDisplayDate(log.attendance_date)} ditolak oleh atasan.`,
+          hr_status: 'rejected_by_supervisor',
+          updated_at: now,
+        })
+        .eq('id', periodConfirmation.id)
 
       if (periodRejectError) {
         setErrorMessage(
@@ -863,7 +855,7 @@ export default function EmployeeApprovalDetailPage() {
       emailInfo = `Email notifikasi belum terkirim: ${emailError?.message || 'Terjadi kendala saat mengirim email.'}`
     }
 
-    setSuccessMessage(`Periode absensi berhasil disetujui atasan dan siap diproses HR. ${emailInfo}`)
+    setSuccessMessage(`Periode absensi berhasil disetujui atasan, saldo PHL kerja hari libur sudah disinkronkan, dan data siap diproses HR. ${emailInfo}`)
     setProcessingPeriod(false)
     await fetchData(false)
   }
