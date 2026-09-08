@@ -90,7 +90,9 @@ export function getNotificationEnvironmentStatus(): NotificationEnvironmentStatu
   ).trim()
 
   const fromValue = String(
-    process.env.NOTIFICATION_FROM_EMAIL || ''
+    process.env.NOTIFICATION_FROM_EMAIL ||
+    process.env.HARMONY_EMAIL_FROM ||
+    ''
   ).trim()
 
   const senderEmail = extractSenderEmail(fromValue)

@@ -31,7 +31,7 @@ type TodayItem = {
   endDate: string
   jobPending: string
   handoverTo: string
-  source: 'leave_requests' | 'attendance_logs'
+  source: 'leave_requests' | 'phl_records' | 'attendance_logs'
 }
 
 const categoryMeta = {
@@ -353,6 +353,37 @@ function mapLeaveRow(row: AnyRow, today: string): TodayItem | null {
   }
 }
 
+
+function mapPHLClaimRow(row: AnyRow, today: string): TodayItem | null {
+  if (normalize(row.source) !== 'employee_phl_claim') return null
+
+  const startDate = firstValue(row, ['claim_start_date', 'phl_date'])
+  const endDate = firstValue(row, ['claim_end_date', 'phl_date']) || startDate
+
+  if (!isDateInside(today, startDate, endDate)) return null
+
+  const status = normalize(row.hr_status || row.supervisor_status || row.status)
+  if (isInactiveStatus(status)) return null
+
+  return {
+    id: `phl-${row.id || `${getEmployeeName(row)}-${startDate}`}`,
+    employeeId: String(row.employee_id || row.employee_number || row.id || ''),
+    employeeName: getEmployeeName(row),
+    employeeNumber: getEmployeeNumber(row),
+    department: getDepartment(row),
+    position: getPosition(row),
+    category: 'phl_claim',
+    categoryLabel: 'Klaim PHL',
+    statusLabel: statusLabel(status),
+    statusTone: statusTone(status),
+    startDate,
+    endDate,
+    jobPending: firstValue(row, ['job_pending_summary', 'job_pending', 'pending_job', 'handover_note', 'notes']),
+    handoverTo: firstValue(row, ['handover_to_full_name', 'handover_to', 'job_handover_to_name']),
+    source: 'phl_records',
+  }
+}
+
 function mapAttendanceRow(row: AnyRow, today: string): TodayItem | null {
   const status = normalize(row.status)
   const absenceType = normalize(row.absence_request_type)
@@ -453,10 +484,16 @@ export function TodayTeamAvailability() {
     setMessage('')
 
     try {
-      const [leaveResponse, attendanceResponse] = await Promise.all([
+      const [leaveResponse, phlResponse, attendanceResponse] = await Promise.all([
         supabase
           .from('leave_requests')
           .select('*')
+          .order('created_at', { ascending: false })
+          .limit(500),
+        supabase
+          .from('phl_records')
+          .select('*')
+          .eq('source', 'employee_phl_claim')
           .order('created_at', { ascending: false })
           .limit(500),
         supabase
@@ -468,10 +505,16 @@ export function TodayTeamAvailability() {
       ])
 
       if (leaveResponse.error) throw leaveResponse.error
+      if (phlResponse.error) throw phlResponse.error
       if (attendanceResponse.error) throw attendanceResponse.error
 
       const leaveItems = (leaveResponse.data || [])
+        .filter((row: AnyRow) => normalize(row.request_type) !== 'phl_claim')
         .map((row) => mapLeaveRow(row, today))
+        .filter(Boolean) as TodayItem[]
+
+      const phlItems = (phlResponse.data || [])
+        .map((row) => mapPHLClaimRow(row, today))
         .filter(Boolean) as TodayItem[]
 
       const attendanceItems = (attendanceResponse.data || [])
@@ -479,7 +522,7 @@ export function TodayTeamAvailability() {
         .filter(Boolean) as TodayItem[]
 
       const seen = new Set<string>()
-      const merged = [...leaveItems, ...attendanceItems].filter((item) => {
+      const merged = [...leaveItems, ...phlItems, ...attendanceItems].filter((item) => {
         const key = `${item.employeeId || item.employeeName}-${item.category}`
 
         if (seen.has(key)) return false

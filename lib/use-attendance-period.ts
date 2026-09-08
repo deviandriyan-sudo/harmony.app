@@ -9,13 +9,6 @@ export function isValidAttendancePeriod(value: string | null | undefined) {
   return Boolean(value && PERIOD_RE.test(value) && value >= '2026-01')
 }
 
-/**
- * Single source of truth untuk period selector HR Attendance.
- * - pertama kali baca ?period=YYYY-MM dari URL
- * - jika tidak ada, gunakan periode cutoff WITA berjalan
- * - setiap selector berubah, URL ikut di-replace tanpa reload
- * - query param lain (q/filter) tetap dipertahankan
- */
 export function useAttendancePeriodQuery() {
   const [periodMonth, setPeriodMonthState] = useState(getCurrentPeriodMonthWita())
   const [periodReady, setPeriodReady] = useState(false)

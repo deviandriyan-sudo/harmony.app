@@ -2,25 +2,19 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { LogOut, Loader2 } from 'lucide-react'
-
+import { Loader2, LogOut } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 
-type LogoutButtonProps = {
-  compact?: boolean
-}
-
-export function LogoutButton({
-  compact = false,
-}: LogoutButtonProps) {
+export function LogoutButton({ compact = false }: { compact?: boolean }) {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
 
   async function handleLogout() {
     setLoading(true)
-
     await supabase.auth.signOut()
-
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('harmony_user')
+    }
     router.replace('/login')
     router.refresh()
   }
@@ -35,12 +29,7 @@ export function LogoutButton({
         compact ? 'min-h-11 px-3' : 'min-h-12 px-5',
       ].join(' ')}
     >
-      {loading ? (
-        <Loader2 size={18} className="animate-spin" />
-      ) : (
-        <LogOut size={18} />
-      )}
-
+      {loading ? <Loader2 size={18} className="animate-spin" /> : <LogOut size={18} />}
       {loading ? 'Keluar...' : 'Keluar'}
     </button>
   )

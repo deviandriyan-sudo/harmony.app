@@ -144,7 +144,9 @@ export async function loadAttendanceReportingDataset(
     warnings.push(`Master jenis request tidak terbaca; classifier memakai fallback code/label: ${requestTypeResult.error.message}`)
   }
 
-  const leaveRequests: AttendanceReportingRequest[] = (leaveResult.data || []).map((item: any) => ({
+  const leaveRequests: AttendanceReportingRequest[] = (leaveResult.data || [])
+    .filter((item: any) => String(item.request_type || '').trim().toLowerCase() !== 'phl_claim')
+    .map((item: any) => ({
     id: item.id,
     source_table: 'leave_requests',
     employee_id: item.employee_id,

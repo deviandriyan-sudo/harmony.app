@@ -1,604 +1,91 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect, useMemo, useState } from 'react'
-import type { ReactNode } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import {
   AlertTriangle,
-  ArrowRight,
   CalendarDays,
   CheckCircle2,
   Clock3,
   FileText,
-  Loader2,
+  Fingerprint,
   Plane,
   RefreshCcw,
-  Send,
+  Settings,
   ShieldCheck,
-  UserCheck,
-  UserRound,
-  UsersRound,
+  Sparkles,
+  WalletCards,
 } from 'lucide-react'
 
+import { TodayTeamAvailability } from '@/components/employee/TodayTeamAvailability'
 import { Topbar } from '@/components/layout/Topbar'
+import { getCurrentPeriodMonthWita, getCutoffRange } from '@/lib/attendance-reporting'
 import { supabase } from '@/lib/supabase'
-import { GeneralOrganizationChart } from '@/components/organization/GeneralOrganizationChart'
 
 type AppUser = {
   id: string
   email: string | null
   role: string | null
-  employee_id?: string | null
-  is_active?: boolean | null
+  employee_id: string | null
+  is_active: boolean | null
 }
 
 type Employee = {
   id: string
-  full_name?: string | null
-  name?: string | null
-  employee_name?: string | null
-  employee_number?: string | null
-  nip?: string | null
-  machine_pin?: string | null
-  email?: string | null
-  department?: string | null
-  unit?: string | null
-  work_unit?: string | null
-  position?: string | null
-  job_title?: string | null
-  supervisor_1?: string | null
-  supervisor_2?: string | null
+  employee_number: string | null
+  machine_pin: string | null
+  full_name: string | null
+  department: string | null
+  position: string | null
+  email: string | null
+  annual_leave_balance: number | null
+  phl_balance: number | null
 }
 
-type LooseRow = Record<string, any>
+type BalanceSummary = {
+  employee_id: string
+  annual_total_available_days: number | null
+  phl_total_available_days: number | null
+  postpone_active_days: number | null
+  postpone_expired_days: number | null
+  next_postpone_expiry: string | null
+  next_phl_expiry: string | null
+}
 
-type AvailabilityCategory = 'leave' | 'phl' | 'absence'
+type AttendanceRow = {
+  attendance_date: string | null
+  check_in: string | null
+  check_out: string | null
+  manual_check_in?: string | null
+  manual_check_out?: string | null
+  status: string | null
+}
 
-type TodayAvailabilityItem = {
+type RequestItem = {
   id: string
-  source: 'leave_requests' | 'attendance_logs'
-  employeeId: string
-  employeeNumber: string
-  fullName: string
-  department: string
-  position: string
-  category: AvailabilityCategory
-  type: string
+  type: 'leave' | 'phl'
   label: string
+  date: string
   status: string
-  statusLabel: string
-  startDate: string
-  endDate: string
-  jobPending: string
-  handoverTo: string
-  handoverNote: string
-}
-
-function todayISO() {
-  return formatDateToISO(new Date())
-}
-
-function formatDateToISO(date: Date) {
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-
-  return `${year}-${month}-${day}`
-}
-
-function parseDate(value?: string | null) {
-  if (!value) return null
-
-  const cleanValue = String(value).slice(0, 10)
-  const date = new Date(`${cleanValue}T00:00:00`)
-
-  if (Number.isNaN(date.getTime())) return null
-
-  return date
-}
-
-function formatDate(value?: string | null) {
-  if (!value) return '-'
-
-  const date = parseDate(value)
-
-  if (!date) return String(value)
-
-  return new Intl.DateTimeFormat('id-ID', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  }).format(date)
-}
-
-function formatLongDate(value?: string | null) {
-  if (!value) return '-'
-
-  const date = parseDate(value)
-
-  if (!date) return String(value)
-
-  return new Intl.DateTimeFormat('id-ID', {
-    weekday: 'long',
-    day: '2-digit',
-    month: 'long',
-    year: 'numeric',
-  }).format(date)
-}
-
-function normalize(value?: string | number | null) {
-  return String(value || '').trim().toLowerCase()
-}
-
-function cleanText(value?: string | number | null) {
-  return String(value || '').trim()
-}
-
-function pick(row: LooseRow | null | undefined, keys: string[]) {
-  if (!row) return ''
-
-  for (const key of keys) {
-    const value = row[key]
-
-    if (value !== undefined && value !== null && String(value).trim() !== '') {
-      return String(value).trim()
-    }
-  }
-
-  return ''
-}
-
-function getEmployeeName(row?: LooseRow | null) {
-  return (
-    pick(row, [
-      'full_name',
-      'employee_name',
-      'name',
-      'nama',
-      'employee_full_name',
-      'created_by',
-      'email',
-    ]) || '-'
-  )
-}
-
-function getEmployeeNumber(row?: LooseRow | null) {
-  return pick(row, [
-    'employee_number',
-    'nip',
-    'npk',
-    'machine_pin',
-    'employee_code',
-  ])
-}
-
-function getDepartment(row?: LooseRow | null) {
-  return pick(row, ['department', 'unit', 'work_unit', 'division'])
-}
-
-function getPosition(row?: LooseRow | null) {
-  return pick(row, ['position', 'job_title', 'jabatan'])
-}
-
-function getStartDate(row?: LooseRow | null) {
-  return pick(row, [
-    'start_date',
-    'date_start',
-    'leave_start_date',
-    'request_start_date',
-    'from_date',
-    'start_at',
-    'effective_start_date',
-    'requested_start_date',
-    'absence_start_date',
-    'tanggal_mulai',
-  ]).slice(0, 10)
-}
-
-function getEndDate(row?: LooseRow | null) {
-  return pick(row, [
-    'end_date',
-    'date_end',
-    'leave_end_date',
-    'request_end_date',
-    'to_date',
-    'end_at',
-    'effective_end_date',
-    'requested_end_date',
-    'absence_end_date',
-    'tanggal_selesai',
-  ]).slice(0, 10)
-}
-
-function getRequestType(row?: LooseRow | null) {
-  return normalize(
-    pick(row, [
-      'request_type',
-      'leave_type',
-      'leave_type_code',
-      'type',
-      'absence_type',
-      'absence_request_type',
-      'status',
-      'category',
-    ]),
-  )
-}
-
-function getRequestLabel(row?: LooseRow | null, fallbackType = '') {
-  return (
-    pick(row, [
-      'request_label',
-      'leave_type_name',
-      'leave_type_label',
-      'absence_request_label',
-      'type_label',
-      'label',
-    ]) || getTypeLabel(fallbackType)
-  )
-}
-
-function getStatus(row?: LooseRow | null) {
-  return normalize(
-    pick(row, [
-      'approval_status',
-      'status',
-      'request_status',
-      'supervisor_approval_status',
-      'hr_status',
-      'absence_request_status',
-    ]),
-  )
-}
-
-function isInactiveStatus(status: string) {
-  return ['rejected', 'cancelled', 'canceled', 'ditolak', 'dibatalkan'].includes(
-    normalize(status),
-  )
-}
-
-function isDateWithin(date: string, startDate: string, endDate: string) {
-  const selected = parseDate(date)
-  const start = parseDate(startDate)
-  const end = parseDate(endDate || startDate)
-
-  if (!selected || !start || !end) return false
-
-  return selected.getTime() >= start.getTime() && selected.getTime() <= end.getTime()
-}
-
-function getCategory(type: string, label?: string): AvailabilityCategory | null {
-  const value = normalize(`${type} ${label || ''}`)
-
-  if (
-    value.includes('phl') ||
-    value.includes('pengganti hari libur') ||
-    value.includes('hari libur')
-  ) {
-    return 'phl'
-  }
-
-  if (
-    value.includes('leave') ||
-    value.includes('cuti') ||
-    value.includes('annual') ||
-    value.includes('marriage') ||
-    value.includes('maternity') ||
-    value.includes('miscarriage') ||
-    value.includes('bereavement') ||
-    value.includes('menstrual') ||
-    value.includes('pregnancy') ||
-    value.includes('worship')
-  ) {
-    return 'leave'
-  }
-
-  if (
-    value.includes('sick') ||
-    value.includes('sakit') ||
-    value.includes('permit') ||
-    value.includes('izin') ||
-    value.includes('absent') ||
-    value.includes('alpa') ||
-    value.includes('dinas') ||
-    value.includes('official_travel') ||
-    value.includes('tugas luar') ||
-    value.includes('manual_attendance')
-  ) {
-    return 'absence'
-  }
-
-  return null
-}
-
-function getTypeLabel(type?: string | null) {
-  const value = normalize(type)
-
-  const map: Record<string, string> = {
-    annual_leave: 'Cuti Tahunan',
-    marriage_leave: 'Cuti Menikah',
-    maternity_leave: 'Cuti Melahirkan',
-    miscarriage_leave: 'Cuti Keguguran',
-    bereavement_leave: 'Cuti Duka',
-    child_circumcision_leave: 'Cuti Khitan / Baptis Anak',
-    worship_leave: 'Cuti Ibadah',
-    menstrual_leave: 'Cuti Haid',
-    pregnancy_check_leave: 'Pemeriksaan Kehamilan',
-    leave: 'Cuti',
-    phl_claim: 'Klaim PHL',
-    phl: 'PHL',
-    official_travel: 'Tugas Luar / Dinas',
-    sick: 'Sakit',
-    permit: 'Izin',
-    permission: 'Izin',
-    absent: 'Alpa / Tidak Hadir',
-    alpa: 'Alpa / Tidak Hadir',
-    no_record: 'Tidak Hadir',
-    manual_attendance: 'Hadir Manual / Koreksi Jam',
-  }
-
-  return map[value] || cleanText(type) || 'Keterangan'
-}
-
-function getStatusLabel(status?: string | null) {
-  const value = normalize(status)
-
-  const map: Record<string, string> = {
-    pending: 'Menunggu Approval',
-    pending_supervisor: 'Menunggu Atasan',
-    pending_supervisor_2: 'Menunggu Atasan 2',
-    waiting_supervisor: 'Menunggu Atasan',
-    pending_hr: 'Menunggu HR',
-    waiting_hr: 'Menunggu HR',
-    approved: 'Disetujui',
-    rejected: 'Ditolak',
-    cancelled: 'Dibatalkan',
-    submitted: 'Diajukan',
-    finalized: 'Final',
-    waiting_supervisor_review: 'Menunggu Atasan',
-  }
-
-  return map[value] || cleanText(status) || '-'
-}
-
-function getJobPending(row?: LooseRow | null) {
-  return pick(row, [
-    'job_pending',
-    'pending_job',
-    'job_handover',
-    'job_handover_note',
-    'job_handover_notes',
-    'handover_note',
-    'work_handover',
-    'task_handover',
-    'pending_tasks',
-    'pending_work',
-    'tugas_pending',
-    'pekerjaan_pending',
-  ])
-}
-
-function getHandoverTo(row?: LooseRow | null) {
-  return pick(row, [
-    'job_handover_to_name',
-    'handover_to_name',
-    'replacement_employee_name',
-    'delegate_to_name',
-    'recipient_name',
-    'pic_name',
-    'backup_name',
-    'job_handover_to',
-    'handover_to',
-  ])
-}
-
-function getHandoverNote(row?: LooseRow | null) {
-  return pick(row, [
-    'job_handover_note',
-    'handover_note',
-    'handover_notes',
-    'note',
-    'notes',
-  ])
-}
-
-function statusClass(status: string) {
-  const value = normalize(status)
-
-  if (value.includes('approved') || value === 'finalized') {
-    return 'border-emerald-200 bg-emerald-50 text-emerald-700'
-  }
-
-  if (value.includes('reject') || value.includes('cancel')) {
-    return 'border-red-200 bg-red-50 text-red-700'
-  }
-
-  if (value.includes('hr')) {
-    return 'border-blue-200 bg-blue-50 text-blue-700'
-  }
-
-  return 'border-amber-200 bg-amber-50 text-amber-700'
-}
-
-function categoryMeta(category: AvailabilityCategory) {
-  const map = {
-    leave: {
-      title: 'Cuti Hari Ini',
-      empty: 'Tidak ada karyawan cuti hari ini.',
-      icon: <CalendarDays size={18} />,
-      badge: 'bg-blue-50 text-blue-700',
-      border: 'border-blue-100',
-    },
-    phl: {
-      title: 'Klaim PHL Hari Ini',
-      empty: 'Tidak ada klaim PHL yang aktif hari ini.',
-      icon: <Plane size={18} />,
-      badge: 'bg-purple-50 text-purple-700',
-      border: 'border-purple-100',
-    },
-    absence: {
-      title: 'Izin / Sakit / Tidak Hadir',
-      empty: 'Tidak ada izin, sakit, tugas luar, atau tidak hadir yang tercatat.',
-      icon: <AlertTriangle size={18} />,
-      badge: 'bg-orange-50 text-orange-700',
-      border: 'border-orange-100',
-    },
-  }
-
-  return map[category]
-}
-
-function buildItemsFromLeaveRequests(rows: LooseRow[], date: string) {
-  return rows
-    .filter((row) => {
-      const status = getStatus(row)
-
-      if (isInactiveStatus(status)) return false
-
-      const startDate = getStartDate(row)
-      const endDate = getEndDate(row) || startDate
-
-      if (!startDate) return false
-
-      return isDateWithin(date, startDate, endDate)
-    })
-    .map((row) => {
-      const type = getRequestType(row)
-      const label = getRequestLabel(row, type)
-      const category = getCategory(type, label)
-
-      if (!category) return null
-
-      const status = getStatus(row)
-      const startDate = getStartDate(row)
-      const endDate = getEndDate(row) || startDate
-
-      return {
-        id: `leave-${row.id || row.employee_id || row.employee_number || crypto.randomUUID()}`,
-        source: 'leave_requests' as const,
-        employeeId: cleanText(row.employee_id),
-        employeeNumber: getEmployeeNumber(row),
-        fullName: getEmployeeName(row),
-        department: getDepartment(row),
-        position: getPosition(row),
-        category,
-        type,
-        label,
-        status,
-        statusLabel: getStatusLabel(status),
-        startDate,
-        endDate,
-        jobPending: getJobPending(row),
-        handoverTo: getHandoverTo(row),
-        handoverNote: getHandoverNote(row),
-      }
-    })
-    .filter(Boolean) as TodayAvailabilityItem[]
-}
-
-function buildItemsFromAttendanceLogs(rows: LooseRow[], date: string) {
-  return rows
-    .filter((row) => {
-      const rowDate = String(row.attendance_date || '').slice(0, 10)
-
-      if (rowDate !== date) return false
-
-      const type = getRequestType(row)
-      const label = getRequestLabel(row, type)
-      const category = getCategory(type, label)
-
-      if (!category) return false
-
-      const status = getStatus(row)
-
-      return !isInactiveStatus(status)
-    })
-    .map((row) => {
-      const type = getRequestType(row)
-      const label = getRequestLabel(row, type)
-      const category = getCategory(type, label)
-
-      if (!category) return null
-
-      const status = getStatus(row)
-
-      return {
-        id: `attendance-${row.id || row.employee_id || row.machine_pin || crypto.randomUUID()}`,
-        source: 'attendance_logs' as const,
-        employeeId: cleanText(row.employee_id),
-        employeeNumber: getEmployeeNumber(row),
-        fullName: getEmployeeName(row),
-        department: getDepartment(row),
-        position: getPosition(row),
-        category,
-        type,
-        label,
-        status,
-        statusLabel: getStatusLabel(status || row.supervisor_approval_status || 'submitted'),
-        startDate: date,
-        endDate: date,
-        jobPending: getJobPending(row),
-        handoverTo: getHandoverTo(row),
-        handoverNote: getHandoverNote(row),
-      }
-    })
-    .filter(Boolean) as TodayAvailabilityItem[]
-}
-
-function mergeAvailabilityItems(
-  leaveItems: TodayAvailabilityItem[],
-  attendanceItems: TodayAvailabilityItem[],
-) {
-  const map = new Map<string, TodayAvailabilityItem>()
-
-  leaveItems.forEach((item) => {
-    const key = `${item.employeeId || item.employeeNumber || item.fullName}-${item.category}-${item.startDate}-${item.endDate}`
-    map.set(key, item)
-  })
-
-  attendanceItems.forEach((item) => {
-    const key = `${item.employeeId || item.employeeNumber || item.fullName}-${item.category}-${item.startDate}-${item.endDate}`
-
-    if (!map.has(key)) {
-      map.set(key, item)
-    }
-  })
-
-  return Array.from(map.values()).sort((a, b) => {
-    const categoryOrder = { leave: 1, phl: 2, absence: 3 }
-    const categoryDiff = categoryOrder[a.category] - categoryOrder[b.category]
-
-    if (categoryDiff !== 0) return categoryDiff
-
-    return a.fullName.localeCompare(b.fullName)
-  })
+  reason: string
 }
 
 export default function EmployeeDashboardPage() {
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
+  const [message, setMessage] = useState('')
   const [appUser, setAppUser] = useState<AppUser | null>(null)
   const [employee, setEmployee] = useState<Employee | null>(null)
-  const [todayItems, setTodayItems] = useState<TodayAvailabilityItem[]>([])
-  const [message, setMessage] = useState('')
+  const [balance, setBalance] = useState<BalanceSummary | null>(null)
+  const [attendance, setAttendance] = useState<AttendanceRow[]>([])
+  const [requests, setRequests] = useState<RequestItem[]>([])
 
-  const dateToday = useMemo(() => todayISO(), [])
-
-  const grouped = useMemo(() => {
-    return {
-      leave: todayItems.filter((item) => item.category === 'leave'),
-      phl: todayItems.filter((item) => item.category === 'phl'),
-      absence: todayItems.filter((item) => item.category === 'absence'),
-    }
-  }, [todayItems])
-
-  const totalLeave = grouped.leave.length
-  const totalPHL = grouped.phl.length
-  const totalAbsence = grouped.absence.length
-  const totalUnavailable = todayItems.length
+  const periodMonth = useMemo(() => getCurrentPeriodMonthWita(), [])
+  const periodRange = useMemo(() => getCutoffRange(periodMonth), [periodMonth])
 
   useEffect(() => {
     fetchDashboardData()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   async function fetchDashboardData() {
@@ -608,408 +95,199 @@ export default function EmployeeDashboardPage() {
 
     try {
       const { data: authData, error: authError } = await supabase.auth.getUser()
-
-      if (authError || !authData.user) {
-        setMessage('Session tidak ditemukan. Silakan login ulang.')
-        setLoading(false)
-        setRefreshing(false)
-        return
-      }
+      if (authError || !authData.user) throw new Error('Session tidak ditemukan. Silakan login ulang.')
 
       const { data: appUserData, error: appUserError } = await supabase
         .from('app_users')
-        .select('*')
+        .select('id,email,role,employee_id,is_active')
         .eq('id', authData.user.id)
         .maybeSingle<AppUser>()
 
       if (appUserError) throw appUserError
+      if (!appUserData || appUserData.is_active === false) throw new Error('Akun HARMONY tidak aktif atau belum terdaftar.')
 
-      const currentAppUser: AppUser = appUserData || {
-        id: authData.user.id,
-        email: authData.user.email || null,
-        role: 'employee',
-        employee_id: null,
-        is_active: true,
+      setAppUser(appUserData)
+
+      let employeeData: Employee | null = null
+      if (appUserData.employee_id) {
+        const response = await supabase.from('employees').select('*').eq('id', appUserData.employee_id).maybeSingle<Employee>()
+        if (response.error) throw response.error
+        employeeData = response.data || null
       }
 
-      setAppUser(currentAppUser)
-
-      let currentEmployee: Employee | null = null
-
-      if (currentAppUser.employee_id) {
-        const { data, error } = await supabase
-          .from('employees')
-          .select('*')
-          .eq('id', currentAppUser.employee_id)
-          .maybeSingle<Employee>()
-
-        if (error) throw error
-
-        currentEmployee = data || null
+      if (!employeeData && authData.user.email) {
+        const response = await supabase.from('employees').select('*').ilike('email', authData.user.email).limit(1)
+        if (response.error) throw response.error
+        employeeData = (response.data?.[0] || null) as Employee | null
       }
 
-      if (!currentEmployee && authData.user.email) {
-        const { data, error } = await supabase
-          .from('employees')
-          .select('*')
-          .eq('email', authData.user.email)
-          .limit(1)
+      if (!employeeData) throw new Error('Akun belum terhubung ke data employee. Hubungi HR.')
+      setEmployee(employeeData)
 
-        if (error) throw error
-
-        currentEmployee = (data?.[0] || null) as Employee | null
-      }
-
-      setEmployee(currentEmployee)
-
-      const [leaveResponse, attendanceResponse] = await Promise.all([
+      const [balanceResponse, attendanceResponse, leaveResponse, phlResponse] = await Promise.all([
         supabase
-          .from('leave_requests')
-          .select('*')
-          .order('created_at', { ascending: false })
-          .limit(500),
+          .from('harmony_leave_balance_summary')
+          .select('employee_id,annual_total_available_days,phl_total_available_days,postpone_active_days,postpone_expired_days,next_postpone_expiry,next_phl_expiry')
+          .eq('employee_id', employeeData.id)
+          .maybeSingle<BalanceSummary>(),
         supabase
           .from('attendance_logs')
-          .select('*')
-          .eq('attendance_date', dateToday)
+          .select('attendance_date,check_in,check_out,manual_check_in,manual_check_out,status')
+          .eq('employee_id', employeeData.id)
           .is('deleted_at', null)
-          .limit(500),
+          .gte('attendance_date', periodRange.start)
+          .lte('attendance_date', periodRange.end)
+          .order('attendance_date', { ascending: false }),
+        supabase
+          .from('leave_requests')
+          .select('id,request_type,leave_type,start_date,end_date,status,supervisor_status,hr_status,reason,created_at')
+          .eq('employee_id', employeeData.id)
+          .order('created_at', { ascending: false })
+          .limit(8),
+        supabase
+          .from('phl_records')
+          .select('id,phl_date,status,supervisor_status,hr_status,reason,created_at')
+          .eq('employee_id', employeeData.id)
+          .eq('source', 'employee_phl_claim')
+          .order('created_at', { ascending: false })
+          .limit(8),
       ])
 
-      if (leaveResponse.error) throw leaveResponse.error
+      if (!balanceResponse.error) setBalance(balanceResponse.data || null)
+      else setBalance(null)
+
       if (attendanceResponse.error) throw attendanceResponse.error
+      setAttendance((attendanceResponse.data || []) as AttendanceRow[])
 
-      const leaveItems = buildItemsFromLeaveRequests(
-        (leaveResponse.data || []) as LooseRow[],
-        dateToday,
-      )
+      const leaveItems: RequestItem[] = (leaveResponse.data || []).map((row: any) => ({
+        id: row.id,
+        type: 'leave',
+        label: row.leave_type || labelRequestType(row.request_type),
+        date: row.start_date && row.end_date && row.start_date !== row.end_date ? `${formatDate(row.start_date)} – ${formatDate(row.end_date)}` : formatDate(row.start_date),
+        status: normalizeStatus(row.hr_status || row.supervisor_status || row.status),
+        reason: row.reason || '-',
+      }))
 
-      const attendanceItems = buildItemsFromAttendanceLogs(
-        (attendanceResponse.data || []) as LooseRow[],
-        dateToday,
-      )
+      const phlItems: RequestItem[] = (phlResponse.data || []).map((row: any) => ({
+        id: row.id,
+        type: 'phl',
+        label: 'Klaim PHL',
+        date: formatDate(row.phl_date),
+        status: normalizeStatus(row.hr_status || row.supervisor_status || row.status),
+        reason: row.reason || '-',
+      }))
 
-      setTodayItems(mergeAvailabilityItems(leaveItems, attendanceItems))
+      setRequests([...leaveItems, ...phlItems].slice(0, 8))
     } catch (error: any) {
-      console.error(error)
-      setMessage(error?.message || 'Dashboard gagal dimuat.')
+      setMessage(error?.message || 'Dashboard employee gagal dimuat.')
     } finally {
       setLoading(false)
       setRefreshing(false)
     }
   }
 
+  const recordedAttendance = attendance.filter((row) => Boolean(row.check_in || row.check_out || row.manual_check_in || row.manual_check_out)).length
+  const pendingRequests = requests.filter((item) => ['pending', 'submitted', 'waiting_hr', 'pending_hr', 'pending_supervisor'].includes(item.status)).length
+  const annualBalance = Number(balance?.annual_total_available_days ?? employee?.annual_leave_balance ?? 0)
+  const phlBalance = Number(balance?.phl_total_available_days ?? employee?.phl_balance ?? 0)
+
   return (
     <>
-      <Topbar
-        title="Beranda"
-        description="Ringkasan pribadi dan informasi kehadiran tim hari ini."
-      />
+      <Topbar title="Beranda Employee" description="Ringkasan saldo, absensi, pengajuan, dan informasi kehadiran tim dari source HARMONY yang sama." />
 
-      <main className="space-y-6 p-4 sm:p-6">
+      <section className="harmony-page-bg min-h-screen space-y-5 overflow-x-hidden p-4 sm:p-6">
         {message && (
-          <section className="rounded-2xl border border-orange-200 bg-orange-50 p-4 text-sm font-semibold text-orange-700">
-            {message}
-          </section>
+          <div className="rounded-2xl border border-orange-200 bg-orange-50 p-4 text-sm font-semibold text-orange-700">
+            <div className="flex items-start gap-2"><AlertTriangle size={18} className="mt-0.5 shrink-0" /><span>{message}</span></div>
+          </div>
         )}
 
-        <section className="overflow-hidden rounded-[32px] border border-black/5 bg-[#1d1d1f] text-white shadow-sm">
-          <div className="grid gap-6 p-6 lg:grid-cols-[1.15fr_0.85fr] lg:p-8">
-            <div className="min-w-0">
-              <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-3 py-1 text-xs font-bold text-white/80">
-                <ShieldCheck size={14} />
-                Harmony Employee Workspace
-              </div>
-
-              <h1 className="mt-5 text-3xl font-bold tracking-tight sm:text-4xl">
-                Halo, {getEmployeeName(employee || appUser)}
-              </h1>
-
-              <p className="mt-3 max-w-3xl text-sm leading-6 text-white/65">
-                Hari ini {formatLongDate(dateToday)}. Pantau absensi pribadi,
-                pengajuan cuti/izin/PHL, approval tim, dan informasi karyawan
-                yang sedang tidak hadir.
-              </p>
-
-              <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                <HeroInfo label="NPK / PIN" value={getEmployeeNumber(employee) || '-'} />
-                <HeroInfo label="Unit" value={getDepartment(employee) || '-'} />
-                <HeroInfo label="Jabatan" value={getPosition(employee) || '-'} />
-                <HeroInfo label="Role" value={appUser?.role || 'employee'} />
-              </div>
-            </div>
-
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
-              <HeroMetric label="Total Tidak Hadir" value={totalUnavailable} />
-              <HeroMetric label="Cuti" value={totalLeave} />
-              <HeroMetric label="Klaim PHL" value={totalPHL} />
-              <HeroMetric label="Izin / Sakit / Dinas" value={totalAbsence} />
-            </div>
-          </div>
-        </section>
-
-        <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <QuickActionCard
-            title="Absensi"
-            description="Cek dan konfirmasi absensi periode."
-            href="/employee/attendance"
-            icon={<Clock3 size={22} />}
-            tone="blue"
-          />
-          <QuickActionCard
-            title="Cuti & Izin"
-            description="Ajukan cuti, izin, sakit, PHL, dan postpone."
-            href="/employee/leave"
-            icon={<CalendarDays size={22} />}
-            tone="green"
-          />
-          <QuickActionCard
-            title="Approval Tim"
-            description="Review pengajuan bawahan."
-            href="/employee/approvals"
-            icon={<UsersRound size={22} />}
-            tone="purple"
-          />
-          <QuickActionCard
-            title="Pengaturan"
-            description="Profil, password, dan akses akun."
-            href="/employee/settings"
-            icon={<UserRound size={22} />}
-            tone="slate"
-          />
-        </section>
-
-        <GeneralOrganizationChart />
-
-        <section className="rounded-[32px] border border-black/5 bg-white shadow-sm">
-          <div className="flex flex-col gap-4 border-b border-black/5 p-5 sm:p-6 lg:flex-row lg:items-center lg:justify-between">
+        <section className="harmony-glass-dark relative overflow-hidden rounded-[30px] p-6 text-white sm:p-7">
+          <div className="pointer-events-none absolute -right-20 -top-20 h-64 w-64 rounded-full bg-[#007aff]/30 blur-3xl" />
+          <div className="pointer-events-none absolute -bottom-24 left-8 h-60 w-60 rounded-full bg-[#af52de]/20 blur-3xl" />
+          <div className="relative grid gap-6 xl:grid-cols-[1.25fr_0.75fr] xl:items-end">
             <div>
-              <div className="inline-flex items-center gap-2 rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-blue-700">
-                <UsersRound size={14} />
-                Informasi Tim
+              <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-3 py-1.5 text-[11px] font-bold text-white/75"><Sparkles size={13} />HARMONY · Employee Self Service</div>
+              <h1 className="mt-5 text-3xl font-semibold tracking-[-0.04em] sm:text-4xl">Selamat datang, {employee?.full_name || appUser?.email || 'Employee'}.</h1>
+              <p className="mt-3 max-w-2xl text-sm leading-7 text-white/60">Saldo cuti dan PHL pada dashboard ini membaca lifecycle summary yang sama dengan HR agar tidak terjadi perbedaan angka.</p>
+              <div className="mt-6 flex flex-wrap gap-3">
+                <Link href="/employee/leave" className="inline-flex min-h-11 items-center gap-2 rounded-2xl bg-white px-4 text-sm font-bold text-[#1d1d1f]"><CalendarDays size={17} />Ajukan Cuti / PHL</Link>
+                <Link href="/employee/attendance" className="inline-flex min-h-11 items-center gap-2 rounded-2xl border border-white/10 bg-white/10 px-4 text-sm font-bold text-white"><Fingerprint size={17} />Absensi</Link>
               </div>
-
-              <h2 className="mt-3 text-xl font-bold text-[#1d1d1f]">
-                Kehadiran Tim Hari Ini
-              </h2>
-
-              <p className="mt-1 max-w-3xl text-sm leading-6 text-[#6e6e73]">
-                Menampilkan karyawan yang sedang cuti, klaim PHL, izin, sakit,
-                tugas luar, atau tidak hadir pada hari ini beserta job pending
-                dan PIC pengganti bila tersedia.
-              </p>
             </div>
 
-            <button
-              type="button"
-              onClick={fetchDashboardData}
-              disabled={refreshing}
-              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {refreshing ? <Loader2 size={17} className="animate-spin" /> : <RefreshCcw size={17} />}
-              Refresh
-            </button>
+            <div className="rounded-[24px] border border-white/10 bg-white/10 p-4 backdrop-blur-xl">
+              <div className="flex items-center justify-between"><div><p className="text-xs font-bold text-white/45">PERIODE BERJALAN</p><p className="mt-1 text-sm font-semibold">{periodRange.label}</p></div><ShieldCheck size={20} className="text-[#9ff2b5]" /></div>
+              <div className="mt-4 grid grid-cols-2 gap-2 text-xs">
+                <MiniInfo label="NIP" value={employee?.employee_number || '-'} />
+                <MiniInfo label="Unit" value={employee?.department || '-'} />
+              </div>
+            </div>
           </div>
-
-          {loading ? (
-            <div className="flex items-center gap-3 p-6 text-sm font-semibold text-[#6e6e73]">
-              <Loader2 size={18} className="animate-spin" />
-              Memuat informasi tim hari ini...
-            </div>
-          ) : (
-            <div className="grid gap-4 p-4 sm:p-6 xl:grid-cols-3">
-              <AvailabilityColumn category="leave" items={grouped.leave} />
-              <AvailabilityColumn category="phl" items={grouped.phl} />
-              <AvailabilityColumn category="absence" items={grouped.absence} />
-            </div>
-          )}
         </section>
-      </main>
+
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <Metric title="Saldo Cuti" value={`${annualBalance}`} description="Cuti matang + postpone aktif" icon={<WalletCards size={20} />} tone="blue" />
+          <Metric title="Saldo PHL" value={`${phlBalance}`} description="PHL aktif yang dapat diklaim" icon={<Plane size={20} />} tone="purple" />
+          <Metric title="Kehadiran Tercatat" value={`${recordedAttendance}`} description="Periode cut-off berjalan" icon={<CheckCircle2 size={20} />} tone="green" />
+          <Metric title="Pending Request" value={`${pendingRequests}`} description="Cuti/izin/PHL belum final" icon={<Clock3 size={20} />} tone="orange" />
+        </div>
+
+        <div className="grid gap-5 xl:grid-cols-[1.05fr_0.95fr]">
+          <section className="harmony-card overflow-hidden">
+            <div className="flex items-center justify-between border-b border-black/5 p-5">
+              <div><h2 className="font-bold text-[#1d1d1f]">Pengajuan Terbaru</h2><p className="mt-1 text-xs text-[#6e6e73]">Leave dari leave_requests · Klaim PHL dari phl_records.</p></div>
+              <Link href="/employee/leave" className="text-xs font-bold text-[#007aff]">Lihat semua</Link>
+            </div>
+            <div className="divide-y divide-black/5">
+              {loading ? <EmptyRow text="Memuat pengajuan..." /> : requests.length === 0 ? <EmptyRow text="Belum ada pengajuan." /> : requests.map((item) => (
+                <div key={`${item.type}-${item.id}`} className="flex gap-3 p-4 sm:p-5">
+                  <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ${item.type === 'phl' ? 'bg-violet-50 text-violet-700' : 'bg-blue-50 text-blue-700'}`}>{item.type === 'phl' ? <Plane size={17} /> : <FileText size={17} />}</div>
+                  <div className="min-w-0 flex-1"><div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between"><p className="text-sm font-bold text-[#1d1d1f]">{item.label}</p><Status status={item.status} /></div><p className="mt-1 text-xs text-[#6e6e73]">{item.date}</p><p className="mt-2 line-clamp-2 text-xs leading-5 text-[#6e6e73]">{item.reason}</p></div>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          <section className="harmony-card p-5">
+            <div className="flex items-center justify-between"><div><h2 className="font-bold text-[#1d1d1f]">Lifecycle Saldo</h2><p className="mt-1 text-xs text-[#6e6e73]">Informasi dari summary database.</p></div><button type="button" onClick={fetchDashboardData} disabled={refreshing} className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white shadow-sm disabled:opacity-50"><RefreshCcw size={16} className={refreshing ? 'animate-spin' : ''} /></button></div>
+            <div className="mt-4 space-y-3">
+              <InfoRow label="Postpone aktif" value={`${Number(balance?.postpone_active_days || 0)} hari`} />
+              <InfoRow label="Postpone expired" value={`${Number(balance?.postpone_expired_days || 0)} hari`} />
+              <InfoRow label="Expiry Postpone terdekat" value={formatDate(balance?.next_postpone_expiry)} />
+              <InfoRow label="Expiry PHL terdekat" value={formatDate(balance?.next_phl_expiry)} />
+            </div>
+            <Link href="/employee/settings" className="mt-4 inline-flex min-h-10 items-center gap-2 rounded-2xl bg-[#f5f5f7] px-4 text-xs font-bold text-[#1d1d1f]"><Settings size={15} />Pengaturan akun</Link>
+          </section>
+        </div>
+
+        <TodayTeamAvailability />
+      </section>
     </>
   )
 }
 
-function HeroInfo({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-2xl bg-white/10 px-4 py-3">
-      <p className="text-[11px] font-bold uppercase tracking-wide text-white/45">
-        {label}
-      </p>
-      <p className="mt-1 break-words text-sm font-bold text-white">{value}</p>
-    </div>
-  )
+function normalizeStatus(value: unknown) { return String(value || '').trim().toLowerCase() }
+function labelRequestType(value: unknown) {
+  const key = normalizeStatus(value)
+  const map: Record<string, string> = { annual_leave: 'Cuti Tahunan', sick: 'Sakit', permit: 'Izin', official_travel: 'Tugas Luar' }
+  return map[key] || String(value || 'Pengajuan').replace(/_/g, ' ')
 }
-
-function HeroMetric({ label, value }: { label: string; value: number }) {
-  return (
-    <div className="rounded-[24px] border border-white/10 bg-white/10 p-5">
-      <p className="text-xs font-bold text-white/45">{label}</p>
-      <p className="mt-2 text-3xl font-bold text-white">{value}</p>
-    </div>
-  )
+function formatDate(value?: string | null) {
+  if (!value) return '-'
+  const date = new Date(`${value}T00:00:00`)
+  if (Number.isNaN(date.getTime())) return value
+  return new Intl.DateTimeFormat('id-ID', { day: '2-digit', month: 'short', year: 'numeric' }).format(date)
 }
-
-function QuickActionCard({
-  title,
-  description,
-  href,
-  icon,
-  tone,
-}: {
-  title: string
-  description: string
-  href: string
-  icon: ReactNode
-  tone: 'blue' | 'green' | 'purple' | 'slate'
-}) {
-  const toneClass = {
-    blue: 'bg-blue-50 text-blue-700',
-    green: 'bg-emerald-50 text-emerald-700',
-    purple: 'bg-purple-50 text-purple-700',
-    slate: 'bg-slate-100 text-slate-700',
-  }[tone]
-
-  return (
-    <Link
-      href={href}
-      className="group rounded-[28px] border border-black/5 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
-    >
-      <div className="flex items-start justify-between gap-4">
-        <div className={`rounded-2xl p-3 ${toneClass}`}>{icon}</div>
-        <ArrowRight
-          size={18}
-          className="text-slate-300 transition group-hover:translate-x-1 group-hover:text-slate-500"
-        />
-      </div>
-
-      <h3 className="mt-5 text-lg font-bold text-[#1d1d1f]">{title}</h3>
-      <p className="mt-1 text-sm leading-6 text-[#6e6e73]">{description}</p>
-    </Link>
-  )
+function Status({ status }: { status: string }) {
+  const normalized = normalizeStatus(status)
+  const cls = ['approved', 'finalized'].includes(normalized) ? 'bg-green-50 text-green-700' : ['rejected', 'cancelled'].includes(normalized) ? 'bg-red-50 text-red-700' : 'bg-orange-50 text-orange-700'
+  return <span className={`inline-flex w-fit rounded-full px-2.5 py-1 text-[10px] font-bold ${cls}`}>{normalized ? normalized.replace(/_/g, ' ') : 'pending'}</span>
 }
-
-function AvailabilityColumn({
-  category,
-  items,
-}: {
-  category: AvailabilityCategory
-  items: TodayAvailabilityItem[]
-}) {
-  const meta = categoryMeta(category)
-
-  return (
-    <div className={`rounded-[28px] border ${meta.border} bg-[#f5f5f7]/55 p-4`}>
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <div className={`rounded-2xl p-2.5 ${meta.badge}`}>{meta.icon}</div>
-          <div>
-            <h3 className="text-sm font-bold text-[#1d1d1f]">{meta.title}</h3>
-            <p className="text-xs font-semibold text-[#86868b]">
-              {items.length} karyawan
-            </p>
-          </div>
-        </div>
-      </div>
-
-      <div className="mt-4 space-y-3">
-        {items.length === 0 ? (
-          <div className="rounded-[24px] border border-dashed border-black/10 bg-white/80 p-5 text-center text-sm font-semibold text-[#86868b]">
-            {meta.empty}
-          </div>
-        ) : (
-          items.map((item) => <AvailabilityCard key={item.id} item={item} />)
-        )}
-      </div>
-    </div>
-  )
+function Metric({ title, value, description, icon, tone }: { title: string; value: string; description: string; icon: ReactNode; tone: 'blue'|'purple'|'green'|'orange' }) {
+  const map = { blue: 'bg-blue-50 text-blue-700', purple: 'bg-violet-50 text-violet-700', green: 'bg-green-50 text-green-700', orange: 'bg-orange-50 text-orange-700' }
+  return <div className="harmony-card p-5"><div className={`flex h-10 w-10 items-center justify-center rounded-2xl ${map[tone]}`}>{icon}</div><p className="mt-4 text-xs font-bold uppercase tracking-wide text-[#86868b]">{title}</p><p className="mt-1 text-3xl font-semibold tracking-tight text-[#1d1d1f]">{value}</p><p className="mt-1 text-xs leading-5 text-[#6e6e73]">{description}</p></div>
 }
-
-function AvailabilityCard({ item }: { item: TodayAvailabilityItem }) {
-  const periodText =
-    item.startDate === item.endDate
-      ? formatDate(item.startDate)
-      : `${formatDate(item.startDate)} - ${formatDate(item.endDate)}`
-
-  return (
-    <article className="rounded-[24px] border border-black/5 bg-white p-4 shadow-sm">
-      <div className="flex items-start gap-3">
-        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-slate-100 text-slate-700">
-          <UserCheck size={19} />
-        </div>
-
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-            <div className="min-w-0">
-              <h4 className="break-words text-sm font-bold text-[#1d1d1f]">
-                {item.fullName}
-              </h4>
-              <p className="mt-1 break-words text-xs leading-5 text-[#6e6e73]">
-                {item.employeeNumber || '-'} · {item.department || '-'}
-              </p>
-              {item.position && (
-                <p className="break-words text-xs leading-5 text-[#86868b]">
-                  {item.position}
-                </p>
-              )}
-            </div>
-
-            <span
-              className={`inline-flex shrink-0 rounded-full border px-3 py-1 text-[11px] font-bold ${statusClass(item.status)}`}
-            >
-              {item.statusLabel}
-            </span>
-          </div>
-
-          <div className="mt-3 flex flex-wrap gap-2">
-            <span className="inline-flex rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-700">
-              {item.label}
-            </span>
-            <span className="inline-flex rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
-              {periodText}
-            </span>
-          </div>
-
-          <div className="mt-4 grid gap-3">
-            <InfoLine
-              label="Job Pending"
-              value={item.jobPending || 'Belum ada informasi job pending.'}
-              icon={<FileText size={15} />}
-            />
-            <InfoLine
-              label="PIC / Pengganti"
-              value={item.handoverTo || 'Belum ditentukan.'}
-              icon={<Send size={15} />}
-            />
-            {item.handoverNote && (
-              <InfoLine
-                label="Catatan Handover"
-                value={item.handoverNote}
-                icon={<CheckCircle2 size={15} />}
-              />
-            )}
-          </div>
-        </div>
-      </div>
-    </article>
-  )
-}
-
-function InfoLine({
-  label,
-  value,
-  icon,
-}: {
-  label: string
-  value: string
-  icon: ReactNode
-}) {
-  return (
-    <div className="rounded-2xl bg-[#f5f5f7]/80 p-3">
-      <div className="mb-1 flex items-center gap-2 text-[11px] font-bold uppercase tracking-wide text-[#86868b]">
-        {icon}
-        {label}
-      </div>
-      <p className="break-words text-xs leading-5 text-[#1d1d1f]">{value}</p>
-    </div>
-  )
-}
+function MiniInfo({ label, value }: { label: string; value: string }) { return <div className="rounded-2xl bg-black/10 p-3"><p className="text-[10px] font-bold text-white/40">{label}</p><p className="mt-1 truncate font-semibold text-white/90">{value}</p></div> }
+function InfoRow({ label, value }: { label: string; value: string }) { return <div className="flex items-center justify-between gap-3 rounded-2xl bg-[#f5f5f7] px-4 py-3"><span className="text-xs font-semibold text-[#6e6e73]">{label}</span><span className="text-right text-xs font-bold text-[#1d1d1f]">{value}</span></div> }
+function EmptyRow({ text }: { text: string }) { return <div className="p-6 text-center text-sm text-[#6e6e73]">{text}</div> }

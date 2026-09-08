@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useMemo, useState, type ReactNode } from 'react'
+import { useMemo, type ReactNode } from 'react'
 import {
   ArrowRight,
   ArrowUpRight,
@@ -17,9 +17,9 @@ import {
 
 import { Topbar } from '@/components/layout/Topbar'
 import {
-  getCurrentPeriodMonthWita,
   getCutoffRange,
 } from '@/lib/attendance-reporting'
+import { useAttendancePeriodQuery } from '@/lib/use-attendance-period'
 
 type Module = {
   step: string
@@ -102,12 +102,12 @@ const modules: Module[] = [
     href: '/hr/attendance/audit',
     icon: <History size={20} />,
     tag: 'Audit Log',
-    periodAware: false,
+    periodAware: true,
   },
 ]
 
 export default function HRAttendanceHomePage() {
-  const [periodMonth, setPeriodMonth] = useState(getCurrentPeriodMonthWita())
+  const { periodMonth, setPeriodMonth } = useAttendancePeriodQuery()
   const range = useMemo(() => getCutoffRange(periodMonth), [periodMonth])
 
   const periodHref = (module: Module) =>

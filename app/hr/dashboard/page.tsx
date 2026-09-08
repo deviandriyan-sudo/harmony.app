@@ -137,7 +137,9 @@ export default function HRDashboardPage() {
         employees: employeesResult.data || [],
         attendanceLogs: attendanceLogsResult.data || [],
         periodConfirmations: confirmationsResult.data || [],
-        leaveRequests: leaveRequestsResult.data || [],
+        leaveRequests: (leaveRequestsResult.data || []).filter(
+          (item: AnyRow) => normalizeStatus(item.request_type) !== 'phl_claim'
+        ),
         holidays: holidaysResult.data || [],
         appUsers: appUsersResult.data || [],
       })

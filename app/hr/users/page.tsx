@@ -73,6 +73,16 @@ const initialResetForm: ResetPasswordForm = {
   new_password: '',
 }
 
+async function getHRApiHeaders(includeJson = true): Promise<Record<string, string>> {
+  const { data } = await supabase.auth.getSession()
+  const token = data.session?.access_token || ''
+
+  return {
+    ...(includeJson ? { 'Content-Type': 'application/json' } : {}),
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  }
+}
+
 export default function HRUsersPage() {
   const [users, setUsers] = useState<AppUser[]>([])
   const [employees, setEmployees] = useState<EmployeeOption[]>([])
@@ -103,7 +113,10 @@ export default function HRUsersPage() {
     setLoading(true)
     setErrorMessage('')
 
-    const userResponse = await fetch('/api/hr/users')
+    const userResponse = await fetch('/api/hr/users', {
+      headers: await getHRApiHeaders(false),
+      cache: 'no-store',
+    })
     const userJson = await userResponse.json()
 
     if (!userResponse.ok) {
@@ -246,17 +259,15 @@ export default function HRUsersPage() {
       return
     }
 
-    if (!form.password || form.password.length < 6) {
-      setErrorMessage('Password minimal 6 karakter.')
+    if (!form.password || form.password.length < 8) {
+      setErrorMessage('Password minimal 8 karakter.')
       setSaving(false)
       return
     }
 
     const response = await fetch('/api/hr/users', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: await getHRApiHeaders(),
       body: JSON.stringify({
         email: form.email,
         password: form.password,
@@ -268,7 +279,7 @@ export default function HRUsersPage() {
     const json = await response.json()
 
     if (!response.ok) {
-      setErrorMessage(json.message || 'Gagal membuat user.')
+      setErrorMessage(json.message || json.error || 'Gagal membuat user.')
       setSaving(false)
       return
     }
@@ -295,17 +306,15 @@ export default function HRUsersPage() {
       return
     }
 
-    if (!bulkPassword || bulkPassword.length < 6) {
-      setErrorMessage('Password default minimal 6 karakter.')
+    if (!bulkPassword || bulkPassword.length < 8) {
+      setErrorMessage('Password default minimal 8 karakter.')
       setSaving(false)
       return
     }
 
     const response = await fetch('/api/hr/users/bulk', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: await getHRApiHeaders(),
       body: JSON.stringify({
         mode: 'selected',
         employee_ids: selectedEmployeeIds,
@@ -317,7 +326,7 @@ export default function HRUsersPage() {
     const json = await response.json()
 
     if (!response.ok) {
-      setErrorMessage(json.message || 'Gagal membuat user checklist.')
+      setErrorMessage(json.message || json.error || 'Gagal membuat user checklist.')
       setSaving(false)
       return
     }
@@ -339,8 +348,8 @@ export default function HRUsersPage() {
     setSuccessMessage('')
     setBulkResultMessage('')
 
-    if (!bulkPassword || bulkPassword.length < 6) {
-      setErrorMessage('Password default minimal 6 karakter.')
+    if (!bulkPassword || bulkPassword.length < 8) {
+      setErrorMessage('Password default minimal 8 karakter.')
       setSaving(false)
       return
     }
@@ -356,9 +365,7 @@ export default function HRUsersPage() {
 
     const response = await fetch('/api/hr/users/bulk', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: await getHRApiHeaders(),
       body: JSON.stringify({
         mode: 'all_missing',
         default_password: bulkPassword,
@@ -369,7 +376,7 @@ export default function HRUsersPage() {
     const json = await response.json()
 
     if (!response.ok) {
-      setErrorMessage(json.message || 'Gagal membuat bulk user.')
+      setErrorMessage(json.message || json.error || 'Gagal membuat bulk user.')
       setSaving(false)
       return
     }
@@ -415,17 +422,15 @@ export default function HRUsersPage() {
       return
     }
 
-    if (!resetForm.new_password || resetForm.new_password.length < 6) {
-      setErrorMessage('Password baru minimal 6 karakter.')
+    if (!resetForm.new_password || resetForm.new_password.length < 8) {
+      setErrorMessage('Password baru minimal 8 karakter.')
       setSaving(false)
       return
     }
 
     const response = await fetch('/api/hr/users/reset-password', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: await getHRApiHeaders(),
       body: JSON.stringify({
         user_id: resetForm.user_id,
         new_password: resetForm.new_password,
@@ -435,7 +440,7 @@ export default function HRUsersPage() {
     const json = await response.json()
 
     if (!response.ok) {
-      setErrorMessage(json.message || 'Gagal reset password.')
+      setErrorMessage(json.message || json.error || 'Gagal reset password.')
       setSaving(false)
       return
     }
@@ -453,9 +458,7 @@ export default function HRUsersPage() {
 
     const response = await fetch('/api/hr/users/update', {
       method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: await getHRApiHeaders(),
       body: JSON.stringify({
         user_id: user.id,
         ...payload,
@@ -465,7 +468,7 @@ export default function HRUsersPage() {
     const json = await response.json()
 
     if (!response.ok) {
-      setErrorMessage(json.message || 'Gagal update user.')
+      setErrorMessage(json.message || json.error || 'Gagal update user.')
       setSaving(false)
       return
     }

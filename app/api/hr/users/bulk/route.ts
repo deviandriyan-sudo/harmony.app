@@ -1,228 +1,175 @@
-import { NextResponse } from 'next/server'
-import { supabaseAdmin } from '@/lib/supabase-admin'
+import { NextRequest, NextResponse } from 'next/server'
 
-type BulkCreatePayload = {
-  mode: 'selected' | 'all_missing'
-  employee_ids?: string[]
-  default_password: string
-  role?: 'employee' | 'hr'
+import {
+  apiError,
+  isAllowedManagedRole,
+  isValidEmail,
+  normalizeEmail,
+  requireHRApi,
+} from '@/lib/server/hr-api-auth'
+
+export const runtime = 'nodejs'
+
+type BulkItem = { employee_id: string; email: string; name: string }
+
+type FailedItem = BulkItem & { reason: string }
+
+async function loadAuthEmails(admin: any) {
+  const result = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 })
+  if (result.error) throw result.error
+  return new Map(result.data.users.map((user: any) => [normalizeEmail(user.email), user]))
 }
 
-type EmployeeRow = {
-  id: string
-  email: string | null
-  full_name: string | null
-  employee_number: string | null
-}
-
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
-    const payload = (await request.json()) as BulkCreatePayload
+    const { admin, actor } = await requireHRApi(request)
+    const body = await request.json().catch(() => null)
 
-    const defaultPassword = payload.default_password
-    const role = payload.role || 'employee'
+    const mode = String(body?.mode || 'selected')
+    const defaultPassword = String(body?.default_password || '')
+    const role = String(body?.role || 'employee').trim().toLowerCase()
+    const selectedIds = Array.isArray(body?.employee_ids)
+      ? body.employee_ids.map((value: unknown) => String(value || '').trim()).filter(Boolean)
+      : []
 
-    if (!defaultPassword || defaultPassword.length < 6) {
-      return NextResponse.json(
-        {
-          message: 'Password default minimal 6 karakter.',
-        },
-        {
-          status: 400,
-        }
-      )
+    if (defaultPassword.length < 8) {
+      return NextResponse.json({ message: 'Password default minimal 8 karakter.' }, { status: 400 })
+    }
+    if (!isAllowedManagedRole(role)) {
+      return NextResponse.json({ message: 'Role hanya boleh employee atau hr.' }, { status: 400 })
+    }
+    if (!['selected', 'all_missing'].includes(mode)) {
+      return NextResponse.json({ message: 'Mode bulk tidak dikenali.' }, { status: 400 })
+    }
+    if (mode === 'selected' && selectedIds.length === 0) {
+      return NextResponse.json({ message: 'Pilih minimal satu employee.' }, { status: 400 })
     }
 
-    let employeeQuery = supabaseAdmin
+    let employeesQuery = admin
       .from('employees')
-      .select('id, email, full_name, employee_number')
+      .select('id,employee_number,full_name,email,department,position,is_active')
       .eq('is_active', true)
-      .not('email', 'is', null)
-      .order('full_name', { ascending: true })
 
-    if (payload.mode === 'selected') {
-      if (!payload.employee_ids || payload.employee_ids.length === 0) {
-        return NextResponse.json(
-          {
-            message: 'Pilih minimal satu employee.',
-          },
-          {
-            status: 400,
-          }
-        )
-      }
+    if (mode === 'selected') employeesQuery = employeesQuery.in('id', selectedIds)
 
-      employeeQuery = employeeQuery.in('id', payload.employee_ids)
-    }
+    const employeesResult = await employeesQuery.order('full_name', { ascending: true })
+    if (employeesResult.error) throw employeesResult.error
 
-    const { data: employees, error: employeeError } = await employeeQuery
-
-    if (employeeError) {
-      return NextResponse.json(
-        {
-          message: employeeError.message,
-        },
-        {
-          status: 400,
-        }
-      )
-    }
-
-    const employeeRows = (employees || []) as EmployeeRow[]
-
-    const { data: existingUsers, error: existingError } = await supabaseAdmin
+    const existingUsersResult = await admin
       .from('app_users')
-      .select('id, email, employee_id')
-
-    if (existingError) {
-      return NextResponse.json(
-        {
-          message: existingError.message,
-        },
-        {
-          status: 400,
-        }
-      )
-    }
+      .select('id,email,employee_id')
+    if (existingUsersResult.error) throw existingUsersResult.error
 
     const existingEmployeeIds = new Set(
-      (existingUsers || [])
-        .map((item) => item.employee_id)
-        .filter(Boolean)
+      (existingUsersResult.data || []).map((item: any) => item.employee_id).filter(Boolean),
     )
-
     const existingEmails = new Set(
-      (existingUsers || [])
-        .map((item) => String(item.email || '').toLowerCase())
-        .filter(Boolean)
+      (existingUsersResult.data || []).map((item: any) => normalizeEmail(item.email)).filter(Boolean),
     )
+    const authByEmail = await loadAuthEmails(admin)
 
-    const targetEmployees = employeeRows.filter((employee) => {
-      const email = String(employee.email || '').trim().toLowerCase()
+    const created: BulkItem[] = []
+    const skipped: Array<BulkItem & { reason: string }> = []
+    const failed: FailedItem[] = []
 
-      if (!email) return false
-      if (existingEmployeeIds.has(employee.id)) return false
-      if (existingEmails.has(email)) return false
-
-      return true
-    })
-
-    if (targetEmployees.length === 0) {
-      return NextResponse.json({
-        message: 'Tidak ada employee baru yang bisa dibuatkan user.',
-        created: [],
-        skipped: employeeRows.map((employee) => ({
-          employee_id: employee.id,
-          email: employee.email,
-          reason: 'Employee sudah memiliki user atau email tidak tersedia.',
-        })),
-        failed: [],
-      })
-    }
-
-    const created: {
-      employee_id: string
-      email: string
-      user_id: string
-    }[] = []
-
-    const failed: {
-      employee_id: string
-      email: string
-      message: string
-    }[] = []
-
-    const skipped: {
-      employee_id: string
-      email: string | null
-      reason: string
-    }[] = []
-
-    for (const employee of employeeRows) {
-      const email = String(employee.email || '').trim().toLowerCase()
-
-      if (!email) {
-        skipped.push({
-          employee_id: employee.id,
-          email: employee.email,
-          reason: 'Employee tidak memiliki email.',
-        })
-        continue
+    for (const employee of employeesResult.data || []) {
+      const email = normalizeEmail(employee.email)
+      const base: BulkItem = {
+        employee_id: employee.id,
+        email,
+        name: employee.full_name || employee.employee_number || email || employee.id,
       }
 
+      if (!email || !isValidEmail(email)) {
+        skipped.push({ ...base, reason: 'Email employee belum valid.' })
+        continue
+      }
       if (existingEmployeeIds.has(employee.id) || existingEmails.has(email)) {
-        skipped.push({
-          employee_id: employee.id,
-          email,
-          reason: 'Employee sudah memiliki user.',
-        })
+        skipped.push({ ...base, reason: 'Akun sudah terdaftar.' })
         continue
       }
 
-      const { data: createdUser, error: createError } =
-        await supabaseAdmin.auth.admin.createUser({
-          email,
-          password: defaultPassword,
-          email_confirm: true,
-          user_metadata: {
-            role,
-            employee_id: employee.id,
-          },
-        })
+      try {
+        let authUser = authByEmail.get(email) as any
+        let createdAuth = false
+        if (!authUser) {
+          const createResult = await admin.auth.admin.createUser({
+            email,
+            password: defaultPassword,
+            email_confirm: true,
+            user_metadata: {
+              employee_id: employee.id,
+              employee_number: employee.employee_number || null,
+              full_name: employee.full_name || null,
+              source: 'harmony_hr_bulk_v8',
+            },
+          })
+          if (createResult.error || !createResult.data?.user) {
+            throw createResult.error || new Error('Auth user gagal dibuat.')
+          }
+          authUser = createResult.data.user
+          authByEmail.set(email, authUser)
+          createdAuth = true
+        } else {
+          const updateResult = await admin.auth.admin.updateUserById(authUser.id, {
+            password: defaultPassword,
+            email_confirm: true,
+            user_metadata: {
+              ...(authUser.user_metadata || {}),
+              employee_id: employee.id,
+              employee_number: employee.employee_number || null,
+              full_name: employee.full_name || null,
+              source: 'harmony_hr_bulk_v8',
+            },
+          })
+          if (updateResult.error) throw updateResult.error
+        }
 
-      if (createError || !createdUser.user) {
-        failed.push({
-          employee_id: employee.id,
-          email,
-          message: createError?.message || 'Gagal membuat user Supabase Auth.',
-        })
-        continue
-      }
-
-      const { error: profileError } = await supabaseAdmin
-        .from('app_users')
-        .upsert({
-          id: createdUser.user.id,
+        const now = new Date().toISOString()
+        const appInsert = await admin.from('app_users').insert({
+          id: authUser.id,
           email,
           role,
           employee_id: employee.id,
           is_active: true,
-          updated_at: new Date().toISOString(),
+          created_at: now,
+          updated_at: now,
         })
+        if (appInsert.error) {
+          if (createdAuth) await admin.auth.admin.deleteUser(authUser.id).catch(() => undefined)
+          throw appInsert.error
+        }
 
-      if (profileError) {
-        failed.push({
-          employee_id: employee.id,
-          email,
-          message: profileError.message,
-        })
-        continue
+        existingEmployeeIds.add(employee.id)
+        existingEmails.add(email)
+        created.push(base)
+      } catch (error: any) {
+        failed.push({ ...base, reason: error?.message || 'Gagal membuat akun.' })
       }
-
-      created.push({
-        employee_id: employee.id,
-        email,
-        user_id: createdUser.user.id,
-      })
     }
 
+    await admin.from('hr_setting_action_logs').insert({
+      actor_user_id: actor.id,
+      actor_email: actor.email,
+      action_type: 'bulk_create_harmony_users',
+      target_full_name: `Bulk ${mode}`,
+      metadata: {
+        mode,
+        role,
+        created_count: created.length,
+        skipped_count: skipped.length,
+        failed_count: failed.length,
+      },
+    })
+
     return NextResponse.json({
-      message: `${created.length} user berhasil dibuat. ${skipped.length} dilewati. ${failed.length} gagal.`,
+      message: `Bulk selesai. Created ${created.length}, skipped ${skipped.length}, failed ${failed.length}.`,
       created,
       skipped,
       failed,
     })
   } catch (error) {
-    return NextResponse.json(
-      {
-        message:
-          error instanceof Error
-            ? error.message
-            : 'Terjadi kesalahan saat bulk create user.',
-      },
-      {
-        status: 500,
-      }
-    )
+    const result = apiError(error, 'Bulk user gagal diproses.')
+    return NextResponse.json({ message: result.message, error: result.error }, { status: result.status })
   }
 }

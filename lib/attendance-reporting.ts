@@ -828,7 +828,15 @@ function isRequestApproved(request: AttendanceReportingRequest) {
   const status = normalizeAttendanceText(request.status)
   const source = normalizeAttendanceText(request.source)
 
-  if (APPROVED_WORDS.has(hrStatus)) return true
+  // HARMONY approval is Supervisor -> HR. Jika hr_status tersedia,
+  // nilai itulah authority final. Ini mencegah status='approved' dari
+  // tahap supervisor dianggap final saat hr_status masih pending.
+  if (hrStatus) {
+    return APPROVED_WORDS.has(hrStatus)
+  }
+
+  // Compatibility untuk source historis/embedded yang memang tidak
+  // memiliki field hr_status.
   if (APPROVED_WORDS.has(status)) return true
   if (source.includes('approved') || source.includes('synced')) return true
   return false

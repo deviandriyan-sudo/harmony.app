@@ -1,11 +1,11 @@
 import {
-  LayoutDashboard,
-  Users,
-  UserCheck,
-  Clock3,
   CalendarDays,
+  Clock3,
   Landmark,
+  LayoutDashboard,
   Settings,
+  UserCheck,
+  Users,
 } from 'lucide-react'
 
 export const hrMenu = [

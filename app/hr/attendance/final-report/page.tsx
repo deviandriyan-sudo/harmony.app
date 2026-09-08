@@ -18,7 +18,6 @@ import {
 import { Topbar } from '@/components/layout/Topbar'
 import { supabase } from '@/lib/supabase'
 import {
-  getCurrentPeriodMonthWita,
   getCutoffRange,
   getEmployeeLogs,
   isUuid,
@@ -26,6 +25,7 @@ import {
   type AttendanceHoliday,
   type AttendanceReportingLog,
 } from '@/lib/attendance-reporting'
+import { useAttendancePeriodQuery } from '@/lib/use-attendance-period'
 
 type Employee = {
   id: string
@@ -87,7 +87,7 @@ type FinalRow = {
 }
 
 export default function HRAttendanceFinalReportPage() {
-  const [periodMonth, setPeriodMonth] = useState(getCurrentPeriodMonthWita())
+  const { periodMonth, setPeriodMonth, periodReady } = useAttendancePeriodQuery()
   const [employees, setEmployees] = useState<Employee[]>([])
   const [confirmations, setConfirmations] = useState<Confirmation[]>([])
   const [logs, setLogs] = useState<Log[]>([])
@@ -224,21 +224,10 @@ export default function HRAttendanceFinalReportPage() {
   }, [rows])
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const queryPeriod = new URLSearchParams(window.location.search).get('period')
-      if (
-        queryPeriod &&
-        /^\d{4}-(0[1-9]|1[0-2])$/.test(queryPeriod) &&
-        queryPeriod !== periodMonth
-      ) {
-        setPeriodMonth(queryPeriod)
-        return
-      }
-    }
-
+    if (!periodReady) return
     fetchData()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [periodMonth])
+  }, [periodMonth, periodReady])
 
   async function fetchData() {
     setLoading(true)

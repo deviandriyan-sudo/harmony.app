@@ -17,7 +17,6 @@ import {
 } from 'lucide-react'
 
 import { supabase } from '@/lib/supabase'
-import { sendHarmonyEmail } from '@/lib/notifications'
 
 type Employee = {
   id: string
@@ -48,6 +47,7 @@ type AppUser = {
 
 type LeaveRequest = {
   id: string
+  source_table?: 'leave_requests' | 'phl_records' | string
   employee_id?: string | null
 
   employee_name?: string | null
@@ -55,7 +55,6 @@ type LeaveRequest = {
   employee_number?: string | null
   department?: string | null
   position?: string | null
-  email?: string | null
 
   request_type?: string | null
   leave_type?: string | null
@@ -252,20 +251,6 @@ function isSameSupervisor(value: string | null | undefined, supervisor: Employee
   return options.includes(target)
 }
 
-function uniqueEmails(values: Array<string | null | undefined>) {
-  const emails = new Set<string>()
-
-  values.forEach((value) => {
-    const email = String(value || '').trim().toLowerCase()
-
-    if (email && email.includes('@')) {
-      emails.add(email)
-    }
-  })
-
-  return Array.from(emails)
-}
-
 export default function EmployeeLeaveApprovalPage() {
   const [currentUser, setCurrentUser] = useState<AppUser | null>(null)
   const [currentEmployee, setCurrentEmployee] = useState<Employee | null>(null)
@@ -440,14 +425,30 @@ export default function EmployeeLeaveApprovalPage() {
       setEmployees(employeeList)
       setCurrentEmployee(matchedEmployee)
 
-      const { data: requestData, error: requestError } = await supabase
-        .from('leave_requests')
-        .select('*')
-        .order('created_at', { ascending: false })
+      const [leaveResult, phlResult] = await Promise.all([
+        supabase
+          .from('leave_requests')
+          .select('*')
+          .order('created_at', { ascending: false }),
+        supabase.rpc('harmony_supervisor_get_phl_claims_v1'),
+      ])
 
-      if (requestError) throw requestError
+      if (leaveResult.error) throw leaveResult.error
+      if (phlResult.error) throw phlResult.error
 
-      setRequests((requestData || []) as LeaveRequest[])
+      const leaveRows = ((leaveResult.data || []) as LeaveRequest[])
+        .filter((item) => normalize(item.request_type) !== 'phl_claim')
+        .map((item) => ({ ...item, source_table: 'leave_requests' as const }))
+
+      const phlRows = Array.isArray(phlResult.data)
+        ? (phlResult.data as LeaveRequest[])
+        : []
+
+      setRequests(
+        [...leaveRows, ...phlRows].sort((a, b) =>
+          String(b.created_at || '').localeCompare(String(a.created_at || '')),
+        ),
+      )
     } catch (error: any) {
       console.error(error)
 
@@ -459,129 +460,6 @@ export default function EmployeeLeaveApprovalPage() {
       })
     } finally {
       setLoading(false)
-    }
-  }
-
-  function findRequestEmployee(request: LeaveRequest) {
-    if (request.employee_id) {
-      return employeeById.get(request.employee_id) || null
-    }
-
-    const requestEmployeeNumber = normalize(request.employee_number)
-    const requestFullName = normalize(request.full_name || request.employee_name)
-
-    return (
-      employees.find((employee) => {
-        return (
-          normalize(employee.employee_number) === requestEmployeeNumber ||
-          normalize(employee.nip) === requestEmployeeNumber ||
-          normalize(employee.machine_pin) === requestEmployeeNumber ||
-          normalize(employee.full_name) === requestFullName ||
-          normalize(employee.employee_name) === requestFullName ||
-          normalize(employee.name) === requestFullName ||
-          normalize(employee.email) === normalize(request.email)
-        )
-      }) || null
-    )
-  }
-
-  async function getHrEmails() {
-    const { data, error } = await supabase
-      .from('app_users')
-      .select('email, role, is_active')
-
-    if (error) {
-      console.warn('HR email lookup warning:', error)
-      return []
-    }
-
-    return uniqueEmails(
-      ((data || []) as Array<{ email?: string | null; role?: string | null; is_active?: boolean | null }>)
-        .filter((user) => {
-          const role = normalize(user.role)
-          return (
-            user.is_active !== false &&
-            ['hr', 'admin', 'super_admin', 'human_resources'].includes(role)
-          )
-        })
-        .map((user) => user.email)
-    )
-  }
-
-  async function notifyLeaveApprovalDecision({
-    request,
-    decision,
-    note,
-  }: {
-    request: LeaveRequest
-    decision: 'approved' | 'rejected'
-    note: string
-  }) {
-    try {
-      const requester = findRequestEmployee(request)
-      const requesterEmail = request.email || requester?.email || null
-      const requesterName = getRequestEmployeeName(request, requester || undefined)
-      const requestTypeLabel = getRequestTypeLabel(request.request_type, request.leave_type)
-      const actorName = getEmployeeName(currentEmployee)
-
-      if (!requesterEmail) {
-        return {
-          success: false,
-          message: 'Email karyawan pemohon belum tersedia pada master employee atau leave request.',
-        }
-      }
-
-      const hrEmails = decision === 'approved' ? await getHrEmails() : []
-
-      const title = decision === 'approved'
-        ? `${requestTypeLabel} Disetujui Atasan`
-        : `${requestTypeLabel} Ditolak Atasan`
-
-      const subject = decision === 'approved'
-        ? `[HARMONY] ${requestTypeLabel} Disetujui Atasan`
-        : `[HARMONY] ${requestTypeLabel} Ditolak Atasan`
-
-      const message = [
-        `Halo ${requesterName || '-'},`,
-        '',
-        `Pengajuan ${requestTypeLabel} kamu telah ${decision === 'approved' ? 'disetujui' : 'ditolak'} oleh ${actorName}.`,
-        '',
-        'Detail Pengajuan:',
-        `- Tanggal: ${formatDate(request.start_date)} s.d. ${formatDate(request.end_date)}`,
-        `- Jumlah hari: ${request.total_days || 0} hari`,
-        `- Alasan: ${request.reason || '-'}`,
-        `- Job pending: ${request.job_pending || '-'}`,
-        `- Penerima job pending: ${request.handover_to || '-'}`,
-        `- Catatan atasan: ${note || '-'}`,
-        '',
-        decision === 'approved'
-          ? 'Pengajuan sudah diteruskan ke HR untuk proses berikutnya. Silakan pantau status melalui menu Cuti & Izin.'
-          : 'Silakan cek catatan penolakan melalui menu Cuti & Izin.',
-      ].join('\n')
-
-      await sendHarmonyEmail({
-        to: requesterEmail,
-        cc: hrEmails.length > 0 ? hrEmails : undefined,
-        subject,
-        title,
-        message,
-        actionLabel: 'Buka Cuti & Izin',
-        actionUrl: `${window.location.origin}/employee/leave`,
-      })
-
-      return {
-        success: true,
-        message: hrEmails.length > 0
-          ? 'Email terkirim ke employee dan HR.'
-          : 'Email terkirim ke employee.',
-      }
-    } catch (error: any) {
-      console.warn('Leave approval notification warning:', error)
-
-      return {
-        success: false,
-        message: error?.message || 'Email notifikasi gagal dikirim.',
-      }
     }
   }
 
@@ -605,26 +483,25 @@ export default function EmployeeLeaveApprovalPage() {
     setMessage(null)
 
     try {
-      const { error } = await supabase.rpc('approve_leave_request_by_supervisor', {
-        p_request_id: request.id,
-        p_supervisor_id: currentEmployee.id,
-        p_supervisor_name: getEmployeeName(currentEmployee),
-        p_note: note || 'Disetujui oleh atasan.',
-      })
+      const approvalResult =
+        request.source_table === 'phl_records'
+          ? await supabase.rpc('harmony_supervisor_review_phl_claim_v1', {
+              p_claim_id: request.id,
+              p_action: 'approve',
+              p_note: note || 'Disetujui oleh atasan.',
+            })
+          : await supabase.rpc('approve_leave_request_by_supervisor', {
+              p_request_id: request.id,
+              p_supervisor_id: currentEmployee.id,
+              p_supervisor_name: getEmployeeName(currentEmployee),
+              p_note: note || 'Disetujui oleh atasan.',
+            })
 
-      if (error) throw error
-
-      const notificationResult = await notifyLeaveApprovalDecision({
-        request,
-        decision: 'approved',
-        note: note || 'Disetujui oleh atasan.',
-      })
+      if (approvalResult.error) throw approvalResult.error
 
       setMessage({
         type: 'success',
-        text: notificationResult.success
-          ? `Pengajuan berhasil disetujui. ${notificationResult.message}`
-          : `Pengajuan berhasil disetujui, tetapi email notifikasi belum terkirim: ${notificationResult.message}`,
+        text: 'Pengajuan berhasil disetujui.',
       })
 
       await fetchData()
@@ -667,26 +544,25 @@ export default function EmployeeLeaveApprovalPage() {
     setMessage(null)
 
     try {
-      const { error } = await supabase.rpc('reject_leave_request_by_supervisor', {
-        p_request_id: request.id,
-        p_supervisor_id: currentEmployee.id,
-        p_supervisor_name: getEmployeeName(currentEmployee),
-        p_note: note,
-      })
+      const rejectResult =
+        request.source_table === 'phl_records'
+          ? await supabase.rpc('harmony_supervisor_review_phl_claim_v1', {
+              p_claim_id: request.id,
+              p_action: 'reject',
+              p_note: note,
+            })
+          : await supabase.rpc('reject_leave_request_by_supervisor', {
+              p_request_id: request.id,
+              p_supervisor_id: currentEmployee.id,
+              p_supervisor_name: getEmployeeName(currentEmployee),
+              p_note: note,
+            })
 
-      if (error) throw error
-
-      const notificationResult = await notifyLeaveApprovalDecision({
-        request,
-        decision: 'rejected',
-        note,
-      })
+      if (rejectResult.error) throw rejectResult.error
 
       setMessage({
         type: 'success',
-        text: notificationResult.success
-          ? `Pengajuan berhasil ditolak. ${notificationResult.message}`
-          : `Pengajuan berhasil ditolak, tetapi email notifikasi belum terkirim: ${notificationResult.message}`,
+        text: 'Pengajuan berhasil ditolak.',
       })
 
       await fetchData()
