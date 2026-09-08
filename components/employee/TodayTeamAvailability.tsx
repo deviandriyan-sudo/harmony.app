@@ -16,6 +16,17 @@ import { supabase } from '@/lib/supabase'
 
 type AnyRow = Record<string, any>
 
+type EmployeeDirectoryEntry = {
+  id: string
+  employee_number?: string | null
+  machine_pin?: string | null
+  full_name?: string | null
+  department?: string | null
+  position?: string | null
+  email?: string | null
+  is_active?: boolean | null
+}
+
 type TodayItem = {
   id: string
   employeeId: string
@@ -299,8 +310,38 @@ function getJobPending(row: AnyRow) {
   ])
 }
 
-function getHandoverTo(row: AnyRow) {
-  return firstValue(row, [
+function looksLikeUuid(value?: string | null) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    String(value || '').trim(),
+  )
+}
+
+function findEmployeeByReference(
+  directory: EmployeeDirectoryEntry[],
+  reference?: string | null,
+) {
+  const target = normalize(reference)
+  if (!target) return null
+
+  return (
+    directory.find((employee) => {
+      return [
+        employee.id,
+        employee.employee_number,
+        employee.machine_pin,
+        employee.email,
+        employee.full_name,
+      ].some((value) => normalize(value) === target)
+    }) || null
+  )
+}
+
+function getHandoverTo(
+  row: AnyRow,
+  directory: EmployeeDirectoryEntry[] = [],
+) {
+  const directName = firstValue(row, [
+    'handover_to_full_name',
     'job_handover_to_name',
     'handover_to_name',
     'delegated_to_name',
@@ -310,19 +351,41 @@ function getHandoverTo(row: AnyRow) {
     'pic_name',
     'backup_person_name',
     'assigned_to_name',
-    'job_handover_to',
-    'handover_to',
-    'delegated_to',
-    'delegate_to',
-    'replacement_employee',
-    'receiver',
-    'pic',
-    'backup_person',
-    'assigned_to',
   ])
+
+  if (directName && !looksLikeUuid(directName)) return directName
+
+  const references = [
+    row?.handover_to_employee_id,
+    row?.handover_to_employee_number,
+    row?.job_handover_to,
+    row?.handover_to,
+    row?.delegated_to,
+    row?.delegate_to,
+    row?.replacement_employee,
+    row?.receiver,
+    row?.pic,
+    row?.backup_person,
+    row?.assigned_to,
+  ]
+
+  for (const reference of references) {
+    const matched = findEmployeeByReference(directory, reference)
+    if (matched?.full_name) return matched.full_name
+  }
+
+  const legacyText = references
+    .map((value) => String(value || '').trim())
+    .find((value) => value && !looksLikeUuid(value))
+
+  return legacyText || ''
 }
 
-function mapLeaveRow(row: AnyRow, today: string): TodayItem | null {
+function mapLeaveRow(
+  row: AnyRow,
+  today: string,
+  directory: EmployeeDirectoryEntry[],
+): TodayItem | null {
   const startDate = getLeaveStart(row)
   const endDate = getLeaveEnd(row) || startDate
 
@@ -348,13 +411,17 @@ function mapLeaveRow(row: AnyRow, today: string): TodayItem | null {
     startDate,
     endDate,
     jobPending: getJobPending(row),
-    handoverTo: getHandoverTo(row),
+    handoverTo: getHandoverTo(row, directory),
     source: 'leave_requests',
   }
 }
 
 
-function mapPHLClaimRow(row: AnyRow, today: string): TodayItem | null {
+function mapPHLClaimRow(
+  row: AnyRow,
+  today: string,
+  directory: EmployeeDirectoryEntry[],
+): TodayItem | null {
   if (normalize(row.source) !== 'employee_phl_claim') return null
 
   const startDate = firstValue(row, ['claim_start_date', 'phl_date'])
@@ -379,12 +446,16 @@ function mapPHLClaimRow(row: AnyRow, today: string): TodayItem | null {
     startDate,
     endDate,
     jobPending: firstValue(row, ['job_pending_summary', 'job_pending', 'pending_job', 'handover_note', 'notes']),
-    handoverTo: firstValue(row, ['handover_to_full_name', 'handover_to', 'job_handover_to_name']),
+    handoverTo: getHandoverTo(row, directory),
     source: 'phl_records',
   }
 }
 
-function mapAttendanceRow(row: AnyRow, today: string): TodayItem | null {
+function mapAttendanceRow(
+  row: AnyRow,
+  today: string,
+  directory: EmployeeDirectoryEntry[],
+): TodayItem | null {
   const status = normalize(row.status)
   const absenceType = normalize(row.absence_request_type)
   const combined = `${status} ${absenceType}`
@@ -431,7 +502,7 @@ function mapAttendanceRow(row: AnyRow, today: string): TodayItem | null {
     startDate: today,
     endDate: today,
     jobPending: getJobPending(row),
-    handoverTo: getHandoverTo(row),
+    handoverTo: getHandoverTo(row, directory),
     source: 'attendance_logs',
   }
 }
@@ -484,7 +555,12 @@ export function TodayTeamAvailability() {
     setMessage('')
 
     try {
-      const [leaveResponse, phlResponse, attendanceResponse] = await Promise.all([
+      const [
+        leaveResponse,
+        phlResponse,
+        attendanceResponse,
+        employeeDirectoryResponse,
+      ] = await Promise.all([
         supabase
           .from('leave_requests')
           .select('*')
@@ -502,23 +578,39 @@ export function TodayTeamAvailability() {
           .eq('attendance_date', today)
           .is('deleted_at', null)
           .limit(500),
+        supabase
+          .from('employees')
+          .select('id,employee_number,machine_pin,full_name,department,position,email,is_active')
+          .eq('is_active', true)
+          .limit(1000),
       ])
 
       if (leaveResponse.error) throw leaveResponse.error
       if (phlResponse.error) throw phlResponse.error
       if (attendanceResponse.error) throw attendanceResponse.error
 
+      if (employeeDirectoryResponse.error) {
+        console.warn(
+          'Direktori karyawan untuk resolusi PIC tidak dapat dimuat:',
+          employeeDirectoryResponse.error.message,
+        )
+      }
+
+      const employeeDirectory = (
+        employeeDirectoryResponse.data || []
+      ) as EmployeeDirectoryEntry[]
+
       const leaveItems = (leaveResponse.data || [])
         .filter((row: AnyRow) => normalize(row.request_type) !== 'phl_claim')
-        .map((row) => mapLeaveRow(row, today))
+        .map((row) => mapLeaveRow(row, today, employeeDirectory))
         .filter(Boolean) as TodayItem[]
 
       const phlItems = (phlResponse.data || [])
-        .map((row) => mapPHLClaimRow(row, today))
+        .map((row) => mapPHLClaimRow(row, today, employeeDirectory))
         .filter(Boolean) as TodayItem[]
 
       const attendanceItems = (attendanceResponse.data || [])
-        .map((row) => mapAttendanceRow(row, today))
+        .map((row) => mapAttendanceRow(row, today, employeeDirectory))
         .filter(Boolean) as TodayItem[]
 
       const seen = new Set<string>()

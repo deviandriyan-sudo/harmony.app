@@ -67,6 +67,11 @@ type LeaveRequest = {
   reason?: string | null
   job_pending?: string | null
   handover_to?: string | null
+  handover_to_employee_id?: string | null
+  handover_to_employee_number?: string | null
+  handover_to_full_name?: string | null
+  handover_to_department?: string | null
+  handover_to_position?: string | null
   handover_note?: string | null
 
   proof_file_url?: string | null
@@ -251,6 +256,51 @@ function isSameSupervisor(value: string | null | undefined, supervisor: Employee
   return options.includes(target)
 }
 
+function looksLikeUuid(value?: string | null) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    String(value || '').trim()
+  )
+}
+
+function resolveHandoverDisplay(
+  request: LeaveRequest,
+  employees: Employee[]
+) {
+  const directName = String(request.handover_to_full_name || '').trim()
+  if (directName && !looksLikeUuid(directName)) return directName
+
+  const references = [
+    request.handover_to_employee_id,
+    request.handover_to_employee_number,
+    request.handover_to,
+  ]
+
+  for (const reference of references) {
+    const target = normalize(reference)
+    if (!target) continue
+
+    const matched = employees.find((employee) => {
+      return [
+        employee.id,
+        employee.employee_number,
+        employee.nip,
+        employee.machine_pin,
+        employee.email,
+        employee.full_name,
+        employee.employee_name,
+        employee.name,
+      ].some((value) => normalize(String(value || '')) === target)
+    })
+
+    if (matched) return getEmployeeName(matched)
+  }
+
+  const legacyText = String(request.handover_to || '').trim()
+  if (legacyText && !looksLikeUuid(legacyText)) return legacyText
+
+  return ''
+}
+
 export default function EmployeeLeaveApprovalPage() {
   const [currentUser, setCurrentUser] = useState<AppUser | null>(null)
   const [currentEmployee, setCurrentEmployee] = useState<Employee | null>(null)
@@ -334,7 +384,7 @@ export default function EmployeeLeaveApprovalPage() {
           getRequestTypeLabel(request.request_type, request.leave_type),
           request.reason,
           request.job_pending,
-          request.handover_to,
+          resolveHandoverDisplay(request, employees),
         ]
           .join(' ')
           .toLowerCase()
@@ -344,7 +394,7 @@ export default function EmployeeLeaveApprovalPage() {
       .sort((a, b) => {
         return String(b.created_at || '').localeCompare(String(a.created_at || ''))
       })
-  }, [requests, subordinateIds, filterStatus, search, employeeById])
+  }, [requests, subordinateIds, filterStatus, search, employeeById, employees])
 
   const stats = useMemo(() => {
     const subordinateRequests = requests.filter((request) => {
@@ -737,6 +787,11 @@ export default function EmployeeLeaveApprovalPage() {
                       request.proof_url ||
                       request.attachment_url
 
+                    const handoverDisplay = resolveHandoverDisplay(
+                      request,
+                      employees
+                    )
+
                     return (
                       <tr
                         key={request.id}
@@ -811,7 +866,7 @@ export default function EmployeeLeaveApprovalPage() {
                           <div className="max-w-[220px] text-xs leading-5 text-slate-600">
                             <div>
                               <span className="font-bold">Ke:</span>{' '}
-                              {request.handover_to || '-'}
+                              {handoverDisplay || '-'}
                             </div>
 
                             {request.handover_note && (

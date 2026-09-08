@@ -130,6 +130,11 @@ type LeaveRequest = {
   reason: string | null
   job_pending: string | null
   handover_to: string | null
+  handover_to_employee_id?: string | null
+  handover_to_employee_number?: string | null
+  handover_to_full_name?: string | null
+  handover_to_department?: string | null
+  handover_to_position?: string | null
   handover_note: string | null
   proof_file_url: string | null
   proof_file_name: string | null
@@ -883,7 +888,16 @@ export default function EmployeeLeavePage() {
 
         reason: form.reason.trim(),
         job_pending: form.job_pending.trim(),
-        handover_to: form.handover_to.trim(),
+
+        // Legacy compatibility tetap menyimpan ID pada handover_to.
+        // Kolom canonical di bawah menjadi source of truth untuk tampilan nama/PIC.
+        handover_to: selectedHandoverEmployee?.id || form.handover_to.trim(),
+        handover_to_employee_id: selectedHandoverEmployee?.id || null,
+        handover_to_employee_number:
+          selectedHandoverEmployee?.employee_number || null,
+        handover_to_full_name: selectedHandoverEmployee?.full_name || null,
+        handover_to_department: selectedHandoverEmployee?.department || null,
+        handover_to_position: selectedHandoverEmployee?.position || null,
         handover_note: form.handover_note.trim() || null,
 
         proof_file_url: uploaded.url || null,
@@ -1137,6 +1151,7 @@ export default function EmployeeLeavePage() {
           loading={loading}
           leaveRequests={leaveRequests}
           phlRecords={phlRecords}
+          employeeDirectory={employeeDirectory}
         />
 
         {formOpen && (
@@ -1445,10 +1460,12 @@ function HistorySection({
   loading,
   leaveRequests,
   phlRecords,
+  employeeDirectory,
 }: {
   loading: boolean
   leaveRequests: LeaveRequest[]
   phlRecords: PHLRecord[]
+  employeeDirectory: Employee[]
 }) {
   return (
     <div className="grid gap-6 xl:grid-cols-[1fr_0.38fr]">
@@ -1475,7 +1492,11 @@ function HistorySection({
           ) : leaveRequests.length > 0 ? (
             <div className="space-y-3">
               {leaveRequests.map((request) => (
-                <HistoryCard key={request.id} request={request} />
+                <HistoryCard
+                  key={request.id}
+                  request={request}
+                  employeeDirectory={employeeDirectory}
+                />
               ))}
             </div>
           ) : (
@@ -1519,10 +1540,20 @@ function HistorySection({
   )
 }
 
-function HistoryCard({ request }: { request: LeaveRequest }) {
-  const label = request.leave_type || getRequestMeta((request.request_type || 'annual_leave') as RequestType).label
-  const statusValue = request.hr_status || request.supervisor_status || request.status || 'pending'
+function HistoryCard({
+  request,
+  employeeDirectory,
+}: {
+  request: LeaveRequest
+  employeeDirectory: Employee[]
+}) {
+  const label =
+    request.leave_type ||
+    getRequestMeta((request.request_type || 'annual_leave') as RequestType).label
+  const statusValue =
+    request.hr_status || request.supervisor_status || request.status || 'pending'
   const tone = getStatusTone(statusValue)
+  const handoverDisplay = resolveHandoverDisplay(request, employeeDirectory)
 
   return (
     <article className="rounded-[26px] border border-black/5 bg-white p-4 shadow-sm transition hover:bg-[#fbfbfd] sm:p-5">
@@ -1551,7 +1582,7 @@ function HistoryCard({ request }: { request: LeaveRequest }) {
             <SmallInfo label="HR Status" value={formatStatus(request.hr_status || '-')} />
           </div>
 
-          {(request.job_pending || request.handover_to || request.handover_note) && (
+          {(request.job_pending || handoverDisplay || request.handover_note) && (
             <div className="mt-4 rounded-2xl bg-[#f5f5f7]/80 p-4">
               <p className="text-xs font-bold uppercase tracking-wide text-[#86868b]">
                 Job Pending
@@ -1562,7 +1593,7 @@ function HistoryCard({ request }: { request: LeaveRequest }) {
               </p>
 
               <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                <SmallInfo label="Dialihkan Kepada" value={request.handover_to || '-'} />
+                <SmallInfo label="Dialihkan Kepada" value={handoverDisplay || '-'} />
                 <SmallInfo label="Catatan" value={request.handover_note || '-'} />
               </div>
             </div>
@@ -1953,6 +1984,48 @@ function formatDateTime(value: string) {
     hour: '2-digit',
     minute: '2-digit',
   })
+}
+
+function looksLikeUuid(value?: string | null) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    String(value || '').trim()
+  )
+}
+
+function resolveHandoverDisplay(
+  request: LeaveRequest,
+  directory: Employee[]
+) {
+  const directName = String(request.handover_to_full_name || '').trim()
+  if (directName && !looksLikeUuid(directName)) return directName
+
+  const references = [
+    request.handover_to_employee_id,
+    request.handover_to_employee_number,
+    request.handover_to,
+  ]
+
+  for (const reference of references) {
+    const target = normalizeText(reference)
+    if (!target) continue
+
+    const matched = directory.find((item) => {
+      return [
+        item.id,
+        item.employee_number,
+        item.machine_pin,
+        item.email,
+        item.full_name,
+      ].some((value) => normalizeText(value) === target)
+    })
+
+    if (matched?.full_name) return matched.full_name
+  }
+
+  const legacyText = String(request.handover_to || '').trim()
+  if (legacyText && !looksLikeUuid(legacyText)) return legacyText
+
+  return ''
 }
 
 function normalizeText(value?: string | null) {
