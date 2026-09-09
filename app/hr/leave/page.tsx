@@ -25,6 +25,13 @@ import {
 
 import { Topbar } from '@/components/layout/Topbar'
 import { supabase } from '@/lib/supabase'
+import {
+  canHRProcessApproval,
+  getHRApprovalLabel,
+  getSupervisorApprovalLabel,
+  isFinalApproved,
+  isSupervisorApproved,
+} from '@/lib/leave-workflow-status'
 import { sendHarmonyEmail } from '@/lib/notifications'
 
 type ActiveTab = 'leave' | 'leave-balance' | 'phl-claim' | 'phl-balance' | 'phl-audit' | 'history'
@@ -968,7 +975,11 @@ export default function HRLeavePage() {
       return
     }
 
-    setLeaveRequests(data || [])
+    setLeaveRequests(
+      (data || []).filter(
+        (item: LeaveRequest) => normalizeStatus(item.request_type) !== 'phl_claim'
+      )
+    )
   }
 
   async function fetchLeaveBalanceLifecycle() {
@@ -2123,12 +2134,9 @@ function LeaveRequestTab({
         ]}
       >
         {requests.map((item) => {
-          const hrStatus = normalizeStatus(item.hr_status || item.status)
-          const canProcess =
-            hrStatus === 'pending' ||
-            hrStatus === 'submitted' ||
-            hrStatus === 'waiting_supervisor' ||
-            hrStatus === 'waiting_hr'
+          const hrStatus = normalizeStatus(item.hr_status)
+          const supervisorApproved = isSupervisorApproved(item)
+          const canProcess = canHRProcessApproval(item)
 
           return (
             <tr key={item.id} className="border-b border-black/5 transition hover:bg-[#f5f5f7]/70">
@@ -2164,11 +2172,11 @@ function LeaveRequestTab({
               </td>
 
               <td className="px-5 py-4">
-                <StatusBadge status={item.supervisor_status || 'pending'} />
+                <WorkflowTextBadge label={getSupervisorApprovalLabel(item.supervisor_status)} />
               </td>
 
               <td className="px-5 py-4">
-                <StatusBadge status={item.hr_status || item.status || 'pending'} />
+                <WorkflowTextBadge label={getHRApprovalLabel(item)} />
               </td>
 
               <td className="px-5 py-4">
@@ -2184,6 +2192,12 @@ function LeaveRequestTab({
 
               <td className="px-5 py-4">
                 <div className="flex flex-wrap items-center gap-2">
+                  {!supervisorApproved && hrStatus !== 'approved' && (
+                    <span className="rounded-full bg-orange-50 px-3 py-2 text-[11px] font-bold text-orange-700">
+                      Menunggu atasan
+                    </span>
+                  )}
+
                   {canProcess && (
                     <>
                       <SmallActionButton
@@ -2583,14 +2597,12 @@ function PHLClaimApprovalTab({
         ]}
       >
         {claims.map((item) => {
-          const status = normalizeStatus(item.hr_status || item.status)
+          const status = normalizeStatus(item.hr_status)
 
-          const canProcess =
-            status === 'pending' ||
-            status === 'submitted' ||
-            status === 'waiting_hr'
+          const supervisorStatus = normalizeStatus(item.supervisor_status)
+          const canProcess = canHRProcessApproval(item)
 
-          const canCancel = status === 'approved'
+          const canCancel = isFinalApproved(item)
           const isCancelled = status === 'cancelled' || status === 'canceled'
 
           return (
@@ -2624,11 +2636,11 @@ function PHLClaimApprovalTab({
               </td>
 
               <td className="px-5 py-4">
-                <StatusBadge status={item.supervisor_status || 'pending'} />
+                <WorkflowTextBadge label={getSupervisorApprovalLabel(item.supervisor_status)} />
               </td>
 
               <td className="px-5 py-4">
-                <StatusBadge status={item.hr_status || item.status || 'pending'} />
+                <WorkflowTextBadge label={getHRApprovalLabel(item)} />
               </td>
 
               <td className="px-5 py-4">
@@ -2675,7 +2687,11 @@ function PHLClaimApprovalTab({
 
                   {!canProcess && !canCancel && (
                     <span className="rounded-full bg-[#f5f5f7] px-3 py-2 text-[11px] font-bold text-[#86868b]">
-                      {isCancelled ? 'Reversal selesai' : 'Proses selesai'}
+                      {isCancelled
+                        ? 'Reversal selesai'
+                        : supervisorStatus !== 'approved' && ['pending', 'submitted', 'waiting_hr'].includes(status)
+                          ? 'Menunggu atasan'
+                          : 'Proses selesai'}
                     </span>
                   )}
 
@@ -4102,6 +4118,7 @@ function ContentBox({
     </div>
   )
 }
+
 function EmptyState({
   title,
   description,
@@ -4127,6 +4144,7 @@ function EmptyState({
     </div>
   )
 }
+
 function SectionIntro({
   title,
   description,
@@ -4433,9 +4451,7 @@ function NumberCell({
 
   return (
     <td className="px-5 py-4">
-      <span
-        className={`inline-flex min-w-8 justify-center rounded-xl px-3 py-1 text-xs font-bold ${className}`}
-      >
+      <span className={`inline-flex min-w-8 justify-center rounded-xl px-3 py-1 text-xs font-bold ${className}`}>
         {value}
       </span>
     </td>
@@ -4459,6 +4475,24 @@ function InfoBox({
         {value}
       </p>
     </div>
+  )
+}
+
+function WorkflowTextBadge({ label }: { label: string }) {
+  const normalized = String(label || '').toLowerCase()
+  const className =
+    normalized.includes('disetujui')
+      ? 'bg-green-50 text-green-700'
+      : normalized.includes('ditolak') || normalized.includes('dibatalkan')
+        ? 'bg-red-50 text-red-700'
+        : normalized.includes('hr')
+          ? 'bg-[#e8f2ff] text-[#0059b8]'
+          : 'bg-orange-50 text-orange-700'
+
+  return (
+    <span className={`inline-flex rounded-full px-3 py-1 text-xs font-bold ${className}`}>
+      {label}
+    </span>
   )
 }
 

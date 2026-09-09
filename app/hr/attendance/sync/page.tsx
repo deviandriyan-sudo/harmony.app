@@ -18,6 +18,7 @@ import { Topbar } from '@/components/layout/Topbar'
 import { supabase } from '@/lib/supabase'
 import { getCutoffRange } from '@/lib/attendance-reporting'
 import { useAttendancePeriodQuery } from '@/lib/use-attendance-period'
+import { isFinalApproved } from '@/lib/leave-workflow-status'
 import {
   loadAttendanceReportingDataset,
   type AttendanceReportingDataset,
@@ -76,7 +77,7 @@ export default function HRAttendanceSyncPage() {
     const logs = dataset?.logs || []
 
     const approvedRequests = requests.filter((request) =>
-      isApproved(request.hr_status) || isApproved(request.status),
+      isFinalApproved(request),
     )
 
     const leaveRequests = approvedRequests.filter(

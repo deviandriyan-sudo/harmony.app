@@ -21,6 +21,7 @@ import { TodayTeamAvailability } from '@/components/employee/TodayTeamAvailabili
 import { Topbar } from '@/components/layout/Topbar'
 import { getCurrentPeriodMonthWita, getCutoffRange } from '@/lib/attendance-reporting'
 import { supabase } from '@/lib/supabase'
+import { getApprovalStageLabel } from '@/lib/leave-workflow-status'
 
 type AppUser = {
   id: string
@@ -164,7 +165,7 @@ export default function EmployeeDashboardPage() {
         type: 'leave',
         label: row.leave_type || labelRequestType(row.request_type),
         date: row.start_date && row.end_date && row.start_date !== row.end_date ? `${formatDate(row.start_date)} – ${formatDate(row.end_date)}` : formatDate(row.start_date),
-        status: normalizeStatus(row.hr_status || row.supervisor_status || row.status),
+        status: getApprovalStageLabel(row),
         reason: row.reason || '-',
       }))
 
@@ -173,7 +174,7 @@ export default function EmployeeDashboardPage() {
         type: 'phl',
         label: 'Klaim PHL',
         date: formatDate(row.phl_date),
-        status: normalizeStatus(row.hr_status || row.supervisor_status || row.status),
+        status: getApprovalStageLabel(row),
         reason: row.reason || '-',
       }))
 
@@ -281,8 +282,20 @@ function formatDate(value?: string | null) {
 }
 function Status({ status }: { status: string }) {
   const normalized = normalizeStatus(status)
-  const cls = ['approved', 'finalized'].includes(normalized) ? 'bg-green-50 text-green-700' : ['rejected', 'cancelled'].includes(normalized) ? 'bg-red-50 text-red-700' : 'bg-orange-50 text-orange-700'
-  return <span className={`inline-flex w-fit rounded-full px-2.5 py-1 text-[10px] font-bold ${cls}`}>{normalized ? normalized.replace(/_/g, ' ') : 'pending'}</span>
+  const cls =
+    normalized.includes('disetujui')
+      ? 'bg-green-50 text-green-700'
+      : normalized.includes('ditolak') || normalized.includes('dibatalkan')
+        ? 'bg-red-50 text-red-700'
+        : normalized.includes('hr')
+          ? 'bg-blue-50 text-blue-700'
+          : 'bg-orange-50 text-orange-700'
+
+  return (
+    <span className={`inline-flex w-fit rounded-full px-2.5 py-1 text-[10px] font-bold ${cls}`}>
+      {status || 'Menunggu Atasan'}
+    </span>
+  )
 }
 function Metric({ title, value, description, icon, tone }: { title: string; value: string; description: string; icon: ReactNode; tone: 'blue'|'purple'|'green'|'orange' }) {
   const map = { blue: 'bg-blue-50 text-blue-700', purple: 'bg-violet-50 text-violet-700', green: 'bg-green-50 text-green-700', orange: 'bg-orange-50 text-orange-700' }

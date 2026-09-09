@@ -1052,11 +1052,11 @@ export default function EmployeeApprovalDetailPage() {
           <div className="relative flex flex-col gap-5 2xl:flex-row 2xl:items-end 2xl:justify-between">
             <div className="min-w-0">
               <Link
-                href="/employee/approvals"
+                href={`/employee/approvals/attendance?period=${encodeURIComponent(periodMonth)}`}
                 className="mb-5 inline-flex min-h-10 items-center gap-2 rounded-full border border-white/10 bg-white/10 px-4 text-xs font-semibold text-white/75 backdrop-blur-xl transition hover:bg-white/15"
               >
                 <ArrowLeft size={15} />
-                Kembali ke Approval Tim
+                Kembali ke Daftar Approval
               </Link>
 
               <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-4 py-2 text-xs font-semibold text-white/75 backdrop-blur-xl">

@@ -17,6 +17,11 @@ import {
 } from 'lucide-react'
 
 import { supabase } from '@/lib/supabase'
+import {
+  getApprovalStageLabel,
+  getApprovalStageTone,
+  getSupervisorApprovalLabel,
+} from '@/lib/leave-workflow-status'
 
 type Employee = {
   id: string
@@ -755,7 +760,7 @@ export default function EmployeeLeaveApprovalPage() {
             />
           ) : (
             <div className="overflow-x-auto">
-              <table className="min-w-[1300px] w-full border-collapse text-left text-sm">
+              <table className="min-w-[1420px] w-full border-collapse text-left text-sm">
                 <thead>
                   <tr className="border-b border-slate-100 bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
                     <th className="px-5 py-4 font-bold">Karyawan</th>
@@ -765,7 +770,8 @@ export default function EmployeeLeaveApprovalPage() {
                     <th className="px-5 py-4 font-bold">Alasan</th>
                     <th className="px-5 py-4 font-bold">Pending Job</th>
                     <th className="px-5 py-4 font-bold">Handover</th>
-                    <th className="px-5 py-4 font-bold">Status</th>
+                    <th className="px-5 py-4 font-bold">Status Atasan</th>
+                    <th className="px-5 py-4 font-bold">Proses</th>
                     <th className="px-5 py-4 text-right font-bold">Aksi</th>
                   </tr>
                 </thead>
@@ -883,7 +889,7 @@ export default function EmployeeLeaveApprovalPage() {
                               status
                             )}`}
                           >
-                            {getStatusLabel(status)}
+                            {getSupervisorApprovalLabel(status)}
                           </span>
 
                           {request.supervisor_note && (
@@ -891,6 +897,22 @@ export default function EmployeeLeaveApprovalPage() {
                               Catatan: {request.supervisor_note}
                             </div>
                           )}
+                        </td>
+
+                        <td className="px-5 py-4">
+                          <span
+                            className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-bold ${
+                              getApprovalStageTone(request) === 'green'
+                                ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                                : getApprovalStageTone(request) === 'red'
+                                  ? 'border-red-200 bg-red-50 text-red-700'
+                                  : getApprovalStageTone(request) === 'blue'
+                                    ? 'border-blue-200 bg-blue-50 text-blue-700'
+                                    : 'border-amber-200 bg-amber-50 text-amber-700'
+                            }`}
+                          >
+                            {getApprovalStageLabel(request)}
+                          </span>
                         </td>
 
                         <td className="px-5 py-4 text-right">
@@ -919,7 +941,7 @@ export default function EmployeeLeaveApprovalPage() {
                             </div>
                           ) : (
                             <span className="text-xs font-semibold text-slate-400">
-                              Sudah diproses
+                              Selesai di Atasan
                             </span>
                           )}
                         </td>

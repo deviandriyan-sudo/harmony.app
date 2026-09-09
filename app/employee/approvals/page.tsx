@@ -21,6 +21,7 @@ import {
 
 import { Topbar } from '@/components/layout/Topbar'
 import { supabase } from '@/lib/supabase'
+import { useAttendancePeriodQuery } from '@/lib/use-attendance-period'
 
 type AppUser = {
   id: string
@@ -120,7 +121,7 @@ export default function EmployeeApprovalsPage() {
   const [attendanceConfirmations, setAttendanceConfirmations] = useState<AttendancePeriodConfirmation[]>([])
   const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>([])
 
-  const [periodMonth, setPeriodMonth] = useState(getCurrentPeriodMonth())
+  const { periodMonth, setPeriodMonth, periodReady } = useAttendancePeriodQuery()
 
   const [loading, setLoading] = useState(true)
   const [errorMessage, setErrorMessage] = useState('')
@@ -172,8 +173,9 @@ export default function EmployeeApprovalsPage() {
   }, [leaveRequests])
 
   useEffect(() => {
+    if (!periodReady) return
     fetchData()
-  }, [periodMonth])
+  }, [periodMonth, periodReady])
 
   async function fetchData() {
     setLoading(true)
@@ -284,17 +286,28 @@ export default function EmployeeApprovalsPage() {
       setAttendanceConfirmations(attendanceData || [])
     }
 
-    const { data: leaveData, error: leaveError } = await supabase
-      .from('leave_requests')
-      .select('*')
-      .in('employee_id', subordinateIds)
-      .order('created_at', { ascending: false })
+    const [leaveResult, phlResult] = await Promise.all([
+      supabase
+        .from('leave_requests')
+        .select('*')
+        .in('employee_id', subordinateIds)
+        .neq('request_type', 'phl_claim')
+        .order('created_at', { ascending: false }),
+      supabase.rpc('harmony_supervisor_get_phl_claims_v1'),
+    ])
 
-    if (leaveError) {
-      setErrorMessage(leaveError.message)
+    if (leaveResult.error) {
+      setErrorMessage(leaveResult.error.message)
       setLeaveRequests([])
     } else {
-      setLeaveRequests(leaveData || [])
+      const canonicalPHL = phlResult.error
+        ? []
+        : (((phlResult.data || []) as unknown) as LeaveRequest[])
+
+      setLeaveRequests([
+        ...((leaveResult.data || []) as LeaveRequest[]),
+        ...canonicalPHL,
+      ])
     }
 
     setLoading(false)
@@ -342,7 +355,7 @@ export default function EmployeeApprovalsPage() {
             <div className="grid gap-3 sm:grid-cols-2 xl:min-w-[580px] 2xl:grid-cols-4">
               <HeroMetric label="Bawahan" value={String(subordinates.length)} />
               <HeroMetric label="Absensi Pending" value={String(attendanceSummary.pending)} />
-              <HeroMetric label="Cuti Pending" value={String(leaveSummary.pending)} />
+              <HeroMetric label="Cuti / PHL Pending" value={String(leaveSummary.pending)} />
               <HeroMetric label="Locked" value={String(attendanceSummary.locked)} />
             </div>
           </div>
@@ -366,7 +379,7 @@ export default function EmployeeApprovalsPage() {
           />
 
           <SummaryCard
-            title="Cuti/Izin Pending"
+            title="Cuti/Izin/PHL Pending"
             value={`${leaveSummary.pending}`}
             description="Menunggu approval atasan"
             icon={<FileText size={22} />}
@@ -374,9 +387,9 @@ export default function EmployeeApprovalsPage() {
           />
 
           <SummaryCard
-            title="Total Approved"
+            title="Selesai di Atasan"
             value={`${attendanceSummary.approved + leaveSummary.approved}`}
-            description="Sudah disetujui atasan"
+            description="Sudah diproses/disetujui atasan; final tetap oleh HR"
             icon={<CheckCircle2 size={22} />}
             tone="green"
           />
@@ -403,7 +416,7 @@ export default function EmployeeApprovalsPage() {
           <ApprovalModuleCard
             title="Approval Absensi"
             description="Review absensi bawahan per periode. Atasan bisa melihat detail harian, bukti, PHL, cuti/izin dari absensi, lalu approve atau reject periode."
-            href="/employee/approvals/attendance"
+            href={`/employee/approvals/attendance?period=${encodeURIComponent(periodMonth)}`}
             icon={<CalendarCheck size={25} />}
             tone="blue"
             metrics={[
@@ -433,7 +446,7 @@ export default function EmployeeApprovalsPage() {
 
           <ApprovalModuleCard
             title="Approval Cuti, Izin & PHL"
-            description="Review pengajuan cuti tahunan, cuti khusus, sakit, izin, tugas luar, dan klaim PHL. Saldo cuti/PHL akan otomatis terpotong saat approve."
+            description="Review pengajuan cuti tahunan, cuti khusus, sakit, izin, tugas luar, dan klaim PHL. Approval atasan hanya meneruskan ke HR; saldo baru berubah pada final approval HR sesuai engine canonical."
             href="/employee/approvals/leave"
             icon={<FileText size={25} />}
             tone="purple"
@@ -457,8 +470,8 @@ export default function EmployeeApprovalsPage() {
             ]}
             highlights={[
               'Approval cuti, izin, sakit, tugas luar',
-              'Klaim PHL mengurangi saldo PHL',
-              'Cuti tahunan mengurangi saldo cuti otomatis',
+              'Approval atasan meneruskan request ke HR',
+              'Saldo cuti/PHL hanya berubah pada final approval HR',
             ]}
           />
         </div>

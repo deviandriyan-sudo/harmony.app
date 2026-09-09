@@ -397,24 +397,40 @@ export async function GET(request: NextRequest) {
         })
 
         if (attendancePending.length > 0) {
-          const periods = attendancePending
-            .map((row) => String(row.period_month || ''))
-            .filter(Boolean)
-            .sort()
-          tasks.push(
-            task({
-              id: 'supervisor-attendance-approval',
-              category: 'attendance',
-              scope: 'supervisor',
-              priority: 'high',
-              title: 'Approval absensi tim menunggu',
-              message: `${attendancePending.length} periode bawahan belum direview atasan. ${listNames(attendancePending, employeeById)}`,
-              action_url: '/employee/approvals/attendance',
-              count: attendancePending.length,
-              period_month: periods[0] || null,
-              oldest_created_at: oldestCreatedAt(attendancePending),
-            }),
-          )
+          // Task attendance dipisah per periode agar action notification selalu
+          // membuka konteks periode yang benar, bukan fallback ke periode berjalan.
+          const attendanceByPeriod = new Map<
+            string,
+            Array<Record<string, any>>
+          >()
+
+          attendancePending.forEach((row) => {
+            const period = String(row.period_month || '').trim()
+            if (!period) return
+
+            const current = attendanceByPeriod.get(period) || []
+            current.push(row)
+            attendanceByPeriod.set(period, current)
+          })
+
+          Array.from(attendanceByPeriod.entries())
+            .sort(([left], [right]) => left.localeCompare(right))
+            .forEach(([period, rows]) => {
+              tasks.push(
+                task({
+                  id: `supervisor-attendance-approval:${period}`,
+                  category: 'attendance',
+                  scope: 'supervisor',
+                  priority: 'high',
+                  title: 'Approval absensi tim menunggu',
+                  message: `${rows.length} periode bawahan belum direview atasan untuk periode ${period}. ${listNames(rows, employeeById)}`,
+                  action_url: `/employee/approvals/attendance?period=${encodeURIComponent(period)}`,
+                  count: rows.length,
+                  period_month: period,
+                  oldest_created_at: oldestCreatedAt(rows),
+                }),
+              )
+            })
         }
 
         const leavePending = (

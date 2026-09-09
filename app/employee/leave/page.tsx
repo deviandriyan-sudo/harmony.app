@@ -25,6 +25,14 @@ import {
 
 import { Topbar } from '@/components/layout/Topbar'
 import { supabase } from '@/lib/supabase'
+import {
+  getApprovalStageLabel,
+  getApprovalStageTone,
+  getHRApprovalLabel,
+  getSupervisorApprovalLabel,
+  isFinalApproved,
+  isWorkflowPending,
+} from '@/lib/leave-workflow-status'
 import { sendHarmonyEmail } from '@/lib/notifications'
 import {
   getActiveHarmonyTypesForScope,
@@ -364,19 +372,11 @@ export default function EmployeeLeavePage() {
   const phlBalanceUsesHROverride = Number(myPHLBalance?.legacy_balance || 0) > 0
 
   const pendingCount = useMemo(() => {
-    return leaveRequests.filter((item) => {
-      return isPendingStatus(item.status) || isPendingStatus(item.supervisor_status) || isPendingStatus(item.hr_status)
-    }).length
+    return leaveRequests.filter((item) => isWorkflowPending(item)).length
   }, [leaveRequests])
 
   const approvedCount = useMemo(() => {
-    return leaveRequests.filter((item) => {
-      return (
-        normalizeText(item.status) === 'approved' ||
-        normalizeText(item.supervisor_status) === 'approved' ||
-        normalizeText(item.hr_status) === 'approved'
-      )
-    }).length
+    return leaveRequests.filter((item) => isFinalApproved(item)).length
   }, [leaveRequests])
 
   const calculatedDays = useMemo(() => {
@@ -1550,9 +1550,8 @@ function HistoryCard({
   const label =
     request.leave_type ||
     getRequestMeta((request.request_type || 'annual_leave') as RequestType).label
-  const statusValue =
-    request.hr_status || request.supervisor_status || request.status || 'pending'
-  const tone = getStatusTone(statusValue)
+  const workflowLabel = getApprovalStageLabel(request)
+  const tone = getApprovalStageTone(request)
   const handoverDisplay = resolveHandoverDisplay(request, employeeDirectory)
 
   return (
@@ -1560,7 +1559,7 @@ function HistoryCard({
       <div className="grid gap-4 xl:grid-cols-[1fr_auto] xl:items-start">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <StatusBadge label={formatStatus(statusValue)} tone={tone} />
+            <StatusBadge label={workflowLabel} tone={tone} />
 
             <span className="rounded-full bg-[#f5f5f7] px-3 py-1 text-xs font-bold text-[#1d1d1f]">
               {label}
@@ -1577,9 +1576,12 @@ function HistoryCard({
 
           <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <SmallInfo label="Jumlah Hari" value={`${request.total_days || 0} hari`} />
-            <SmallInfo label="Atasan" value={request.supervisor_name || '-'} />
+            <SmallInfo
+              label="Status Atasan"
+              value={getSupervisorApprovalLabel(request.supervisor_status)}
+            />
             <SmallInfo label="Submit" value={formatDateTime(request.created_at || '')} />
-            <SmallInfo label="HR Status" value={formatStatus(request.hr_status || '-')} />
+            <SmallInfo label="Status HR" value={getHRApprovalLabel(request)} />
           </div>
 
           {(request.job_pending || handoverDisplay || request.handover_note) && (
