@@ -69,6 +69,7 @@ type RequestItem = {
   date: string
   status: string
   reason: string
+  createdAt: string
 }
 
 export default function EmployeeDashboardPage() {
@@ -143,6 +144,7 @@ export default function EmployeeDashboardPage() {
           .from('leave_requests')
           .select('id,request_type,leave_type,start_date,end_date,status,supervisor_status,hr_status,reason,created_at')
           .eq('employee_id', employeeData.id)
+          .neq('request_type', 'phl_claim')
           .order('created_at', { ascending: false })
           .limit(8),
         supabase
@@ -164,9 +166,13 @@ export default function EmployeeDashboardPage() {
         id: row.id,
         type: 'leave',
         label: row.leave_type || labelRequestType(row.request_type),
-        date: row.start_date && row.end_date && row.start_date !== row.end_date ? `${formatDate(row.start_date)} – ${formatDate(row.end_date)}` : formatDate(row.start_date),
+        date:
+          row.start_date && row.end_date && row.start_date !== row.end_date
+            ? `${formatDate(row.start_date)} – ${formatDate(row.end_date)}`
+            : formatDate(row.start_date),
         status: getApprovalStageLabel(row),
         reason: row.reason || '-',
+        createdAt: String(row.created_at || ''),
       }))
 
       const phlItems: RequestItem[] = (phlResponse.data || []).map((row: any) => ({
@@ -176,9 +182,18 @@ export default function EmployeeDashboardPage() {
         date: formatDate(row.phl_date),
         status: getApprovalStageLabel(row),
         reason: row.reason || '-',
+        createdAt: String(row.created_at || ''),
       }))
 
-      setRequests([...leaveItems, ...phlItems].slice(0, 8))
+      // Canonical employee request feed:
+      // - leave/izin/sakit/ST hanya dari leave_requests non-PHL
+      // - klaim PHL hanya dari phl_records source=employee_phl_claim
+      // - gabungan diurutkan ulang agar "Pengajuan Terbaru" benar-benar terbaru
+      setRequests(
+        [...leaveItems, ...phlItems]
+          .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+          .slice(0, 8),
+      )
     } catch (error: any) {
       setMessage(error?.message || 'Dashboard employee gagal dimuat.')
     } finally {
