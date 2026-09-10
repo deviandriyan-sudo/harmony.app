@@ -44,6 +44,16 @@ type AppUser = {
   is_active: boolean | null
 }
 
+type EmployeeDirectoryRow = {
+  id: string
+  employee_number?: string | null
+  machine_pin?: string | null
+  full_name?: string | null
+  department?: string | null
+  position?: string | null
+  email?: string | null
+}
+
 type LeaveRequest = {
   id: string
   employee_id: string | null
@@ -663,6 +673,7 @@ export default function HRLeavePage() {
   const [activeTab, setActiveTab] = useState<ActiveTab>('leave')
 
   const [appUser, setAppUser] = useState<AppUser | null>(null)
+  const [employeeDirectory, setEmployeeDirectory] = useState<EmployeeDirectoryRow[]>([])
   const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>([])
   const [phlRecords, setPHLRecords] = useState<PHLRecord[]>([])
   const [phlBalanceSummary, setPHLBalanceSummary] = useState<PHLBalanceSummary[]>([])
@@ -701,13 +712,25 @@ export default function HRLeavePage() {
   const [errorMessage, setErrorMessage] = useState('')
   const [successMessage, setSuccessMessage] = useState('')
 
+  const resolvedLeaveRequests = useMemo(() => {
+    return leaveRequests.map((item) =>
+      resolveHandoverRecord(item, employeeDirectory)
+    )
+  }, [leaveRequests, employeeDirectory])
+
+  const resolvedPHLRecords = useMemo(() => {
+    return phlRecords.map((item) =>
+      resolveHandoverRecord(item, employeeDirectory)
+    )
+  }, [phlRecords, employeeDirectory])
+
   const phlClaims = useMemo(() => {
-    return phlRecords.filter((item) => item.source === 'employee_phl_claim')
-  }, [phlRecords])
+    return resolvedPHLRecords.filter((item) => item.source === 'employee_phl_claim')
+  }, [resolvedPHLRecords])
 
   const phlBalances = useMemo(() => {
-    return phlRecords.filter((item) => item.source === 'attendance_phl_approved')
-  }, [phlRecords])
+    return resolvedPHLRecords.filter((item) => item.source === 'attendance_phl_approved')
+  }, [resolvedPHLRecords])
 
   const pendingPHLClaims = phlClaims.filter((item) => {
     const status = normalizeStatus(item.status)
@@ -727,7 +750,7 @@ export default function HRLeavePage() {
     return normalizeStatus(item.status) === 'rejected'
   })
 
-  const pendingLeaveRequests = leaveRequests.filter((item) => {
+  const pendingLeaveRequests = resolvedLeaveRequests.filter((item) => {
     const status = normalizeStatus(item.hr_status || item.status || item.supervisor_status)
 
     return (
@@ -741,9 +764,9 @@ export default function HRLeavePage() {
   const filteredLeaveRequests = useMemo(() => {
     const keyword = searchKeyword.trim().toLowerCase()
 
-    if (!keyword) return leaveRequests
+    if (!keyword) return resolvedLeaveRequests
 
-    return leaveRequests.filter((item) => {
+    return resolvedLeaveRequests.filter((item) => {
       return (
         item.full_name?.toLowerCase().includes(keyword) ||
         item.employee_number?.toLowerCase().includes(keyword) ||
@@ -760,7 +783,7 @@ export default function HRLeavePage() {
         item.handover_to_full_name?.toLowerCase().includes(keyword)
       )
     })
-  }, [leaveRequests, searchKeyword])
+  }, [resolvedLeaveRequests, searchKeyword])
 
   const filteredPHLClaims = useMemo(() => {
     const keyword = searchKeyword.trim().toLowerCase()
@@ -954,6 +977,7 @@ export default function HRLeavePage() {
     }
 
     await Promise.all([
+      fetchEmployeeDirectory(),
       fetchLeaveRequests(),
       fetchLeaveBalanceLifecycle(),
       fetchPHLRecords(),
@@ -962,6 +986,21 @@ export default function HRLeavePage() {
     ])
 
     setLoading(false)
+  }
+
+  async function fetchEmployeeDirectory() {
+    const { data, error } = await supabase
+      .from('employees')
+      .select('*')
+      .order('full_name', { ascending: true })
+
+    if (error) {
+      console.warn('Employee directory warning:', error.message)
+      setEmployeeDirectory([])
+      return
+    }
+
+    setEmployeeDirectory((data || []) as EmployeeDirectoryRow[])
   }
 
   async function fetchLeaveRequests() {
@@ -4047,7 +4086,7 @@ function HandoverDetailBox({
           </p>
 
           <p className="mt-2 text-sm font-semibold text-[#1d1d1f]">
-            {handoverName || '-'}
+            {handoverName || 'Nama pengganti belum terhubung'}
           </p>
 
           <p className="mt-1 text-xs leading-5 text-[#6e6e73]">
@@ -4069,6 +4108,79 @@ function HandoverDetailBox({
       </div>
     </div>
   )
+}
+
+function looksLikeUuid(value?: string | null) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    String(value || '').trim()
+  )
+}
+
+function normalizeDirectoryKey(value?: string | null) {
+  return String(value || '').trim().toLowerCase()
+}
+
+function resolveHandoverRecord<
+  T extends {
+    handover_to?: string | null
+    handover_to_employee_id?: string | null
+    handover_to_employee_number?: string | null
+    handover_to_full_name?: string | null
+    handover_to_department?: string | null
+    handover_to_position?: string | null
+  }
+>(record: T, directory: EmployeeDirectoryRow[]): T {
+  const rawFullName = String(record.handover_to_full_name || '').trim()
+
+  const references = [
+    record.handover_to_employee_id,
+    record.handover_to_employee_number,
+    rawFullName,
+    record.handover_to,
+  ]
+    .map((value) => normalizeDirectoryKey(value))
+    .filter(Boolean)
+
+  const matched = directory.find((employee) => {
+    const employeeKeys = [
+      employee.id,
+      employee.employee_number,
+      employee.machine_pin,
+      employee.email,
+      employee.full_name,
+    ]
+      .map((value) => normalizeDirectoryKey(value))
+      .filter(Boolean)
+
+    return references.some((reference) => employeeKeys.includes(reference))
+  })
+
+  if (matched) {
+    return {
+      ...record,
+      handover_to_employee_id:
+        matched.id || record.handover_to_employee_id || null,
+      handover_to_employee_number:
+        matched.employee_number || record.handover_to_employee_number || null,
+      handover_to_full_name:
+        matched.full_name ||
+        (rawFullName && !looksLikeUuid(rawFullName) ? rawFullName : null),
+      handover_to_department:
+        matched.department || record.handover_to_department || null,
+      handover_to_position:
+        matched.position || record.handover_to_position || null,
+    }
+  }
+
+  // Jangan pernah tampilkan UUID internal sebagai nama manusia.
+  if (rawFullName && looksLikeUuid(rawFullName)) {
+    return {
+      ...record,
+      handover_to_full_name: null,
+    }
+  }
+
+  return record
 }
 
 function JobPendingPreview({
@@ -4093,7 +4205,7 @@ function JobPendingPreview({
       </p>
 
       <p className="mt-1 line-clamp-1 text-[11px] leading-4 text-[#6e6e73]">
-        Ke: {handoverName || '-'}
+        Ke: {handoverName || 'Nama pengganti belum terhubung'}
       </p>
     </div>
   )
