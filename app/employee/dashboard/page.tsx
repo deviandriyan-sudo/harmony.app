@@ -21,7 +21,7 @@ import { TodayTeamAvailability } from '@/components/employee/TodayTeamAvailabili
 import { Topbar } from '@/components/layout/Topbar'
 import { getCurrentPeriodMonthWita, getCutoffRange } from '@/lib/attendance-reporting'
 import { supabase } from '@/lib/supabase'
-import { getApprovalStageLabel } from '@/lib/leave-workflow-status'
+import { getApprovalStageLabel, isWorkflowPending } from '@/lib/leave-workflow-status'
 
 type AppUser = {
   id: string
@@ -81,6 +81,7 @@ export default function EmployeeDashboardPage() {
   const [balance, setBalance] = useState<BalanceSummary | null>(null)
   const [attendance, setAttendance] = useState<AttendanceRow[]>([])
   const [requests, setRequests] = useState<RequestItem[]>([])
+  const [pendingRequestCount, setPendingRequestCount] = useState(0)
 
   const periodMonth = useMemo(() => getCurrentPeriodMonthWita(), [])
   const periodRange = useMemo(() => getCutoffRange(periodMonth), [periodMonth])
@@ -126,7 +127,14 @@ export default function EmployeeDashboardPage() {
       if (!employeeData) throw new Error('Akun belum terhubung ke data employee. Hubungi HR.')
       setEmployee(employeeData)
 
-      const [balanceResponse, attendanceResponse, leaveResponse, phlResponse] = await Promise.all([
+      const [
+        balanceResponse,
+        attendanceResponse,
+        leaveResponse,
+        phlResponse,
+        pendingLeaveResponse,
+        pendingPHLResponse,
+      ] = await Promise.all([
         supabase
           .from('harmony_leave_balance_summary')
           .select('employee_id,annual_total_available_days,phl_total_available_days,postpone_active_days,postpone_expired_days,next_postpone_expiry,next_phl_expiry')
@@ -154,6 +162,16 @@ export default function EmployeeDashboardPage() {
           .eq('source', 'employee_phl_claim')
           .order('created_at', { ascending: false })
           .limit(8),
+        supabase
+          .from('leave_requests')
+          .select('status,supervisor_status,hr_status')
+          .eq('employee_id', employeeData.id)
+          .neq('request_type', 'phl_claim'),
+        supabase
+          .from('phl_records')
+          .select('status,supervisor_status,hr_status')
+          .eq('employee_id', employeeData.id)
+          .eq('source', 'employee_phl_claim'),
       ])
 
       if (!balanceResponse.error) setBalance(balanceResponse.data || null)
@@ -161,6 +179,18 @@ export default function EmployeeDashboardPage() {
 
       if (attendanceResponse.error) throw attendanceResponse.error
       setAttendance((attendanceResponse.data || []) as AttendanceRow[])
+
+      if (leaveResponse.error) throw leaveResponse.error
+      if (phlResponse.error) throw phlResponse.error
+      if (pendingLeaveResponse.error) throw pendingLeaveResponse.error
+      if (pendingPHLResponse.error) throw pendingPHLResponse.error
+
+      const canonicalPendingCount = [
+        ...(pendingLeaveResponse.data || []),
+        ...(pendingPHLResponse.data || []),
+      ].filter((row: any) => isWorkflowPending(row)).length
+
+      setPendingRequestCount(canonicalPendingCount)
 
       const leaveItems: RequestItem[] = (leaveResponse.data || []).map((row: any) => ({
         id: row.id,
@@ -203,7 +233,6 @@ export default function EmployeeDashboardPage() {
   }
 
   const recordedAttendance = attendance.filter((row) => Boolean(row.check_in || row.check_out || row.manual_check_in || row.manual_check_out)).length
-  const pendingRequests = requests.filter((item) => ['pending', 'submitted', 'waiting_hr', 'pending_hr', 'pending_supervisor'].includes(item.status)).length
   const annualBalance = Number(balance?.annual_total_available_days ?? employee?.annual_leave_balance ?? 0)
   const phlBalance = Number(balance?.phl_total_available_days ?? employee?.phl_balance ?? 0)
 
@@ -246,7 +275,7 @@ export default function EmployeeDashboardPage() {
           <Metric title="Saldo Cuti" value={`${annualBalance}`} description="Cuti matang + postpone aktif" icon={<WalletCards size={20} />} tone="blue" />
           <Metric title="Saldo PHL" value={`${phlBalance}`} description="PHL aktif yang dapat diklaim" icon={<Plane size={20} />} tone="purple" />
           <Metric title="Kehadiran Tercatat" value={`${recordedAttendance}`} description="Periode cut-off berjalan" icon={<CheckCircle2 size={20} />} tone="green" />
-          <Metric title="Pending Request" value={`${pendingRequests}`} description="Cuti/izin/PHL belum final" icon={<Clock3 size={20} />} tone="orange" />
+          <Metric title="Pending Request" value={`${pendingRequestCount}`} description="Cuti/izin/PHL belum final" icon={<Clock3 size={20} />} tone="orange" />
         </div>
 
         <div className="grid gap-5 xl:grid-cols-[1.05fr_0.95fr]">
