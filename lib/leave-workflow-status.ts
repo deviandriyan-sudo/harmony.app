@@ -132,6 +132,7 @@ export function getSupervisorApprovalLabel(status: unknown) {
   const value = normalizeApprovalStatus(status)
   if (APPROVED.has(value)) return 'Disetujui Atasan'
   if (REJECTED.has(value)) return 'Ditolak Atasan'
+  if (CANCELLED.has(value)) return 'Dibatalkan Employee'
   return 'Menunggu Atasan'
 }
 

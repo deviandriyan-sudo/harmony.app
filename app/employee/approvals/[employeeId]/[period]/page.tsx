@@ -24,6 +24,7 @@ import {
 } from 'lucide-react'
 
 import { Topbar } from '@/components/layout/Topbar'
+import { HarmonyAttachmentViewer } from '@/components/attachments/HarmonyAttachments'
 import { supabase } from '@/lib/supabase'
 import { sendHarmonyEmail } from '@/lib/notifications'
 
@@ -1052,11 +1053,11 @@ export default function EmployeeApprovalDetailPage() {
           <div className="relative flex flex-col gap-5 2xl:flex-row 2xl:items-end 2xl:justify-between">
             <div className="min-w-0">
               <Link
-                href={`/employee/approvals/attendance?period=${encodeURIComponent(periodMonth)}`}
+                href="/employee/approvals"
                 className="mb-5 inline-flex min-h-10 items-center gap-2 rounded-full border border-white/10 bg-white/10 px-4 text-xs font-semibold text-white/75 backdrop-blur-xl transition hover:bg-white/15"
               >
                 <ArrowLeft size={15} />
-                Kembali ke Daftar Approval
+                Kembali ke Approval Tim
               </Link>
 
               <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-4 py-2 text-xs font-semibold text-white/75 backdrop-blur-xl">
@@ -1735,42 +1736,16 @@ function AttendanceDetailModal({
             content={log.supervisor_note || log.correction_notes || '-'}
           />
 
-          <div className="mt-5 flex flex-wrap gap-3">
-            {log.absence_proof_url && (
-              <a
-                href={log.absence_proof_url}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl bg-[#1d1d1f] px-5 text-sm font-bold text-white"
-              >
-                <FileText size={17} />
-                Bukti Absensi / Keterangan
-              </a>
-            )}
-
-            {log.phl_proof_url && (
-              <a
-                href={log.phl_proof_url}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl bg-[#7b2cbf] px-5 text-sm font-bold text-white"
-              >
-                <FileText size={17} />
-                Bukti PHL
-              </a>
-            )}
-
-            {log.correction_proof_url && (
-              <a
-                href={log.correction_proof_url}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl bg-[#007aff] px-5 text-sm font-bold text-white"
-              >
-                <FileText size={17} />
-                Bukti Koreksi
-              </a>
-            )}
+          <div className="mt-5">
+            <HarmonyAttachmentViewer
+              entityType="attendance_log"
+              entityId={log.id}
+              legacyLinks={[
+                { url: log.absence_proof_url, name: log.absence_proof_name || 'Bukti Absensi / Keterangan' },
+                { url: log.phl_proof_url, name: log.phl_proof_name || 'Bukti PHL' },
+                { url: log.correction_proof_url, name: log.correction_proof_name || 'Bukti Koreksi' },
+              ]}
+            />
           </div>
         </div>
       </div>
@@ -1862,40 +1837,18 @@ function ProofLinks({
     return <span className="text-xs font-semibold text-[#86868b]">-</span>
   }
 
-  const links = [
-    {
-      label: 'Keterangan',
-      url: log.absence_proof_url,
-    },
-    {
-      label: 'PHL',
-      url: log.phl_proof_url,
-    },
-    {
-      label: 'Koreksi',
-      url: log.correction_proof_url,
-    },
-  ].filter((item) => Boolean(item.url))
-
-  if (links.length === 0) {
-    return <span className="text-xs font-semibold text-[#86868b]">-</span>
-  }
-
   return (
-    <div className="flex flex-wrap gap-2">
-      {links.map((item) => (
-        <a
-          key={item.label}
-          href={item.url || '#'}
-          target="_blank"
-          rel="noreferrer"
-          className="inline-flex items-center gap-1.5 rounded-2xl bg-[#e8f2ff] px-3 py-2 text-xs font-bold text-[#0059b8]"
-        >
-          <FileText size={14} />
-          {item.label}
-        </a>
-      ))}
-    </div>
+    <HarmonyAttachmentViewer
+      entityType="attendance_log"
+      entityId={log.id}
+      legacyLinks={[
+        { url: log.absence_proof_url, name: log.absence_proof_name || 'Bukti Keterangan' },
+        { url: log.phl_proof_url, name: log.phl_proof_name || 'Bukti PHL' },
+        { url: log.correction_proof_url, name: log.correction_proof_name || 'Bukti Koreksi' },
+      ]}
+      compact
+      emptyText="-"
+    />
   )
 }
 

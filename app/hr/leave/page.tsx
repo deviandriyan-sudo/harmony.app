@@ -24,6 +24,7 @@ import {
 } from 'lucide-react'
 
 import { Topbar } from '@/components/layout/Topbar'
+import { HarmonyAttachmentViewer } from '@/components/attachments/HarmonyAttachments'
 import { supabase } from '@/lib/supabase'
 import {
   canHRProcessApproval,
@@ -3416,17 +3417,18 @@ function LeaveDetailModal({
         emergencyContact={record.emergency_contact_during_leave}
       />
 
-      {(record.proof_url || record.proof_file_url) && (
-        <a
-          href={record.proof_url || record.proof_file_url || '#'}
-          target="_blank"
-          rel="noreferrer"
-          className="mt-5 inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl bg-[#1d1d1f] px-5 text-sm font-bold text-white"
-        >
-          <FileText size={17} />
-          Buka Dokumen Bukti
-        </a>
-      )}
+      <div className="mt-5">
+        <HarmonyAttachmentViewer
+          entityType="leave_request"
+          entityId={record.id}
+          legacyLinks={[
+            {
+              url: record.proof_url || record.proof_file_url,
+              name: record.proof_file_name || 'Dokumen Pendukung',
+            },
+          ]}
+        />
+      </div>
     </ModalShell>
   )
 }
@@ -3494,17 +3496,18 @@ function PHLDetailModal({
         />
       )}
 
-      {record.proof_file_url && (
-        <a
-          href={record.proof_file_url}
-          target="_blank"
-          rel="noreferrer"
-          className="mt-5 inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl bg-[#1d1d1f] px-5 text-sm font-bold text-white"
-        >
-          <FileText size={17} />
-          Buka Dokumen
-        </a>
-      )}
+      <div className="mt-5">
+        <HarmonyAttachmentViewer
+          entityType="phl_record"
+          entityId={record.id}
+          legacyLinks={[
+            {
+              url: record.proof_file_url,
+              name: record.proof_file_name || 'Dokumen PHL',
+            },
+          ]}
+        />
+      </div>
     </ModalShell>
   )
 }

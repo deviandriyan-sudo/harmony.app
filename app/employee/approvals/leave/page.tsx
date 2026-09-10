@@ -16,6 +16,7 @@ import {
   XCircle,
 } from 'lucide-react'
 
+import { HarmonyAttachmentViewer } from '@/components/attachments/HarmonyAttachments'
 import { supabase } from '@/lib/supabase'
 import {
   getApprovalStageLabel,
@@ -849,17 +850,25 @@ export default function EmployeeLeaveApprovalPage() {
                             {request.reason || '-'}
                           </div>
 
-                          {proofUrl && (
-                            <a
-                              href={proofUrl}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="mt-2 inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-700 transition hover:bg-slate-50"
-                            >
-                              <FileText className="h-3.5 w-3.5" />
-                              Bukti
-                            </a>
-                          )}
+                          <div className="mt-2">
+                            <HarmonyAttachmentViewer
+                              entityType={
+                                request.source_table === 'phl_records' ||
+                                normalize(request.request_type) === 'phl_claim' ||
+                                normalize(request.source) === 'employee_phl_claim'
+                                  ? 'phl_record'
+                                  : 'leave_request'
+                              }
+                              entityId={request.id}
+                              legacyLinks={[
+                                {
+                                  url: proofUrl,
+                                  name: 'Dokumen Pendukung',
+                                },
+                              ]}
+                              compact
+                            />
+                          </div>
                         </td>
 
                         <td className="px-5 py-4">

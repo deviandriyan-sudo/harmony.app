@@ -18,12 +18,16 @@ import {
   Send,
   Timer,
   Trash2,
-  Upload,
   X,
 } from "lucide-react";
 
 import { Topbar } from "@/components/layout/Topbar";
+import {
+  HarmonyAttachmentViewer,
+  HarmonyPendingAttachmentPicker,
+} from "@/components/attachments/HarmonyAttachments";
 import { supabase } from "@/lib/supabase";
+import { registerHarmonySubmissionAttachments } from "@/lib/harmony-attachments";
 import { sendHarmonyEmail } from "@/lib/notifications";
 import {
   getActiveHarmonyTypesForScope,
@@ -202,8 +206,7 @@ type RowDraft = {
   manual_check_in: string;
   manual_check_out: string;
   employee_daily_note: string;
-  absence_file: File | null;
-  phl_file: File | null;
+  support_files: File[];
 };
 
 type DailyTypeMeta = {
@@ -224,7 +227,7 @@ type LiveManualForm = {
   manual_check_in: string;
   manual_check_out: string;
   reason: string;
-  proof_file: File | null;
+  proof_files: File[];
   existing_proof_url: string;
   existing_proof_name: string;
 };
@@ -249,8 +252,7 @@ const emptyRowDraft: RowDraft = {
   manual_check_in: "",
   manual_check_out: "",
   employee_daily_note: "",
-  absence_file: null,
-  phl_file: null,
+  support_files: [],
 };
 
 function createLiveManualForm(date = getTodayISO()): LiveManualForm {
@@ -259,7 +261,7 @@ function createLiveManualForm(date = getTodayISO()): LiveManualForm {
     manual_check_in: "",
     manual_check_out: "",
     reason: "",
-    proof_file: null,
+    proof_files: [],
     existing_proof_url: "",
     existing_proof_name: "",
   };
@@ -279,6 +281,7 @@ export default function EmployeeAttendancePage() {
   const [periodMonth, setPeriodMonth] = useState(getCurrentPeriodMonth());
   const [loading, setLoading] = useState(true);
   const [submittingPeriod, setSubmittingPeriod] = useState(false);
+  const [cancellingPeriod, setCancellingPeriod] = useState(false);
 
   const [editOpen, setEditOpen] = useState(false);
   const [selectedRow, setSelectedRow] = useState<CalendarDayRow | null>(null);
@@ -372,6 +375,20 @@ export default function EmployeeAttendancePage() {
   const isProcessReadOnly = submittedPeriod && !isPeriodLocked;
   const isReadOnlyPeriod = submittedPeriod || isPeriodLocked;
   const isPeriodComplete = getTodayISO() >= periodRange.end;
+  const hasDailySupervisorDecision = logs.some((item) =>
+    ["approved", "rejected"].includes(
+      String(item.supervisor_approval_status || "").trim().toLowerCase(),
+    ),
+  );
+
+  const canCancelSubmittedPeriod =
+    !isPeriodLocked &&
+    !isSupervisorRejected &&
+    !hasDailySupervisorDecision &&
+    periodConfirmation?.employee_status === "submitted" &&
+    ["", "pending", "submitted", "waiting_supervisor", "belum_ada"].includes(
+      String(periodConfirmation?.supervisor_status || "").trim().toLowerCase(),
+    );
 
   const calendarRows = useMemo(() => {
     const dates = getDateRange(periodRange.start, periodRange.end);
@@ -579,8 +596,7 @@ export default function EmployeeAttendancePage() {
         row.log?.manual_check_out || row.log?.requested_check_out || "",
       employee_daily_note:
         row.log?.employee_daily_note || row.log?.correction_reason || "",
-      absence_file: null,
-      phl_file: null,
+      support_files: [],
     };
 
     setRowDrafts((prev) => ({
@@ -603,8 +619,7 @@ export default function EmployeeAttendancePage() {
           row.log?.manual_check_out || row.log?.requested_check_out || "",
         employee_daily_note:
           row.log?.employee_daily_note || row.log?.correction_reason || "",
-        absence_file: null,
-        phl_file: null,
+        support_files: [],
       }
     );
   }
@@ -639,7 +654,7 @@ export default function EmployeeAttendancePage() {
   function updateRowDraft(
     date: string,
     field: keyof RowDraft,
-    value: string | File | null,
+    value: string | File[],
   ) {
     setRowDrafts((prev) => ({
       ...prev,
@@ -685,8 +700,7 @@ export default function EmployeeAttendancePage() {
       draft.manual_check_in ||
         draft.manual_check_out ||
         draft.employee_daily_note ||
-        draft.absence_file ||
-        draft.phl_file ||
+        draft.support_files.length > 0 ||
         draft.daily_type !== inferDailyType(row) ||
         selectedDates.includes(row.date),
     );
@@ -968,7 +982,7 @@ export default function EmployeeAttendancePage() {
           record?.manual_check_out || record?.requested_check_out || "",
         reason:
           record?.employee_daily_note || record?.correction_reason || "",
-        proof_file: null,
+        proof_files: [],
         existing_proof_url: existingProofUrl,
         existing_proof_name: existingProofName,
       });
@@ -1078,7 +1092,7 @@ export default function EmployeeAttendancePage() {
     }
 
     if (
-      !liveManualForm.proof_file &&
+      liveManualForm.proof_files.length === 0 &&
       !liveManualForm.existing_proof_url
     ) {
       setErrorMessage(
@@ -1093,18 +1107,20 @@ export default function EmployeeAttendancePage() {
       let proofUrl = liveManualForm.existing_proof_url;
       let proofName = liveManualForm.existing_proof_name;
 
-      if (liveManualForm.proof_file) {
-        const upload = await uploadFile(
-          liveManualForm.proof_file,
+      let primaryUpload: { url: string; name: string; error: string } | null = null;
+
+      if (!proofUrl && liveManualForm.proof_files[0]) {
+        primaryUpload = await uploadFile(
+          liveManualForm.proof_files[0],
           `attendance-live-manual/${employee.id}/${liveManualForm.attendance_date}`,
         );
 
-        if (upload.error) {
-          throw new Error(upload.error);
+        if (primaryUpload.error) {
+          throw new Error(primaryUpload.error);
         }
 
-        proofUrl = upload.url;
-        proofName = upload.name;
+        proofUrl = primaryUpload.url;
+        proofName = primaryUpload.name;
       }
 
       const { data: sessionData, error: sessionError } =
@@ -1142,6 +1158,33 @@ export default function EmployeeAttendancePage() {
             result?.message ||
             "Absensi manual gagal disimpan.",
         );
+      }
+
+      let savedRecordId = String(result?.record?.id || "");
+
+      if (!savedRecordId) {
+        const savedLookup = await supabase
+          .from("attendance_logs")
+          .select("id")
+          .eq("employee_id", employee.id)
+          .eq("attendance_date", liveManualForm.attendance_date)
+          .is("deleted_at", null)
+          .maybeSingle();
+        savedRecordId = String(savedLookup.data?.id || "");
+      }
+
+      if (savedRecordId && liveManualForm.proof_files.length > 0) {
+        await registerHarmonySubmissionAttachments({
+          entityType: "attendance_log",
+          entityId: savedRecordId,
+          legacy: primaryUpload?.url
+            ? { url: primaryUpload.url, name: primaryUpload.name }
+            : null,
+          extraFiles: primaryUpload
+            ? liveManualForm.proof_files.slice(1)
+            : liveManualForm.proof_files,
+          attachmentKind: "manual_attendance_support",
+        });
       }
 
       const savedDate = liveManualForm.attendance_date;
@@ -1226,7 +1269,7 @@ export default function EmployeeAttendancePage() {
     const existingProofName =
       row.log?.absence_proof_name || row.log?.correction_proof_name || "";
 
-    if (!draft.absence_file && !existingProofUrl) {
+    if (draft.support_files.length === 0 && !existingProofUrl) {
       setErrorMessage(
         `${formatDisplayDate(row.date)}: upload bukti pendukung untuk absensi manual.`,
       );
@@ -1239,18 +1282,20 @@ export default function EmployeeAttendancePage() {
       let proofUrl = existingProofUrl;
       let proofName = existingProofName;
 
-      if (draft.absence_file) {
-        const upload = await uploadFile(
-          draft.absence_file,
+      let primaryUpload: { url: string; name: string; error: string } | null = null;
+
+      if (!proofUrl && draft.support_files[0]) {
+        primaryUpload = await uploadFile(
+          draft.support_files[0],
           `attendance-live-manual/${employee.id}/${row.date}`,
         );
 
-        if (upload.error) {
-          throw new Error(upload.error);
+        if (primaryUpload.error) {
+          throw new Error(primaryUpload.error);
         }
 
-        proofUrl = upload.url;
-        proofName = upload.name;
+        proofUrl = primaryUpload.url;
+        proofName = primaryUpload.name;
       }
 
       const { data: sessionData, error: sessionError } =
@@ -1290,6 +1335,33 @@ export default function EmployeeAttendancePage() {
         );
       }
 
+      let savedRecordId = String(result?.record?.id || row.log?.id || "");
+
+      if (!savedRecordId) {
+        const savedLookup = await supabase
+          .from("attendance_logs")
+          .select("id")
+          .eq("employee_id", employee.id)
+          .eq("attendance_date", row.date)
+          .is("deleted_at", null)
+          .maybeSingle();
+        savedRecordId = String(savedLookup.data?.id || "");
+      }
+
+      if (savedRecordId && draft.support_files.length > 0) {
+        await registerHarmonySubmissionAttachments({
+          entityType: "attendance_log",
+          entityId: savedRecordId,
+          legacy: primaryUpload?.url
+            ? { url: primaryUpload.url, name: primaryUpload.name }
+            : null,
+          extraFiles: primaryUpload
+            ? draft.support_files.slice(1)
+            : draft.support_files,
+          attachmentKind: "manual_attendance_support",
+        });
+      }
+
       closeEdit();
 
       setSuccessMessage(
@@ -1314,6 +1386,62 @@ export default function EmployeeAttendancePage() {
       );
     } finally {
       setSavingInlineManualDate("");
+    }
+  }
+
+  async function handleCancelSubmittedPeriod() {
+    if (!canCancelSubmittedPeriod) {
+      setErrorMessage(
+        "Submit periode sudah diproses atasan atau statusnya tidak dapat dibatalkan employee.",
+      );
+      return;
+    }
+
+    const note = window.prompt(
+      "Alasan membatalkan Submit Periode:",
+      "Perlu memperbaiki data sebelum dikirim kembali ke atasan.",
+    );
+
+    if (note === null) return;
+    if (note.trim().length < 3) {
+      setErrorMessage("Alasan pembatalan minimal 3 karakter.");
+      return;
+    }
+
+    const confirmed = window.confirm(
+      "Batalkan Submit Periode? Data fingerprint, jam manual, catatan, dan dokumen tetap tersimpan. Periode akan kembali dapat diedit lalu bisa disubmit ulang.",
+    );
+    if (!confirmed) return;
+
+    setCancellingPeriod(true);
+    setErrorMessage("");
+    setSuccessMessage("");
+
+    try {
+      const { data, error } = await supabase.rpc(
+        "harmony_employee_cancel_attendance_period_v1",
+        {
+          p_period_month: periodMonth,
+          p_note: note.trim(),
+        },
+      );
+
+      if (error) throw error;
+
+      const result = (data || {}) as { success?: boolean; message?: string };
+      if (result.success === false) {
+        throw new Error(result.message || "Submit periode belum berhasil dibatalkan.");
+      }
+
+      setSuccessMessage(
+        result.message ||
+          "Submit periode berhasil dibatalkan. Data kembali dapat diedit sebelum dikirim ulang.",
+      );
+      await fetchData(false);
+    } catch (cancelError: any) {
+      setErrorMessage(cancelError?.message || "Submit periode gagal dibatalkan.");
+    } finally {
+      setCancellingPeriod(false);
     }
   }
 
@@ -1352,7 +1480,18 @@ export default function EmployeeAttendancePage() {
       return;
     }
 
-    // Tombol centang hanya checklist review employee. Saat Submit Periode ditekan,
+    // Checklist sekarang benar-benar menjadi gate verifikasi employee.
+    // Employee harus mencentang seluruh kalender periode sebelum submit/resubmit.
+    if (!allRowsSelected) {
+      const message =
+        `Verifikasi belum lengkap. Centang semua ${selectableRows.length} hari pada periode ini terlebih dahulu sebelum ${isSupervisorRejected ? "mengirim ulang" : "submit"} ke atasan.`;
+      setErrorMessage(message);
+      setSubmittingPeriod(false);
+      window.alert(message);
+      return;
+    }
+
+    // Tombol centang adalah checklist review employee. Saat Submit Periode ditekan,
     // SELURUH tanggal relevan dalam periode dikirim ke atasan agar tidak pernah
     // terjadi kasus hanya 1 tanggal yang terkirim tetapi header periode sudah submitted.
     const rowsToSubmit = calendarRows.filter((row) => {
@@ -1371,15 +1510,27 @@ export default function EmployeeAttendancePage() {
       return;
     }
 
+    // Pada resubmit setelah reject, data periode lama yang sudah pernah dikirim
+    // tidak boleh gagal hanya karena aturan validasi baru (mis. cuti approved lama
+    // tidak memiliki employee_daily_note atau proof di attendance_logs).
+    // Kita validasi kondisi aktualnya: jam lengkap / absence existing / data baru.
     const validationErrors = rowsToSubmit
-      .map((row) => validateRowBeforeSubmit(row))
+      .map((row) =>
+        isSupervisorRejected
+          ? validateRowBeforeResubmit(row)
+          : validateRowBeforeSubmit(row),
+      )
       .filter(Boolean);
 
     if (validationErrors.length > 0) {
-      setErrorMessage(
-        `Submit seluruh periode belum dapat dilakukan. Lengkapi data berikut terlebih dahulu: ${validationErrors.join(" ")}`,
-      );
+      const message =
+        `Submit seluruh periode belum dapat dilakukan. Masih ada data yang harus dilengkapi: ${validationErrors.join(" ")}`;
+      setErrorMessage(message);
       setSubmittingPeriod(false);
+      window.alert(message);
+      if (typeof window !== "undefined") {
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      }
       return;
     }
 
@@ -1411,46 +1562,37 @@ export default function EmployeeAttendancePage() {
       const draft = getDraft(row);
       const meta = getDailyTypeMeta(draft.daily_type);
       const hasExistingLog = Boolean(row.log?.id);
-
-      let absenceProofUrl = row.log?.absence_proof_url || "";
-      let absenceProofName = row.log?.absence_proof_name || "";
-      let phlProofUrl = row.log?.phl_proof_url || "";
-      let phlProofName = row.log?.phl_proof_name || "";
-
-      if (draft.absence_file) {
-        const upload = await uploadFile(
-          draft.absence_file,
-          "attendance-absence-proofs",
-        );
-
-        if (upload.error) {
-          setErrorMessage(upload.error);
-          setSubmittingPeriod(false);
-          return;
-        }
-
-        absenceProofUrl = upload.url;
-        absenceProofName = upload.name;
-      }
-
-      if (draft.phl_file) {
-        const upload = await uploadFile(
-          draft.phl_file,
-          "attendance-phl-proofs",
-        );
-
-        if (upload.error) {
-          setErrorMessage(upload.error);
-          setSubmittingPeriod(false);
-          return;
-        }
-
-        phlProofUrl = upload.url;
-        phlProofName = upload.name;
-      }
-
       const incomplete = isIncompleteRow(row, draft);
       const phlCandidate = isPotentialPHL(row, draft);
+
+      let absenceProofUrl =
+        row.log?.absence_proof_url || row.log?.correction_proof_url || "";
+      let absenceProofName =
+        row.log?.absence_proof_name || row.log?.correction_proof_name || "";
+      let phlProofUrl = row.log?.phl_proof_url || "";
+      let phlProofName = row.log?.phl_proof_name || "";
+      let primaryAttachment: { url: string; name: string; error: string } | null = null;
+
+      if (draft.support_files[0]) {
+        primaryAttachment = await uploadFile(
+          draft.support_files[0],
+          phlCandidate ? "attendance-phl-proofs" : "attendance-absence-proofs",
+        );
+
+        if (primaryAttachment.error) {
+          setErrorMessage(primaryAttachment.error);
+          setSubmittingPeriod(false);
+          return;
+        }
+
+        if (phlCandidate) {
+          phlProofUrl = primaryAttachment.url;
+          phlProofName = primaryAttachment.name;
+        } else {
+          absenceProofUrl = primaryAttachment.url;
+          absenceProofName = primaryAttachment.name;
+        }
+      }
 
       const correctionType = phlCandidate
         ? "phl_confirmation"
@@ -1529,25 +1671,59 @@ export default function EmployeeAttendancePage() {
         updated_at: now,
       };
 
+      let savedLogId = row.log?.id || "";
+
       if (hasExistingLog) {
-        const { error } = await supabase
+        const { data: savedLog, error } = await supabase
           .from("attendance_logs")
           .update(payload)
-          .eq("id", row.log!.id);
+          .eq("id", row.log!.id)
+          .select("id")
+          .single();
 
         if (error) {
           setErrorMessage(error.message);
           setSubmittingPeriod(false);
           return;
         }
+
+        savedLogId = String(savedLog?.id || row.log!.id);
       } else {
-        const { error } = await supabase.from("attendance_logs").insert({
-          ...payload,
-          created_at: now,
-        });
+        const { data: savedLog, error } = await supabase
+          .from("attendance_logs")
+          .insert({
+            ...payload,
+            created_at: now,
+          })
+          .select("id")
+          .single();
 
         if (error) {
           setErrorMessage(error.message);
+          setSubmittingPeriod(false);
+          return;
+        }
+
+        savedLogId = String(savedLog?.id || "");
+      }
+
+      if (savedLogId && draft.support_files.length > 0) {
+        try {
+          await registerHarmonySubmissionAttachments({
+            entityType: "attendance_log",
+            entityId: savedLogId,
+            legacy: primaryAttachment?.url
+              ? { url: primaryAttachment.url, name: primaryAttachment.name }
+              : null,
+            extraFiles: draft.support_files.slice(1),
+            attachmentKind: phlCandidate
+              ? "attendance_phl_support"
+              : "attendance_support",
+          });
+        } catch (attachmentError: any) {
+          setErrorMessage(
+            `Data ${formatDisplayDate(row.date)} tersimpan, tetapi lampiran tambahan gagal: ${attachmentError?.message || "terjadi kendala"}.`,
+          );
           setSubmittingPeriod(false);
           return;
         }
@@ -1779,6 +1955,65 @@ export default function EmployeeAttendancePage() {
     return Array.from(recipients);
   }
 
+  function validateRowBeforeResubmit(row: CalendarDayRow) {
+    const draft = getDraft(row);
+    const meta = getDailyTypeMeta(draft.daily_type);
+    const label = formatDisplayDate(row.date);
+
+    // Hari libur/weekend kosong tidak perlu dibuat sebagai log attendance.
+    if (isOffDayWithoutAttendance(row, draft)) {
+      return "";
+    }
+
+    const effectiveIn = getEffectiveCheckIn(row, draft);
+    const effectiveOut = getEffectiveCheckOut(row, draft);
+    const hasExistingAbsence = Boolean(
+      row.log?.absence_request_type ||
+        row.log?.absence_request_label ||
+        row.log?.absence_request_status,
+    );
+
+    // Cuti/izin/sakit/tugas luar/PHL yang SUDAH tersimpan dari submit sebelumnya
+    // tidak diwajibkan mengulang note/proof hanya untuk resubmit periode.
+    if (meta.isAbsenceLike && hasExistingAbsence) {
+      return "";
+    }
+
+    // Kehadiran fingerprint/manual dengan pasangan jam lengkap aman untuk resubmit.
+    if (effectiveIn && effectiveOut) {
+      return "";
+    }
+
+    // Jika salah satu jam masih kosong, employee memang harus melengkapinya.
+    if (effectiveIn || effectiveOut) {
+      if (!effectiveIn) {
+        return `${label}: check in masih kosong. Klik Lengkapi lalu isi jam masuk.`;
+      }
+
+      if (!effectiveOut) {
+        return `${label}: check out masih kosong. Klik Lengkapi lalu isi jam pulang.`;
+      }
+    }
+
+    // Data absence BARU yang dibuat saat revisi tetap memakai validasi normal.
+    if (meta.isAbsenceLike) {
+      return validateRowBeforeSubmit(row);
+    }
+
+    // Weekday yang benar-benar tidak punya data tetap harus dijelaskan.
+    if (!row.log?.id && !row.is_weekend && !row.holiday_name) {
+      return `${label}: belum ada data kehadiran/keterangan. Klik Lengkapi.`;
+    }
+
+    // Log existing yang pernah disubmit tetapi tidak memiliki jam/absence dapat
+    // berasal dari data lama. Jangan diam-diam dianggap valid jika memang kosong.
+    if (row.log?.id && !effectiveIn && !effectiveOut && !hasExistingAbsence) {
+      return `${label}: data masih kosong. Klik Lengkapi sebelum kirim ulang.`;
+    }
+
+    return "";
+  }
+
   function validateRowBeforeSubmit(row: CalendarDayRow) {
     const draft = getDraft(row);
     const meta = getDailyTypeMeta(draft.daily_type);
@@ -1825,13 +2060,14 @@ export default function EmployeeAttendancePage() {
     if (
       meta.requiresProof &&
       !row.log?.absence_proof_url &&
-      !draft.absence_file
+      !row.log?.correction_proof_url &&
+      draft.support_files.length === 0
     ) {
       return `${label}: upload bukti/dokumen pendukung untuk ${meta.label}.`;
     }
 
     if (isPotentialPHL(row, draft)) {
-      if (!row.log?.phl_proof_url && !draft.phl_file) {
+      if (!row.log?.phl_proof_url && draft.support_files.length === 0) {
         return `${label}: upload bukti perintah atasan untuk potensi PHL.`;
       }
     }
@@ -2303,9 +2539,9 @@ export default function EmployeeAttendancePage() {
                   </h3>
 
                   <p className="mt-1 text-sm leading-6 text-[#6e6e73]">
-                    Centang harian hanya sebagai checklist pengecekan. Tombol
-                    Submit Periode selalu mengirim seluruh data relevan dari
-                    tanggal 11 sampai 10, bukan hanya tanggal yang dicentang.
+                    Centang seluruh hari sebagai tanda verifikasi employee. Setelah
+                    checklist 100%, tombol Submit/Kirim Ulang akan mengirim seluruh
+                    data relevan periode tanggal 11 sampai 10 ke atasan.
                   </p>
 
                   <p className="mt-1 text-xs font-semibold text-[#007aff]">
@@ -2348,11 +2584,28 @@ export default function EmployeeAttendancePage() {
                     {allRowsSelected ? "Batal Centang Semua" : "Centang Semua"}
                   </button>
 
+                  {canCancelSubmittedPeriod && (
+                    <button
+                      type="button"
+                      onClick={handleCancelSubmittedPeriod}
+                      disabled={cancellingPeriod || submittingPeriod}
+                      className="inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl border border-red-200 bg-red-50 px-4 text-sm font-bold text-red-700 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {cancellingPeriod ? (
+                        <RefreshCcw size={18} className="animate-spin" />
+                      ) : (
+                        <X size={18} />
+                      )}
+                      {cancellingPeriod ? "Membatalkan..." : "Batalkan Submit Periode"}
+                    </button>
+                  )}
+
                   <button
                     type="button"
                     onClick={handleSubmitPeriod}
                     disabled={
                       !isPeriodComplete ||
+                      !allRowsSelected ||
                       isReadOnlyPeriod ||
                       submittingPeriod
                     }
@@ -2864,7 +3117,7 @@ function LiveManualAttendanceModal({
               <LiveManualStatusBox
                 label="Bukti"
                 value={
-                  form.existing_proof_url || form.proof_file
+                  form.existing_proof_url || form.proof_files.length > 0
                     ? "Tersedia"
                     : "Wajib upload"
                 }
@@ -2930,48 +3183,30 @@ function LiveManualAttendanceModal({
             />
           </label>
 
-          <div className="rounded-[26px] border border-dashed border-black/10 bg-[#f5f5f7]/70 p-5">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <h3 className="font-semibold text-[#1d1d1f]">
-                  Bukti Pendukung
-                </h3>
-                <p className="mt-1 text-sm leading-6 text-[#6e6e73]">
-                  Wajib. Bisa berupa surat tugas, instruksi atasan, foto
-                  kegiatan, atau dokumen relevan lainnya.
-                </p>
-                <p className="mt-1 text-xs font-bold text-[#007aff]">
-                  {form.proof_file?.name ||
-                    form.existing_proof_name ||
-                    "Belum ada file"}
-                </p>
-              </div>
+          <div className="space-y-3">
+            <HarmonyPendingAttachmentPicker
+              files={form.proof_files}
+              onChange={(files) => onChange("proof_files", files)}
+              required={!form.existing_proof_url}
+              label="Bukti / Dokumen Pendukung"
+              description="Wajib untuk absensi manual. Maksimal 3 dokumen; file baru dapat dihapus sebelum Submit Periode ke atasan."
+              disabled={loading || saving}
+              maxFiles={form.existing_proof_url ? 2 : 3}
+            />
 
-              <label className="inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-2xl bg-white px-5 text-sm font-bold text-[#007aff] shadow-sm transition hover:bg-[#e8f2ff]">
-                <Upload size={17} />
-                Pilih Bukti
-                <input
-                  type="file"
-                  accept=".pdf,.jpg,.jpeg,.png,.webp"
-                  className="hidden"
-                  disabled={loading || saving}
-                  onChange={(event) =>
-                    onChange("proof_file", event.target.files?.[0] || null)
-                  }
-                />
-              </label>
-            </div>
-
-            {form.existing_proof_url && (
-              <a
-                href={form.existing_proof_url}
-                target="_blank"
-                rel="noreferrer"
-                className="mt-4 inline-flex items-center gap-2 rounded-2xl bg-white px-4 py-3 text-sm font-semibold text-[#007aff]"
-              >
-                <FileText size={16} />
-                Lihat bukti yang sudah tersimpan
-              </a>
+            {record?.id && (
+              <HarmonyAttachmentViewer
+                entityType="attendance_log"
+                entityId={record.id}
+                legacyLinks={[
+                  { url: record.absence_proof_url, name: record.absence_proof_name },
+                  { url: record.correction_proof_url, name: record.correction_proof_name },
+                  { url: record.phl_proof_url, name: record.phl_proof_name },
+                ]}
+                editable
+                emptyText="Belum ada dokumen tersimpan"
+                onDeleted={() => onDateChange(form.attendance_date)}
+              />
             )}
           </div>
 
@@ -3044,7 +3279,7 @@ function EditAttendanceModal({
   requestTypes: HarmonyRequestTypeDefinition[];
   locked: boolean;
   saving: boolean;
-  onChange: (field: keyof RowDraft, value: string | File | null) => void;
+  onChange: (field: keyof RowDraft, value: string | File[]) => void;
   onSave: () => void;
   onClose: () => void;
 }) {
@@ -3180,32 +3415,43 @@ function EditAttendanceModal({
           {(incomplete ||
             noMachineData ||
             meta.isAbsenceLike ||
-            meta.requiresProof) && (
-            <FilePickerBox
-              title="Upload Bukti / Dokumen Pendukung"
-              description={
-                meta.requiresProof
-                  ? `Wajib untuk ${meta.label}.`
-                  : "Upload dokumen jika diperlukan untuk validasi atasan/HR."
-              }
-              file={draft.absence_file}
-              existingUrl={row.log?.absence_proof_url || ""}
-              existingName={row.log?.absence_proof_name || ""}
-              disabled={locked}
-              onChange={(file) => onChange("absence_file", file)}
-            />
-          )}
+            meta.requiresProof ||
+            phl) && (
+            <div className="space-y-3">
+              <HarmonyPendingAttachmentPicker
+                files={draft.support_files}
+                onChange={(files) => onChange("support_files", files)}
+                required={meta.requiresProof || phl || draft.daily_type === "manual_attendance"}
+                label={phl ? "Dokumen Pendukung PHL" : "Dokumen Pendukung"}
+                description={
+                  phl
+                    ? "Maksimal 3 file. Lampirkan perintah atasan/dokumen kerja hari libur. File baru dapat dihapus sebelum Submit Periode."
+                    : "Maksimal 3 file. Lampiran baru dapat dihapus sebelum Submit Periode."
+                }
+                disabled={locked}
+                maxFiles={
+                  row.log?.absence_proof_url ||
+                  row.log?.correction_proof_url ||
+                  row.log?.phl_proof_url
+                    ? 2
+                    : 3
+                }
+              />
 
-          {phl && (
-            <FilePickerBox
-              title="Upload Bukti Perintah Atasan / PHL"
-              description="Wajib untuk kerja pada Sabtu/Minggu atau libur aktif."
-              file={draft.phl_file}
-              existingUrl={row.log?.phl_proof_url || ""}
-              existingName={row.log?.phl_proof_name || ""}
-              disabled={locked}
-              onChange={(file) => onChange("phl_file", file)}
-            />
+              {row.log?.id && (
+                <HarmonyAttachmentViewer
+                  entityType="attendance_log"
+                  entityId={row.log.id}
+                  legacyLinks={[
+                    { url: row.log.absence_proof_url, name: row.log.absence_proof_name },
+                    { url: row.log.phl_proof_url, name: row.log.phl_proof_name },
+                    { url: row.log.correction_proof_url, name: row.log.correction_proof_name },
+                  ]}
+                  editable={!locked}
+                  emptyText="Belum ada dokumen tersimpan"
+                />
+              )}
+            </div>
           )}
         </div>
 
@@ -3233,71 +3479,6 @@ function EditAttendanceModal({
           </button>
         </div>
       </div>
-    </div>
-  );
-}
-
-function FilePickerBox({
-  title,
-  description,
-  file,
-  existingUrl,
-  existingName,
-  disabled,
-  onChange,
-}: {
-  title: string;
-  description: string;
-  file: File | null;
-  existingUrl: string;
-  existingName: string;
-  disabled: boolean;
-  onChange: (file: File | null) => void;
-}) {
-  return (
-    <div className="rounded-[28px] border border-dashed border-black/10 bg-[#f5f5f7]/70 p-5">
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div>
-          <h3 className="font-semibold text-[#1d1d1f]">{title}</h3>
-
-          <p className="mt-1 text-sm leading-6 text-[#6e6e73]">{description}</p>
-
-          <p className="mt-1 text-xs font-bold text-[#007aff]">
-            {file?.name || existingName || "Belum ada file dipilih"}
-          </p>
-        </div>
-
-        <label
-          className={[
-            "inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl bg-white px-5 text-sm font-bold text-[#007aff] shadow-sm transition",
-            disabled
-              ? "cursor-not-allowed opacity-50"
-              : "cursor-pointer hover:bg-[#e8f2ff]",
-          ].join(" ")}
-        >
-          <Upload size={17} />
-          Pilih File
-          <input
-            type="file"
-            accept=".pdf,.jpg,.jpeg,.png,.webp"
-            className="hidden"
-            disabled={disabled}
-            onChange={(event) => onChange(event.target.files?.[0] || null)}
-          />
-        </label>
-      </div>
-
-      {existingUrl && (
-        <a
-          href={existingUrl}
-          target="_blank"
-          rel="noreferrer"
-          className="mt-4 inline-flex items-center gap-2 rounded-2xl bg-white px-4 py-3 text-sm font-semibold text-[#007aff]"
-        >
-          <FileText size={16} />
-          Lihat bukti yang sudah tersedia
-        </a>
-      )}
     </div>
   );
 }
@@ -3888,8 +4069,7 @@ function calculatePeriodTotals(
         row.log?.manual_check_out || row.log?.requested_check_out || "",
       employee_daily_note:
         row.log?.employee_daily_note || row.log?.correction_reason || "",
-      absence_file: null,
-      phl_file: null,
+      support_files: [],
     };
 
     const isHoliday = holidays.some(

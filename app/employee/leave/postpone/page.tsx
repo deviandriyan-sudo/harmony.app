@@ -382,6 +382,7 @@ async function notifyPostponeRequestSubmitted({
 export default function EmployeeLeavePostponePage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [cancellingId, setCancellingId] = useState('')
 
   const [appUser, setAppUser] = useState<AppUser | null>(null)
   const [employee, setEmployee] = useState<Employee | null>(null)
@@ -637,6 +638,66 @@ export default function EmployeeLeavePostponePage() {
     }
   }
 
+  async function handleCancelPostpone(item: LeavePostponeRequest) {
+    const s1 = normalize(item.supervisor_1_status)
+    const s2 = normalize(item.supervisor_2_status)
+    const overall = normalize(item.approval_status)
+
+    if (s1 === 'approved' || s2 === 'approved' || ['approved', 'rejected', 'cancelled'].includes(overall)) {
+      setMessage({
+        type: 'error',
+        text: 'Postpone sudah diproses atasan dan tidak dapat dibatalkan employee.',
+      })
+      return
+    }
+
+    const note = window.prompt(
+      'Alasan pembatalan postpone:',
+      'Dibatalkan oleh employee sebelum approval atasan.',
+    )
+
+    if (note === null) return
+    if (note.trim().length < 3) {
+      setMessage({ type: 'error', text: 'Alasan pembatalan minimal 3 karakter.' })
+      return
+    }
+
+    if (!window.confirm('Batalkan pengajuan postpone ini? Histori tetap tersimpan.')) return
+
+    setCancellingId(item.id)
+    setMessage(null)
+
+    try {
+      const { data, error } = await supabase.rpc(
+        'harmony_employee_cancel_leave_postpone_v1',
+        {
+          p_request_id: item.id,
+          p_note: note.trim(),
+        },
+      )
+
+      if (error) throw error
+
+      const result = (data || {}) as { success?: boolean; message?: string }
+      if (result.success === false) {
+        throw new Error(result.message || 'Postpone belum berhasil dibatalkan.')
+      }
+
+      setMessage({
+        type: 'success',
+        text: result.message || 'Pengajuan postpone berhasil dibatalkan sebelum approval atasan.',
+      })
+      await fetchData()
+    } catch (error: any) {
+      setMessage({
+        type: 'error',
+        text: error?.message || 'Pengajuan postpone gagal dibatalkan.',
+      })
+    } finally {
+      setCancellingId('')
+    }
+  }
+
   return (
     <>
       <Topbar
@@ -852,6 +913,26 @@ export default function EmployeeLeavePostponePage() {
                         {item.reason}
                       </p>
                     )}
+
+                    {normalize(item.approval_status) !== 'cancelled' &&
+                      normalize(item.approval_status) !== 'approved' &&
+                      normalize(item.approval_status) !== 'rejected' &&
+                      normalize(item.supervisor_1_status) !== 'approved' &&
+                      normalize(item.supervisor_2_status) !== 'approved' && (
+                        <button
+                          type="button"
+                          onClick={() => handleCancelPostpone(item)}
+                          disabled={cancellingId === item.id}
+                          className="mt-4 inline-flex min-h-10 items-center justify-center gap-2 rounded-2xl border border-red-200 bg-red-50 px-4 text-xs font-bold text-red-700 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          {cancellingId === item.id ? (
+                            <Loader2 size={14} className="animate-spin" />
+                          ) : (
+                            <XCircle size={14} />
+                          )}
+                          {cancellingId === item.id ? 'Membatalkan...' : 'Batalkan Pengajuan'}
+                        </button>
+                      )}
                   </div>
                 ))
               )}

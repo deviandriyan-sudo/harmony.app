@@ -24,7 +24,12 @@ import {
 } from 'lucide-react'
 
 import { Topbar } from '@/components/layout/Topbar'
+import {
+  HarmonyAttachmentViewer,
+  HarmonyPendingAttachmentPicker,
+} from '@/components/attachments/HarmonyAttachments'
 import { supabase } from '@/lib/supabase'
+import { registerHarmonySubmissionAttachments } from '@/lib/harmony-attachments'
 import {
   getApprovalStageLabel,
   getApprovalStageTone,
@@ -176,7 +181,7 @@ type FormState = {
   job_pending: string
   handover_to: string
   handover_note: string
-  proof_file: File | null
+  proof_files: File[]
 }
 
 const initialForm: FormState = {
@@ -187,7 +192,7 @@ const initialForm: FormState = {
   job_pending: '',
   handover_to: '',
   handover_note: '',
-  proof_file: null,
+  proof_files: [],
 }
 
 
@@ -339,6 +344,7 @@ export default function EmployeeLeavePage() {
 
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
+  const [cancellingId, setCancellingId] = useState('')
 
   const [successMessage, setSuccessMessage] = useState('')
   const [errorMessage, setErrorMessage] = useState('')
@@ -779,7 +785,7 @@ export default function EmployeeLeavePage() {
       return
     }
 
-    if (requiresProof && !form.proof_file) {
+    if (requiresProof && form.proof_files.length === 0) {
       setErrorMessage(`${selectedRequestMeta.label} wajib melampirkan bukti/dokumen pendukung.`)
       setSubmitting(false)
       return
@@ -811,7 +817,7 @@ export default function EmployeeLeavePage() {
       return
     }
 
-    const uploaded = await uploadProofFile(form.proof_file)
+    const uploaded = await uploadProofFile(form.proof_files[0] || null)
 
     if (uploaded.error) {
       setErrorMessage(uploaded.error)
@@ -932,6 +938,33 @@ export default function EmployeeLeavePage() {
       insertedRequestId = insertedRequest?.id || ''
     }
 
+    let attachmentWarning = ''
+
+    if (insertedRequestId && form.proof_files.length > 0) {
+      try {
+        await registerHarmonySubmissionAttachments({
+          entityType:
+            form.request_type === 'phl_claim' ? 'phl_record' : 'leave_request',
+          entityId: insertedRequestId,
+          legacy: uploaded.url
+            ? {
+                url: uploaded.url,
+                name: uploaded.name,
+                size: uploaded.size,
+                type: uploaded.type,
+              }
+            : null,
+          extraFiles: form.proof_files.slice(1),
+          attachmentKind:
+            form.request_type === 'phl_claim'
+              ? 'phl_claim_support'
+              : `${form.request_type}_support`,
+        })
+      } catch (attachmentError: any) {
+        attachmentWarning = ` Lampiran tambahan belum seluruhnya terdaftar: ${attachmentError?.message || 'terjadi kendala saat menyimpan lampiran'}.`
+      }
+    }
+
     const notificationResult = await notifyLeaveRequestSubmitted({
       requester: employee,
       supervisorOne,
@@ -951,8 +984,8 @@ export default function EmployeeLeavePage() {
 
     setSuccessMessage(
       notificationResult.success
-        ? `${selectedRequestMeta.label} berhasil diajukan dan email notifikasi terkirim ke ${notificationResult.count} penerima.`
-        : `${selectedRequestMeta.label} berhasil diajukan, tetapi email notifikasi belum terkirim: ${notificationResult.message}`
+        ? `${selectedRequestMeta.label} berhasil diajukan dan email notifikasi terkirim ke ${notificationResult.count} penerima.${attachmentWarning}`
+        : `${selectedRequestMeta.label} berhasil diajukan, tetapi email notifikasi belum terkirim: ${notificationResult.message}.${attachmentWarning}`
     )
 
     resetForm()
@@ -965,6 +998,68 @@ export default function EmployeeLeavePage() {
       fetchLeaveRequests(employee.id),
       fetchHolidays(),
     ])
+  }
+
+  async function handleCancelRequest(request: LeaveRequest) {
+    if (!employee) return
+
+    const supervisorStatus = normalizeText(request.supervisor_status)
+    if (!['', 'pending', 'submitted', 'waiting_supervisor', 'pending_supervisor'].includes(supervisorStatus)) {
+      setErrorMessage('Pengajuan sudah diproses atasan dan tidak dapat dibatalkan employee.')
+      return
+    }
+
+    const note = window.prompt(
+      'Alasan pembatalan pengajuan:',
+      'Dibatalkan oleh employee sebelum approval atasan.',
+    )
+
+    if (note === null) return
+    if (note.trim().length < 3) {
+      setErrorMessage('Alasan pembatalan minimal 3 karakter.')
+      return
+    }
+
+    const confirmed = window.confirm(
+      'Batalkan pengajuan ini? Pengajuan tetap tersimpan sebagai histori dan tidak dapat diproses atasan setelah dibatalkan.',
+    )
+    if (!confirmed) return
+
+    setCancellingId(request.id)
+    setErrorMessage('')
+    setSuccessMessage('')
+
+    try {
+      const isPHL = request.source_table === 'phl_records' || normalizeText(request.request_type) === 'phl_claim'
+      const { data, error } = isPHL
+        ? await supabase.rpc('harmony_employee_cancel_phl_claim_v1', {
+            p_claim_record_id: request.id,
+            p_note: note.trim(),
+          })
+        : await supabase.rpc('harmony_employee_cancel_leave_request_v1', {
+            p_request_id: request.id,
+            p_note: note.trim(),
+          })
+
+      if (error) throw error
+
+      const result = (data || {}) as { success?: boolean; message?: string }
+      if (result.success === false) {
+        throw new Error(result.message || 'Pengajuan belum berhasil dibatalkan.')
+      }
+
+      setSuccessMessage(result.message || 'Pengajuan berhasil dibatalkan sebelum approval atasan.')
+
+      await Promise.all([
+        fetchAnnualLeaveSummary(employee.id),
+        fetchPHLBalance(employee.id),
+        fetchLeaveRequests(employee.id),
+      ])
+    } catch (cancelError: any) {
+      setErrorMessage(cancelError?.message || 'Pengajuan gagal dibatalkan.')
+    } finally {
+      setCancellingId('')
+    }
   }
 
   return (
@@ -1152,6 +1247,8 @@ export default function EmployeeLeavePage() {
           leaveRequests={leaveRequests}
           phlRecords={phlRecords}
           employeeDirectory={employeeDirectory}
+          cancellingId={cancellingId}
+          onCancel={handleCancelRequest}
         />
 
         {formOpen && (
@@ -1403,37 +1500,18 @@ function LeaveRequestModal({
               </div>
             </div>
 
-            <div className="rounded-[28px] border border-dashed border-black/10 bg-[#f5f5f7]/70 p-5">
-              <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                <div>
-                  <h3 className="font-semibold text-[#1d1d1f]">
-                    Lampiran Bukti
-                  </h3>
-
-                  <p className="mt-1 text-sm leading-6 text-[#6e6e73]">
-                    {requiresProof
-                      ? `${selectedRequestMeta.label} wajib melampirkan bukti/dokumen pendukung.`
-                      : 'Opsional untuk jenis pengajuan ini.'}
-                  </p>
-
-                  <p className="mt-1 text-xs font-bold text-[#007aff]">
-                    {form.proof_file?.name || 'Belum ada file dipilih'}
-                  </p>
-                </div>
-
-                <label className="inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-2xl bg-white px-5 text-sm font-bold text-[#007aff] shadow-sm transition hover:bg-[#e8f2ff]">
-                  <Upload size={17} />
-                  Pilih File
-
-                  <input
-                    type="file"
-                    accept=".pdf,.jpg,.jpeg,.png,.webp"
-                    className="hidden"
-                    onChange={(event) => onUpdate('proof_file', event.target.files?.[0] || null)}
-                  />
-                </label>
-              </div>
-            </div>
+            <HarmonyPendingAttachmentPicker
+              files={form.proof_files}
+              onChange={(files) => onUpdate('proof_files', files)}
+              required={requiresProof}
+              label="Lampiran Bukti / Dokumen Pendukung"
+              description={
+                requiresProof
+                  ? `${selectedRequestMeta.label} wajib memiliki minimal 1 dokumen. Maksimal 3 dokumen dan semuanya dapat dihapus sebelum submit.`
+                  : 'Opsional. Maksimal 3 dokumen dan semuanya dapat dihapus sebelum submit.'
+              }
+              disabled={submitting}
+            />
           </div>
 
           <div className="flex flex-col gap-3 border-t border-black/5 bg-white p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
@@ -1461,11 +1539,15 @@ function HistorySection({
   leaveRequests,
   phlRecords,
   employeeDirectory,
+  cancellingId,
+  onCancel,
 }: {
   loading: boolean
   leaveRequests: LeaveRequest[]
   phlRecords: PHLRecord[]
   employeeDirectory: Employee[]
+  cancellingId: string
+  onCancel: (request: LeaveRequest) => void
 }) {
   return (
     <div className="grid gap-6 xl:grid-cols-[1fr_0.38fr]">
@@ -1496,6 +1578,8 @@ function HistorySection({
                   key={request.id}
                   request={request}
                   employeeDirectory={employeeDirectory}
+                  cancelling={cancellingId === request.id}
+                  onCancel={onCancel}
                 />
               ))}
             </div>
@@ -1543,9 +1627,13 @@ function HistorySection({
 function HistoryCard({
   request,
   employeeDirectory,
+  cancelling,
+  onCancel,
 }: {
   request: LeaveRequest
   employeeDirectory: Employee[]
+  cancelling: boolean
+  onCancel: (request: LeaveRequest) => void
 }) {
   const label =
     request.leave_type ||
@@ -1553,6 +1641,10 @@ function HistoryCard({
   const workflowLabel = getApprovalStageLabel(request)
   const tone = getApprovalStageTone(request)
   const handoverDisplay = resolveHandoverDisplay(request, employeeDirectory)
+  const supervisorStatus = normalizeText(request.supervisor_status)
+  const canEmployeeCancel =
+    ['','pending','submitted','waiting_supervisor','pending_supervisor'].includes(supervisorStatus) &&
+    !['cancelled','canceled','approved','rejected'].includes(normalizeText(request.status))
 
   return (
     <article className="rounded-[26px] border border-black/5 bg-white p-4 shadow-sm transition hover:bg-[#fbfbfd] sm:p-5">
@@ -1602,22 +1694,34 @@ function HistoryCard({
           )}
         </div>
 
-        <div className="flex flex-col gap-2 xl:min-w-[170px]">
-          {request.proof_file_url ? (
-            <a
-              href={request.proof_file_url}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex min-h-10 items-center justify-center gap-2 rounded-2xl bg-[#e8f2ff] px-4 text-xs font-bold text-[#0059b8] transition hover:bg-blue-100"
+        <div className="flex flex-col gap-2 xl:min-w-[190px]">
+          <HarmonyAttachmentViewer
+            entityType={
+              request.source_table === 'phl_records' || normalizeText(request.request_type) === 'phl_claim'
+                ? 'phl_record'
+                : 'leave_request'
+            }
+            entityId={request.id}
+            legacyLinks={[
+              {
+                url: request.proof_file_url,
+                name: request.proof_file_name || 'Dokumen Pendukung',
+              },
+            ]}
+            compact
+          />
+
+          {canEmployeeCancel ? (
+            <button
+              type="button"
+              onClick={() => onCancel(request)}
+              disabled={cancelling}
+              className="inline-flex min-h-10 items-center justify-center gap-2 rounded-2xl border border-red-200 bg-red-50 px-4 text-xs font-bold text-red-700 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              <FileText size={15} />
-              Lihat Bukti
-            </a>
-          ) : (
-            <span className="inline-flex min-h-10 items-center justify-center rounded-2xl bg-[#f5f5f7] px-4 text-xs font-bold text-[#86868b]">
-              Tidak ada bukti
-            </span>
-          )}
+              {cancelling ? <Loader2 size={14} className="animate-spin" /> : <X size={14} />}
+              {cancelling ? 'Membatalkan...' : 'Batalkan Pengajuan'}
+            </button>
+          ) : null}
         </div>
       </div>
     </article>
