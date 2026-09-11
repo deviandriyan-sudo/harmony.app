@@ -44,6 +44,31 @@ type Employee = {
   is_active: boolean | null
 }
 
+type EmployeeAssignment = {
+  id: string
+  employee_id: string
+  employee_number: string | null
+  full_name: string | null
+  assignment_department: string | null
+  assignment_position: string | null
+  assignment_type: string | null
+  supervisor_1: string | null
+  supervisor_2: string | null
+  start_date: string | null
+  end_date: string | null
+  is_primary: boolean | null
+  is_active: boolean | null
+}
+
+type SupervisorRelation = {
+  source: 'homebase' | 'assignment'
+  level: 'Atasan 1' | 'Atasan 2'
+  assignment_id: string | null
+  department: string | null
+  position: string | null
+  assignment_type: string | null
+}
+
 type AttendancePeriodConfirmation = {
   id: string
   employee_id: string
@@ -118,6 +143,9 @@ export default function EmployeeApprovalsPage() {
   const [appUser, setAppUser] = useState<AppUser | null>(null)
   const [supervisor, setSupervisor] = useState<Employee | null>(null)
   const [subordinates, setSubordinates] = useState<Employee[]>([])
+  const [subordinateRelations, setSubordinateRelations] = useState<
+    Map<string, SupervisorRelation[]>
+  >(new Map())
   const [attendanceConfirmations, setAttendanceConfirmations] = useState<AttendancePeriodConfirmation[]>([])
   const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>([])
 
@@ -229,41 +257,48 @@ export default function EmployeeApprovalsPage() {
 
     setSupervisor(supervisorData)
 
-    const { data: employeeData, error: employeeError } = await supabase
-      .from('employees')
-      .select('*')
-      .eq('is_active', true)
+    const [employeeResult, assignmentResult] = await Promise.all([
+      supabase
+        .from('employees')
+        .select('*')
+        .eq('is_active', true),
+      supabase
+        .from('employee_assignments')
+        .select(
+          'id,employee_id,employee_number,full_name,assignment_department,assignment_position,assignment_type,supervisor_1,supervisor_2,start_date,end_date,is_primary,is_active'
+        )
+        .eq('is_active', true),
+    ])
 
-    if (employeeError) {
-      setErrorMessage(employeeError.message)
+    if (employeeResult.error) {
+      setErrorMessage(employeeResult.error.message)
       setLoading(false)
       return
     }
 
-    const subordinateList = (employeeData || []).filter((employee) => {
-      const supervisorName = normalizeText(supervisorData.full_name)
-      const supervisorId = normalizeText(supervisorData.id)
-      const supervisorEmployeeNumber = normalizeText(supervisorData.employee_number)
-      const supervisorEmail = normalizeText(supervisorData.email)
+    if (assignmentResult.error) {
+      setErrorMessage(assignmentResult.error.message)
+      setLoading(false)
+      return
+    }
 
-      const employeeSupervisorOne = normalizeText(employee.supervisor_1)
-      const employeeSupervisorTwo = normalizeText(employee.supervisor_2)
+    const employeeList = (employeeResult.data || []) as Employee[]
+    const assignmentList = (assignmentResult.data || []) as EmployeeAssignment[]
+    const relationMap = buildSubordinateRelationMap(
+      supervisorData,
+      employeeList,
+      assignmentList
+    )
 
-      return (
-        employeeSupervisorOne === supervisorName ||
-        employeeSupervisorOne === supervisorId ||
-        employeeSupervisorOne === supervisorEmployeeNumber ||
-        employeeSupervisorOne === supervisorEmail ||
-        employeeSupervisorTwo === supervisorName ||
-        employeeSupervisorTwo === supervisorId ||
-        employeeSupervisorTwo === supervisorEmployeeNumber ||
-        employeeSupervisorTwo === supervisorEmail
-      )
-    })
+    const subordinateList = employeeList.filter((employee) =>
+      relationMap.has(employee.id)
+    )
 
     setSubordinates(subordinateList)
+    setSubordinateRelations(relationMap)
 
     if (subordinateList.length === 0) {
+      setSubordinateRelations(new Map())
       setAttendanceConfirmations([])
       setLeaveRequests([])
       setLoading(false)
@@ -409,6 +444,7 @@ export default function EmployeeApprovalsPage() {
         <SubordinateOrgChart
           supervisor={supervisor}
           employees={subordinates}
+          relations={subordinateRelations}
           loading={loading}
         />
 
@@ -576,10 +612,12 @@ function PeriodFilterBar({
 function SubordinateOrgChart({
   supervisor,
   employees,
+  relations,
   loading,
 }: {
   supervisor: Employee | null
   employees: Employee[]
+  relations: Map<string, SupervisorRelation[]>
   loading: boolean
 }) {
   return (
@@ -592,7 +630,9 @@ function SubordinateOrgChart({
             </h2>
 
             <p className="mt-1 text-sm leading-6 text-[#6e6e73]">
-              Struktur ini membaca relasi dari field supervisor_1 dan supervisor_2 pada data karyawan.
+              Relasi approval membaca homebase dan jabatan tambahan aktif. Satu
+              approval dari salah satu atasan yang sah menyelesaikan tahap
+              supervisor.
             </p>
           </div>
 
@@ -620,8 +660,8 @@ function SubordinateOrgChart({
             </h3>
 
             <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-[#6e6e73]">
-              Pastikan field supervisor_1 atau supervisor_2 pada data karyawan bawahan
-              berisi nama, ID, NIP, atau email atasan yang sesuai.
+              Pastikan supervisor homebase atau supervisor pada jabatan tambahan
+              aktif menunjuk ke atasan yang sesuai.
             </p>
           </div>
         </div>
@@ -642,7 +682,7 @@ function SubordinateOrgChart({
                   <div className="absolute left-1/2 top-[-24px] hidden h-6 w-px bg-black/10 sm:block" />
                   <OrgEmployeeNode
                     employee={employee}
-                    supervisor={supervisor}
+                    relations={relations.get(employee.id) || []}
                   />
                 </div>
               ))}
@@ -687,12 +727,15 @@ function OrgSupervisorNode({
 
 function OrgEmployeeNode({
   employee,
-  supervisor,
+  relations,
 }: {
   employee: Employee
-  supervisor: Employee | null
+  relations: SupervisorRelation[]
 }) {
-  const level = getSupervisorLevel(employee, supervisor)
+  const assignmentRelations = relations.filter(
+    (relation) => relation.source === 'assignment'
+  )
+  const relationLabel = getSupervisorRelationLabel(relations)
 
   return (
     <div className="h-full rounded-[28px] border border-black/5 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
@@ -704,8 +747,14 @@ function OrgEmployeeNode({
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <span className="inline-flex rounded-full bg-[#f5f5f7] px-2.5 py-1 text-[11px] font-bold text-[#6e6e73]">
-              {level}
+              {relationLabel}
             </span>
+
+            {assignmentRelations.length > 0 && (
+              <span className="inline-flex rounded-full bg-[#f7edfc] px-2.5 py-1 text-[11px] font-bold text-[#7b2cbf]">
+                Jabatan Tambahan
+              </span>
+            )}
 
             {employee.is_active && (
               <span className="inline-flex rounded-full bg-green-50 px-2.5 py-1 text-[11px] font-bold text-green-700">
@@ -725,6 +774,32 @@ function OrgEmployeeNode({
           <p className="mt-1 break-words text-xs leading-5 text-[#86868b]">
             {employee.position || '-'}
           </p>
+
+          {assignmentRelations.length > 0 && (
+            <div className="mt-3 space-y-2 border-t border-black/5 pt-3">
+              {assignmentRelations.map((relation) => (
+                <div
+                  key={`${relation.assignment_id || 'assignment'}-${relation.level}`}
+                  className="rounded-2xl bg-[#f7f3fb] px-3 py-2.5"
+                >
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-[10px] font-bold uppercase tracking-wide text-[#7b2cbf]">
+                      Jabatan Tambahan
+                    </span>
+                    <span className="text-[10px] font-semibold text-[#86868b]">
+                      {relation.level}
+                    </span>
+                  </div>
+                  <p className="mt-1 break-words text-xs font-semibold leading-5 text-[#1d1d1f]">
+                    {relation.position || '-'}
+                  </p>
+                  <p className="mt-0.5 break-words text-[11px] leading-4 text-[#6e6e73]">
+                    {relation.department || '-'}
+                  </p>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -884,36 +959,130 @@ function HeroMetric({
   )
 }
 
-function getSupervisorLevel(employee: Employee, supervisor: Employee | null) {
-  if (!supervisor) return 'Bawahan'
+function supervisorIdentitySet(supervisor: Employee | null) {
+  if (!supervisor) return new Set<string>()
 
-  const supervisorName = normalizeText(supervisor.full_name)
-  const supervisorId = normalizeText(supervisor.id)
-  const supervisorEmployeeNumber = normalizeText(supervisor.employee_number)
-  const supervisorEmail = normalizeText(supervisor.email)
+  return new Set(
+    [
+      supervisor.id,
+      supervisor.full_name,
+      supervisor.employee_number,
+      supervisor.machine_pin,
+      supervisor.email,
+    ]
+      .map(normalizeText)
+      .filter(Boolean)
+  )
+}
 
-  const supervisorOne = normalizeText(employee.supervisor_1)
-  const supervisorTwo = normalizeText(employee.supervisor_2)
+function matchesSupervisor(
+  value: string | null | undefined,
+  supervisor: Employee | null
+) {
+  const target = normalizeText(value)
+  return Boolean(target && supervisorIdentitySet(supervisor).has(target))
+}
 
-  const matchesOne = [
-    supervisorName,
-    supervisorId,
-    supervisorEmployeeNumber,
-    supervisorEmail,
-  ].includes(supervisorOne)
+function isAssignmentEffective(assignment: EmployeeAssignment, today: string) {
+  if (assignment.is_active === false || assignment.is_primary === true) {
+    return false
+  }
 
-  const matchesTwo = [
-    supervisorName,
-    supervisorId,
-    supervisorEmployeeNumber,
-    supervisorEmail,
-  ].includes(supervisorTwo)
+  const startDate = String(assignment.start_date || '').slice(0, 10)
+  const endDate = String(assignment.end_date || '').slice(0, 10)
 
-  if (matchesOne && matchesTwo) return 'Atasan 1 & 2'
-  if (matchesOne) return 'Atasan 1'
-  if (matchesTwo) return 'Atasan 2'
+  if (startDate && startDate > today) return false
+  if (endDate && endDate < today) return false
 
-  return 'Bawahan'
+  return true
+}
+
+function buildSubordinateRelationMap(
+  supervisor: Employee,
+  employees: Employee[],
+  assignments: EmployeeAssignment[]
+) {
+  const today = formatDateToISO(new Date())
+  const result = new Map<string, SupervisorRelation[]>()
+  const employeeIds = new Set(employees.map((employee) => employee.id))
+
+  const append = (employeeId: string, relation: SupervisorRelation) => {
+    const existing = result.get(employeeId) || []
+
+    const duplicate = existing.some(
+      (item) =>
+        item.source === relation.source &&
+        item.level === relation.level &&
+        item.assignment_id === relation.assignment_id
+    )
+
+    if (!duplicate) {
+      result.set(employeeId, [...existing, relation])
+    }
+  }
+
+  employees.forEach((employee) => {
+    if (employee.id === supervisor.id) return
+
+    if (matchesSupervisor(employee.supervisor_1, supervisor)) {
+      append(employee.id, {
+        source: 'homebase',
+        level: 'Atasan 1',
+        assignment_id: null,
+        department: employee.department,
+        position: employee.position,
+        assignment_type: null,
+      })
+    }
+
+    if (matchesSupervisor(employee.supervisor_2, supervisor)) {
+      append(employee.id, {
+        source: 'homebase',
+        level: 'Atasan 2',
+        assignment_id: null,
+        department: employee.department,
+        position: employee.position,
+        assignment_type: null,
+      })
+    }
+  })
+
+  assignments.forEach((assignment) => {
+    if (!isAssignmentEffective(assignment, today)) return
+    if (!employeeIds.has(assignment.employee_id)) return
+    if (assignment.employee_id === supervisor.id) return
+
+    if (matchesSupervisor(assignment.supervisor_1, supervisor)) {
+      append(assignment.employee_id, {
+        source: 'assignment',
+        level: 'Atasan 1',
+        assignment_id: assignment.id,
+        department: assignment.assignment_department,
+        position: assignment.assignment_position,
+        assignment_type: assignment.assignment_type,
+      })
+    }
+
+    if (matchesSupervisor(assignment.supervisor_2, supervisor)) {
+      append(assignment.employee_id, {
+        source: 'assignment',
+        level: 'Atasan 2',
+        assignment_id: assignment.id,
+        department: assignment.assignment_department,
+        position: assignment.assignment_position,
+        assignment_type: assignment.assignment_type,
+      })
+    }
+  })
+
+  return result
+}
+
+function getSupervisorRelationLabel(relations: SupervisorRelation[]) {
+  const levels = Array.from(new Set(relations.map((relation) => relation.level)))
+
+  if (levels.length > 1) return 'Atasan 1 & 2'
+  return levels[0] || 'Bawahan'
 }
 
 function getCurrentPeriodMonth() {

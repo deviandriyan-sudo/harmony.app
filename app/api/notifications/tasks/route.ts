@@ -177,19 +177,52 @@ export async function GET(request: NextRequest) {
     const tasks: HarmonyActionTask[] = []
     const nowDate = todayWita()
 
-    const employeeDirectoryResult = await admin
-      .from('employees')
-      .select(
-        'id,employee_number,machine_pin,full_name,department,position,email,supervisor_1,supervisor_2,join_date,is_active',
-      )
-      .eq('is_active', true)
+    const [employeeDirectoryResult, assignmentDirectoryResult] =
+      await Promise.all([
+        admin
+          .from('employees')
+          .select(
+            'id,employee_number,machine_pin,full_name,department,position,email,supervisor_1,supervisor_2,join_date,is_active',
+          )
+          .eq('is_active', true),
+        admin
+          .from('employee_assignments')
+          .select(
+            'id,employee_id,supervisor_1,supervisor_2,start_date,end_date,is_primary,is_active',
+          )
+          .eq('is_active', true),
+      ])
 
     if (employeeDirectoryResult.error) {
       throw employeeDirectoryResult.error
     }
 
+    if (assignmentDirectoryResult.error) {
+      throw assignmentDirectoryResult.error
+    }
+
     const employees = (employeeDirectoryResult.data || []) as HarmonyEmployeeIdentity[]
     const employeeById = new Map(employees.map((item) => [item.id, item]))
+    const activeEmployeeIds = new Set(employees.map((item) => item.id))
+    const activeAssignments = (
+      (assignmentDirectoryResult.data || []) as Array<Record<string, any>>
+    ).filter((assignment) => {
+      if (assignment.is_active === false || assignment.is_primary === true) {
+        return false
+      }
+
+      if (!activeEmployeeIds.has(String(assignment.employee_id || ''))) {
+        return false
+      }
+
+      const startDate = String(assignment.start_date || '').slice(0, 10)
+      const endDate = String(assignment.end_date || '').slice(0, 10)
+
+      if (startDate && startDate > nowDate) return false
+      if (endDate && endDate < nowDate) return false
+
+      return true
+    })
 
     // ------------------------------------------------------------
     // A. PERSONAL / EMPLOYEE ACTIONS
@@ -330,13 +363,37 @@ export async function GET(request: NextRequest) {
     // ------------------------------------------------------------
     if (employee?.id) {
       const supervisorRefs = employeeIdentitySet(employee)
-      const subordinates = employees.filter((item) => {
-        if (item.id === employee.id) return false
-        return [item.supervisor_1, item.supervisor_2]
+      const subordinateIdSet = new Set<string>()
+
+      employees.forEach((item) => {
+        if (item.id === employee.id) return
+
+        const isHomebaseSubordinate = [item.supervisor_1, item.supervisor_2]
           .map(normalizeHarmonyText)
           .some((value) => value && supervisorRefs.has(value))
+
+        if (isHomebaseSubordinate) {
+          subordinateIdSet.add(item.id)
+        }
       })
-      const subordinateIds = subordinates.map((item) => item.id)
+
+      activeAssignments.forEach((assignment) => {
+        const employeeId = String(assignment.employee_id || '').trim()
+        if (!employeeId || employeeId === employee.id) return
+
+        const isAssignmentSubordinate = [
+          assignment.supervisor_1,
+          assignment.supervisor_2,
+        ]
+          .map(normalizeHarmonyText)
+          .some((value) => value && supervisorRefs.has(value))
+
+        if (isAssignmentSubordinate) {
+          subordinateIdSet.add(employeeId)
+        }
+      })
+
+      const subordinateIds = Array.from(subordinateIdSet)
 
       if (subordinateIds.length > 0) {
         const [attendanceResult, leaveResult, phlResult, postponeResult] =

@@ -43,6 +43,22 @@ type Employee = {
   supervisor_2?: string | null
 }
 
+type EmployeeAssignment = {
+  id: string
+  employee_id: string
+  employee_number?: string | null
+  full_name?: string | null
+  assignment_department?: string | null
+  assignment_position?: string | null
+  assignment_type?: string | null
+  supervisor_1?: string | null
+  supervisor_2?: string | null
+  start_date?: string | null
+  end_date?: string | null
+  is_primary?: boolean | null
+  is_active?: boolean | null
+}
+
 type AppUser = {
   id: string
   email: string
@@ -262,6 +278,33 @@ function isSameSupervisor(value: string | null | undefined, supervisor: Employee
   return options.includes(target)
 }
 
+function todayWitaIso() {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Makassar',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(new Date())
+
+  const map = new Map(parts.map((part) => [part.type, part.value]))
+  return `${map.get('year')}-${map.get('month')}-${map.get('day')}`
+}
+
+function isAssignmentEffective(assignment: EmployeeAssignment) {
+  if (assignment.is_active === false || assignment.is_primary === true) {
+    return false
+  }
+
+  const today = todayWitaIso()
+  const startDate = String(assignment.start_date || '').slice(0, 10)
+  const endDate = String(assignment.end_date || '').slice(0, 10)
+
+  if (startDate && startDate > today) return false
+  if (endDate && endDate < today) return false
+
+  return true
+}
+
 function looksLikeUuid(value?: string | null) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
     String(value || '').trim()
@@ -312,6 +355,7 @@ export default function EmployeeLeaveApprovalPage() {
   const [currentEmployee, setCurrentEmployee] = useState<Employee | null>(null)
 
   const [employees, setEmployees] = useState<Employee[]>([])
+  const [assignments, setAssignments] = useState<EmployeeAssignment[]>([])
   const [requests, setRequests] = useState<LeaveRequest[]>([])
 
   const [filterStatus, setFilterStatus] = useState<FilterStatus>('pending')
@@ -338,17 +382,35 @@ export default function EmployeeLeaveApprovalPage() {
   const subordinateIds = useMemo(() => {
     if (!currentEmployee) return new Set<string>()
 
-    const ids = employees
-      .filter((employee) => {
-        return (
-          isSameSupervisor(employee.supervisor_1, currentEmployee) ||
-          isSameSupervisor(employee.supervisor_2, currentEmployee)
-        )
-      })
-      .map((employee) => employee.id)
+    const ids = new Set<string>()
 
-    return new Set(ids)
-  }, [employees, currentEmployee])
+    employees.forEach((employee) => {
+      if (employee.id === currentEmployee.id) return
+
+      if (
+        isSameSupervisor(employee.supervisor_1, currentEmployee) ||
+        isSameSupervisor(employee.supervisor_2, currentEmployee)
+      ) {
+        ids.add(employee.id)
+      }
+    })
+
+    assignments.forEach((assignment) => {
+      if (!isAssignmentEffective(assignment)) return
+      if (!assignment.employee_id || assignment.employee_id === currentEmployee.id) {
+        return
+      }
+
+      if (
+        isSameSupervisor(assignment.supervisor_1, currentEmployee) ||
+        isSameSupervisor(assignment.supervisor_2, currentEmployee)
+      ) {
+        ids.add(assignment.employee_id)
+      }
+    })
+
+    return ids
+  }, [employees, assignments, currentEmployee])
 
   const filteredRequests = useMemo(() => {
     const keyword = normalize(search)
@@ -461,14 +523,24 @@ export default function EmployeeLeaveApprovalPage() {
 
       setCurrentUser(appUser)
 
-      const { data: employeeData, error: employeeError } = await supabase
-        .from('employees')
-        .select('*')
-        .order('full_name', { ascending: true })
+      const [employeeResult, assignmentResult] = await Promise.all([
+        supabase
+          .from('employees')
+          .select('*')
+          .order('full_name', { ascending: true }),
+        supabase
+          .from('employee_assignments')
+          .select(
+            'id,employee_id,employee_number,full_name,assignment_department,assignment_position,assignment_type,supervisor_1,supervisor_2,start_date,end_date,is_primary,is_active'
+          )
+          .eq('is_active', true),
+      ])
 
-      if (employeeError) throw employeeError
+      if (employeeResult.error) throw employeeResult.error
+      if (assignmentResult.error) throw assignmentResult.error
 
-      const employeeList = (employeeData || []) as Employee[]
+      const employeeList = (employeeResult.data || []) as Employee[]
+      const assignmentList = (assignmentResult.data || []) as EmployeeAssignment[]
 
       const matchedEmployee =
         employeeList.find((employee) => employee.id === appUser.employee_id) ||
@@ -479,6 +551,7 @@ export default function EmployeeLeaveApprovalPage() {
         null
 
       setEmployees(employeeList)
+      setAssignments(assignmentList)
       setCurrentEmployee(matchedEmployee)
 
       const [leaveResult, phlResult] = await Promise.all([
