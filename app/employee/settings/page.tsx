@@ -51,6 +51,12 @@ type EmployeeProfile = {
   is_active: boolean | null
 }
 
+type SupervisorLookup = {
+  id: string
+  full_name: string | null
+  position: string | null
+}
+
 type ProfileForm = {
   gender: string
   personal_phone: string
@@ -81,6 +87,11 @@ export default function EmployeeSettingsPage() {
   const [appUser, setAppUser] = useState<AppUser | null>(null)
   const [employee, setEmployee] = useState<EmployeeProfile | null>(null)
 
+  const [supervisorLabels, setSupervisorLabels] = useState({
+    supervisor_1: '-',
+    supervisor_2: '-',
+  })
+
   const [profileForm, setProfileForm] = useState<ProfileForm>(initialProfileForm)
   const [passwordForm, setPasswordForm] = useState<PasswordForm>(initialPasswordForm)
 
@@ -102,6 +113,41 @@ export default function EmployeeSettingsPage() {
   useEffect(() => {
     fetchProfile()
   }, [])
+
+  async function resolveSupervisorLabel(value?: string | null) {
+    const cleanValue = String(value || '').trim()
+
+    if (!cleanValue) return '-'
+
+    const isUuid =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+        cleanValue
+      )
+
+    // Data lama HARMONY dapat berisi nama/employee number secara langsung.
+    // Jangan ubah nilai tersebut bila bukan UUID.
+    if (!isUuid) return cleanValue
+
+    const { data, error } = await supabase
+      .from('employees')
+      .select('id, full_name, position')
+      .eq('id', cleanValue)
+      .maybeSingle<SupervisorLookup>()
+
+    if (error || !data) {
+      return 'Data atasan tidak ditemukan'
+    }
+
+    const name = String(data.full_name || '').trim()
+
+    if (!name) {
+      return 'Data atasan tidak ditemukan'
+    }
+
+    return data.position
+      ? `${name} · ${data.position}`
+      : name
+  }
 
   async function fetchProfile() {
     setLoading(true)
@@ -158,6 +204,16 @@ export default function EmployeeSettingsPage() {
       setLoading(false)
       return
     }
+
+    const [supervisor1Label, supervisor2Label] = await Promise.all([
+      resolveSupervisorLabel(employeeData.supervisor_1),
+      resolveSupervisorLabel(employeeData.supervisor_2),
+    ])
+
+    setSupervisorLabels({
+      supervisor_1: supervisor1Label,
+      supervisor_2: supervisor2Label,
+    })
 
     setEmployee(employeeData)
 
@@ -430,13 +486,13 @@ export default function EmployeeSettingsPage() {
                   <ReadOnlyItem
                     icon={<ShieldCheck size={18} />}
                     label="Atasan 1"
-                    value={employee?.supervisor_1 || '-'}
+                    value={supervisorLabels.supervisor_1}
                   />
 
                   <ReadOnlyItem
                     icon={<ShieldCheck size={18} />}
                     label="Atasan 2"
-                    value={employee?.supervisor_2 || '-'}
+                    value={supervisorLabels.supervisor_2}
                   />
                 </div>
               </div>
