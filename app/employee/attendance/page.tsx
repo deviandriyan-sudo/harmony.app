@@ -27,7 +27,10 @@ import {
   HarmonyPendingAttachmentPicker,
 } from "@/components/attachments/HarmonyAttachments";
 import { supabase } from "@/lib/supabase";
-import { registerHarmonySubmissionAttachments } from "@/lib/harmony-attachments";
+import {
+  listHarmonyAttachments,
+  registerHarmonySubmissionAttachments,
+} from "@/lib/harmony-attachments";
 import { sendHarmonyEmail } from "@/lib/notifications";
 import {
   getActiveHarmonyTypesForScope,
@@ -1522,6 +1525,46 @@ export default function EmployeeAttendancePage() {
       return;
     }
 
+    // FEATURE-008 menyimpan attachment tambahan pada harmony_request_attachments.
+    // Bukti yang sudah tersimpan di sana harus ikut dianggap valid saat Submit Periode,
+    // walaupun legacy field phl_proof_url/absence_proof_url belum terisi.
+    const storedAttachmentsByLogId: Record<
+      string,
+      Array<{ file_url: string; file_name: string }>
+    > = {};
+
+    const rowsNeedingAttachmentLookup = rowsToSubmit.filter((row) => {
+      if (!row.log?.id) return false;
+
+      const draft = getDraft(row);
+      const meta = getDailyTypeMeta(draft.daily_type);
+
+      return meta.requiresProof || isPotentialPHL(row, draft);
+    });
+
+    await Promise.all(
+      rowsNeedingAttachmentLookup.map(async (row) => {
+        const logId = row.log?.id;
+        if (!logId) return;
+
+        try {
+          const attachments = await listHarmonyAttachments(
+            "attendance_log",
+            logId,
+          );
+
+          storedAttachmentsByLogId[logId] = attachments.map((attachment) => ({
+            file_url: attachment.file_url,
+            file_name: attachment.file_name,
+          }));
+        } catch {
+          // Fallback ke legacy proof fields di attendance_logs.
+          // Jangan menggagalkan seluruh submit hanya karena lookup attachment API gagal.
+          storedAttachmentsByLogId[logId] = [];
+        }
+      }),
+    );
+
     // Pada resubmit setelah reject, data periode lama yang sudah pernah dikirim
     // tidak boleh gagal hanya karena aturan validasi baru (mis. cuti approved lama
     // tidak memiliki employee_daily_note atau proof di attendance_logs).
@@ -1529,8 +1572,8 @@ export default function EmployeeAttendancePage() {
     const validationErrors = rowsToSubmit
       .map((row) =>
         isSupervisorRejected
-          ? validateRowBeforeResubmit(row)
-          : validateRowBeforeSubmit(row),
+          ? validateRowBeforeResubmit(row, storedAttachmentsByLogId)
+          : validateRowBeforeSubmit(row, storedAttachmentsByLogId),
       )
       .filter(Boolean);
 
@@ -1576,13 +1619,36 @@ export default function EmployeeAttendancePage() {
       const hasExistingLog = Boolean(row.log?.id);
       const incomplete = isIncompleteRow(row, draft);
       const phlCandidate = isPotentialPHL(row, draft);
+      const storedAttachment = row.log?.id
+        ? storedAttachmentsByLogId[row.log.id]?.[0]
+        : undefined;
 
       let absenceProofUrl =
-        row.log?.absence_proof_url || row.log?.correction_proof_url || "";
+        row.log?.absence_proof_url ||
+        row.log?.correction_proof_url ||
+        (!phlCandidate ? storedAttachment?.file_url : "") ||
+        "";
       let absenceProofName =
-        row.log?.absence_proof_name || row.log?.correction_proof_name || "";
-      let phlProofUrl = row.log?.phl_proof_url || "";
-      let phlProofName = row.log?.phl_proof_name || "";
+        row.log?.absence_proof_name ||
+        row.log?.correction_proof_name ||
+        (!phlCandidate ? storedAttachment?.file_name : "") ||
+        "";
+      let phlProofUrl =
+        row.log?.phl_proof_url ||
+        (phlCandidate
+          ? row.log?.absence_proof_url ||
+            row.log?.correction_proof_url ||
+            storedAttachment?.file_url
+          : "") ||
+        "";
+      let phlProofName =
+        row.log?.phl_proof_name ||
+        (phlCandidate
+          ? row.log?.absence_proof_name ||
+            row.log?.correction_proof_name ||
+            storedAttachment?.file_name
+          : "") ||
+        "";
       let primaryAttachment: { url: string; name: string; error: string } | null = null;
 
       if (draft.support_files[0]) {
@@ -1967,7 +2033,13 @@ export default function EmployeeAttendancePage() {
     return Array.from(recipients);
   }
 
-  function validateRowBeforeResubmit(row: CalendarDayRow) {
+  function validateRowBeforeResubmit(
+    row: CalendarDayRow,
+    storedAttachmentsByLogId: Record<
+      string,
+      Array<{ file_url: string; file_name: string }>
+    > = {},
+  ) {
     const draft = getDraft(row);
     const meta = getDailyTypeMeta(draft.daily_type);
     const label = formatDisplayDate(row.date);
@@ -2009,7 +2081,7 @@ export default function EmployeeAttendancePage() {
 
     // Data absence BARU yang dibuat saat revisi tetap memakai validasi normal.
     if (meta.isAbsenceLike) {
-      return validateRowBeforeSubmit(row);
+      return validateRowBeforeSubmit(row, storedAttachmentsByLogId);
     }
 
     // Weekday yang benar-benar tidak punya data tetap harus dijelaskan.
@@ -2026,7 +2098,13 @@ export default function EmployeeAttendancePage() {
     return "";
   }
 
-  function validateRowBeforeSubmit(row: CalendarDayRow) {
+  function validateRowBeforeSubmit(
+    row: CalendarDayRow,
+    storedAttachmentsByLogId: Record<
+      string,
+      Array<{ file_url: string; file_name: string }>
+    > = {},
+  ) {
     const draft = getDraft(row);
     const meta = getDailyTypeMeta(draft.daily_type);
     const label = formatDisplayDate(row.date);
@@ -2034,6 +2112,15 @@ export default function EmployeeAttendancePage() {
     const noMachineData = !row.log?.id;
     const hasManualTime = Boolean(
       draft.manual_check_in || draft.manual_check_out,
+    );
+    const canonicalStoredAttachment = row.log?.id
+      ? storedAttachmentsByLogId[row.log.id]?.[0]
+      : undefined;
+    const hasStoredProof = Boolean(
+      row.log?.phl_proof_url ||
+        row.log?.absence_proof_url ||
+        row.log?.correction_proof_url ||
+        canonicalStoredAttachment?.file_url,
     );
 
     if (noMachineData && draft.daily_type === "present" && !hasManualTime) {
@@ -2071,15 +2158,14 @@ export default function EmployeeAttendancePage() {
 
     if (
       meta.requiresProof &&
-      !row.log?.absence_proof_url &&
-      !row.log?.correction_proof_url &&
+      !hasStoredProof &&
       draft.support_files.length === 0
     ) {
       return `${label}: upload bukti/dokumen pendukung untuk ${meta.label}.`;
     }
 
     if (isPotentialPHL(row, draft)) {
-      if (!row.log?.phl_proof_url && draft.support_files.length === 0) {
+      if (!hasStoredProof && draft.support_files.length === 0) {
         return `${label}: upload bukti perintah atasan untuk potensi PHL.`;
       }
     }
