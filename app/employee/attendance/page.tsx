@@ -27,10 +27,7 @@ import {
   HarmonyPendingAttachmentPicker,
 } from "@/components/attachments/HarmonyAttachments";
 import { supabase } from "@/lib/supabase";
-import {
-  listHarmonyAttachments,
-  registerHarmonySubmissionAttachments,
-} from "@/lib/harmony-attachments";
+import { registerHarmonySubmissionAttachments } from "@/lib/harmony-attachments";
 import { sendHarmonyEmail } from "@/lib/notifications";
 import {
   getActiveHarmonyTypesForScope,
@@ -1280,9 +1277,15 @@ export default function EmployeeAttendancePage() {
     }
 
     const existingProofUrl =
-      row.log?.absence_proof_url || row.log?.correction_proof_url || "";
+      row.log?.phl_proof_url ||
+      row.log?.absence_proof_url ||
+      row.log?.correction_proof_url ||
+      "";
     const existingProofName =
-      row.log?.absence_proof_name || row.log?.correction_proof_name || "";
+      row.log?.phl_proof_name ||
+      row.log?.absence_proof_name ||
+      row.log?.correction_proof_name ||
+      "";
 
     if (draft.support_files.length === 0 && !existingProofUrl) {
       setErrorMessage(
@@ -1525,46 +1528,6 @@ export default function EmployeeAttendancePage() {
       return;
     }
 
-    // FEATURE-008 menyimpan attachment tambahan pada harmony_request_attachments.
-    // Bukti yang sudah tersimpan di sana harus ikut dianggap valid saat Submit Periode,
-    // walaupun legacy field phl_proof_url/absence_proof_url belum terisi.
-    const storedAttachmentsByLogId: Record<
-      string,
-      Array<{ file_url: string; file_name: string }>
-    > = {};
-
-    const rowsNeedingAttachmentLookup = rowsToSubmit.filter((row) => {
-      if (!row.log?.id) return false;
-
-      const draft = getDraft(row);
-      const meta = getDailyTypeMeta(draft.daily_type);
-
-      return meta.requiresProof || isPotentialPHL(row, draft);
-    });
-
-    await Promise.all(
-      rowsNeedingAttachmentLookup.map(async (row) => {
-        const logId = row.log?.id;
-        if (!logId) return;
-
-        try {
-          const attachments = await listHarmonyAttachments(
-            "attendance_log",
-            logId,
-          );
-
-          storedAttachmentsByLogId[logId] = attachments.map((attachment) => ({
-            file_url: attachment.file_url,
-            file_name: attachment.file_name,
-          }));
-        } catch {
-          // Fallback ke legacy proof fields di attendance_logs.
-          // Jangan menggagalkan seluruh submit hanya karena lookup attachment API gagal.
-          storedAttachmentsByLogId[logId] = [];
-        }
-      }),
-    );
-
     // Pada resubmit setelah reject, data periode lama yang sudah pernah dikirim
     // tidak boleh gagal hanya karena aturan validasi baru (mis. cuti approved lama
     // tidak memiliki employee_daily_note atau proof di attendance_logs).
@@ -1572,8 +1535,8 @@ export default function EmployeeAttendancePage() {
     const validationErrors = rowsToSubmit
       .map((row) =>
         isSupervisorRejected
-          ? validateRowBeforeResubmit(row, storedAttachmentsByLogId)
-          : validateRowBeforeSubmit(row, storedAttachmentsByLogId),
+          ? validateRowBeforeResubmit(row)
+          : validateRowBeforeSubmit(row),
       )
       .filter(Boolean);
 
@@ -1619,36 +1582,28 @@ export default function EmployeeAttendancePage() {
       const hasExistingLog = Boolean(row.log?.id);
       const incomplete = isIncompleteRow(row, draft);
       const phlCandidate = isPotentialPHL(row, draft);
-      const storedAttachment = row.log?.id
-        ? storedAttachmentsByLogId[row.log.id]?.[0]
-        : undefined;
 
-      let absenceProofUrl =
+      const existingSharedProofUrl =
+        row.log?.phl_proof_url ||
         row.log?.absence_proof_url ||
         row.log?.correction_proof_url ||
-        (!phlCandidate ? storedAttachment?.file_url : "") ||
         "";
-      let absenceProofName =
+      const existingSharedProofName =
+        row.log?.phl_proof_name ||
         row.log?.absence_proof_name ||
         row.log?.correction_proof_name ||
-        (!phlCandidate ? storedAttachment?.file_name : "") ||
         "";
+
+      let absenceProofUrl =
+        row.log?.absence_proof_url || row.log?.correction_proof_url || "";
+      let absenceProofName =
+        row.log?.absence_proof_name || row.log?.correction_proof_name || "";
       let phlProofUrl =
         row.log?.phl_proof_url ||
-        (phlCandidate
-          ? row.log?.absence_proof_url ||
-            row.log?.correction_proof_url ||
-            storedAttachment?.file_url
-          : "") ||
-        "";
+        (phlCandidate ? existingSharedProofUrl : "");
       let phlProofName =
         row.log?.phl_proof_name ||
-        (phlCandidate
-          ? row.log?.absence_proof_name ||
-            row.log?.correction_proof_name ||
-            storedAttachment?.file_name
-          : "") ||
-        "";
+        (phlCandidate ? existingSharedProofName : "");
       let primaryAttachment: { url: string; name: string; error: string } | null = null;
 
       if (draft.support_files[0]) {
@@ -2033,13 +1988,7 @@ export default function EmployeeAttendancePage() {
     return Array.from(recipients);
   }
 
-  function validateRowBeforeResubmit(
-    row: CalendarDayRow,
-    storedAttachmentsByLogId: Record<
-      string,
-      Array<{ file_url: string; file_name: string }>
-    > = {},
-  ) {
+  function validateRowBeforeResubmit(row: CalendarDayRow) {
     const draft = getDraft(row);
     const meta = getDailyTypeMeta(draft.daily_type);
     const label = formatDisplayDate(row.date);
@@ -2081,7 +2030,7 @@ export default function EmployeeAttendancePage() {
 
     // Data absence BARU yang dibuat saat revisi tetap memakai validasi normal.
     if (meta.isAbsenceLike) {
-      return validateRowBeforeSubmit(row, storedAttachmentsByLogId);
+      return validateRowBeforeSubmit(row);
     }
 
     // Weekday yang benar-benar tidak punya data tetap harus dijelaskan.
@@ -2098,13 +2047,7 @@ export default function EmployeeAttendancePage() {
     return "";
   }
 
-  function validateRowBeforeSubmit(
-    row: CalendarDayRow,
-    storedAttachmentsByLogId: Record<
-      string,
-      Array<{ file_url: string; file_name: string }>
-    > = {},
-  ) {
+  function validateRowBeforeSubmit(row: CalendarDayRow) {
     const draft = getDraft(row);
     const meta = getDailyTypeMeta(draft.daily_type);
     const label = formatDisplayDate(row.date);
@@ -2112,15 +2055,6 @@ export default function EmployeeAttendancePage() {
     const noMachineData = !row.log?.id;
     const hasManualTime = Boolean(
       draft.manual_check_in || draft.manual_check_out,
-    );
-    const canonicalStoredAttachment = row.log?.id
-      ? storedAttachmentsByLogId[row.log.id]?.[0]
-      : undefined;
-    const hasStoredProof = Boolean(
-      row.log?.phl_proof_url ||
-        row.log?.absence_proof_url ||
-        row.log?.correction_proof_url ||
-        canonicalStoredAttachment?.file_url,
     );
 
     if (noMachineData && draft.daily_type === "present" && !hasManualTime) {
@@ -2156,16 +2090,22 @@ export default function EmployeeAttendancePage() {
       return `${label}: catatan wajib diisi untuk ${meta.label}.`;
     }
 
+    const existingStoredProofUrl =
+      row.log?.phl_proof_url ||
+      row.log?.absence_proof_url ||
+      row.log?.correction_proof_url ||
+      "";
+
     if (
       meta.requiresProof &&
-      !hasStoredProof &&
+      !existingStoredProofUrl &&
       draft.support_files.length === 0
     ) {
       return `${label}: upload bukti/dokumen pendukung untuk ${meta.label}.`;
     }
 
     if (isPotentialPHL(row, draft)) {
-      if (!hasStoredProof && draft.support_files.length === 0) {
+      if (!existingStoredProofUrl && draft.support_files.length === 0) {
         return `${label}: upload bukti perintah atasan untuk potensi PHL.`;
       }
     }
@@ -2612,7 +2552,15 @@ export default function EmployeeAttendancePage() {
                       </div>
                     </div>
 
-                    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5">
+                    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
+                      <SummaryCard
+                        title="Total Hari Kerja"
+                        value={String(periodTotals.totalWorkDays)}
+                        description="Senin–Jumat, tidak termasuk hari libur"
+                        icon={<CalendarDays size={22} />}
+                        tone="blue"
+                      />
+
                       <SummaryCard
                         title="Hadir"
                         value={String(presentCount)}
@@ -2640,7 +2588,7 @@ export default function EmployeeAttendancePage() {
                       <SummaryCard
                         title="Cuti / Izin"
                         value={String(leaveActivityCount)}
-                        description="Cuti, izin, sakit, dan tugas luar"
+                        description="Cuti/izin pada hari kerja saja"
                         icon={<FileText size={22} />}
                         tone="blue"
                       />
@@ -2827,8 +2775,8 @@ export default function EmployeeAttendancePage() {
                           </p>
 
                           {isOffDayNoAttendance ? (
-                            <span className="text-xs font-semibold text-[#86868b]">
-                              -
+                            <span className="inline-flex rounded-full bg-white/80 px-3 py-1 text-xs font-bold text-[#6e6e73]">
+                              {row.holiday_name ? "Libur" : "Weekend"}
                             </span>
                           ) : (
                             <StatusBadge status={displayStatus} log={row.log} />
@@ -2859,7 +2807,9 @@ export default function EmployeeAttendancePage() {
                               </p>
                               <ApprovalBadge
                                 status={
-                                  row.log?.supervisor_approval_status || "none"
+                                  isOffDayNoAttendance
+                                    ? "none"
+                                    : row.log?.supervisor_approval_status || "none"
                                 }
                               />
                             </div>
@@ -3022,8 +2972,8 @@ export default function EmployeeAttendancePage() {
 
                           <td className="px-3 py-3 align-top">
                             {isOffDayNoAttendance ? (
-                              <span className="text-xs font-semibold text-[#86868b]">
-                                -
+                              <span className="inline-flex rounded-full bg-white/80 px-3 py-1 text-xs font-bold text-[#6e6e73]">
+                                {row.holiday_name ? "Libur" : "Weekend"}
                               </span>
                             ) : (
                               <StatusBadge
@@ -3044,7 +2994,9 @@ export default function EmployeeAttendancePage() {
                           <td className="px-3 py-3 align-top">
                             <ApprovalBadge
                               status={
-                                row.log?.supervisor_approval_status || "none"
+                                isOffDayNoAttendance
+                                  ? "none"
+                                  : row.log?.supervisor_approval_status || "none"
                               }
                             />
                           </td>
@@ -3652,7 +3604,11 @@ function RequestLabelBadge({
     row.log?.absence_request_label || getDailyTypeMeta(draft.daily_type).label;
 
   if (isOffDayWithoutAttendance(row, draft)) {
-    return <span className="text-xs font-semibold text-[#86868b]">-</span>;
+    return (
+      <span className="inline-flex rounded-full bg-white/80 px-3 py-1 text-xs font-bold text-[#6e6e73]">
+        {getOffDayLabel(row)}
+      </span>
+    );
   }
 
   return (
@@ -3673,6 +3629,17 @@ function ValidationInfo({
   const phl = isPotentialPHL(row, draft);
   const noRecord = !row.log;
   const meta = getDailyTypeMeta(draft.daily_type);
+
+  if (isOffDayWithoutAttendance(row, draft)) {
+    return (
+      <div className="space-y-1">
+        <p className="text-xs font-bold text-[#6e6e73]">Hari non-kerja</p>
+        <p className="text-xs leading-5 text-[#86868b]">
+          Tidak dihitung sebagai hari cuti.
+        </p>
+      </div>
+    );
+  }
 
   if (phl) {
     return (
@@ -3946,8 +3913,8 @@ function PeriodStatusBadge({
   );
 }
 
-function isOffDayWithoutAttendance(row: CalendarDayRow, draft?: RowDraft) {
-  const hasAttendance = Boolean(
+function hasAttendanceActivity(row: CalendarDayRow, draft?: RowDraft) {
+  return Boolean(
     row.log?.check_in ||
     row.log?.check_out ||
     row.log?.manual_check_in ||
@@ -3955,15 +3922,43 @@ function isOffDayWithoutAttendance(row: CalendarDayRow, draft?: RowDraft) {
     draft?.manual_check_in ||
     draft?.manual_check_out,
   );
+}
 
+function isLeaveRequestOnOffDay(row: CalendarDayRow, draft?: RowDraft) {
+  if (!draft) return false;
+
+  const meta = getDailyTypeMeta(draft.daily_type);
+
+  return Boolean(
+    meta.isLeaveLike &&
+      (row.is_weekend || row.holiday_name) &&
+      !hasAttendanceActivity(row, draft),
+  );
+}
+
+function isOffDayWithoutAttendance(row: CalendarDayRow, draft?: RowDraft) {
+  const hasAttendance = hasAttendanceActivity(row, draft);
   const meta = draft ? getDailyTypeMeta(draft.daily_type) : null;
-  const hasAbsenceInfo = Boolean(meta?.isAbsenceLike);
+
+  // BUG-013:
+  // Cuti tahunan / leave-like yang rentangnya melewati Sabtu, Minggu, atau
+  // libur nasional tidak mengubah hari non-kerja tersebut menjadi hari cuti.
+  // Hari itu tetap off-day dan tidak dihitung sebagai penggunaan cuti.
+  const hasAbsenceInfo = Boolean(
+    meta?.isAbsenceLike && !meta?.isLeaveLike,
+  );
 
   return (
     (row.is_weekend || Boolean(row.holiday_name)) &&
     !hasAttendance &&
     !hasAbsenceInfo
   );
+}
+
+function getOffDayLabel(row: CalendarDayRow) {
+  if (row.holiday_name) return row.holiday_name;
+  if (row.is_weekend) return "Weekend";
+  return "Hari Libur";
 }
 
 function inferDailyType(row: CalendarDayRow): DailyType {
@@ -4044,6 +4039,7 @@ function getSubmittedStatus(row: CalendarDayRow, draft: RowDraft) {
   const meta = getDailyTypeMeta(draft.daily_type);
 
   if (isPotentialPHL(row, draft)) return "present";
+  if (isLeaveRequestOnOffDay(row, draft)) return "off_day";
   if (meta.status) return meta.status;
   if (row.log?.status) return row.log.status;
   if (draft.manual_check_in || draft.manual_check_out) return "present";
@@ -4060,8 +4056,9 @@ function getDisplayStatus(row: CalendarDayRow, draft: RowDraft) {
     return "pending_phl";
   }
 
-  if (meta.isAbsenceLike) return meta.status;
+  if (isLeaveRequestOnOffDay(row, draft)) return "off_day";
   if (isOffDayWithoutAttendance(row, draft)) return "off_day";
+  if (meta.isAbsenceLike) return meta.status;
 
   const effectiveIn = getEffectiveCheckIn(row, draft);
   const effectiveOut = getEffectiveCheckOut(row, draft);
@@ -4116,6 +4113,11 @@ function classifyAttendanceSummary(
   draft: RowDraft,
 ): AttendanceSummaryBucket {
   const meta = getDailyTypeMeta(draft.daily_type);
+
+  // Leave yang melewati weekend/libur tetap merupakan off-day, bukan cuti.
+  if (isLeaveRequestOnOffDay(row, draft)) {
+    return "other";
+  }
 
   // Cuti, izin, sakit, tugas luar, alpa, klaim PHL, dll tidak boleh
   // ikut dihitung sebagai "Tanpa Data".
@@ -4206,6 +4208,12 @@ function calculatePeriodTotals(
 
     if (!isOffday) {
       result.totalWorkDays += 1;
+    }
+
+    // BUG-013: approved/synced leave rows can span calendar dates, tetapi
+    // Sabtu/Minggu/libur nasional tidak boleh menambah total cuti.
+    if (isLeaveRequestOnOffDay(row, draft)) {
+      return;
     }
 
     if (status === "phl" || status === "pending_phl") {
