@@ -450,6 +450,18 @@ export default function EmployeeAttendancePage() {
     (bucket) => bucket === "phl",
   ).length;
 
+  const periodTotals = useMemo(
+    () => calculatePeriodTotals(calendarRows, holidays, rowDrafts),
+    [calendarRows, holidays, rowDrafts],
+  );
+
+  const absentCount = periodTotals.absent;
+  const leaveActivityCount =
+    periodTotals.leave +
+    periodTotals.permit +
+    periodTotals.sick +
+    periodTotals.officialTravel;
+
   useEffect(() => {
     fetchData();
   }, [periodMonth]);
@@ -2320,62 +2332,27 @@ export default function EmployeeAttendancePage() {
           </div>
         )}
 
-        <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
-          <SummaryCard
-            title="Hadir"
-            value={String(presentCount)}
-            description="Hari dengan kehadiran"
-            icon={<CheckCircle2 size={22} />}
-            tone="green"
-          />
-
-          <SummaryCard
-            title="Incomplete"
-            value={String(incompleteCount)}
-            description="Jam masuk/pulang perlu dilengkapi"
-            icon={<AlertTriangle size={22} />}
-            tone="red"
-          />
-
-          <SummaryCard
-            title="Tanpa Data"
-            value={String(noRecordCount)}
-            description="Bisa diisi manual / keterangan"
-            icon={<Clock3 size={22} />}
-            tone="orange"
-          />
-
-          <SummaryCard
-            title="Potensi PHL"
-            value={String(phlCandidateCount)}
-            description="Weekend/libur dengan scan"
-            icon={<CalendarDays size={22} />}
-            tone="purple"
-          />
-        </div>
-
         <div className="harmony-card overflow-hidden">
-          <div className="flex min-w-0 flex-col gap-4 border-b border-black/5 p-4 sm:p-6 xl:grid xl:grid-cols-[minmax(0,1fr)_minmax(320px,620px)] xl:items-start xl:gap-6">
-            <div className="min-w-0">
-              <h2 className="text-lg font-semibold text-[#1d1d1f]">
-                Rekap Absensi Pribadi
-              </h2>
+          <div className="border-b border-black/5 p-4 sm:p-6">
+            <div className="flex min-w-0 flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+              <div className="min-w-0">
+                <h2 className="text-lg font-semibold text-[#1d1d1f]">
+                  Rekap Absensi Pribadi
+                </h2>
 
-              <p className="mt-1 text-sm text-[#6e6e73]">
-                Periode {formatDisplayDate(periodRange.start)} s.d.{" "}
-                {formatDisplayDate(periodRange.end)}.
-              </p>
+                <p className="mt-1 text-sm text-[#6e6e73]">
+                  Periode {formatDisplayDate(periodRange.start)} s.d.{" "}
+                  {formatDisplayDate(periodRange.end)}.
+                </p>
+              </div>
 
-            </div>
+              <div className="flex w-full min-w-0 flex-col gap-3 xl:w-auto xl:max-w-none">
+                <div className="flex min-w-0 flex-wrap items-center gap-2 rounded-[24px] border border-[#d8e8ff] bg-[#f7fbff] p-3">
+                  <div className="mr-1 flex items-center gap-2 text-xs font-bold text-[#0059b8]">
+                    <CalendarDays size={15} />
+                    Periode Absensi
+                  </div>
 
-            <div className="w-full min-w-0 xl:w-auto xl:max-w-[620px]">
-              <div className="rounded-[24px] border border-[#d8e8ff] bg-[#f7fbff] p-3 shadow-sm">
-                <div className="mb-2 flex items-center gap-2 text-xs font-bold text-[#0059b8]">
-                  <CalendarDays size={15} />
-                  Periode Absensi
-                </div>
-
-                <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_110px] gap-2 sm:flex sm:flex-wrap sm:items-center">
                   <select
                     aria-label="Pilih bulan periode absensi"
                     value={normalizePeriodMonth(periodMonth).split("-")[1]}
@@ -2384,7 +2361,7 @@ export default function EmployeeAttendancePage() {
                         updatePeriodPart(current, "month", event.target.value),
                       )
                     }
-                    className="harmony-input min-w-0 w-full sm:w-[160px]"
+                    className="harmony-input min-w-0 flex-1 sm:w-[180px] xl:flex-none"
                   >
                     {ATTENDANCE_MONTH_OPTIONS.map((option) => (
                       <option key={option.value} value={option.value}>
@@ -2401,7 +2378,7 @@ export default function EmployeeAttendancePage() {
                         updatePeriodPart(current, "year", event.target.value),
                       )
                     }
-                    className="harmony-input min-w-0 w-full sm:w-[110px]"
+                    className="harmony-input min-w-0 w-[120px]"
                   >
                     {getAttendanceYearOptions().map((year) => (
                       <option key={year} value={year}>
@@ -2409,31 +2386,29 @@ export default function EmployeeAttendancePage() {
                       </option>
                     ))}
                   </select>
+
+                  <div className="inline-flex min-h-11 items-center rounded-2xl border border-[#d8e8ff] bg-white px-4 text-xs font-semibold text-[#3a3a3c]">
+                    Aktif: {getPeriodLabel(periodMonth)}
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={exportCsv}
+                    className="harmony-button-secondary ml-auto w-full sm:ml-0 sm:w-auto"
+                  >
+                    <Download size={18} />
+                    Export
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => fetchData()}
+                    className="harmony-button-secondary w-full sm:w-auto"
+                  >
+                    <RefreshCcw size={18} />
+                    Refresh
+                  </button>
                 </div>
-
-                <p className="mt-2 text-[11px] font-semibold leading-5 text-[#6e6e73]">
-                  Aktif: {getPeriodLabel(periodMonth)}
-                </p>
-              </div>
-
-              <div className="mt-3 grid grid-cols-2 gap-2 sm:flex sm:justify-end">
-                <button
-                  type="button"
-                  onClick={exportCsv}
-                  className="harmony-button-secondary w-full sm:w-auto"
-                >
-                  <Download size={18} />
-                  Export
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => fetchData()}
-                  className="harmony-button-secondary w-full sm:w-auto"
-                >
-                  <RefreshCcw size={18} />
-                  Refresh
-                </button>
               </div>
             </div>
           </div>
@@ -2447,7 +2422,7 @@ export default function EmployeeAttendancePage() {
 
           {!loading && (
             <>
-              <div className="grid gap-5 border-b border-black/5 p-6">
+              <div className="border-b border-black/5 p-6">
                 <div className="rounded-[28px] border border-black/5 bg-[#1d1d1f] p-6 text-white">
                   <div className="flex items-center gap-4">
                     <div className="flex h-14 w-14 items-center justify-center rounded-3xl bg-white/10 text-white">
@@ -2460,7 +2435,7 @@ export default function EmployeeAttendancePage() {
                       </h3>
 
                       <p className="mt-1 text-sm text-white/55">
-                        {employee?.employee_number || "-"} ·{" "}
+                        {employee?.employee_number || "-"} · {" "}
                         {employee?.department || "-"}
                       </p>
                     </div>
@@ -2494,41 +2469,105 @@ export default function EmployeeAttendancePage() {
                   </div>
                 </div>
 
-                <div className="rounded-[28px] border border-black/5 bg-white/70 p-6 shadow-sm">
-                  <h3 className="text-lg font-semibold text-[#1d1d1f]">
-                    Ringkasan Terakhir
-                  </h3>
+                <div className="sticky top-4 z-20 mt-5 space-y-5 rounded-[30px] border border-black/5 bg-white/90 p-4 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/80 sm:p-5">
+                  <div className="rounded-[28px] border border-black/5 bg-white/70 p-5 shadow-sm">
+                    <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                      <div>
+                        <h3 className="text-lg font-semibold text-[#1d1d1f]">
+                          Ringkasan Terakhir
+                        </h3>
 
+                        <p className="mt-1 text-sm text-[#6e6e73]">
+                          Snapshot absensi terakhir dan ringkasan periode aktif.
+                        </p>
+                      </div>
+                    </div>
 
-                  {latestLog ? (
-                    <div className="mt-5 grid gap-4 sm:grid-cols-2 2xl:grid-cols-4">
-                      <MiniInfoCard
-                        title="Tanggal"
-                        value={formatDisplayDate(latestLog.attendance_date)}
+                    {latestLog ? (
+                      <div className="mt-5 grid gap-4 sm:grid-cols-2 2xl:grid-cols-4">
+                        <MiniInfoCard
+                          title="Tanggal"
+                          value={formatDisplayDate(latestLog.attendance_date)}
+                        />
+                        <MiniInfoCard
+                          title="Check In"
+                          value={latestLog.check_in || "-"}
+                        />
+                        <MiniInfoCard
+                          title="Check Out"
+                          value={latestLog.check_out || "-"}
+                        />
+                        <MiniInfoCard
+                          title="Status"
+                          value={formatStatus(
+                            latestLog.status || "present",
+                            latestLog,
+                          )}
+                        />
+                      </div>
+                    ) : (
+                      <div className="mt-5 rounded-[24px] border border-dashed border-black/10 bg-[#f5f5f7]/70 p-6 text-sm text-[#6e6e73]">
+                        Belum ada data absensi pada periode ini, tetapi employee
+                        tetap bisa menambahkan keterangan manual per tanggal
+                        selama periode belum dikunci atau belum disubmit.
+                      </div>
+                    )}
+                  </div>
+
+                  <div>
+                    <div className="mb-3 flex items-center justify-between gap-3">
+                      <div>
+                        <h3 className="text-base font-semibold text-[#1d1d1f]">
+                          Summary Periode
+                        </h3>
+                        <p className="mt-1 text-sm text-[#6e6e73]">
+                          Ringkasan kehadiran periode aktif tepat di atas detail absensi.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5">
+                      <SummaryCard
+                        title="Hadir"
+                        value={String(presentCount)}
+                        description="Hari dengan kehadiran"
+                        icon={<CheckCircle2 size={22} />}
+                        tone="green"
                       />
-                      <MiniInfoCard
-                        title="Check In"
-                        value={latestLog.check_in || "-"}
+
+                      <SummaryCard
+                        title="Belum Selesai"
+                        value={String(incompleteCount)}
+                        description="Jam masuk/pulang perlu dilengkapi"
+                        icon={<AlertTriangle size={22} />}
+                        tone="red"
                       />
-                      <MiniInfoCard
-                        title="Check Out"
-                        value={latestLog.check_out || "-"}
+
+                      <SummaryCard
+                        title="Ketidakhadiran"
+                        value={String(absentCount)}
+                        description="Tanpa data / alpa di hari kerja"
+                        icon={<Clock3 size={22} />}
+                        tone="orange"
                       />
-                      <MiniInfoCard
-                        title="Status"
-                        value={formatStatus(
-                          latestLog.status || "present",
-                          latestLog,
-                        )}
+
+                      <SummaryCard
+                        title="Cuti / Izin"
+                        value={String(leaveActivityCount)}
+                        description="Cuti, izin, sakit, dan tugas luar"
+                        icon={<FileText size={22} />}
+                        tone="blue"
+                      />
+
+                      <SummaryCard
+                        title="Potensi PHL"
+                        value={String(phlCandidateCount)}
+                        description="Weekend/libur dengan scan"
+                        icon={<CalendarDays size={22} />}
+                        tone="purple"
                       />
                     </div>
-                  ) : (
-                    <div className="mt-5 rounded-[24px] border border-dashed border-black/10 bg-[#f5f5f7]/70 p-6 text-sm text-[#6e6e73]">
-                      Belum ada data absensi pada periode ini, tetapi employee
-                      tetap bisa menambahkan keterangan manual per tanggal
-                      selama periode belum dikunci atau belum disubmit.
-                    </div>
-                  )}
+                  </div>
                 </div>
               </div>
 
