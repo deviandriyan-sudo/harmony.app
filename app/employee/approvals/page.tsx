@@ -146,6 +146,7 @@ export default function EmployeeApprovalsPage() {
   const [subordinateRelations, setSubordinateRelations] = useState<
     Map<string, SupervisorRelation[]>
   >(new Map())
+  const [employeeAssignments, setEmployeeAssignments] = useState<EmployeeAssignment[]>([])
   const [attendanceConfirmations, setAttendanceConfirmations] = useState<AttendancePeriodConfirmation[]>([])
   const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>([])
 
@@ -296,6 +297,7 @@ export default function EmployeeApprovalsPage() {
 
     setSubordinates(subordinateList)
     setSubordinateRelations(relationMap)
+    setEmployeeAssignments(assignmentList)
 
     if (subordinateList.length === 0) {
       setSubordinateRelations(new Map())
@@ -445,6 +447,7 @@ export default function EmployeeApprovalsPage() {
           supervisor={supervisor}
           employees={subordinates}
           relations={subordinateRelations}
+          assignments={employeeAssignments}
           loading={loading}
         />
 
@@ -613,13 +616,25 @@ function SubordinateOrgChart({
   supervisor,
   employees,
   relations,
+  assignments,
   loading,
 }: {
   supervisor: Employee | null
   employees: Employee[]
   relations: Map<string, SupervisorRelation[]>
+  assignments: EmployeeAssignment[]
   loading: boolean
 }) {
+  const today = formatDateToISO(new Date())
+
+  const activeAssignmentsByEmployee = new Map<string, EmployeeAssignment[]>()
+
+  assignments.forEach((assignment) => {
+    if (!isAssignmentEffective(assignment, today)) return
+
+    const current = activeAssignmentsByEmployee.get(assignment.employee_id) || []
+    activeAssignmentsByEmployee.set(assignment.employee_id, [...current, assignment])
+  })
   return (
     <div className="harmony-card overflow-hidden p-0">
       <div className="border-b border-black/5 p-5 lg:p-6">
@@ -683,6 +698,7 @@ function SubordinateOrgChart({
                   <OrgEmployeeNode
                     employee={employee}
                     relations={relations.get(employee.id) || []}
+                    assignments={activeAssignmentsByEmployee.get(employee.id) || []}
                   />
                 </div>
               ))}
@@ -728,13 +744,12 @@ function OrgSupervisorNode({
 function OrgEmployeeNode({
   employee,
   relations,
+  assignments,
 }: {
   employee: Employee
   relations: SupervisorRelation[]
+  assignments: EmployeeAssignment[]
 }) {
-  const assignmentRelations = relations.filter(
-    (relation) => relation.source === 'assignment'
-  )
   const relationLabel = getSupervisorRelationLabel(relations)
 
   return (
@@ -750,7 +765,7 @@ function OrgEmployeeNode({
               {relationLabel}
             </span>
 
-            {assignmentRelations.length > 0 && (
+            {assignments.length > 0 && (
               <span className="inline-flex rounded-full bg-[#f7edfc] px-2.5 py-1 text-[11px] font-bold text-[#7b2cbf]">
                 Jabatan Tambahan
               </span>
@@ -775,29 +790,42 @@ function OrgEmployeeNode({
             {employee.position || '-'}
           </p>
 
-          {assignmentRelations.length > 0 && (
+          {assignments.length > 0 && (
             <div className="mt-3 space-y-2 border-t border-black/5 pt-3">
-              {assignmentRelations.map((relation) => (
-                <div
-                  key={`${relation.assignment_id || 'assignment'}-${relation.level}`}
-                  className="rounded-2xl bg-[#f7f3fb] px-3 py-2.5"
-                >
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-[10px] font-bold uppercase tracking-wide text-[#7b2cbf]">
-                      Jabatan Tambahan
-                    </span>
-                    <span className="text-[10px] font-semibold text-[#86868b]">
-                      {relation.level}
-                    </span>
+              {assignments.map((assignment) => {
+                const assignmentRelations = relations.filter(
+                  (relation) =>
+                    relation.source === 'assignment' &&
+                    relation.assignment_id === assignment.id
+                )
+                const assignmentLevel = getSupervisorRelationLabel(assignmentRelations)
+
+                return (
+                  <div
+                    key={assignment.id}
+                    className="rounded-2xl bg-[#f7f3fb] px-3 py-2.5"
+                  >
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-[10px] font-bold uppercase tracking-wide text-[#7b2cbf]">
+                        Jabatan Tambahan
+                      </span>
+
+                      {assignmentRelations.length > 0 && (
+                        <span className="text-[10px] font-semibold text-[#86868b]">
+                          {assignmentLevel}
+                        </span>
+                      )}
+                    </div>
+
+                    <p className="mt-1 break-words text-xs font-semibold leading-5 text-[#1d1d1f]">
+                      {assignment.assignment_position || '-'}
+                    </p>
+                    <p className="mt-0.5 break-words text-[11px] leading-4 text-[#6e6e73]">
+                      {assignment.assignment_department || '-'}
+                    </p>
                   </div>
-                  <p className="mt-1 break-words text-xs font-semibold leading-5 text-[#1d1d1f]">
-                    {relation.position || '-'}
-                  </p>
-                  <p className="mt-0.5 break-words text-[11px] leading-4 text-[#6e6e73]">
-                    {relation.department || '-'}
-                  </p>
-                </div>
-              ))}
+                )
+              })}
             </div>
           )}
         </div>
