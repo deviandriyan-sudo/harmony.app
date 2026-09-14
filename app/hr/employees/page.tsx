@@ -256,6 +256,10 @@ type AnnualLeaveDebtItem = {
   original_days: number
   remaining_days: number
   status: 'pending' | 'partially_applied' | 'settled' | 'cancelled' | string
+  origin: 'new_advance' | 'legacy_existing_credit' | string
+  credit_granted_days: number
+  legacy_normalization_days: number
+  legacy_normalized_at: string | null
   apply_from_maturity: string
   reason: string
   created_by_email: string | null
@@ -266,7 +270,7 @@ type AnnualLeaveDebtItem = {
 type AnnualLeaveDebtTransaction = {
   id: string
   debt_id: string
-  transaction_type: 'created' | 'reduced' | 'applied' | string
+  transaction_type: 'created' | 'credit_granted' | 'legacy_registered' | 'legacy_adjustment_normalized' | 'reduced' | 'applied' | string
   days: number
   cycle_id: string | null
   note: string | null
@@ -674,7 +678,7 @@ export default function HREmployeesPage() {
 
     try {
       const { data, error } = await supabase.rpc(
-        'hr_get_annual_leave_debt_detail_v1',
+        'hr_get_annual_leave_debt_detail_v2',
         { p_employee_id: employeeId }
       )
 
@@ -719,7 +723,7 @@ export default function HREmployeesPage() {
       const actorEmail = authData.user?.email || 'HR Administrator'
 
       const { data, error } = await supabase.rpc(
-        'hr_adjust_annual_leave_debt_v1',
+        'hr_adjust_annual_leave_debt_v2',
         {
           p_employee_id: editingEmployeeId,
           p_action: annualLeaveDebtForm.action,
@@ -735,6 +739,8 @@ export default function HREmployeesPage() {
         success?: boolean
         outstanding_before?: number
         outstanding_after?: number
+        balance_before?: number | null
+        balance_after?: number | null
         next_maturity?: string | null
         message?: string
       }
@@ -743,10 +749,18 @@ export default function HREmployeesPage() {
         throw new Error(result.message || 'Penyesuaian hutang cuti belum berhasil.')
       }
 
+      const balanceText =
+        result.balance_before !== null &&
+        result.balance_before !== undefined &&
+        result.balance_after !== null &&
+        result.balance_after !== undefined
+          ? ` Saldo cuti: ${result.balance_before} → ${result.balance_after} hari.`
+          : ''
+
       setSuccessMessage(
         `${result.message || 'Hutang cuti berhasil diperbarui.'} Hutang aktif: ${
           result.outstanding_before ?? 0
-        } → ${result.outstanding_after ?? 0} hari.${
+        } → ${result.outstanding_after ?? 0} hari.${balanceText}${
           result.next_maturity
             ? ` Target maturity: ${formatDate(result.next_maturity)}.`
             : ''
@@ -2752,7 +2766,7 @@ function AnnualLeaveDebtSection({
           <div>
             <h3 className="font-semibold text-[#1d1d1f]">Hutang Cuti</h3>
             <p className="mt-1 max-w-3xl text-sm leading-6 text-[#6e6e73]">
-              Hutang yang dicatat HR tidak mengurangi saldo saat ini. Sistem memotongnya otomatis ketika hak cuti tahunan periode berikutnya matang.
+              Hutang baru menambahkan saldo cuti sementara agar dapat dipakai sekarang, lalu dibayar otomatis dari hak cuti tahunan periode berikutnya. Hutang legacy yang sudah pernah diberikan sebelumnya tidak ditambahkan ulang.
             </p>
           </div>
         </div>
@@ -2804,7 +2818,7 @@ function AnnualLeaveDebtSection({
                 onChange={(value) => onUpdate('action', value as AnnualLeaveDebtForm['action'])}
                 options={[
                   { label: 'Tambah Hutang Cuti', value: 'add' },
-                  { label: 'Kurangi Hutang Cuti', value: 'reduce' },
+                  { label: 'Kurangi / Ampuni Hutang', value: 'reduce' },
                 ]}
               />
 
@@ -2817,9 +2831,13 @@ function AnnualLeaveDebtSection({
 
               <div className="rounded-[22px] border border-black/5 bg-[#f5f5f7] p-4">
                 <span className="harmony-label">Dampak Saldo Saat Ini</span>
-                <div className="mt-1 font-bold text-[#1d1d1f]">Tidak berubah</div>
+                <div className="mt-1 font-bold text-[#1d1d1f]">
+                  {form.action === 'add' ? `+${Number(form.days || 0)} hari sementara` : 'Tidak otomatis berubah'}
+                </div>
                 <p className="mt-1 text-xs leading-5 text-[#6e6e73]">
-                  Pemotongan baru terjadi saat entitlement periode berikutnya matang.
+                  {form.action === 'add'
+                    ? 'Hutang baru langsung menambah saldo cuti. Nilainya akan dibebankan ke annual cycle berikutnya.'
+                    : 'Pengurangan berarti koreksi/ampunan hutang. Saldo advance yang sudah diberikan tidak ditarik kembali otomatis.'}
                 </p>
               </div>
             </div>
@@ -2841,7 +2859,7 @@ function AnnualLeaveDebtSection({
                 className="harmony-button-primary disabled:opacity-50"
               >
                 {saving ? <Loader2 size={17} className="animate-spin" /> : <Save size={17} />}
-                {form.action === 'add' ? 'Simpan Hutang Cuti' : 'Kurangi Hutang Cuti'}
+                {form.action === 'add' ? 'Simpan Hutang Cuti' : 'Kurangi / Ampuni Hutang'}
               </button>
             </div>
           </div>
@@ -2856,12 +2874,22 @@ function AnnualLeaveDebtSection({
                       <div className="font-semibold text-[#1d1d1f]">
                         {Number(item.original_days || 0)} hari · Sisa {Number(item.remaining_days || 0)} hari
                       </div>
-                      <span className="rounded-full bg-white px-2.5 py-1 text-[10px] font-bold uppercase text-[#6e6e73]">
-                        {item.status.replace('_', ' ')}
-                      </span>
+                      <div className="flex flex-wrap gap-2">
+                        <span className="rounded-full bg-white px-2.5 py-1 text-[10px] font-bold uppercase text-[#6e6e73]">
+                          {item.origin === 'legacy_existing_credit' ? 'LEGACY' : 'HUTANG BARU'}
+                        </span>
+                        <span className="rounded-full bg-white px-2.5 py-1 text-[10px] font-bold uppercase text-[#6e6e73]">
+                          {item.status.replace('_', ' ')}
+                        </span>
+                      </div>
                     </div>
                     <div className="mt-2 text-xs leading-5 text-[#6e6e73]">
                       Target maturity: {formatDate(item.apply_from_maturity)} · Oleh {item.created_by_email || '-'} · {formatDateTime(item.created_at)}
+                    </div>
+                    <div className="mt-1 text-xs leading-5 text-[#6e6e73]">
+                      {item.origin === 'legacy_existing_credit'
+                        ? `Saldo advance sudah diberikan sebelum fitur ini. Normalisasi maturity: ${Number(item.legacy_normalization_days || 0)} hari.`
+                        : `Saldo advance diberikan oleh sistem: ${Number(item.credit_granted_days || 0)} hari.`}
                     </div>
                     <div className="mt-1 text-xs leading-5 text-[#3a3a3c]">{item.reason}</div>
                   </div>
