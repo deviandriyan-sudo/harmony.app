@@ -18,9 +18,6 @@ export type HarmonyRequestTypeDefinition = {
   is_system: boolean
   is_active: boolean
   sort_order: number
-  max_days: number | null
-  limit_mode: 'none' | 'fixed' | 'balance' | 'hr_discretion'
-  policy_note: string | null
 }
 
 export const FALLBACK_HARMONY_REQUEST_TYPES: HarmonyRequestTypeDefinition[] = [
@@ -76,9 +73,6 @@ export const FALLBACK_HARMONY_REQUEST_TYPES: HarmonyRequestTypeDefinition[] = [
     true,
     30,
     'Cuti tahunan yang menggunakan saldo cuti aktif.',
-    null,
-    'balance',
-    'Cuti tahunan menggunakan saldo annual leave aktif.',
   ),
 
   typeRow(
@@ -96,32 +90,6 @@ export const FALLBACK_HARMONY_REQUEST_TYPES: HarmonyRequestTypeDefinition[] = [
     true,
     true,
     40,
-    'Izin tidak masuk dengan upah karena pernikahan pekerja.',
-    3,
-    'fixed',
-    'Maksimal 3 hari kerja. Lampirkan surat undangan dan/atau dokumen pernikahan.',
-  ),
-
-
-  typeRow(
-    'child_marriage_leave',
-    'Cuti Pernikahan Anak',
-    'Cuti',
-    'leave',
-    'leave',
-    'child_marriage_leave',
-    true,
-    false,
-    true,
-    true,
-    false,
-    true,
-    true,
-    45,
-    'Izin tidak masuk dengan upah karena pernikahan anak pekerja.',
-    2,
-    'fixed',
-    'Maksimal 2 hari kerja. Lampirkan surat undangan dan/atau dokumen pernikahan anak.',
   ),
 
   typeRow(
@@ -158,31 +126,9 @@ export const FALLBACK_HARMONY_REQUEST_TYPES: HarmonyRequestTypeDefinition[] = [
     60,
   ),
 
-
-  typeRow(
-    'wife_maternity_leave',
-    'Cuti Istri Melahirkan / Keguguran',
-    'Cuti',
-    'leave',
-    'leave',
-    'wife_maternity_leave',
-    true,
-    false,
-    true,
-    true,
-    false,
-    true,
-    true,
-    65,
-    'Izin tidak masuk dengan upah karena istri melahirkan atau mengalami keguguran.',
-    3,
-    'fixed',
-    'Maksimal 3 hari kerja. Lampirkan surat rumah sakit/bidan atau dokumen kelahiran.',
-  ),
-
   typeRow(
     'bereavement_leave',
-    'Cuti Duka Keluarga Inti',
+    'Cuti Duka',
     'Cuti',
     'leave',
     'leave',
@@ -195,52 +141,6 @@ export const FALLBACK_HARMONY_REQUEST_TYPES: HarmonyRequestTypeDefinition[] = [
     true,
     true,
     70,
-    'Izin tidak masuk dengan upah karena keluarga inti meninggal dunia.',
-    3,
-    'fixed',
-    'Maksimal 3 hari kerja untuk suami/istri, orang tua/mertua, atau anak meninggal. Lampirkan surat keterangan kematian.',
-  ),
-
-  typeRow(
-    'household_death_leave',
-    'Cuti Duka Keluarga Serumah',
-    'Cuti',
-    'leave',
-    'leave',
-    'household_death_leave',
-    true,
-    false,
-    true,
-    true,
-    false,
-    true,
-    true,
-    74,
-    'Izin tidak masuk dengan upah karena anggota keluarga dalam satu rumah meninggal dunia.',
-    1,
-    'fixed',
-    'Maksimal 1 hari kerja. Lampirkan surat keterangan kematian.',
-  ),
-
-  typeRow(
-    'family_hospitalization_leave',
-    'Izin Keluarga Opname',
-    'Cuti',
-    'leave',
-    'leave',
-    'family_hospitalization_leave',
-    true,
-    false,
-    true,
-    true,
-    false,
-    true,
-    true,
-    72,
-    'Izin tidak masuk dengan upah karena suami/istri, orang tua/mertua, atau anak opname.',
-    2,
-    'fixed',
-    'Maksimal 2 hari kerja. Lampirkan surat keterangan rumah sakit.',
   ),
 
   typeRow(
@@ -258,31 +158,6 @@ export const FALLBACK_HARMONY_REQUEST_TYPES: HarmonyRequestTypeDefinition[] = [
     true,
     true,
     80,
-    'Izin tidak masuk dengan upah karena khitan atau baptis anak pekerja.',
-    2,
-    'fixed',
-    'Maksimal 2 hari kerja. Lampirkan surat dokter atau surat baptis/dokumen pendukung.',
-  ),
-
-  typeRow(
-    'disaster_leave',
-    'Izin Musibah / Bencana Alam',
-    'Cuti',
-    'leave',
-    'leave',
-    'disaster_leave',
-    false,
-    false,
-    true,
-    true,
-    false,
-    true,
-    true,
-    85,
-    'Izin tidak masuk dengan upah karena musibah atau bencana alam.',
-    null,
-    'hr_discretion',
-    'Durasi sesuai waktu yang dianggap perlu dan keputusan HR.',
   ),
 
   typeRow(
@@ -460,9 +335,6 @@ function typeRow(
   showInLeave: boolean,
   sortOrder: number,
   description = '',
-  maxDays: number | null = null,
-  limitMode: 'none' | 'fixed' | 'balance' | 'hr_discretion' = 'none',
-  policyNote = '',
 ): HarmonyRequestTypeDefinition {
   return {
     code,
@@ -482,9 +354,6 @@ function typeRow(
     is_system: true,
     is_active: true,
     sort_order: sortOrder,
-    max_days: maxDays,
-    limit_mode: limitMode,
-    policy_note: policyNote || null,
   }
 }
 
@@ -549,9 +418,6 @@ export function getHarmonyRequestTypeMeta(
     is_system: false,
     is_active: false,
     sort_order: 9999,
-    max_days: null,
-    limit_mode: 'none',
-    policy_note: null,
   } satisfies HarmonyRequestTypeDefinition
 }
 
@@ -711,19 +577,6 @@ function normalizeType(
 
     sort_order:
       Number(item.sort_order || 100),
-
-    max_days:
-      item.max_days === null || item.max_days === undefined || item.max_days === ('' as any)
-        ? null
-        : Number(item.max_days),
-
-    limit_mode:
-      ['none', 'fixed', 'balance', 'hr_discretion'].includes(String(item.limit_mode || ''))
-        ? (String(item.limit_mode) as HarmonyRequestTypeDefinition['limit_mode'])
-        : 'none',
-
-    policy_note:
-      item.policy_note ? String(item.policy_note) : null,
   }
 }
 

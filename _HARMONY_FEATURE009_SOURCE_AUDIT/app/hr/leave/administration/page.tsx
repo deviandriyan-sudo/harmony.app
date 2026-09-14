@@ -2179,18 +2179,6 @@ export default function HRLeaveAdministrationPage() {
                           </span>
                         )}
 
-                        {item.limit_mode === 'fixed' && item.max_days && (
-                          <span className="rounded-full bg-amber-50 px-2.5 py-1 text-amber-700">
-                            Maks. {item.max_days} hari kerja
-                          </span>
-                        )}
-
-                        {item.limit_mode === 'hr_discretion' && (
-                          <span className="rounded-full bg-indigo-50 px-2.5 py-1 text-indigo-700">
-                            Durasi Keputusan HR
-                          </span>
-                        )}
-
                         {item.is_system && (
                           <span className="rounded-full bg-slate-100 px-2.5 py-1">
                             System
@@ -2199,14 +2187,9 @@ export default function HRLeaveAdministrationPage() {
                       </div>
 
                       <p className="mt-3 text-xs leading-5 text-[#6e6e73]">
-                        {item.description || '-'}
+                        {item.description ||
+                          '-'}
                       </p>
-
-                      {item.policy_note && (
-                        <p className="mt-2 rounded-xl bg-[#f8f8fa] px-3 py-2 text-[11px] leading-5 text-[#3a3a3c]">
-                          {item.policy_note}
-                        </p>
-                      )}
 
                       <button
                         type="button"

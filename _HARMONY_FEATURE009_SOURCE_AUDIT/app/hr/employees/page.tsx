@@ -251,47 +251,6 @@ type PostponeAdjustmentForm = {
   note: string
 }
 
-type AnnualLeaveDebtItem = {
-  id: string
-  original_days: number
-  remaining_days: number
-  status: 'pending' | 'partially_applied' | 'settled' | 'cancelled' | string
-  apply_from_maturity: string
-  reason: string
-  created_by_email: string | null
-  created_at: string
-  updated_at: string
-}
-
-type AnnualLeaveDebtTransaction = {
-  id: string
-  debt_id: string
-  transaction_type: 'created' | 'reduced' | 'applied' | string
-  days: number
-  cycle_id: string | null
-  note: string | null
-  actor_email: string | null
-  created_at: string
-}
-
-type AnnualLeaveDebtDetail = {
-  success: boolean
-  employee_id: string
-  outstanding_days: number
-  total_created_days: number
-  total_reduced_days: number
-  total_applied_days: number
-  next_maturity: string | null
-  debts: AnnualLeaveDebtItem[]
-  transactions: AnnualLeaveDebtTransaction[]
-}
-
-type AnnualLeaveDebtForm = {
-  action: 'add' | 'reduce'
-  days: number
-  reason: string
-}
-
 const initialForm: EmployeeForm = {
   employee_number: '',
   machine_pin: '',
@@ -341,12 +300,6 @@ const initialPostponeAdjustmentForm: PostponeAdjustmentForm = {
   effective_date: '',
   expired_at: '',
   note: '',
-}
-
-const initialAnnualLeaveDebtForm: AnnualLeaveDebtForm = {
-  action: 'add',
-  days: 1,
-  reason: '',
 }
 
 const assignmentTypeOptions = [
@@ -403,14 +356,6 @@ export default function HREmployeesPage() {
   )
   const [loadingPostpone, setLoadingPostpone] = useState(false)
   const [savingPostpone, setSavingPostpone] = useState(false)
-
-
-  const [annualLeaveDebtDetail, setAnnualLeaveDebtDetail] = useState<AnnualLeaveDebtDetail | null>(null)
-  const [annualLeaveDebtForm, setAnnualLeaveDebtForm] = useState<AnnualLeaveDebtForm>(
-    initialAnnualLeaveDebtForm
-  )
-  const [loadingAnnualLeaveDebt, setLoadingAnnualLeaveDebt] = useState(false)
-  const [savingAnnualLeaveDebt, setSavingAnnualLeaveDebt] = useState(false)
 
   const [errorMessage, setErrorMessage] = useState('')
   const [successMessage, setSuccessMessage] = useState('')
@@ -656,118 +601,6 @@ export default function HREmployeesPage() {
       ...prev,
       [field]: value,
     }))
-  }
-
-
-  function updateAnnualLeaveDebtForm<K extends keyof AnnualLeaveDebtForm>(
-    field: K,
-    value: AnnualLeaveDebtForm[K]
-  ) {
-    setAnnualLeaveDebtForm((prev) => ({
-      ...prev,
-      [field]: value,
-    }))
-  }
-
-  async function fetchAnnualLeaveDebtDetail(employeeId: string) {
-    setLoadingAnnualLeaveDebt(true)
-
-    try {
-      const { data, error } = await supabase.rpc(
-        'hr_get_annual_leave_debt_detail_v1',
-        { p_employee_id: employeeId }
-      )
-
-      if (error) throw error
-      setAnnualLeaveDebtDetail((data || null) as AnnualLeaveDebtDetail | null)
-    } catch (error: any) {
-      setAnnualLeaveDebtDetail(null)
-      setErrorMessage(
-        error?.message ||
-          'Detail hutang cuti gagal dimuat. Saldo cuti, postpone, dan PHL tidak diubah.'
-      )
-    } finally {
-      setLoadingAnnualLeaveDebt(false)
-    }
-  }
-
-  async function handleAnnualLeaveDebtAdjustment() {
-    if (!editingEmployeeId) {
-      setErrorMessage('Simpan data karyawan terlebih dahulu sebelum mengelola hutang cuti.')
-      return
-    }
-
-    const days = Number(annualLeaveDebtForm.days || 0)
-    const reason = annualLeaveDebtForm.reason.trim()
-
-    if (days <= 0) {
-      setErrorMessage('Jumlah hutang cuti harus lebih dari 0 hari.')
-      return
-    }
-
-    if (reason.length < 5) {
-      setErrorMessage('Alasan hutang cuti minimal 5 karakter.')
-      return
-    }
-
-    setSavingAnnualLeaveDebt(true)
-    setErrorMessage('')
-    setSuccessMessage('')
-
-    try {
-      const { data: authData } = await supabase.auth.getUser()
-      const actorEmail = authData.user?.email || 'HR Administrator'
-
-      const { data, error } = await supabase.rpc(
-        'hr_adjust_annual_leave_debt_v1',
-        {
-          p_employee_id: editingEmployeeId,
-          p_action: annualLeaveDebtForm.action,
-          p_days: days,
-          p_reason: reason,
-          p_actor_email: actorEmail,
-        }
-      )
-
-      if (error) throw error
-
-      const result = (data || {}) as {
-        success?: boolean
-        outstanding_before?: number
-        outstanding_after?: number
-        next_maturity?: string | null
-        message?: string
-      }
-
-      if (!result.success) {
-        throw new Error(result.message || 'Penyesuaian hutang cuti belum berhasil.')
-      }
-
-      setSuccessMessage(
-        `${result.message || 'Hutang cuti berhasil diperbarui.'} Hutang aktif: ${
-          result.outstanding_before ?? 0
-        } → ${result.outstanding_after ?? 0} hari.${
-          result.next_maturity
-            ? ` Target maturity: ${formatDate(result.next_maturity)}.`
-            : ''
-        }`
-      )
-
-      setAnnualLeaveDebtForm({
-        action: annualLeaveDebtForm.action,
-        days: 1,
-        reason: '',
-      })
-
-      await fetchAnnualLeaveDebtDetail(editingEmployeeId)
-    } catch (error: any) {
-      setErrorMessage(
-        error?.message ||
-          'Penyesuaian hutang cuti gagal. Saldo cuti saat ini tidak diubah.'
-      )
-    } finally {
-      setSavingAnnualLeaveDebt(false)
-    }
   }
 
   async function getSessionAccessToken() {
@@ -1227,10 +1060,6 @@ export default function HREmployeesPage() {
     setPostponeAdjustmentForm(initialPostponeAdjustmentForm)
     setLoadingPostpone(false)
     setSavingPostpone(false)
-    setAnnualLeaveDebtDetail(null)
-    setAnnualLeaveDebtForm(initialAnnualLeaveDebtForm)
-    setLoadingAnnualLeaveDebt(false)
-    setSavingAnnualLeaveDebt(false)
     setEditingEmployeeId(null)
     setEditModalOpen(false)
     setErrorMessage('')
@@ -1250,8 +1079,6 @@ export default function HREmployeesPage() {
       ...initialPostponeAdjustmentForm,
       effective_date: getTodayISO(),
     })
-    setAnnualLeaveDebtDetail(null)
-    setAnnualLeaveDebtForm(initialAnnualLeaveDebtForm)
     setEditingEmployeeId(null)
     setSelectedEmployee(null)
     setEditModalOpen(true)
@@ -1278,8 +1105,6 @@ export default function HREmployeesPage() {
       ...initialPostponeAdjustmentForm,
       effective_date: getTodayISO(),
     })
-    setAnnualLeaveDebtDetail(null)
-    setAnnualLeaveDebtForm(initialAnnualLeaveDebtForm)
     setEditModalOpen(true)
     setSelectedEmployee(null)
     setSuccessMessage('')
@@ -1287,7 +1112,6 @@ export default function HREmployeesPage() {
     void Promise.all([
       fetchEmployeePHLBalanceDetail(employee.id),
       fetchEmployeePostponeDetail(employee.id),
-      fetchAnnualLeaveDebtDetail(employee.id),
     ])
   }
 
@@ -1973,10 +1797,6 @@ export default function HREmployeesPage() {
             postponeAdjustmentForm={postponeAdjustmentForm}
             loadingPostpone={loadingPostpone}
             savingPostpone={savingPostpone}
-            annualLeaveDebtDetail={annualLeaveDebtDetail}
-            annualLeaveDebtForm={annualLeaveDebtForm}
-            loadingAnnualLeaveDebt={loadingAnnualLeaveDebt}
-            savingAnnualLeaveDebt={savingAnnualLeaveDebt}
             onSubmit={handleSubmit}
             onClose={resetForm}
             onUpdate={updateForm}
@@ -1986,8 +1806,6 @@ export default function HREmployeesPage() {
             onPHLAdjust={handlePHLBalanceAdjustment}
             onPostponeAdjustmentUpdate={updatePostponeAdjustmentForm}
             onPostponeAdjust={handlePostponeAdjustment}
-            onAnnualLeaveDebtUpdate={updateAnnualLeaveDebtForm}
-            onAnnualLeaveDebtAdjust={handleAnnualLeaveDebtAdjustment}
             onAddAssignment={handleAddAssignment}
             onDeleteAssignment={handleDeleteAssignment}
           />
@@ -2502,10 +2320,6 @@ function EmployeeFormModal({
   postponeAdjustmentForm,
   loadingPostpone,
   savingPostpone,
-  annualLeaveDebtDetail,
-  annualLeaveDebtForm,
-  loadingAnnualLeaveDebt,
-  savingAnnualLeaveDebt,
   onSubmit,
   onClose,
   onUpdate,
@@ -2515,8 +2329,6 @@ function EmployeeFormModal({
   onPHLAdjust,
   onPostponeAdjustmentUpdate,
   onPostponeAdjust,
-  onAnnualLeaveDebtUpdate,
-  onAnnualLeaveDebtAdjust,
   onAddAssignment,
   onDeleteAssignment,
 }: {
@@ -2541,10 +2353,6 @@ function EmployeeFormModal({
   postponeAdjustmentForm: PostponeAdjustmentForm
   loadingPostpone: boolean
   savingPostpone: boolean
-  annualLeaveDebtDetail: AnnualLeaveDebtDetail | null
-  annualLeaveDebtForm: AnnualLeaveDebtForm
-  loadingAnnualLeaveDebt: boolean
-  savingAnnualLeaveDebt: boolean
   onSubmit: (event: FormEvent<HTMLFormElement>) => void
   onClose: () => void
   onUpdate: (field: keyof EmployeeForm, value: string | number | boolean) => void
@@ -2560,11 +2368,6 @@ function EmployeeFormModal({
     value: PostponeAdjustmentForm[K]
   ) => void
   onPostponeAdjust: () => void
-  onAnnualLeaveDebtUpdate: <K extends keyof AnnualLeaveDebtForm>(
-    field: K,
-    value: AnnualLeaveDebtForm[K]
-  ) => void
-  onAnnualLeaveDebtAdjust: () => void
   onAddAssignment: () => void
   onDeleteAssignment: (assignment: EmployeeAssignment) => void
 }) {
@@ -2652,16 +2455,6 @@ function EmployeeFormModal({
               <SelectField label="Status Data" value={form.is_active ? 'active' : 'inactive'} onChange={(value) => onUpdate('is_active', value === 'active')} options={[{ label: 'Active', value: 'active' }, { label: 'Inactive', value: 'inactive' }]} />
             </FormSection>
 
-            <AnnualLeaveDebtSection
-              editingEmployeeId={editingEmployeeId}
-              detail={annualLeaveDebtDetail}
-              form={annualLeaveDebtForm}
-              loading={loadingAnnualLeaveDebt}
-              saving={savingAnnualLeaveDebt}
-              onUpdate={onAnnualLeaveDebtUpdate}
-              onAdjust={onAnnualLeaveDebtAdjust}
-            />
-
             <PostponeAdjustmentSection
               editingEmployeeId={editingEmployeeId}
               summary={leaveBalanceSummary}
@@ -2720,160 +2513,6 @@ function ReadOnlyBalanceField({
   )
 }
 
-
-
-function AnnualLeaveDebtSection({
-  editingEmployeeId,
-  detail,
-  form,
-  loading,
-  saving,
-  onUpdate,
-  onAdjust,
-}: {
-  editingEmployeeId: string | null
-  detail: AnnualLeaveDebtDetail | null
-  form: AnnualLeaveDebtForm
-  loading: boolean
-  saving: boolean
-  onUpdate: <K extends keyof AnnualLeaveDebtForm>(
-    field: K,
-    value: AnnualLeaveDebtForm[K]
-  ) => void
-  onAdjust: () => void
-}) {
-  return (
-    <section className="rounded-[28px] border border-amber-200 bg-amber-50/35 p-5 sm:p-6">
-      <div className="flex flex-col gap-3 border-b border-amber-200/70 pb-5 md:flex-row md:items-start md:justify-between">
-        <div className="flex items-start gap-3">
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white text-amber-700 shadow-sm">
-            <CalendarClock size={19} />
-          </div>
-          <div>
-            <h3 className="font-semibold text-[#1d1d1f]">Hutang Cuti</h3>
-            <p className="mt-1 max-w-3xl text-sm leading-6 text-[#6e6e73]">
-              Hutang yang dicatat HR tidak mengurangi saldo saat ini. Sistem memotongnya otomatis ketika hak cuti tahunan periode berikutnya matang.
-            </p>
-          </div>
-        </div>
-
-        <div className="rounded-full border border-amber-200 bg-white px-3 py-1.5 text-xs font-bold text-amber-700">
-          Auto Potong Saat Maturity
-        </div>
-      </div>
-
-      {!editingEmployeeId ? (
-        <div className="mt-5 rounded-2xl border border-dashed border-amber-200 bg-white/70 p-5 text-sm text-[#6e6e73]">
-          Simpan karyawan terlebih dahulu untuk mengelola hutang cuti.
-        </div>
-      ) : loading ? (
-        <div className="mt-5 flex items-center gap-3 rounded-2xl bg-white p-5 text-sm text-[#6e6e73]">
-          <Loader2 size={18} className="animate-spin" />
-          Memuat hutang cuti...
-        </div>
-      ) : (
-        <div className="mt-5 space-y-5">
-          <div className="grid gap-3 md:grid-cols-4">
-            <PHLSummaryMiniCard
-              title="Hutang Aktif"
-              value={`${Number(detail?.outstanding_days || 0)} hari`}
-              description="Akan dipotong di maturity berikutnya"
-            />
-            <PHLSummaryMiniCard
-              title="Total Pernah Dicatat"
-              value={`${Number(detail?.total_created_days || 0)} hari`}
-              description="Akumulasi hutang yang dibuat HR"
-            />
-            <PHLSummaryMiniCard
-              title="Sudah Terpotong"
-              value={`${Number(detail?.total_applied_days || 0)} hari`}
-              description="Applied otomatis ke annual cycle"
-            />
-            <PHLSummaryMiniCard
-              title="Maturity Berikutnya"
-              value={detail?.next_maturity ? formatDate(detail.next_maturity) : '-'}
-              description="Target pemotongan hutang aktif"
-            />
-          </div>
-
-          <div className="rounded-[24px] border border-black/5 bg-white p-5">
-            <div className="grid gap-4 md:grid-cols-3">
-              <SelectField
-                label="Tindakan"
-                value={form.action}
-                onChange={(value) => onUpdate('action', value as AnnualLeaveDebtForm['action'])}
-                options={[
-                  { label: 'Tambah Hutang Cuti', value: 'add' },
-                  { label: 'Kurangi Hutang Cuti', value: 'reduce' },
-                ]}
-              />
-
-              <InputField
-                label="Jumlah Hari"
-                type="number"
-                value={String(form.days)}
-                onChange={(value) => onUpdate('days', Number(value || 0))}
-              />
-
-              <div className="rounded-[22px] border border-black/5 bg-[#f5f5f7] p-4">
-                <span className="harmony-label">Dampak Saldo Saat Ini</span>
-                <div className="mt-1 font-bold text-[#1d1d1f]">Tidak berubah</div>
-                <p className="mt-1 text-xs leading-5 text-[#6e6e73]">
-                  Pemotongan baru terjadi saat entitlement periode berikutnya matang.
-                </p>
-              </div>
-            </div>
-
-            <div className="mt-4">
-              <TextareaField
-                label="Alasan / Dasar Hutang Cuti"
-                value={form.reason}
-                onChange={(value) => onUpdate('reason', value)}
-                placeholder="Contoh: Cuti diambil sebelum hak cuti periode berikutnya matang."
-              />
-            </div>
-
-            <div className="mt-4 flex justify-end">
-              <button
-                type="button"
-                onClick={onAdjust}
-                disabled={saving}
-                className="harmony-button-primary disabled:opacity-50"
-              >
-                {saving ? <Loader2 size={17} className="animate-spin" /> : <Save size={17} />}
-                {form.action === 'add' ? 'Simpan Hutang Cuti' : 'Kurangi Hutang Cuti'}
-              </button>
-            </div>
-          </div>
-
-          {(detail?.debts?.length || 0) > 0 && (
-            <div className="rounded-[24px] border border-black/5 bg-white p-5">
-              <h4 className="text-sm font-bold text-[#1d1d1f]">Riwayat Hutang Cuti</h4>
-              <div className="mt-3 space-y-2">
-                {(detail?.debts || []).slice(0, 8).map((item) => (
-                  <div key={item.id} className="rounded-2xl bg-[#f8f8fa] p-4">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <div className="font-semibold text-[#1d1d1f]">
-                        {Number(item.original_days || 0)} hari · Sisa {Number(item.remaining_days || 0)} hari
-                      </div>
-                      <span className="rounded-full bg-white px-2.5 py-1 text-[10px] font-bold uppercase text-[#6e6e73]">
-                        {item.status.replace('_', ' ')}
-                      </span>
-                    </div>
-                    <div className="mt-2 text-xs leading-5 text-[#6e6e73]">
-                      Target maturity: {formatDate(item.apply_from_maturity)} · Oleh {item.created_by_email || '-'} · {formatDateTime(item.created_at)}
-                    </div>
-                    <div className="mt-1 text-xs leading-5 text-[#3a3a3c]">{item.reason}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-    </section>
-  )
-}
 
 function PostponeAdjustmentSection({
   editingEmployeeId,

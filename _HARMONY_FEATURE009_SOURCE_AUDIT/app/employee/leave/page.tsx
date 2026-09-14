@@ -799,19 +799,6 @@ export default function EmployeeLeavePage() {
       return
     }
 
-    const fixedMaximumDays =
-      selectedRequestMeta.limit_mode === 'fixed' && selectedRequestMeta.max_days
-        ? Number(selectedRequestMeta.max_days)
-        : 0
-
-    if (fixedMaximumDays > 0 && calculatedDays > fixedMaximumDays) {
-      setErrorMessage(
-        `${selectedRequestMeta.label} maksimal ${fixedMaximumDays} hari kerja. Rentang yang dipilih menghasilkan ${calculatedDays} hari kerja.`
-      )
-      setSubmitting(false)
-      return
-    }
-
     if (form.request_type === 'annual_leave' && calculatedDays > annualRemaining) {
       setErrorMessage(`Saldo cuti tahunan tidak cukup. Sisa saldo saat ini ${annualRemaining} hari.`)
       setSubmitting(false)
@@ -1384,23 +1371,6 @@ function LeaveRequestModal({
                   </optgroup>
                 ))}
               </select>
-
-              {(selectedRequestMeta.limit_mode === 'fixed' ||
-                selectedRequestMeta.limit_mode === 'hr_discretion' ||
-                selectedRequestMeta.policy_note) && (
-                <div className="mt-3 rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 text-xs leading-5 text-blue-700">
-                  <div className="font-bold">
-                    {selectedRequestMeta.limit_mode === 'fixed' && selectedRequestMeta.max_days
-                      ? `Maksimal ${selectedRequestMeta.max_days} hari kerja`
-                      : selectedRequestMeta.limit_mode === 'hr_discretion'
-                        ? 'Durasi sesuai kebutuhan dan keputusan HR'
-                        : selectedRequestMeta.label}
-                  </div>
-                  {selectedRequestMeta.policy_note && (
-                    <div className="mt-1 text-blue-600">{selectedRequestMeta.policy_note}</div>
-                  )}
-                </div>
-              )}
             </label>
 
             <div className="grid gap-4 md:grid-cols-2">
