@@ -9,6 +9,7 @@ import {
   Clock3,
   FileText,
   Fingerprint,
+  History,
   Plane,
   RefreshCcw,
   Settings,
@@ -64,12 +65,32 @@ type AttendanceRow = {
 
 type RequestItem = {
   id: string
-  type: 'leave' | 'phl'
+  type: 'leave' | 'phl' | 'debt'
   label: string
   date: string
   status: string
   reason: string
   createdAt: string
+}
+
+type AnnualLeaveDebtHistoryItem = {
+  id: string
+  original_days: number | null
+  remaining_days: number | null
+  status: string | null
+  origin: string | null
+  apply_from_maturity: string | null
+  created_at: string | null
+  updated_at: string | null
+  applied_days: number | null
+  last_applied_at: string | null
+}
+
+type AnnualLeaveDebtHistoryResponse = {
+  success?: boolean
+  outstanding_days?: number | null
+  next_maturity?: string | null
+  debts?: AnnualLeaveDebtHistoryItem[]
 }
 
 export default function EmployeeDashboardPage() {
@@ -82,6 +103,8 @@ export default function EmployeeDashboardPage() {
   const [attendance, setAttendance] = useState<AttendanceRow[]>([])
   const [requests, setRequests] = useState<RequestItem[]>([])
   const [pendingRequestCount, setPendingRequestCount] = useState(0)
+  const [debtOutstandingDays, setDebtOutstandingDays] = useState(0)
+  const [debtNextMaturity, setDebtNextMaturity] = useState<string | null>(null)
 
   const periodMonth = useMemo(() => getCurrentPeriodMonthWita(), [])
   const periodRange = useMemo(() => getCutoffRange(periodMonth), [periodMonth])
@@ -192,6 +215,60 @@ export default function EmployeeDashboardPage() {
 
       setPendingRequestCount(canonicalPendingCount)
 
+      let debtItems: RequestItem[] = []
+
+      const debtResponse = await supabase.rpc(
+        'harmony_get_my_annual_leave_debt_history_v1',
+      )
+
+      if (!debtResponse.error) {
+        const debtData = (debtResponse.data || {}) as AnnualLeaveDebtHistoryResponse
+
+        setDebtOutstandingDays(Number(debtData.outstanding_days || 0))
+        setDebtNextMaturity(debtData.next_maturity || null)
+
+        debtItems = (debtData.debts || []).map((row) => {
+          const originalDays = Number(row.original_days || 0)
+          const remainingDays = Number(row.remaining_days || 0)
+          const appliedDays = Number(row.applied_days || 0)
+          const isLegacy = normalizeStatus(row.origin) === 'legacy_existing_credit'
+          const statusLabel = labelDebtStatus(row.status)
+          const targetText = row.apply_from_maturity
+            ? `Target pelunasan ${formatDate(row.apply_from_maturity)}`
+            : 'Target pelunasan belum tersedia'
+
+          let reason = isLegacy
+            ? `Hutang cuti lama ${originalDays} hari. Saldo advance sudah pernah diberikan sebelum fitur hutang cuti aktif.`
+            : `Advance cuti ${originalDays} hari diberikan lebih awal dan akan diperhitungkan pada hak cuti tahunan berikutnya.`
+
+          if (remainingDays > 0) {
+            reason += ` Sisa hutang ${remainingDays} hari. ${targetText}.`
+          } else {
+            reason += ` Hutang sudah lunas${appliedDays > 0 ? ` (${appliedDays} hari telah diperhitungkan)` : ''}.`
+          }
+
+          return {
+            id: row.id,
+            type: 'debt' as const,
+            label: isLegacy ? 'Hutang Cuti Legacy' : 'Hutang Cuti',
+            date:
+              remainingDays > 0
+                ? targetText
+                : row.last_applied_at
+                  ? `Dilunasi ${formatDateTime(row.last_applied_at)}`
+                  : 'Status hutang selesai',
+            status: statusLabel,
+            reason,
+            createdAt: String(row.created_at || row.updated_at || ''),
+          }
+        })
+      } else {
+        // Dashboard tetap boleh dipakai bila migration FEATURE-011 V2.1
+        // belum terpasang. Hutang hanya tidak ditampilkan sampai RPC tersedia.
+        setDebtOutstandingDays(0)
+        setDebtNextMaturity(null)
+      }
+
       const leaveItems: RequestItem[] = (leaveResponse.data || []).map((row: any) => ({
         id: row.id,
         type: 'leave',
@@ -215,14 +292,15 @@ export default function EmployeeDashboardPage() {
         createdAt: String(row.created_at || ''),
       }))
 
-      // Canonical employee request feed:
+      // Canonical employee history feed:
       // - leave/izin/sakit/ST hanya dari leave_requests non-PHL
       // - klaim PHL hanya dari phl_records source=employee_phl_claim
-      // - gabungan diurutkan ulang agar "Pengajuan Terbaru" benar-benar terbaru
+      // - hutang cuti hanya dari employee-safe debt RPC (read-only)
+      // Hutang TIDAK ikut Pending Request karena bukan workflow approval.
       setRequests(
-        [...leaveItems, ...phlItems]
+        [...leaveItems, ...phlItems, ...debtItems]
           .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-          .slice(0, 8),
+          .slice(0, 10),
       )
     } catch (error: any) {
       setMessage(error?.message || 'Dashboard employee gagal dimuat.')
@@ -281,14 +359,14 @@ export default function EmployeeDashboardPage() {
         <div className="grid gap-5 xl:grid-cols-[1.05fr_0.95fr]">
           <section className="harmony-card overflow-hidden">
             <div className="flex items-center justify-between border-b border-black/5 p-5">
-              <div><h2 className="font-bold text-[#1d1d1f]">Pengajuan Terbaru</h2><p className="mt-1 text-xs text-[#6e6e73]">Leave dari leave_requests · Klaim PHL dari phl_records.</p></div>
-              <Link href="/employee/leave" className="text-xs font-bold text-[#007aff]">Lihat semua</Link>
+              <div><h2 className="font-bold text-[#1d1d1f]">Riwayat Cuti, Izin & PHL</h2><p className="mt-1 text-xs text-[#6e6e73]">Riwayat pengajuan termasuk catatan hutang cuti milik employee.</p></div>
+              <Link href="/employee/leave" className="text-xs font-bold text-[#007aff]">Buka menu cuti</Link>
             </div>
             <div className="divide-y divide-black/5">
-              {loading ? <EmptyRow text="Memuat pengajuan..." /> : requests.length === 0 ? <EmptyRow text="Belum ada pengajuan." /> : requests.map((item) => (
+              {loading ? <EmptyRow text="Memuat riwayat..." /> : requests.length === 0 ? <EmptyRow text="Belum ada riwayat cuti, izin, PHL, atau hutang cuti." /> : requests.map((item) => (
                 <div key={`${item.type}-${item.id}`} className="flex gap-3 p-4 sm:p-5">
-                  <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ${item.type === 'phl' ? 'bg-violet-50 text-violet-700' : 'bg-blue-50 text-blue-700'}`}>{item.type === 'phl' ? <Plane size={17} /> : <FileText size={17} />}</div>
-                  <div className="min-w-0 flex-1"><div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between"><p className="text-sm font-bold text-[#1d1d1f]">{item.label}</p><Status status={item.status} /></div><p className="mt-1 text-xs text-[#6e6e73]">{item.date}</p><p className="mt-2 line-clamp-2 text-xs leading-5 text-[#6e6e73]">{item.reason}</p></div>
+                  <RequestTypeIcon type={item.type} />
+                  <div className="min-w-0 flex-1"><div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between"><p className="text-sm font-bold text-[#1d1d1f]">{item.label}</p><Status status={item.status} /></div><p className="mt-1 text-xs text-[#6e6e73]">{item.date}</p><p className="mt-2 line-clamp-3 text-xs leading-5 text-[#6e6e73]">{item.reason}</p></div>
                 </div>
               ))}
             </div>
@@ -299,6 +377,8 @@ export default function EmployeeDashboardPage() {
             <div className="mt-4 space-y-3">
               <InfoRow label="Postpone aktif" value={`${Number(balance?.postpone_active_days || 0)} hari`} />
               <InfoRow label="Postpone expired" value={`${Number(balance?.postpone_expired_days || 0)} hari`} />
+              <InfoRow label="Hutang cuti aktif" value={`${debtOutstandingDays} hari`} />
+              <InfoRow label="Target pelunasan hutang" value={formatDate(debtNextMaturity)} />
               <InfoRow label="Expiry Postpone terdekat" value={formatDate(balance?.next_postpone_expiry)} />
               <InfoRow label="Expiry PHL terdekat" value={formatDate(balance?.next_phl_expiry)} />
             </div>
@@ -310,6 +390,53 @@ export default function EmployeeDashboardPage() {
       </section>
     </>
   )
+}
+
+function RequestTypeIcon({
+  type,
+}: {
+  type: RequestItem['type']
+}) {
+  if (type === 'debt') {
+    return (
+      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-orange-50 text-orange-700">
+        <History size={17} />
+      </div>
+    )
+  }
+
+  if (type === 'phl') {
+    return (
+      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-violet-50 text-violet-700">
+        <Plane size={17} />
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-blue-50 text-blue-700">
+      <FileText size={17} />
+    </div>
+  )
+}
+
+function labelDebtStatus(value: unknown) {
+  const status = normalizeStatus(value)
+  if (status === 'settled') return 'Lunas'
+  if (status === 'partially_applied') return 'Sebagian Terbayar'
+  if (status === 'cancelled') return 'Dibatalkan'
+  return 'Menunggu Pelunasan'
+}
+
+function formatDateTime(value?: string | null) {
+  if (!value) return '-'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  return new Intl.DateTimeFormat('id-ID', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  }).format(date)
 }
 
 function normalizeStatus(value: unknown) { return String(value || '').trim().toLowerCase() }
@@ -327,7 +454,7 @@ function formatDate(value?: string | null) {
 function Status({ status }: { status: string }) {
   const normalized = normalizeStatus(status)
   const cls =
-    normalized.includes('disetujui')
+    normalized.includes('disetujui') || normalized === 'lunas'
       ? 'bg-green-50 text-green-700'
       : normalized.includes('ditolak') || normalized.includes('dibatalkan')
         ? 'bg-red-50 text-red-700'
