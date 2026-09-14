@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase'
 export type HarmonyAttachmentEntityType =
   | 'leave_request'
   | 'phl_record'
+  | 'phl_adjustment'
   | 'attendance_log'
   | 'leave_postpone'
 

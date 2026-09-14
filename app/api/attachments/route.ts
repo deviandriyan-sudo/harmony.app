@@ -9,6 +9,7 @@ const MAX_FILE_BYTES = 10 * 1024 * 1024
 const ENTITY_TYPES = new Set([
   'leave_request',
   'phl_record',
+  'phl_adjustment',
   'attendance_log',
   'leave_postpone',
 ])
@@ -165,6 +166,15 @@ async function loadParent(
     return { ...result, entityType }
   }
 
+  if (entityType === 'phl_adjustment') {
+    const result = await admin
+      .from('phl_hr_adjustments')
+      .select('id,request_key,employee_id,action,days,phl_date,created_at')
+      .eq('id', entityId)
+      .maybeSingle()
+    return { ...result, entityType }
+  }
+
   if (entityType === 'attendance_log') {
     const result = await admin
       .from('attendance_logs')
@@ -314,6 +324,13 @@ export async function GET(request: NextRequest) {
       )
     }
 
+    if (entityType === 'phl_adjustment' && !auth.identity.isHR) {
+      return NextResponse.json(
+        { success: false, error: 'Evidence penyesuaian PHL manual hanya dapat dilihat HR/Admin.' },
+        { status: 403 },
+      )
+    }
+
     const parentResult = await loadParent(admin, entityType, entityId)
     if (parentResult.error) throw parentResult.error
     if (!parentResult.data) {
@@ -373,6 +390,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { success: false, error: 'Entity lampiran tidak valid.' },
         { status: 400 },
+      )
+    }
+
+    if (entityType === 'phl_adjustment' && !auth.identity.isHR) {
+      return NextResponse.json(
+        { success: false, error: 'Hanya HR/Admin yang dapat menyimpan evidence penyesuaian PHL manual.' },
+        { status: 403 },
       )
     }
 
