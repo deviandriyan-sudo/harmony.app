@@ -41,12 +41,15 @@ export async function GET(request: NextRequest) {
     if (error) throw error
 
     const context = (data || {}) as Record<string, any>
+    const visibleCycles = (Array.isArray(context.cycles) ? context.cycles : []).filter(
+      (cycle: any) => !String(cycle?.notes || '').includes('[HR_FLEX_POSTPONE]')
+    )
 
     return NextResponse.json(
       {
         success: true,
         employee: context.employee || null,
-        cycles: context.cycles || [],
+        cycles: visibleCycles,
         requests: context.requests || [],
         reference_date: context.reference_date || null,
       },

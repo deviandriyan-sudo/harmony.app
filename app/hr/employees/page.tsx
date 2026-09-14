@@ -196,6 +196,61 @@ type PHLAdjustmentForm = {
   reason: string
 }
 
+
+type LeaveBalanceSummary = {
+  employee_id: string
+  employee_number: string | null
+  full_name: string | null
+  department: string | null
+  position_name: string | null
+  join_date: string | null
+  annual_regular_days: number | null
+  postpone_active_days: number | null
+  postpone_expired_days: number | null
+  postpone_manual_net_days?: number | null
+  annual_total_available_days: number | null
+  latest_matured_at: string | null
+  current_cycle_end: string | null
+  next_postpone_expiry: string | null
+}
+
+type FlexiblePostponeCycle = {
+  id: string
+  employee_id: string | null
+  employee_number: string | null
+  cycle_end: string | null
+  matured_at: string | null
+  carry_forward_days: number | null
+  carry_forward_used_days: number | null
+  carry_forward_remaining_days: number | null
+  carry_forward_expired_at: string | null
+  status: string | null
+  notes: string | null
+  is_active: boolean | null
+}
+
+type ManualPostponeAdjustment = {
+  id: string
+  employee_id: string
+  source_cycle_id: string | null
+  action: string
+  delta_days: number
+  anniversary_date: string | null
+  expired_at: string | null
+  lifecycle_status: string
+  note: string
+  actor_email: string | null
+  created_at: string
+}
+
+type PostponeAdjustmentForm = {
+  action: 'add' | 'remove'
+  days: number
+  effective_date: string
+  expired_at: string
+  note: string
+}
+
 const initialForm: EmployeeForm = {
   employee_number: '',
   machine_pin: '',
@@ -236,6 +291,15 @@ const initialPHLAdjustmentForm: PHLAdjustmentForm = {
   phl_date: '',
   description: '',
   reason: '',
+}
+
+
+const initialPostponeAdjustmentForm: PostponeAdjustmentForm = {
+  action: 'add',
+  days: 1,
+  effective_date: '',
+  expired_at: '',
+  note: '',
 }
 
 const assignmentTypeOptions = [
@@ -282,6 +346,16 @@ export default function HREmployeesPage() {
   const [phlAdjustmentRequestKey, setPHLAdjustmentRequestKey] = useState('')
   const [loadingPHLBalance, setLoadingPHLBalance] = useState(false)
   const [savingPHLAdjustment, setSavingPHLAdjustment] = useState(false)
+
+
+  const [leaveBalanceSummary, setLeaveBalanceSummary] = useState<LeaveBalanceSummary | null>(null)
+  const [flexiblePostponeCycles, setFlexiblePostponeCycles] = useState<FlexiblePostponeCycle[]>([])
+  const [postponeAdjustments, setPostponeAdjustments] = useState<ManualPostponeAdjustment[]>([])
+  const [postponeAdjustmentForm, setPostponeAdjustmentForm] = useState<PostponeAdjustmentForm>(
+    initialPostponeAdjustmentForm
+  )
+  const [loadingPostpone, setLoadingPostpone] = useState(false)
+  const [savingPostpone, setSavingPostpone] = useState(false)
 
   const [errorMessage, setErrorMessage] = useState('')
   const [successMessage, setSuccessMessage] = useState('')
@@ -516,6 +590,168 @@ export default function HREmployeesPage() {
       ...prev,
       [field]: value,
     }))
+  }
+
+
+  function updatePostponeAdjustmentForm<K extends keyof PostponeAdjustmentForm>(
+    field: K,
+    value: PostponeAdjustmentForm[K]
+  ) {
+    setPostponeAdjustmentForm((prev) => ({
+      ...prev,
+      [field]: value,
+    }))
+  }
+
+  async function getSessionAccessToken() {
+    const { data } = await supabase.auth.getSession()
+    const token = data.session?.access_token
+    if (!token) throw new Error('Session login tidak ditemukan. Silakan login ulang.')
+    return token
+  }
+
+  async function fetchEmployeePostponeDetail(employeeId: string) {
+    setLoadingPostpone(true)
+
+    try {
+      const token = await getSessionAccessToken()
+      const response = await fetch(
+        `/api/hr/leave/postpone-adjustments?employee_id=${encodeURIComponent(employeeId)}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+          cache: 'no-store',
+        }
+      )
+      const result = await response.json().catch(() => null)
+
+      if (!response.ok) {
+        throw new Error(result?.error || 'Gagal memuat lifecycle cuti dan postpone.')
+      }
+
+      const summaries = (result?.summaries || []) as LeaveBalanceSummary[]
+      const flexibleCycles = (result?.flexible_cycles || []) as FlexiblePostponeCycle[]
+      const adjustments = (result?.adjustments || []) as ManualPostponeAdjustment[]
+      const summary = summaries.find((item) => item.employee_id === employeeId) || null
+
+      setLeaveBalanceSummary(summary)
+      setFlexiblePostponeCycles(flexibleCycles)
+      setPostponeAdjustments(adjustments)
+
+      if (summary) {
+        setForm((current) => ({
+          ...current,
+          annual_leave_balance: Number(
+            summary.annual_total_available_days ?? current.annual_leave_balance ?? 0
+          ),
+        }))
+      }
+    } catch (error: any) {
+      setLeaveBalanceSummary(null)
+      setFlexiblePostponeCycles([])
+      setPostponeAdjustments([])
+      setErrorMessage(
+        error?.message ||
+          'Lifecycle cuti/postpone gagal dimuat. Data PHL dan data karyawan lain tidak diubah.'
+      )
+    } finally {
+      setLoadingPostpone(false)
+    }
+  }
+
+  async function handlePostponeAdjustment() {
+    if (!editingEmployeeId) {
+      setErrorMessage('Simpan data karyawan terlebih dahulu sebelum menyesuaikan postpone.')
+      return
+    }
+
+    const days = Number(postponeAdjustmentForm.days || 0)
+    const note = postponeAdjustmentForm.note.trim()
+
+    if (days <= 0) {
+      setErrorMessage('Jumlah postpone harus lebih dari 0 hari.')
+      return
+    }
+
+    if (note.length < 5) {
+      setErrorMessage('Alasan/keterangan postpone minimal 5 karakter.')
+      return
+    }
+
+    if (postponeAdjustmentForm.action === 'add') {
+      if (!postponeAdjustmentForm.effective_date) {
+        setErrorMessage('Tanggal mulai berlaku postpone wajib diisi.')
+        return
+      }
+      if (!postponeAdjustmentForm.expired_at) {
+        setErrorMessage('Tanggal expired postpone wajib diisi.')
+        return
+      }
+      if (postponeAdjustmentForm.effective_date > getTodayISO()) {
+        setErrorMessage('Tanggal mulai berlaku postpone HR tidak boleh di masa depan.')
+        return
+      }
+      if (postponeAdjustmentForm.expired_at < postponeAdjustmentForm.effective_date) {
+        setErrorMessage('Tanggal expired tidak boleh lebih awal dari tanggal mulai berlaku.')
+        return
+      }
+    }
+
+    setSavingPostpone(true)
+    setErrorMessage('')
+    setSuccessMessage('')
+
+    try {
+      const token = await getSessionAccessToken()
+      const response = await fetch('/api/hr/leave/postpone-adjustments', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          mode: 'flexible',
+          employee_id: editingEmployeeId,
+          action: postponeAdjustmentForm.action,
+          days,
+          effective_date:
+            postponeAdjustmentForm.action === 'add'
+              ? postponeAdjustmentForm.effective_date
+              : null,
+          expired_at:
+            postponeAdjustmentForm.action === 'add'
+              ? postponeAdjustmentForm.expired_at
+              : null,
+          note,
+        }),
+      })
+
+      const result = await response.json().catch(() => null)
+      if (!response.ok) {
+        throw new Error(result?.error || 'Gagal memproses postpone manual HR.')
+      }
+
+      setSuccessMessage(
+        result?.result?.message ||
+          (postponeAdjustmentForm.action === 'add'
+            ? 'Postpone manual HR berhasil ditambahkan.'
+            : 'Postpone manual HR berhasil dikurangi.')
+      )
+
+      setPostponeAdjustmentForm((current) => ({
+        ...initialPostponeAdjustmentForm,
+        action: current.action,
+        effective_date: getTodayISO(),
+      }))
+
+      await Promise.all([
+        fetchEmployeePostponeDetail(editingEmployeeId),
+        fetchEmployees(),
+      ])
+    } catch (error: any) {
+      setErrorMessage(error?.message || 'Gagal memproses postpone manual HR.')
+    } finally {
+      setSavingPostpone(false)
+    }
   }
 
   async function fetchEmployeePHLBalanceDetail(employeeId: string) {
@@ -818,6 +1054,12 @@ export default function HREmployeesPage() {
     setPHLBalanceDetail(null)
     setLoadingPHLBalance(false)
     setSavingPHLAdjustment(false)
+    setLeaveBalanceSummary(null)
+    setFlexiblePostponeCycles([])
+    setPostponeAdjustments([])
+    setPostponeAdjustmentForm(initialPostponeAdjustmentForm)
+    setLoadingPostpone(false)
+    setSavingPostpone(false)
     setEditingEmployeeId(null)
     setEditModalOpen(false)
     setErrorMessage('')
@@ -830,6 +1072,13 @@ export default function HREmployeesPage() {
     setPHLAdjustmentFiles([])
     setPHLAdjustmentRequestKey('')
     setPHLBalanceDetail(null)
+    setLeaveBalanceSummary(null)
+    setFlexiblePostponeCycles([])
+    setPostponeAdjustments([])
+    setPostponeAdjustmentForm({
+      ...initialPostponeAdjustmentForm,
+      effective_date: getTodayISO(),
+    })
     setEditingEmployeeId(null)
     setSelectedEmployee(null)
     setEditModalOpen(true)
@@ -849,11 +1098,21 @@ export default function HREmployeesPage() {
     setPHLAdjustmentFiles([])
     setPHLAdjustmentRequestKey('')
     setPHLBalanceDetail(null)
+    setLeaveBalanceSummary(null)
+    setFlexiblePostponeCycles([])
+    setPostponeAdjustments([])
+    setPostponeAdjustmentForm({
+      ...initialPostponeAdjustmentForm,
+      effective_date: getTodayISO(),
+    })
     setEditModalOpen(true)
     setSelectedEmployee(null)
     setSuccessMessage('')
     setErrorMessage('')
-    void fetchEmployeePHLBalanceDetail(employee.id)
+    void Promise.all([
+      fetchEmployeePHLBalanceDetail(employee.id),
+      fetchEmployeePostponeDetail(employee.id),
+    ])
   }
 
   const activeMasterOptions = useMemo(() => {
@@ -1532,6 +1791,12 @@ export default function HREmployeesPage() {
             phlAdjustmentFiles={phlAdjustmentFiles}
             loadingPHLBalance={loadingPHLBalance}
             savingPHLAdjustment={savingPHLAdjustment}
+            leaveBalanceSummary={leaveBalanceSummary}
+            flexiblePostponeCycles={flexiblePostponeCycles}
+            postponeAdjustments={postponeAdjustments}
+            postponeAdjustmentForm={postponeAdjustmentForm}
+            loadingPostpone={loadingPostpone}
+            savingPostpone={savingPostpone}
             onSubmit={handleSubmit}
             onClose={resetForm}
             onUpdate={updateForm}
@@ -1539,6 +1804,8 @@ export default function HREmployeesPage() {
             onPHLAdjustmentUpdate={updatePHLAdjustmentForm}
             onPHLAdjustmentFilesChange={setPHLAdjustmentFiles}
             onPHLAdjust={handlePHLBalanceAdjustment}
+            onPostponeAdjustmentUpdate={updatePostponeAdjustmentForm}
+            onPostponeAdjust={handlePostponeAdjustment}
             onAddAssignment={handleAddAssignment}
             onDeleteAssignment={handleDeleteAssignment}
           />
@@ -2047,6 +2314,12 @@ function EmployeeFormModal({
   phlAdjustmentFiles,
   loadingPHLBalance,
   savingPHLAdjustment,
+  leaveBalanceSummary,
+  flexiblePostponeCycles,
+  postponeAdjustments,
+  postponeAdjustmentForm,
+  loadingPostpone,
+  savingPostpone,
   onSubmit,
   onClose,
   onUpdate,
@@ -2054,6 +2327,8 @@ function EmployeeFormModal({
   onPHLAdjustmentUpdate,
   onPHLAdjustmentFilesChange,
   onPHLAdjust,
+  onPostponeAdjustmentUpdate,
+  onPostponeAdjust,
   onAddAssignment,
   onDeleteAssignment,
 }: {
@@ -2072,6 +2347,12 @@ function EmployeeFormModal({
   phlAdjustmentFiles: File[]
   loadingPHLBalance: boolean
   savingPHLAdjustment: boolean
+  leaveBalanceSummary: LeaveBalanceSummary | null
+  flexiblePostponeCycles: FlexiblePostponeCycle[]
+  postponeAdjustments: ManualPostponeAdjustment[]
+  postponeAdjustmentForm: PostponeAdjustmentForm
+  loadingPostpone: boolean
+  savingPostpone: boolean
   onSubmit: (event: FormEvent<HTMLFormElement>) => void
   onClose: () => void
   onUpdate: (field: keyof EmployeeForm, value: string | number | boolean) => void
@@ -2082,6 +2363,11 @@ function EmployeeFormModal({
   ) => void
   onPHLAdjustmentFilesChange: (files: File[]) => void
   onPHLAdjust: () => void
+  onPostponeAdjustmentUpdate: <K extends keyof PostponeAdjustmentForm>(
+    field: K,
+    value: PostponeAdjustmentForm[K]
+  ) => void
+  onPostponeAdjust: () => void
   onAddAssignment: () => void
   onDeleteAssignment: (assignment: EmployeeAssignment) => void
 }) {
@@ -2169,6 +2455,18 @@ function EmployeeFormModal({
               <SelectField label="Status Data" value={form.is_active ? 'active' : 'inactive'} onChange={(value) => onUpdate('is_active', value === 'active')} options={[{ label: 'Active', value: 'active' }, { label: 'Inactive', value: 'inactive' }]} />
             </FormSection>
 
+            <PostponeAdjustmentSection
+              editingEmployeeId={editingEmployeeId}
+              summary={leaveBalanceSummary}
+              flexibleCycles={flexiblePostponeCycles}
+              adjustments={postponeAdjustments}
+              form={postponeAdjustmentForm}
+              loading={loadingPostpone}
+              saving={savingPostpone}
+              onUpdate={onPostponeAdjustmentUpdate}
+              onAdjust={onPostponeAdjust}
+            />
+
             <PHLBalanceAdjustmentSection
               editingEmployeeId={editingEmployeeId}
               detail={phlBalanceDetail}
@@ -2211,6 +2509,223 @@ function ReadOnlyBalanceField({
       <span className="harmony-label">{label}</span>
       <div className="mt-1 text-lg font-bold text-[#1d1d1f]">{value}</div>
       <p className="mt-1 text-xs leading-5 text-[#6e6e73]">{description}</p>
+    </div>
+  )
+}
+
+
+function PostponeAdjustmentSection({
+  editingEmployeeId,
+  summary,
+  flexibleCycles,
+  adjustments,
+  form,
+  loading,
+  saving,
+  onUpdate,
+  onAdjust,
+}: {
+  editingEmployeeId: string | null
+  summary: LeaveBalanceSummary | null
+  flexibleCycles: FlexiblePostponeCycle[]
+  adjustments: ManualPostponeAdjustment[]
+  form: PostponeAdjustmentForm
+  loading: boolean
+  saving: boolean
+  onUpdate: <K extends keyof PostponeAdjustmentForm>(
+    field: K,
+    value: PostponeAdjustmentForm[K]
+  ) => void
+  onAdjust: () => void
+}) {
+  const today = getTodayISO()
+  const activeFlexibleCycles = flexibleCycles.filter((cycle) => {
+    const effectiveDate = cycle.cycle_end ? addDaysISO(cycle.cycle_end, 1) : ''
+    const expiry = String(cycle.carry_forward_expired_at || '')
+    return (
+      cycle.is_active !== false &&
+      Number(cycle.carry_forward_remaining_days || 0) > 0 &&
+      Boolean(effectiveDate) &&
+      effectiveDate <= today &&
+      (!expiry || expiry >= today)
+    )
+  })
+  const flexibleActiveDays = activeFlexibleCycles.reduce(
+    (sum, cycle) => sum + Number(cycle.carry_forward_remaining_days || 0),
+    0
+  )
+  const flexibleNextExpiry = activeFlexibleCycles
+    .map((cycle) => String(cycle.carry_forward_expired_at || ''))
+    .filter(Boolean)
+    .sort()[0] || ''
+
+  return (
+    <div className="rounded-[28px] border border-[#eadcff] bg-gradient-to-br from-[#fbf8ff] to-white p-5 shadow-sm">
+      <div className="flex flex-col gap-3 border-b border-black/5 pb-5 md:flex-row md:items-start md:justify-between">
+        <div className="flex min-w-0 items-start gap-3">
+          <div className="rounded-2xl bg-[#f1e9ff] p-3 text-[#6f42c1]">
+            <CalendarClock size={19} />
+          </div>
+          <div className="min-w-0">
+            <h3 className="font-semibold text-[#1d1d1f]">Penyesuaian Postpone Manual HR</h3>
+            <p className="mt-1 text-sm leading-6 text-[#6e6e73]">
+              HR dapat menambah postpone tanpa mengikuti batas cycle karyawan. HR menentukan jumlah hari,
+              tanggal mulai berlaku, dan tanggal expired. Pengajuan postpone oleh karyawan tetap mengikuti
+              cycle, H-7, saldo sumber, dan approval existing.
+            </p>
+          </div>
+        </div>
+        <div className="inline-flex w-fit items-center gap-2 rounded-full bg-purple-50 px-3 py-1.5 text-xs font-bold text-purple-700">
+          <ShieldCheck size={14} />
+          HR Flexible · Audit Aktif
+        </div>
+      </div>
+
+      {!editingEmployeeId ? (
+        <div className="mt-5 rounded-[22px] border border-amber-200 bg-amber-50 p-4 text-sm font-semibold leading-6 text-amber-700">
+          Simpan karyawan terlebih dahulu. Setelah itu buka Edit Data untuk mengelola postpone manual HR.
+        </div>
+      ) : loading ? (
+        <div className="mt-5 flex min-h-32 items-center justify-center gap-3 rounded-[22px] border border-black/5 bg-white">
+          <Loader2 size={20} className="animate-spin text-[#7c3aed]" />
+          <span className="text-sm font-semibold text-[#6e6e73]">Memuat lifecycle cuti...</span>
+        </div>
+      ) : (
+        <>
+          <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+            <PHLSummaryMiniCard
+              title="Cuti Matang"
+              value={`${Number(summary?.annual_regular_days || 0)} hari`}
+              description="Saldo regular aktif"
+            />
+            <PHLSummaryMiniCard
+              title="Postpone Aktif"
+              value={`${Number(summary?.postpone_active_days || 0)} hari`}
+              description={summary?.next_postpone_expiry ? `Expiry ${formatDate(summary.next_postpone_expiry)}` : 'Seluruh postpone aktif'}
+            />
+            <PHLSummaryMiniCard
+              title="Postpone HR Fleksibel"
+              value={`${flexibleActiveDays} hari`}
+              description={flexibleNextExpiry ? `Expiry terdekat ${formatDate(flexibleNextExpiry)}` : 'Belum ada saldo fleksibel aktif'}
+            />
+            <PHLSummaryMiniCard
+              title="Postpone Expired"
+              value={`${Number(summary?.postpone_expired_days || 0)} hari`}
+              description="Tidak masuk saldo aktif"
+            />
+            <PHLSummaryMiniCard
+              title="Total Saldo Cuti"
+              value={`${Number(summary?.annual_total_available_days || 0)} hari`}
+              description="Regular + postpone + koreksi"
+            />
+          </div>
+
+          <div className="mt-5 rounded-[24px] border border-black/5 bg-white p-5">
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+              <SelectField
+                label="Tindakan"
+                value={form.action}
+                onChange={(value) => onUpdate('action', value as 'add' | 'remove')}
+                options={[
+                  { label: 'Tambah Postpone HR', value: 'add' },
+                  { label: 'Kurangi Postpone HR Fleksibel', value: 'remove' },
+                ]}
+              />
+
+              <InputField
+                label="Jumlah Hari"
+                type="number"
+                value={String(form.days)}
+                onChange={(value) => onUpdate('days', Number(value))}
+                placeholder="Contoh: 3"
+              />
+
+              {form.action === 'add' ? (
+                <>
+                  <InputField
+                    label="Mulai Berlaku"
+                    type="date"
+                    value={form.effective_date}
+                    onChange={(value) => onUpdate('effective_date', value)}
+                  />
+                  <InputField
+                    label="Expired At"
+                    type="date"
+                    value={form.expired_at}
+                    onChange={(value) => onUpdate('expired_at', value)}
+                  />
+                </>
+              ) : (
+                <ReadOnlyBalanceField
+                  label="Saldo Fleksibel Bisa Dikurangi"
+                  value={`${flexibleActiveDays} hari`}
+                  description="Pengurangan hanya mengambil postpone manual HR fleksibel aktif; postpone employee tidak disentuh."
+                />
+              )}
+            </div>
+
+            <div className="mt-4">
+              <TextareaField
+                label="Alasan / Keterangan HR"
+                value={form.note}
+                onChange={(value) => onUpdate('note', value)}
+                placeholder="Contoh: Penambahan postpone berdasarkan keputusan khusus manajemen."
+              />
+            </div>
+
+            <div className="mt-5 flex justify-end">
+              <button
+                type="button"
+                disabled={saving || (form.action === 'remove' && flexibleActiveDays <= 0)}
+                onClick={onAdjust}
+                className="harmony-button-primary disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {saving ? (
+                  <Loader2 size={17} className="animate-spin" />
+                ) : form.action === 'add' ? (
+                  <Plus size={17} />
+                ) : (
+                  <Minus size={17} />
+                )}
+                {saving
+                  ? 'Memproses...'
+                  : form.action === 'add'
+                    ? 'Tambah Postpone HR'
+                    : 'Kurangi Postpone HR'}
+              </button>
+            </div>
+          </div>
+
+          {adjustments.length > 0 && (
+            <div className="mt-5 rounded-[24px] border border-black/5 bg-white p-5">
+              <div className="mb-3 flex items-center gap-2 font-semibold text-[#1d1d1f]">
+                <History size={17} />
+                Audit Postpone Terbaru
+              </div>
+              <div className="space-y-2">
+                {adjustments.slice(0, 8).map((item) => (
+                  <div
+                    key={item.id}
+                    className="flex flex-col gap-1 rounded-2xl bg-[#f8f8fa] px-4 py-3 text-xs text-[#6e6e73] sm:flex-row sm:items-center sm:justify-between"
+                  >
+                    <span>
+                      <strong className="text-[#1d1d1f]">
+                        {Number(item.delta_days || 0) >= 0 ? '+' : ''}
+                        {Number(item.delta_days || 0)} hari
+                      </strong>{' '}
+                      · {item.note || '-'}
+                    </span>
+                    <span>
+                      {item.anniversary_date ? formatDate(item.anniversary_date) : '-'} →{' '}
+                      {item.expired_at ? formatDate(item.expired_at) : '-'}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </>
+      )}
     </div>
   )
 }
