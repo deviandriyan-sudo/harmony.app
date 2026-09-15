@@ -12,97 +12,102 @@ import {
   History,
   RefreshCcw,
   ShieldCheck,
-  WalletCards,
+  Wrench,
 } from 'lucide-react'
 
 import { Topbar } from '@/components/layout/Topbar'
-import {
-  getCutoffRange,
-} from '@/lib/attendance-reporting'
+import { getCutoffRange } from '@/lib/attendance-reporting'
 import { useAttendancePeriodQuery } from '@/lib/use-attendance-period'
 
-type Module = {
+type Tone = 'blue' | 'orange' | 'purple' | 'green'
+
+type StepAction = {
+  label: string
+  href: string
+  periodAware: boolean
+}
+
+type AttendanceStep = {
   step: string
   title: string
   description: string
-  href: string
   icon: ReactNode
-  tag: string
-  periodAware: boolean
-  optional?: boolean
+  tone: Tone
+  primary: StepAction
+  secondary?: StepAction[]
+  helper: string
 }
 
-const modules: Module[] = [
+const attendanceSteps: AttendanceStep[] = [
   {
     step: '01',
-    title: 'Upload Absensi',
+    title: 'Input Absensi',
     description:
-      'Import fingerprint/CSV/Excel. Safe merge mempertahankan jam manual, bukti, dan koreksi employee.',
-    href: '/hr/attendance/upload',
+      'Upload fingerprint lalu cek data yang masuk. Monitoring tetap tersedia tanpa menjadi tahap terpisah.',
     icon: <Fingerprint size={20} />,
-    tag: 'Input Data',
-    periodAware: false,
+    tone: 'blue',
+    primary: {
+      label: 'Upload Fingerprint',
+      href: '/hr/attendance/upload',
+      periodAware: false,
+    },
+    secondary: [
+      {
+        label: 'Lihat Data Absensi',
+        href: '/hr/attendance/data',
+        periodAware: true,
+      },
+    ],
+    helper: 'Mesin, manual, koreksi, dan data pendukung tetap memakai source existing.',
   },
   {
     step: '02',
-    title: 'Data Absensi',
+    title: 'Review & Validasi',
     description:
-      'Monitoring seluruh karyawan dan seluruh sumber kehadiran, termasuk yang belum submit periode.',
-    href: '/hr/attendance/data',
-    icon: <CalendarDays size={20} />,
-    tag: 'Monitoring',
-    periodAware: true,
+      'Periksa hasil submit, approval atasan, cuti/izin/sakit/ST/PHL, dan data yang memerlukan tindak lanjut.',
+    icon: <ShieldCheck size={20} />,
+    tone: 'orange',
+    primary: {
+      label: 'Buka HR Review',
+      href: '/hr/attendance/approvals',
+      periodAware: true,
+    },
+    secondary: [
+      {
+        label: 'Sinkronisasi Request',
+        href: '/hr/attendance/sync',
+        periodAware: true,
+      },
+    ],
+    helper: 'Sinkronisasi tetap tersedia sebagai tool manual tanpa menjadi langkah utama terpisah.',
   },
   {
     step: '03',
-    title: 'HR Review',
+    title: 'Finalisasi',
     description:
-      'Lihat data seluruh karyawan. Approval HR tetap hanya aktif setelah approval atasan.',
-    href: '/hr/attendance/approvals',
-    icon: <ShieldCheck size={20} />,
-    tag: 'Review',
-    periodAware: true,
+      'Finalisasi dan lock hanya employee yang sudah lolos review. Semua kontrol existing tetap digunakan.',
+    icon: <CheckCircle2 size={20} />,
+    tone: 'purple',
+    primary: {
+      label: 'Buka Finalisasi',
+      href: '/hr/attendance/final-report',
+      periodAware: true,
+    },
+    helper: 'Finalisasi tetap memakai route dan mekanisme lock yang sama seperti sebelumnya.',
   },
   {
     step: '04',
-    title: 'Sinkron Approved Request',
+    title: 'Laporan',
     description:
-      'Materialisasi cuti/izin/sakit/ST/tugas luar/PHL approved ke attendance_logs untuk workflow finalisasi.',
-    href: '/hr/attendance/sync',
-    icon: <RefreshCcw size={20} />,
-    tag: 'Sync',
-    periodAware: true,
-    optional: true,
-  },
-  {
-    step: '05',
-    title: 'Finalisasi HR',
-    description:
-      'Finalisasi dan lock hanya untuk employee yang sudah lolos review. Approved request disinkronkan sebelum final.',
-    href: '/hr/attendance/final-report',
-    icon: <CheckCircle2 size={20} />,
-    tag: 'Finalisasi',
-    periodAware: true,
-  },
-  {
-    step: 'R',
-    title: 'Laporan Kehadiran & Tunjangan',
-    description:
-      'Rekap mesin, manual, ST/tugas luar, dan kerja hari libur. Laporan membaca sumber asli langsung, tidak menunggu finalisasi.',
-    href: '/hr/attendance/export',
+      'Buka rekap kehadiran dan dasar tunjangan dari reporting engine existing untuk periode yang dipilih.',
     icon: <FileSpreadsheet size={20} />,
-    tag: 'Report',
-    periodAware: true,
-  },
-  {
-    step: 'A',
-    title: 'Audit Absensi',
-    description:
-      'Riwayat finalisasi, lock/unlock, dan aktivitas penting HR.',
-    href: '/hr/attendance/audit',
-    icon: <History size={20} />,
-    tag: 'Audit Log',
-    periodAware: true,
+    tone: 'green',
+    primary: {
+      label: 'Buka Laporan',
+      href: '/hr/attendance/export',
+      periodAware: true,
+    },
+    helper: 'Laporan tetap membaca mesin, manual, ST/tugas luar, hari libur, dan approved request.',
   },
 ]
 
@@ -110,42 +115,42 @@ export default function HRAttendanceHomePage() {
   const { periodMonth, setPeriodMonth } = useAttendancePeriodQuery()
   const range = useMemo(() => getCutoffRange(periodMonth), [periodMonth])
 
-  const periodHref = (module: Module) =>
-    module.periodAware
-      ? `${module.href}?period=${encodeURIComponent(periodMonth)}`
-      : module.href
+  const withPeriod = (action: StepAction) =>
+    action.periodAware
+      ? `${action.href}?period=${encodeURIComponent(periodMonth)}`
+      : action.href
 
   return (
     <>
       <Topbar
         title="Absensi HR"
-        description="Satu periode, satu sumber reporting: mesin + manual + ST/tugas luar + approved request."
+        description="Alur kerja absensi disederhanakan tanpa mengubah route, reporting, approval, finalisasi, atau lock existing."
       />
 
-      <section className="harmony-page-bg min-h-screen space-y-6 overflow-x-hidden p-4 sm:p-6">
-        <section className="relative overflow-hidden rounded-[32px] border border-black/5 bg-white p-6 shadow-sm sm:p-8">
-          <div className="pointer-events-none absolute -right-20 -top-20 h-64 w-64 rounded-full bg-[#007aff]/10 blur-3xl" />
+      <section className="harmony-page-bg min-h-screen space-y-5 overflow-x-hidden p-4 sm:p-6">
+        <section className="relative overflow-hidden rounded-[32px] border border-black/5 bg-white/90 p-6 shadow-sm backdrop-blur-xl sm:p-8">
+          <div className="pointer-events-none absolute -right-20 -top-24 h-64 w-64 rounded-full bg-[#007aff]/10 blur-3xl" />
+          <div className="pointer-events-none absolute -bottom-24 left-[28%] h-56 w-56 rounded-full bg-[#af52de]/8 blur-3xl" />
 
-          <div className="relative grid gap-6 xl:grid-cols-[1fr_360px] xl:items-center">
+          <div className="relative grid gap-6 xl:grid-cols-[1fr_340px] xl:items-center">
             <div>
-              <div className="inline-flex items-center gap-2 rounded-full border border-black/5 bg-[#f5f5f7] px-3 py-1.5 text-xs font-bold text-[#6e6e73]">
+              <div className="inline-flex items-center gap-2 rounded-full border border-blue-100 bg-blue-50/80 px-3 py-1.5 text-xs font-bold text-blue-700">
                 <ShieldCheck size={14} />
                 HARMONY Attendance Control
               </div>
 
-              <h1 className="mt-4 text-3xl font-semibold tracking-tight text-[#1d1d1f]">
-                Semua route memakai periode yang sama
+              <h1 className="mt-4 max-w-3xl text-3xl font-semibold tracking-[-0.035em] text-[#1d1d1f]">
+                Empat langkah untuk satu periode absensi
               </h1>
 
               <p className="mt-3 max-w-4xl text-sm leading-7 text-[#6e6e73]">
-                Monitoring dan laporan tidak lagi bergantung pada employee submit atau menu Sync. Fingerprint mesin,
-                absensi manual, ST/tugas luar/luar kota, kerja hari libur, cuti, sakit, izin, dan PHL dibaca dari sumber
-                aslinya lalu diklasifikasikan satu kali dengan aturan yang sama.
+                Route lama tetap aktif. Halaman ini hanya menyederhanakan cara HR bekerja menjadi Input, Review, Finalisasi, lalu Laporan.
+                Sinkronisasi dan Audit tetap tersedia sebagai tools pendukung.
               </p>
             </div>
 
-            <div className="rounded-[24px] border border-blue-100 bg-blue-50 p-5">
-              <label className="text-xs font-bold uppercase tracking-wide text-blue-500">
+            <div className="rounded-[24px] border border-blue-100/80 bg-gradient-to-br from-blue-50 via-white to-indigo-50/60 p-5 shadow-sm">
+              <label className="text-xs font-bold uppercase tracking-[0.14em] text-blue-500">
                 Periode Aktif
               </label>
               <input
@@ -162,56 +167,70 @@ export default function HRAttendanceHomePage() {
           </div>
         </section>
 
-        <section className="rounded-[28px] border border-black/5 bg-[#1d1d1f] p-5 text-white shadow-sm">
-          <div className="flex flex-wrap items-center gap-2 text-xs font-bold">
-            <FlowPill label="Upload" />
-            <ArrowRight size={14} className="text-white/35" />
-            <FlowPill label="Monitoring" />
-            <ArrowRight size={14} className="text-white/35" />
-            <FlowPill label="Supervisor" />
-            <ArrowRight size={14} className="text-white/35" />
-            <FlowPill label="HR Review" />
-            <ArrowRight size={14} className="text-white/35" />
-            <FlowPill label="Finalisasi" />
-            <ArrowRight size={14} className="text-white/35" />
-            <FlowPill label="Payroll Report" accent />
+        <section className="overflow-hidden rounded-[28px] border border-black/5 bg-[#1d1d1f] p-4 text-white shadow-sm sm:p-5">
+          <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-[1fr_auto_1fr_auto_1fr_auto_1fr] xl:items-center">
+            <FlowPill number="01" label="Input" tone="blue" />
+            <ArrowRight size={15} className="hidden text-white/25 xl:block" />
+            <FlowPill number="02" label="Review" tone="orange" />
+            <ArrowRight size={15} className="hidden text-white/25 xl:block" />
+            <FlowPill number="03" label="Finalisasi" tone="purple" />
+            <ArrowRight size={15} className="hidden text-white/25 xl:block" />
+            <FlowPill number="04" label="Laporan" tone="green" />
           </div>
-          <p className="mt-3 text-xs leading-6 text-white/55">
-            <strong className="text-white">Laporan dapat dibuka kapan saja.</strong> Sync hanya untuk materialisasi approved
-            request ke attendance_logs/finalisasi; laporan tetap membaca request approved langsung agar ST/tugas luar tidak hilang.
-          </p>
         </section>
 
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {modules.map((item) => (
-            <ModuleCard key={item.href} {...item} href={periodHref(item)} />
+        <section className="grid gap-4 lg:grid-cols-2 2xl:grid-cols-4">
+          {attendanceSteps.map((step) => (
+            <AttendanceStepCard
+              key={step.step}
+              step={step}
+              primaryHref={withPeriod(step.primary)}
+              secondaryHrefs={(step.secondary || []).map((action) => ({
+                ...action,
+                href: withPeriod(action),
+              }))}
+            />
           ))}
-        </div>
+        </section>
 
-        <section className="grid gap-4 lg:grid-cols-2">
-          <div className="rounded-[28px] border border-green-200 bg-green-50 p-5 text-sm leading-7 text-green-800">
+        <section className="grid gap-4 lg:grid-cols-[1fr_1fr]">
+          <div className="rounded-[28px] border border-slate-200/80 bg-gradient-to-br from-slate-50 via-white to-blue-50/40 p-5 shadow-sm sm:p-6">
             <div className="flex items-start gap-3">
-              <WalletCards size={19} className="mt-1 shrink-0" />
-              <div>
-                <p className="font-bold">Dasar laporan tunjangan</p>
-                <p className="mt-1">
-                  Hari kerja yang benar-benar dilakukan dipisahkan menjadi <strong>Hadir Kantor</strong>,{' '}
-                  <strong>Hadir Manual/Lapangan</strong>, <strong>ST/Tugas Luar</strong>, dan{' '}
-                  <strong>Kerja Hari Libur</strong>. Total terverifikasi menjadi kandidat dasar jumlah hari tunjangan transport
-                  dan makan.
+              <div className="rounded-2xl bg-slate-900 p-2.5 text-white">
+                <Wrench size={18} />
+              </div>
+              <div className="min-w-0 flex-1">
+                <h2 className="font-semibold text-[#1d1d1f]">Tools & Riwayat</h2>
+                <p className="mt-1 text-sm leading-6 text-[#6e6e73]">
+                  Digunakan bila HR perlu re-sync manual, troubleshooting, atau melihat aktivitas finalisasi dan lock.
                 </p>
+
+                <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                  <ToolLink
+                    href={`/hr/attendance/sync?period=${encodeURIComponent(periodMonth)}`}
+                    icon={<RefreshCcw size={16} />}
+                    label="Sinkronisasi Manual"
+                  />
+                  <ToolLink
+                    href={`/hr/attendance/audit?period=${encodeURIComponent(periodMonth)}`}
+                    icon={<History size={16} />}
+                    label="Audit Absensi"
+                  />
+                </div>
               </div>
             </div>
           </div>
 
-          <div className="rounded-[28px] border border-orange-200 bg-orange-50 p-5 text-sm leading-7 text-orange-800">
+          <div className="rounded-[28px] border border-emerald-200/70 bg-gradient-to-br from-emerald-50/80 via-white to-cyan-50/40 p-5 shadow-sm sm:p-6">
             <div className="flex items-start gap-3">
-              <ShieldCheck size={19} className="mt-1 shrink-0" />
+              <div className="rounded-2xl bg-emerald-100 p-2.5 text-emerald-700">
+                <CalendarDays size={18} />
+              </div>
               <div>
-                <p className="font-bold">Kontrol payroll aman</p>
-                <p className="mt-1">
-                  Pure manual tetap muncul sebagai kehadiran tercatat, tetapi baru masuk <strong>Dasar Tunjangan</strong> setelah
-                  approval. Cuti/sakit/izin/PHL yang bertabrakan dengan jam kerja masuk <strong>Konflik Data</strong>, bukan double count.
+                <h2 className="font-semibold text-[#1d1d1f]">Prinsip reporting tetap sama</h2>
+                <p className="mt-1 text-sm leading-6 text-[#5f6f66]">
+                  Hari kerja terverifikasi tetap dipisahkan menjadi Hadir Kantor, Manual/Lapangan, ST/Tugas Luar, dan Kerja Hari Libur.
+                  Konflik cuti/sakit/izin/PHL tetap ditandai sebagai konflik, bukan double count.
                 </p>
               </div>
             </div>
@@ -222,59 +241,131 @@ export default function HRAttendanceHomePage() {
   )
 }
 
-function FlowPill({ label, accent = false }: { label: string; accent?: boolean }) {
+function AttendanceStepCard({
+  step,
+  primaryHref,
+  secondaryHrefs,
+}: {
+  step: AttendanceStep
+  primaryHref: string
+  secondaryHrefs: StepAction[]
+}) {
+  const tones = {
+    blue: {
+      shell: 'border-blue-100/80 bg-gradient-to-br from-blue-50/90 via-white to-cyan-50/35',
+      icon: 'bg-blue-100 text-blue-700',
+      badge: 'bg-blue-100/80 text-blue-700',
+      button: 'bg-[#007aff] text-white hover:bg-[#006ee6]',
+    },
+    orange: {
+      shell: 'border-orange-100/90 bg-gradient-to-br from-orange-50/85 via-white to-amber-50/40',
+      icon: 'bg-orange-100 text-orange-700',
+      badge: 'bg-orange-100/80 text-orange-700',
+      button: 'bg-[#b85d00] text-white hover:bg-[#a65300]',
+    },
+    purple: {
+      shell: 'border-purple-100/90 bg-gradient-to-br from-purple-50/85 via-white to-indigo-50/40',
+      icon: 'bg-purple-100 text-purple-700',
+      badge: 'bg-purple-100/80 text-purple-700',
+      button: 'bg-[#7b2cbf] text-white hover:bg-[#6f24ad]',
+    },
+    green: {
+      shell: 'border-emerald-100/90 bg-gradient-to-br from-emerald-50/85 via-white to-teal-50/40',
+      icon: 'bg-emerald-100 text-emerald-700',
+      badge: 'bg-emerald-100/80 text-emerald-700',
+      button: 'bg-[#168034] text-white hover:bg-[#126f2d]',
+    },
+  }[step.tone]
+
   return (
-    <span className={`rounded-full px-3 py-1.5 ${accent ? 'bg-green-500 text-white' : 'bg-white/10 text-white/75'}`}>
-      {label}
-    </span>
+    <div className={`flex min-h-[330px] flex-col rounded-[28px] border p-5 shadow-sm ${tones.shell}`}>
+      <div className="flex items-start justify-between gap-4">
+        <div className={`flex h-11 w-11 items-center justify-center rounded-2xl ${tones.icon}`}>
+          {step.icon}
+        </div>
+        <span className={`rounded-full px-3 py-1 text-[10px] font-bold tracking-[0.12em] ${tones.badge}`}>
+          STEP {step.step}
+        </span>
+      </div>
+
+      <div className="mt-5 flex-1">
+        <h2 className="text-lg font-semibold text-[#1d1d1f]">{step.title}</h2>
+        <p className="mt-2 text-sm leading-6 text-[#6e6e73]">{step.description}</p>
+
+        <div className="mt-4 rounded-2xl border border-black/5 bg-white/70 p-3 text-xs leading-5 text-[#6e6e73]">
+          {step.helper}
+        </div>
+      </div>
+
+      <div className="mt-5 space-y-2">
+        <Link
+          href={primaryHref}
+          className={`flex min-h-11 items-center justify-between rounded-2xl px-4 text-xs font-bold transition ${tones.button}`}
+        >
+          {step.primary.label}
+          <ArrowUpRight size={15} />
+        </Link>
+
+        {secondaryHrefs.map((action) => (
+          <Link
+            key={`${step.step}-${action.href}`}
+            href={action.href}
+            className="flex min-h-10 items-center justify-between rounded-2xl border border-black/5 bg-white/75 px-4 text-xs font-bold text-[#1d1d1f] transition hover:bg-white"
+          >
+            {action.label}
+            <ArrowRight size={14} className="text-[#86868b]" />
+          </Link>
+        ))}
+      </div>
+    </div>
   )
 }
 
-function ModuleCard({
-  step,
-  title,
-  description,
+function FlowPill({
+  number,
+  label,
+  tone,
+}: {
+  number: string
+  label: string
+  tone: Tone
+}) {
+  const toneClass = {
+    blue: 'bg-blue-400/15 text-blue-200',
+    orange: 'bg-orange-400/15 text-orange-200',
+    purple: 'bg-purple-400/15 text-purple-200',
+    green: 'bg-emerald-400/15 text-emerald-200',
+  }[tone]
+
+  return (
+    <div className="flex items-center gap-3 rounded-2xl border border-white/8 bg-white/[0.06] px-3 py-2.5">
+      <span className={`flex h-8 w-8 items-center justify-center rounded-xl text-[10px] font-bold ${toneClass}`}>
+        {number}
+      </span>
+      <span className="text-xs font-bold text-white/80">{label}</span>
+    </div>
+  )
+}
+
+function ToolLink({
   href,
   icon,
-  tag,
-  optional,
-}: Module & { href: string }) {
+  label,
+}: {
+  href: string
+  icon: ReactNode
+  label: string
+}) {
   return (
     <Link
       href={href}
-      className="group harmony-card flex min-h-[235px] flex-col justify-between overflow-hidden p-5 transition hover:-translate-y-0.5 hover:shadow-lg sm:p-6"
+      className="flex items-center justify-between gap-3 rounded-2xl border border-black/5 bg-white/80 px-4 py-3 text-xs font-bold text-[#1d1d1f] shadow-sm transition hover:-translate-y-0.5 hover:bg-white"
     >
-      <div>
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#f5f5f7] text-[#1d1d1f]">
-              {icon}
-            </div>
-            <span className="text-xs font-bold text-[#86868b]">{step}</span>
-          </div>
-
-          <div className="flex items-center gap-2">
-            {optional && (
-              <span className="rounded-full bg-orange-50 px-2.5 py-1 text-[10px] font-bold text-orange-700">
-                Workflow
-              </span>
-            )}
-            <span className="rounded-full border border-black/5 bg-white px-3 py-1 text-[10px] font-bold text-[#6e6e73]">
-              {tag}
-            </span>
-          </div>
-        </div>
-
-        <h2 className="mt-5 text-lg font-semibold text-[#1d1d1f]">{title}</h2>
-        <p className="mt-2 text-sm leading-6 text-[#6e6e73]">{description}</p>
-      </div>
-
-      <div className="mt-5 flex items-center justify-between border-t border-black/5 pt-4 text-xs font-bold text-[#1d1d1f]">
-        Buka halaman
-        <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#f5f5f7] transition group-hover:bg-[#1d1d1f] group-hover:text-white">
-          <ArrowUpRight size={16} />
-        </span>
-      </div>
+      <span className="flex items-center gap-2">
+        {icon}
+        {label}
+      </span>
+      <ArrowUpRight size={14} className="text-[#86868b]" />
     </Link>
   )
 }

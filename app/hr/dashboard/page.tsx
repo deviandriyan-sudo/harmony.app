@@ -12,7 +12,6 @@ import {
   CheckCircle2,
   Clock3,
   Database,
-  Download,
   Fingerprint,
   Landmark,
   KeyRound,
@@ -161,7 +160,9 @@ export default function HRDashboardPage() {
         description="Control center absensi, cuti, PHL, user access, dan monitoring operasional HR."
       />
 
-      <section className="harmony-page-bg min-h-screen space-y-5 overflow-x-hidden p-4 sm:p-5">
+      <section className="harmony-page-bg relative min-h-screen space-y-5 overflow-x-hidden p-4 sm:p-5">
+        <div className="pointer-events-none absolute -left-24 top-24 h-72 w-72 rounded-full bg-[#007aff]/[0.035] blur-3xl" />
+        <div className="pointer-events-none absolute -right-24 top-[34rem] h-80 w-80 rounded-full bg-[#af52de]/[0.035] blur-3xl" />
         <HeroSection
           periodLabel={currentPeriod.label}
           startDate={currentPeriod.startDate}
@@ -306,9 +307,9 @@ function HeroSection({
       : Math.round((metrics.submittedEmployees / metrics.activeEmployees) * 100)
 
   return (
-    <div className="harmony-glass-dark harmony-slide-up relative overflow-hidden rounded-[28px] p-5 text-white sm:p-6">
-      <div className="pointer-events-none absolute -right-16 -top-20 h-52 w-52 rounded-full bg-[#007aff]/30 blur-3xl" />
-      <div className="pointer-events-none absolute -bottom-20 left-10 h-52 w-52 rounded-full bg-[#af52de]/25 blur-3xl" />
+    <div className="harmony-glass-dark harmony-slide-up relative overflow-hidden rounded-[28px] border border-white/10 bg-gradient-to-br from-[#172033] via-[#1d1d1f] to-[#251d33] p-5 text-white shadow-[0_22px_60px_rgba(29,29,31,0.16)] sm:p-6">
+      <div className="pointer-events-none absolute -right-16 -top-20 h-52 w-52 rounded-full bg-[#007aff]/28 blur-3xl" />
+      <div className="pointer-events-none absolute -bottom-20 left-10 h-52 w-52 rounded-full bg-[#af52de]/20 blur-3xl" />
 
       <div className="relative grid gap-5 xl:grid-cols-[1.2fr_0.8fr] xl:items-center">
         <div className="min-w-0">
@@ -432,45 +433,52 @@ function MetricCard({
   href: string
   tone: 'blue' | 'green' | 'orange' | 'purple'
 }) {
-  const toneClass = {
-    blue: 'from-[#e8f2ff] to-white text-[#007aff]',
-    green: 'from-[#eaf8ee] to-white text-[#168034]',
-    orange: 'from-[#fff4e5] to-white text-[#b35b00]',
-    purple: 'from-[#f7edfc] to-white text-[#7b2cbf]',
+  const style = {
+    blue: {
+      card: 'border-blue-100/80 bg-gradient-to-br from-blue-50/90 via-white to-cyan-50/40',
+      icon: 'bg-blue-100 text-[#007aff]',
+      link: 'text-[#007aff]',
+    },
+    green: {
+      card: 'border-emerald-100/80 bg-gradient-to-br from-emerald-50/90 via-white to-teal-50/40',
+      icon: 'bg-emerald-100 text-[#168034]',
+      link: 'text-[#168034]',
+    },
+    orange: {
+      card: 'border-orange-100/90 bg-gradient-to-br from-orange-50/90 via-white to-amber-50/45',
+      icon: 'bg-orange-100 text-[#b35b00]',
+      link: 'text-[#b35b00]',
+    },
+    purple: {
+      card: 'border-purple-100/90 bg-gradient-to-br from-purple-50/90 via-white to-indigo-50/45',
+      icon: 'bg-purple-100 text-[#7b2cbf]',
+      link: 'text-[#7b2cbf]',
+    },
   }[tone]
 
   return (
     <Link
       href={href}
-      className="harmony-card harmony-hover-lift harmony-slide-up block min-w-0 p-4"
+      className={`harmony-hover-lift harmony-slide-up block min-w-0 rounded-[24px] border p-4 shadow-sm transition ${style.card}`}
     >
       <div className="flex min-w-0 items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="truncate text-xs font-medium text-[#6e6e73]">
-            {title}
-          </p>
-
-          <h3 className="mt-1 truncate text-xl font-semibold tracking-tight text-[#1d1d1f]">
-            {value}
-          </h3>
-
-          <p className="mt-1.5 line-clamp-2 text-[11px] leading-5 text-[#86868b]">
-            {description}
-          </p>
+          <p className="truncate text-xs font-medium text-[#6e6e73]">{title}</p>
+          <h3 className="mt-1 truncate text-xl font-semibold tracking-tight text-[#1d1d1f]">{value}</h3>
+          <p className="mt-1.5 line-clamp-2 text-[11px] leading-5 text-[#86868b]">{description}</p>
         </div>
 
-        <div className={`shrink-0 rounded-2xl bg-gradient-to-br p-2.5 ${toneClass}`}>
-          {icon}
-        </div>
+        <div className={`shrink-0 rounded-2xl p-2.5 ${style.icon}`}>{icon}</div>
       </div>
 
-      <div className="mt-4 flex items-center gap-1.5 text-[11px] font-bold text-[#007aff]">
-        Open module
+      <div className={`mt-4 flex items-center gap-1.5 text-[11px] font-bold ${style.link}`}>
+        Buka modul
         <ArrowUpRight size={13} />
       </div>
     </Link>
   )
 }
+
 
 function SmallStatCard({
   title,
@@ -485,58 +493,50 @@ function SmallStatCard({
   icon: ReactNode
   tone: 'blue' | 'green' | 'orange' | 'purple'
 }) {
-  const toneClass = {
-    blue: 'bg-[#e8f2ff] text-[#007aff]',
-    green: 'bg-[#eaf8ee] text-[#168034]',
-    orange: 'bg-[#fff4e5] text-[#b35b00]',
-    purple: 'bg-[#f7edfc] text-[#7b2cbf]',
+  const style = {
+    blue: 'border-blue-100/70 bg-blue-50/55 text-[#007aff]',
+    green: 'border-emerald-100/70 bg-emerald-50/55 text-[#168034]',
+    orange: 'border-orange-100/70 bg-orange-50/60 text-[#b35b00]',
+    purple: 'border-purple-100/70 bg-purple-50/55 text-[#7b2cbf]',
   }[tone]
 
   return (
-    <div className="harmony-card harmony-slide-up min-w-0 p-4">
+    <div className={`harmony-slide-up min-w-0 rounded-[22px] border bg-white/75 p-4 shadow-sm backdrop-blur-xl ${style}`}>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="truncate text-xs font-medium text-[#6e6e73]">
-            {title}
-          </p>
-          <p className="mt-1 text-xl font-semibold tracking-tight text-[#1d1d1f]">
-            {value}
-          </p>
-          <p className="mt-1.5 line-clamp-2 text-[11px] leading-5 text-[#86868b]">
-            {description}
-          </p>
+          <p className="truncate text-xs font-medium text-[#6e6e73]">{title}</p>
+          <p className="mt-1 text-xl font-semibold tracking-tight text-[#1d1d1f]">{value}</p>
+          <p className="mt-1.5 line-clamp-2 text-[11px] leading-5 text-[#86868b]">{description}</p>
         </div>
-
-        <div className={`shrink-0 rounded-2xl p-2.5 ${toneClass}`}>
-          {icon}
-        </div>
+        <div className="shrink-0 rounded-2xl bg-white/80 p-2.5 shadow-sm">{icon}</div>
       </div>
     </div>
   )
 }
 
+
 function QuickActionsPanel() {
   return (
-    <div className="harmony-card harmony-slide-up overflow-hidden">
+    <div className="harmony-slide-up overflow-hidden rounded-[28px] border border-blue-100/70 bg-gradient-to-br from-white via-white to-blue-50/55 shadow-sm">
       <PanelHeader
         title="Quick Actions"
-        description="Akses cepat proses HR yang paling sering dipakai."
+        description="Akses cepat fungsi HR utama. Detail absensi sekarang masuk satu control center."
         icon={<Zap size={17} />}
         tone="blue"
       />
 
       <div className="grid gap-3 p-4 md:grid-cols-2">
-        <QuickAction title="Upload Absensi" description="Import Excel/CSV mesin fingerprint." href="/hr/attendance/upload" icon={<Upload size={17} />} tone="blue" />
-        <QuickAction title="Data Absensi" description="Monitoring periode, lock, unlock, dan reset attendance." href="/hr/attendance/data" icon={<Clock3 size={17} />} tone="green" />
-        <QuickAction title="Final Report" description="Rekap final HR dan export laporan." href="/hr/attendance/final-report" icon={<Download size={17} />} tone="purple" />
-        <QuickAction title="Cuti & Izin" description="Approval, bukti, jenis cuti, saldo." href="/hr/leave" icon={<CalendarDays size={17} />} tone="orange" />
-        <QuickAction title="Master Karyawan" description="Data karyawan, homebase, jabatan tambahan." href="/hr/employees" icon={<Users size={17} />} tone="blue" />
-        <QuickAction title="Reset Password Karyawan" description="Generate, tampilkan, copy, dan reset password baru untuk karyawan yang lupa." href="/hr/settings" icon={<KeyRound size={17} />} tone="green" />
-        <QuickAction title="User Management" description="Akun Google, role, aktif/nonaktif user." href="/hr/users" icon={<UserCog size={17} />} tone="purple" />
+        <QuickAction title="Absensi" description="Input, review, finalisasi, laporan, sync, dan audit dalam satu alur." href="/hr/attendance" icon={<Fingerprint size={17} />} tone="blue" />
+        <QuickAction title="Cuti & Izin" description="Approval, bukti, PHL, saldo, dan administrasi cuti." href="/hr/leave" icon={<CalendarDays size={17} />} tone="orange" />
+        <QuickAction title="Data Karyawan" description="Master employee, homebase, atasan, jabatan tambahan, dan saldo." href="/hr/employees" icon={<Users size={17} />} tone="green" />
+        <QuickAction title="User Management" description="Kelola akun, role, serta status aktif/nonaktif user." href="/hr/users" icon={<UserCog size={17} />} tone="purple" />
+        <QuickAction title="Pengaturan" description="Reset password dan konfigurasi operasional HR." href="/hr/settings" icon={<KeyRound size={17} />} tone="green" />
+        <QuickAction title="Kalender Libur" description="Kelola hari libur nasional dan perusahaan." href="/hr/holidays" icon={<Landmark size={17} />} tone="purple" />
       </div>
     </div>
   )
 }
+
 
 function AttendanceMonitoringPanel({
   loading,
@@ -567,26 +567,26 @@ function AttendanceMonitoringPanel({
     {
       title: 'Ready for HR',
       value: metrics.readyForHr,
-      description: 'Sudah disetujui atasan dan siap dicek HR.',
-      href: '/hr/attendance/final-report',
+      description: 'Sudah disetujui atasan dan siap direview HR.',
+      href: '/hr/attendance/approvals',
       icon: <CheckCircle2 size={16} />,
       tone: 'blue',
     },
     {
       title: 'Locked Period',
       value: metrics.lockedEmployees,
-      description: 'Data periode yang sudah terkunci.',
-      href: '/hr/attendance/data',
+      description: 'Data periode yang sudah final dan terkunci.',
+      href: '/hr/attendance/final-report',
       icon: <Lock size={16} />,
       tone: 'purple',
     },
   ] as const
 
   return (
-    <div className="harmony-card harmony-slide-up overflow-hidden">
+    <div className="harmony-slide-up overflow-hidden rounded-[28px] border border-emerald-100/70 bg-gradient-to-br from-white via-white to-emerald-50/45 shadow-sm">
       <PanelHeader
         title={`Monitoring Absensi · ${periodLabel}`}
-        description="Status utama proses absensi periode berjalan."
+        description="Status utama periode berjalan tanpa membuka banyak halaman."
         icon={<Activity size={17} />}
         tone="green"
       />
@@ -608,6 +608,7 @@ function AttendanceMonitoringPanel({
   )
 }
 
+
 function SystemModulesPanel({
   metrics,
   loading,
@@ -616,10 +617,10 @@ function SystemModulesPanel({
   loading: boolean
 }) {
   return (
-    <div className="harmony-card harmony-slide-up overflow-hidden">
+    <div className="harmony-slide-up overflow-hidden rounded-[28px] border border-purple-100/70 bg-gradient-to-br from-white via-white to-purple-50/45 shadow-sm">
       <PanelHeader
         title="System Modules"
-        description="Modul inti HARMONY."
+        description="Modul inti HARMONY yang tetap memakai struktur existing."
         icon={<Layers size={17} />}
         tone="purple"
       />
@@ -630,49 +631,55 @@ function SystemModulesPanel({
           description={`${loading ? '...' : formatNumber(metrics.activeEmployees)} karyawan aktif, homebase, atasan, jabatan tambahan.`}
           icon={<Users size={17} />}
           href="/hr/employees"
+          tone="green"
         />
         <ModuleRow
           title="Attendance Engine"
           description={`${loading ? '...' : formatNumber(metrics.attendanceLogs)} log fingerprint periode berjalan.`}
           icon={<Database size={17} />}
-          href="/hr/attendance/data"
+          href="/hr/attendance"
+          tone="blue"
         />
         <ModuleRow
           title="Leave & PHL Control"
           description={`${loading ? '...' : formatNumber(metrics.pendingLeaveRequests)} pengajuan pending.`}
           icon={<CalendarDays size={17} />}
           href="/hr/leave"
+          tone="orange"
         />
         <ModuleRow
           title="Access Control"
           description={`${loading ? '...' : formatNumber(metrics.activeUsers)} user aktif untuk login Google/email.`}
           icon={<ShieldCheck size={17} />}
           href="/hr/users"
+          tone="purple"
         />
         <ModuleRow
           title="Holiday Calendar"
           description={`${loading ? '...' : formatNumber(metrics.upcomingHolidays)} hari libur mendatang terdata.`}
           icon={<Landmark size={17} />}
           href="/hr/holidays"
+          tone="green"
         />
       </div>
     </div>
   )
 }
 
+
 function WorkflowPanel() {
   const steps = [
-    { number: '01', title: 'Upload Absensi', description: 'HR upload data fingerprint dari mesin.', tone: 'blue' },
-    { number: '02', title: 'Employee Confirm', description: 'Employee cek dan submit data periode.', tone: 'green' },
-    { number: '03', title: 'Approval Atasan', description: 'Atasan approve/reject data bawahan.', tone: 'orange' },
-    { number: '04', title: 'HR Final & Lock', description: 'HR finalisasi lalu lock satu periode.', tone: 'purple' },
+    { number: '01', title: 'Input Absensi', description: 'Upload fingerprint dan cek data masuk.', tone: 'blue' },
+    { number: '02', title: 'Review & Validasi', description: 'Review submit, approval, dan request terkait.', tone: 'orange' },
+    { number: '03', title: 'Finalisasi', description: 'Finalisasi dan lock data yang sudah siap.', tone: 'purple' },
+    { number: '04', title: 'Laporan', description: 'Buka rekap kehadiran dan dasar tunjangan.', tone: 'green' },
   ] as const
 
   return (
-    <div className="harmony-card harmony-slide-up overflow-hidden">
+    <div className="harmony-slide-up overflow-hidden rounded-[28px] border border-orange-100/70 bg-gradient-to-br from-white via-white to-amber-50/45 shadow-sm">
       <PanelHeader
-        title="Workflow HARMONY"
-        description="Alur utama absensi dari upload sampai lock periode."
+        title="Alur Absensi HR"
+        description="Empat langkah sederhana; route dan engine existing tetap dipakai."
         icon={<CheckCircle2 size={17} />}
         tone="orange"
       />
@@ -686,6 +693,7 @@ function WorkflowPanel() {
   )
 }
 
+
 function PanelHeader({
   title,
   description,
@@ -698,30 +706,23 @@ function PanelHeader({
   tone: 'blue' | 'green' | 'orange' | 'purple'
 }) {
   const toneClass = {
-    blue: 'bg-[#e8f2ff] text-[#007aff]',
-    green: 'bg-[#eaf8ee] text-[#168034]',
-    orange: 'bg-[#fff4e5] text-[#b35b00]',
-    purple: 'bg-[#f7edfc] text-[#7b2cbf]',
+    blue: 'bg-blue-100 text-[#007aff]',
+    green: 'bg-emerald-100 text-[#168034]',
+    orange: 'bg-orange-100 text-[#b35b00]',
+    purple: 'bg-purple-100 text-[#7b2cbf]',
   }[tone]
 
   return (
-    <div className="flex items-center justify-between gap-4 border-b border-black/5 p-4">
+    <div className="flex items-center justify-between gap-4 border-b border-black/5 bg-white/45 p-4 backdrop-blur-xl">
       <div className="min-w-0">
-        <h3 className="truncate text-base font-semibold text-[#1d1d1f]">
-          {title}
-        </h3>
-
-        <p className="mt-0.5 line-clamp-1 text-xs text-[#6e6e73]">
-          {description}
-        </p>
+        <h3 className="truncate text-base font-semibold text-[#1d1d1f]">{title}</h3>
+        <p className="mt-0.5 line-clamp-1 text-xs text-[#6e6e73]">{description}</p>
       </div>
-
-      <div className={`shrink-0 rounded-2xl p-2.5 ${toneClass}`}>
-        {icon}
-      </div>
+      <div className={`shrink-0 rounded-2xl p-2.5 ${toneClass}`}>{icon}</div>
     </div>
   )
 }
+
 
 function StatusRow({
   label,
@@ -765,40 +766,32 @@ function QuickAction({
   icon: ReactNode
   tone: 'blue' | 'green' | 'orange' | 'purple'
 }) {
-  const toneClass = {
-    blue: 'bg-[#e8f2ff] text-[#007aff]',
-    green: 'bg-[#eaf8ee] text-[#168034]',
-    orange: 'bg-[#fff4e5] text-[#b35b00]',
-    purple: 'bg-[#f7edfc] text-[#7b2cbf]',
+  const style = {
+    blue: 'border-blue-100/80 bg-blue-50/65 text-[#007aff]',
+    green: 'border-emerald-100/80 bg-emerald-50/65 text-[#168034]',
+    orange: 'border-orange-100/80 bg-orange-50/70 text-[#b35b00]',
+    purple: 'border-purple-100/80 bg-purple-50/65 text-[#7b2cbf]',
   }[tone]
 
   return (
     <Link
       href={href}
-      className="group rounded-[22px] border border-black/5 bg-white/60 p-3.5 shadow-sm transition hover:-translate-y-0.5 hover:bg-white hover:shadow-md"
+      className={`group rounded-[22px] border p-3.5 shadow-sm transition hover:-translate-y-0.5 hover:bg-white hover:shadow-md ${style}`}
     >
       <div className="flex min-w-0 items-start gap-3">
-        <div className={`shrink-0 rounded-2xl p-2.5 ${toneClass}`}>
-          {icon}
-        </div>
-
+        <div className="shrink-0 rounded-2xl bg-white/85 p-2.5 shadow-sm">{icon}</div>
         <div className="min-w-0 flex-1">
           <div className="flex min-w-0 items-center justify-between gap-2">
-            <h4 className="truncate text-sm font-semibold text-[#1d1d1f]">
-              {title}
-            </h4>
-
-            <ArrowUpRight size={15} className="shrink-0 text-[#c7c7cc] transition group-hover:text-[#007aff]" />
+            <h4 className="truncate text-sm font-semibold text-[#1d1d1f]">{title}</h4>
+            <ArrowUpRight size={15} className="shrink-0 opacity-55 transition group-hover:opacity-100" />
           </div>
-
-          <p className="mt-1 line-clamp-2 text-[11px] leading-5 text-[#6e6e73]">
-            {description}
-          </p>
+          <p className="mt-1 line-clamp-2 text-[11px] leading-5 text-[#6e6e73]">{description}</p>
         </div>
       </div>
     </Link>
   )
 }
+
 
 function OverviewItem({
   title,
@@ -815,78 +808,68 @@ function OverviewItem({
   href: string
   tone: 'blue' | 'green' | 'orange' | 'purple'
 }) {
-  const toneClass = {
-    blue: 'bg-[#e8f2ff] text-[#007aff]',
-    green: 'bg-[#eaf8ee] text-[#168034]',
-    orange: 'bg-[#fff4e5] text-[#b35b00]',
-    purple: 'bg-[#f7edfc] text-[#7b2cbf]',
+  const style = {
+    blue: 'border-blue-100/70 bg-blue-50/55 text-[#007aff]',
+    green: 'border-emerald-100/70 bg-emerald-50/55 text-[#168034]',
+    orange: 'border-orange-100/70 bg-orange-50/60 text-[#b35b00]',
+    purple: 'border-purple-100/70 bg-purple-50/55 text-[#7b2cbf]',
   }[tone]
-
-  const statusClass = toneClass
 
   return (
     <Link
       href={href}
-      className="block rounded-[22px] border border-black/5 bg-white/60 p-3.5 shadow-sm transition hover:-translate-y-0.5 hover:bg-white hover:shadow-md"
+      className={`block rounded-[22px] border p-3.5 shadow-sm transition hover:-translate-y-0.5 hover:bg-white hover:shadow-md ${style}`}
     >
       <div className="flex items-start gap-3">
-        <div className={`shrink-0 rounded-2xl p-2.5 ${toneClass}`}>
-          {icon}
-        </div>
-
+        <div className="shrink-0 rounded-2xl bg-white/85 p-2.5 shadow-sm">{icon}</div>
         <div className="min-w-0 flex-1">
           <div className="flex items-center justify-between gap-3">
-            <h4 className="truncate text-sm font-semibold text-[#1d1d1f]">
-              {title}
-            </h4>
-
-            <span className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-bold ${statusClass}`}>
-              {status}
-            </span>
+            <h4 className="truncate text-sm font-semibold text-[#1d1d1f]">{title}</h4>
+            <span className="shrink-0 rounded-full bg-white/85 px-2.5 py-1 text-[11px] font-bold shadow-sm">{status}</span>
           </div>
-
-          <p className="mt-1 line-clamp-2 text-[11px] leading-5 text-[#6e6e73]">
-            {description}
-          </p>
+          <p className="mt-1 line-clamp-2 text-[11px] leading-5 text-[#6e6e73]">{description}</p>
         </div>
       </div>
     </Link>
   )
 }
+
 
 function ModuleRow({
   title,
   description,
   icon,
   href,
+  tone,
 }: {
   title: string
   description: string
   icon: ReactNode
   href: string
+  tone: 'blue' | 'green' | 'orange' | 'purple'
 }) {
+  const style = {
+    blue: 'border-blue-100/70 bg-blue-50/45 text-[#007aff]',
+    green: 'border-emerald-100/70 bg-emerald-50/45 text-[#168034]',
+    orange: 'border-orange-100/70 bg-orange-50/50 text-[#b35b00]',
+    purple: 'border-purple-100/70 bg-purple-50/45 text-[#7b2cbf]',
+  }[tone]
+
   return (
     <Link
       href={href}
-      className="group flex items-center gap-3 rounded-[22px] border border-black/5 bg-white/60 p-3.5 shadow-sm transition hover:-translate-y-0.5 hover:bg-white hover:shadow-md"
+      className={`group flex items-center gap-3 rounded-[22px] border p-3.5 shadow-sm transition hover:-translate-y-0.5 hover:bg-white hover:shadow-md ${style}`}
     >
-      <div className="shrink-0 rounded-2xl bg-[#e8f2ff] p-2.5 text-[#007aff]">
-        {icon}
-      </div>
-
+      <div className="shrink-0 rounded-2xl bg-white/85 p-2.5 shadow-sm">{icon}</div>
       <div className="min-w-0 flex-1">
-        <h4 className="truncate text-sm font-semibold text-[#1d1d1f]">
-          {title}
-        </h4>
-        <p className="mt-0.5 line-clamp-1 text-[11px] leading-5 text-[#6e6e73]">
-          {description}
-        </p>
+        <h4 className="truncate text-sm font-semibold text-[#1d1d1f]">{title}</h4>
+        <p className="mt-0.5 line-clamp-1 text-[11px] leading-5 text-[#6e6e73]">{description}</p>
       </div>
-
-      <ArrowRight size={15} className="shrink-0 text-[#c7c7cc] transition group-hover:translate-x-0.5 group-hover:text-[#007aff]" />
+      <ArrowRight size={15} className="shrink-0 opacity-45 transition group-hover:translate-x-0.5 group-hover:opacity-100" />
     </Link>
   )
 }
+
 
 function WorkflowStep({
   number,
@@ -899,29 +882,22 @@ function WorkflowStep({
   description: string
   tone: 'blue' | 'green' | 'orange' | 'purple'
 }) {
-  const toneClass = {
-    blue: 'bg-[#e8f2ff] text-[#007aff]',
-    green: 'bg-[#eaf8ee] text-[#168034]',
-    orange: 'bg-[#fff4e5] text-[#b35b00]',
-    purple: 'bg-[#f7edfc] text-[#7b2cbf]',
+  const style = {
+    blue: 'border-blue-100/70 bg-gradient-to-br from-blue-50/80 to-white text-[#007aff]',
+    green: 'border-emerald-100/70 bg-gradient-to-br from-emerald-50/80 to-white text-[#168034]',
+    orange: 'border-orange-100/70 bg-gradient-to-br from-orange-50/80 to-white text-[#b35b00]',
+    purple: 'border-purple-100/70 bg-gradient-to-br from-purple-50/80 to-white text-[#7b2cbf]',
   }[tone]
 
   return (
-    <div className="rounded-[22px] border border-black/5 bg-white/60 p-3.5 shadow-sm">
-      <div className={`mb-3 inline-flex h-9 w-9 items-center justify-center rounded-2xl text-xs font-bold ${toneClass}`}>
-        {number}
-      </div>
-
-      <h4 className="truncate text-sm font-semibold text-[#1d1d1f]">
-        {title}
-      </h4>
-
-      <p className="mt-1.5 line-clamp-2 text-[11px] leading-5 text-[#6e6e73]">
-        {description}
-      </p>
+    <div className={`rounded-[22px] border p-3.5 shadow-sm ${style}`}>
+      <div className="mb-3 inline-flex h-9 w-9 items-center justify-center rounded-2xl bg-white/90 text-xs font-bold shadow-sm">{number}</div>
+      <h4 className="truncate text-sm font-semibold text-[#1d1d1f]">{title}</h4>
+      <p className="mt-1.5 line-clamp-2 text-[11px] leading-5 text-[#6e6e73]">{description}</p>
     </div>
   )
 }
+
 
 function buildDashboardMetrics(
   data: DashboardData,
