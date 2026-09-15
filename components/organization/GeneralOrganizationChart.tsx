@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   AlertTriangle,
   Building2,
@@ -8,6 +8,7 @@ import {
   ChevronUp,
   GitBranch,
   Loader2,
+  Maximize2,
   RefreshCcw,
   UserRound,
   UsersRound,
@@ -491,6 +492,15 @@ export function GeneralOrganizationChart({
   const [errorMessage, setErrorMessage] = useState('')
   const [showAdditional, setShowAdditional] = useState(true)
   const [showUnconnected, setShowUnconnected] = useState(false)
+  const [fitMode, setFitMode] = useState<'auto' | 'actual'>('auto')
+  const [chartScale, setChartScale] = useState(1)
+  const [chartNaturalSize, setChartNaturalSize] = useState({
+    width: 0,
+    height: 0,
+  })
+
+  const chartViewportRef = useRef<HTMLDivElement | null>(null)
+  const chartContentRef = useRef<HTMLDivElement | null>(null)
 
   const model = useMemo(
     () => buildChartModel(employees, assignments, showAdditional),
@@ -500,6 +510,97 @@ export function GeneralOrganizationChart({
   useEffect(() => {
     fetchOrganization()
   }, [])
+
+  useEffect(() => {
+    if (loading || model.roots.length === 0) {
+      return
+    }
+
+    let animationFrame = 0
+
+    const recalculateChartFit = () => {
+      const viewport = chartViewportRef.current
+      const content = chartContentRef.current
+
+      if (!viewport || !content) {
+        return
+      }
+
+      const naturalWidth = Math.max(content.scrollWidth, content.offsetWidth)
+      const naturalHeight = Math.max(content.scrollHeight, content.offsetHeight)
+
+      const viewportStyle = window.getComputedStyle(viewport)
+      const horizontalPadding =
+        Number.parseFloat(viewportStyle.paddingLeft || '0') +
+        Number.parseFloat(viewportStyle.paddingRight || '0')
+
+      const availableWidth = Math.max(
+        viewport.clientWidth - horizontalPadding,
+        1,
+      )
+
+      const autoScale =
+        naturalWidth > 0
+          ? Math.min(1, availableWidth / naturalWidth)
+          : 1
+
+      // Struktur yang sangat lebar tetap diberi batas minimum agar nama/jabatan
+      // masih terbaca. Jika melewati batas ini, scroll horizontal menjadi fallback.
+      const nextScale =
+        fitMode === 'auto'
+          ? Math.max(0.35, autoScale)
+          : 1
+
+      setChartScale((current) => {
+        const rounded = Math.round(nextScale * 1000) / 1000
+        return Math.abs(current - rounded) < 0.001 ? current : rounded
+      })
+
+      setChartNaturalSize((current) => {
+        if (
+          Math.abs(current.width - naturalWidth) < 1 &&
+          Math.abs(current.height - naturalHeight) < 1
+        ) {
+          return current
+        }
+
+        return {
+          width: naturalWidth,
+          height: naturalHeight,
+        }
+      })
+    }
+
+    const scheduleRecalculate = () => {
+      window.cancelAnimationFrame(animationFrame)
+      animationFrame = window.requestAnimationFrame(recalculateChartFit)
+    }
+
+    scheduleRecalculate()
+
+    const resizeObserver = new ResizeObserver(scheduleRecalculate)
+
+    if (chartViewportRef.current) {
+      resizeObserver.observe(chartViewportRef.current)
+    }
+
+    if (chartContentRef.current) {
+      resizeObserver.observe(chartContentRef.current)
+    }
+
+    window.addEventListener('resize', scheduleRecalculate)
+
+    return () => {
+      window.cancelAnimationFrame(animationFrame)
+      resizeObserver.disconnect()
+      window.removeEventListener('resize', scheduleRecalculate)
+    }
+  }, [
+    compact,
+    fitMode,
+    loading,
+    model,
+  ])
 
   async function fetchOrganization(isRefresh = false) {
     try {
@@ -627,6 +728,41 @@ export function GeneralOrganizationChart({
         </div>
 
         <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+          <div className="inline-flex min-h-10 items-center rounded-2xl border border-slate-200 bg-slate-50 p-1">
+            <button
+              type="button"
+              onClick={() => setFitMode('auto')}
+              className={[
+                'inline-flex min-h-8 items-center justify-center gap-1.5 rounded-xl px-3 text-[11px] font-bold transition',
+                fitMode === 'auto'
+                  ? 'bg-white text-[#007aff] shadow-sm'
+                  : 'text-slate-500 hover:text-slate-700',
+              ].join(' ')}
+            >
+              <Maximize2 size={14} />
+              Auto Fit
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setFitMode('actual')}
+              className={[
+                'inline-flex min-h-8 items-center justify-center rounded-xl px-3 text-[11px] font-bold transition',
+                fitMode === 'actual'
+                  ? 'bg-white text-slate-800 shadow-sm'
+                  : 'text-slate-500 hover:text-slate-700',
+              ].join(' ')}
+            >
+              100%
+            </button>
+          </div>
+
+          {!loading && model.roots.length > 0 && (
+            <span className="inline-flex min-h-10 items-center justify-center rounded-2xl border border-slate-200 bg-white px-3 text-[11px] font-bold text-slate-500">
+              {Math.round(chartScale * 100)}%
+            </span>
+          )}
+
           <button
             type="button"
             onClick={() => setShowAdditional((value) => !value)}
@@ -704,18 +840,40 @@ export function GeneralOrganizationChart({
             </div>
           )}
 
-          <div className="overflow-x-auto px-4 py-7 sm:px-6">
-            <div className={compact ? 'min-w-max pb-2' : 'min-w-max pb-4'}>
-              <div className="flex items-start justify-center gap-10">
-                {model.roots.map((root) => (
-                  <OrgTreeNode
-                    key={root.key}
-                    node={root}
-                    compact={compact}
-                    depth={0}
-                    path={new Set<string>()}
-                  />
-                ))}
+          <div
+            ref={chartViewportRef}
+            className="overflow-x-auto px-4 py-5 sm:px-6"
+          >
+            <div
+              className="relative mx-auto w-max"
+              style={
+                chartNaturalSize.width > 0
+                  ? {
+                      width: `${chartNaturalSize.width * chartScale}px`,
+                      height: `${chartNaturalSize.height * chartScale}px`,
+                    }
+                  : undefined
+              }
+            >
+              <div
+                ref={chartContentRef}
+                className={compact ? 'w-max pb-2' : 'w-max pb-4'}
+                style={{
+                  transform: `scale(${chartScale})`,
+                  transformOrigin: 'top left',
+                }}
+              >
+                <div className="flex items-start justify-center gap-10">
+                  {model.roots.map((root) => (
+                    <OrgTreeNode
+                      key={root.key}
+                      node={root}
+                      compact={compact}
+                      depth={0}
+                      path={new Set<string>()}
+                    />
+                  ))}
+                </div>
               </div>
             </div>
           </div>
