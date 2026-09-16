@@ -1245,6 +1245,20 @@ export default function EmployeeAttendancePage() {
     }
 
     const draft = getDraft(row);
+    const phlDeclined = isOffDayPHLOptOut(row, draft);
+
+    // Khusus hari libur/weekend dengan aktivitas:
+    // pilihan Alpa / Tidak Hadir dipakai sebagai keputusan "tidak mengajukan PHL".
+    // Jam fingerprint/manual tetap dipertahankan sebagai histori, tetapi employee
+    // tidak diwajibkan mengisi catatan atau bukti hanya untuk menolak PHL.
+    if (phlDeclined) {
+      closeEdit();
+      setSuccessMessage(
+        `${formatDisplayDate(row.date)} ditandai sebagai hari non-kerja tanpa pengajuan PHL. Catatan dan bukti tidak diwajibkan.`,
+      );
+      return;
+    }
+
     const shouldPersistManual =
       draft.daily_type === "manual_attendance" ||
       Boolean(draft.manual_check_in || draft.manual_check_out);
@@ -1579,6 +1593,7 @@ export default function EmployeeAttendancePage() {
     for (const row of rowsToSubmit) {
       const draft = getDraft(row);
       const meta = getDailyTypeMeta(draft.daily_type);
+      const phlDeclined = isOffDayPHLOptOut(row, draft);
       const hasExistingLog = Boolean(row.log?.id);
       const incomplete = isIncompleteRow(row, draft);
       const phlCandidate = isPotentialPHL(row, draft);
@@ -1627,13 +1642,15 @@ export default function EmployeeAttendancePage() {
         }
       }
 
-      const correctionType = phlCandidate
-        ? "phl_confirmation"
-        : meta.correctionType || incomplete
-          ? "manual_check"
-          : row.log?.id
-            ? "attendance_confirmation"
-            : "absence_or_manual_confirmation";
+      const correctionType = phlDeclined
+        ? "attendance_confirmation"
+        : phlCandidate
+          ? "phl_confirmation"
+          : meta.correctionType || incomplete
+            ? "manual_check"
+            : row.log?.id
+              ? "attendance_confirmation"
+              : "absence_or_manual_confirmation";
 
       const payload = {
         employee_id: employee.id,
@@ -1668,18 +1685,24 @@ export default function EmployeeAttendancePage() {
         absence_proof_url: absenceProofUrl || null,
         absence_proof_name: absenceProofName || null,
 
-        absence_request_type: meta.absenceRequestType,
-        absence_request_label: meta.absenceRequestLabel,
-        absence_request_status: meta.absenceRequestType ? "submitted" : null,
-        absence_request_source: meta.absenceRequestType
-          ? "employee_attendance_confirmation"
-          : null,
+        // Hari non-kerja yang dipilih Alpa/Tidak Hadir adalah opt-out PHL,
+        // bukan Alpa hari kerja. Karena itu jangan membuat absence request.
+        absence_request_type: phlDeclined ? null : meta.absenceRequestType,
+        absence_request_label: phlDeclined ? null : meta.absenceRequestLabel,
+        absence_request_status:
+          !phlDeclined && meta.absenceRequestType ? "submitted" : null,
+        absence_request_source:
+          !phlDeclined && meta.absenceRequestType
+            ? "employee_attendance_confirmation"
+            : null,
 
         correction_status: "pending",
         correction_type: correctionType,
         correction_reason:
           draft.employee_daily_note ||
-          `${meta.label} dari konfirmasi absensi employee.`,
+          (phlDeclined
+            ? "Hari non-kerja dengan aktivitas absensi; employee tidak mengajukan PHL."
+            : `${meta.label} dari konfirmasi absensi employee.`),
         correction_submitted_by: appUser.email,
         correction_submitted_role: "employee",
         correction_submitted_at: now,
@@ -1698,7 +1721,7 @@ export default function EmployeeAttendancePage() {
 
         correction_notes: appendCorrectionNote(
           row.log?.correction_notes || null,
-          `${isSupervisorRejected ? "Employee RESUBMIT setelah reject atasan" : "Employee submit"} absensi periode ${formatDisplayDate(periodRange.start)} s.d. ${formatDisplayDate(periodRange.end)} dengan keterangan: ${meta.label}.`,
+          `${isSupervisorRejected ? "Employee RESUBMIT setelah reject atasan" : "Employee submit"} absensi periode ${formatDisplayDate(periodRange.start)} s.d. ${formatDisplayDate(periodRange.end)} dengan keterangan: ${phlDeclined ? "Tidak Mengajukan PHL / Hari Non-Kerja" : meta.label}.`,
         ),
 
         updated_at: now,
@@ -1993,6 +2016,12 @@ export default function EmployeeAttendancePage() {
     const meta = getDailyTypeMeta(draft.daily_type);
     const label = formatDisplayDate(row.date);
 
+    // Employee boleh menolak/tidak mengajukan PHL pada hari non-kerja
+    // meskipun terdapat fingerprint/manual time. Tidak perlu note atau evidence.
+    if (isOffDayPHLOptOut(row, draft)) {
+      return "";
+    }
+
     // Hari libur/weekend kosong tidak perlu dibuat sebagai log attendance.
     if (isOffDayWithoutAttendance(row, draft)) {
       return "";
@@ -2056,6 +2085,13 @@ export default function EmployeeAttendancePage() {
     const hasManualTime = Boolean(
       draft.manual_check_in || draft.manual_check_out,
     );
+
+    // Pada Sabtu/Minggu/libur dengan aktivitas, pilihan Alpa/Tidak Hadir
+    // berarti employee tidak mengajukan PHL. Ini bukan Alpa hari kerja,
+    // sehingga catatan dan dokumen perintah atasan tidak diwajibkan.
+    if (isOffDayPHLOptOut(row, draft)) {
+      return "";
+    }
 
     if (noMachineData && draft.daily_type === "present" && !hasManualTime) {
       if (row.is_weekend || row.holiday_name) {
@@ -2135,7 +2171,9 @@ export default function EmployeeAttendancePage() {
           row.log?.manual_check_out || draft.manual_check_out || "",
         duration: formatDuration(row.log?.work_duration_minutes),
         status: formatStatus(getDisplayStatus(row, draft), row.log),
-        keterangan: row.log?.absence_request_label || meta.label,
+        keterangan: isOffDayPHLOptOut(row, draft)
+          ? "Tidak Mengajukan PHL"
+          : row.log?.absence_request_label || meta.label,
         employee_confirmation_status:
           row.log?.employee_confirmation_status || "",
         supervisor_approval_status: row.log?.supervisor_approval_status || "",
@@ -3362,6 +3400,7 @@ function EditAttendanceModal({
 }) {
   const incomplete = isIncompleteRow(row, draft);
   const noMachineData = !row.log?.id;
+  const phlDeclined = isOffDayPHLOptOut(row, draft);
   const phl = isPotentialPHL(row, draft);
   const meta = getDailyTypeMeta(draft.daily_type);
 
@@ -3448,6 +3487,18 @@ function EditAttendanceModal({
             <p className="mt-1">{getDailyTypeDescription(draft.daily_type)}</p>
           </div>
 
+          {phlDeclined && (
+            <div className="rounded-[22px] border border-blue-100 bg-blue-50 p-4 text-sm leading-6 text-blue-700">
+              <p className="font-bold">Tidak mengajukan PHL</p>
+              <p className="mt-1">
+                Tanggal ini merupakan hari non-kerja. Memilih Alpa / Tidak Hadir
+                berarti kamu tidak mengajukan aktivitas pada tanggal ini sebagai
+                PHL. Jam fingerprint/manual tetap disimpan sebagai histori,
+                tetapi catatan dan bukti perintah atasan tidak diwajibkan.
+              </p>
+            </div>
+          )}
+
           <div className="grid gap-4 md:grid-cols-2">
             <label className="block">
               <span className="harmony-label">Manual Check In</span>
@@ -3477,23 +3528,30 @@ function EditAttendanceModal({
           </div>
 
           <label className="block">
-            <span className="harmony-label">Catatan / Alasan</span>
+            <span className="harmony-label">
+              {phlDeclined ? "Catatan / Alasan (Opsional)" : "Catatan / Alasan"}
+            </span>
             <textarea
               value={draft.employee_daily_note}
               disabled={locked}
               onChange={(event) =>
                 onChange("employee_daily_note", event.target.value)
               }
-              placeholder="Contoh: cuti menikah, klaim PHL, tugas luar daerah, lupa scan pulang, sakit, izin, atau keterangan lainnya."
+              placeholder={
+                phlDeclined
+                  ? "Opsional. Boleh dikosongkan jika hanya memilih tidak mengajukan PHL."
+                  : "Contoh: cuti menikah, klaim PHL, tugas luar daerah, lupa scan pulang, sakit, izin, atau keterangan lainnya."
+              }
               className="harmony-textarea disabled:cursor-not-allowed disabled:opacity-60"
             />
           </label>
 
-          {(incomplete ||
-            noMachineData ||
-            meta.isAbsenceLike ||
-            meta.requiresProof ||
-            phl) && (
+          {!phlDeclined &&
+            (incomplete ||
+              noMachineData ||
+              meta.isAbsenceLike ||
+              meta.requiresProof ||
+              phl) && (
             <div className="space-y-3">
               <HarmonyPendingAttachmentPicker
                 files={draft.support_files}
@@ -3548,11 +3606,13 @@ function EditAttendanceModal({
               ? "Tutup"
               : saving
                 ? "Menyimpan..."
-                : draft.daily_type === "manual_attendance" ||
-                    draft.manual_check_in ||
-                    draft.manual_check_out
-                  ? "Simpan Manual ke Database"
-                  : "Simpan Sementara"}
+                : phlDeclined
+                  ? "Simpan Sementara"
+                  : draft.daily_type === "manual_attendance" ||
+                      draft.manual_check_in ||
+                      draft.manual_check_out
+                    ? "Simpan Manual ke Database"
+                    : "Simpan Sementara"}
           </button>
         </div>
       </div>
@@ -3600,6 +3660,14 @@ function RequestLabelBadge({
   row: CalendarDayRow;
   draft: RowDraft;
 }) {
+  if (isOffDayPHLOptOut(row, draft)) {
+    return (
+      <span className="inline-flex rounded-full bg-[#e8f2ff] px-3 py-1 text-xs font-bold text-[#0059b8]">
+        Tidak Mengajukan PHL
+      </span>
+    );
+  }
+
   const label =
     row.log?.absence_request_label || getDailyTypeMeta(draft.daily_type).label;
 
@@ -3629,6 +3697,17 @@ function ValidationInfo({
   const phl = isPotentialPHL(row, draft);
   const noRecord = !row.log;
   const meta = getDailyTypeMeta(draft.daily_type);
+
+  if (isOffDayPHLOptOut(row, draft)) {
+    return (
+      <div className="space-y-1">
+        <p className="text-xs font-bold text-[#0059b8]">PHL tidak diajukan</p>
+        <p className="text-xs leading-5 text-[#6e6e73]">
+          Hari non-kerja. Bukti perintah atasan tidak diwajibkan.
+        </p>
+      </div>
+    );
+  }
 
   if (isOffDayWithoutAttendance(row, draft)) {
     return (
@@ -3924,6 +4003,22 @@ function hasAttendanceActivity(row: CalendarDayRow, draft?: RowDraft) {
   );
 }
 
+function isOffDayPHLOptOut(row: CalendarDayRow, draft?: RowDraft) {
+  if (!draft) return false;
+
+  const meta = getDailyTypeMeta(draft.daily_type);
+  const isOffDay = row.is_weekend || Boolean(row.holiday_name);
+  const selectedAsAbsent =
+    meta.status === "absent" ||
+    draft.daily_type === "absent" ||
+    draft.daily_type === "alpa";
+
+  // Khusus hari non-kerja yang memiliki aktivitas absensi.
+  // "Alpa / Tidak Hadir" di sini dibaca sebagai keputusan untuk tidak
+  // mengajukan aktivitas tersebut sebagai PHL, bukan sebagai Alpa hari kerja.
+  return isOffDay && hasAttendanceActivity(row, draft) && selectedAsAbsent;
+}
+
 function isLeaveRequestOnOffDay(row: CalendarDayRow, draft?: RowDraft) {
   if (!draft) return false;
 
@@ -3975,6 +4070,24 @@ function inferDailyType(row: CalendarDayRow): DailyType {
   if (type === "permission") return "permit";
   if (type === "alpa") return "absent";
 
+  // Persistensi keputusan "tidak mengajukan PHL":
+  // setelah submit/cancel/reload, row off-day dengan aktivitas dan
+  // is_phl_candidate=false harus kembali terbaca sebagai pilihan Alpa/Tidak Hadir,
+  // bukan berubah lagi menjadi manual_attendance lalu diminta bukti PHL.
+  if (
+    (row.is_weekend || Boolean(row.holiday_name)) &&
+    row.log?.status === "off_day" &&
+    row.log?.is_phl_candidate === false &&
+    Boolean(
+      row.log?.check_in ||
+        row.log?.check_out ||
+        row.log?.manual_check_in ||
+        row.log?.manual_check_out,
+    )
+  ) {
+    return "absent";
+  }
+
   if (row.log?.manual_check_in || row.log?.manual_check_out) {
     return "manual_attendance";
   }
@@ -4022,6 +4135,7 @@ function isPotentialPHL(row: CalendarDayRow, draft?: RowDraft) {
   const meta = draft ? getDailyTypeMeta(draft.daily_type) : null;
 
   if (meta?.isPHLClaim) return false;
+  if (isOffDayPHLOptOut(row, draft)) return false;
 
   const hasAttendance = Boolean(
     row.log?.check_in ||
@@ -4038,6 +4152,7 @@ function isPotentialPHL(row: CalendarDayRow, draft?: RowDraft) {
 function getSubmittedStatus(row: CalendarDayRow, draft: RowDraft) {
   const meta = getDailyTypeMeta(draft.daily_type);
 
+  if (isOffDayPHLOptOut(row, draft)) return "off_day";
   if (isPotentialPHL(row, draft)) return "present";
   if (isLeaveRequestOnOffDay(row, draft)) return "off_day";
   if (meta.status) return meta.status;
@@ -4050,6 +4165,8 @@ function getSubmittedStatus(row: CalendarDayRow, draft: RowDraft) {
 
 function getDisplayStatus(row: CalendarDayRow, draft: RowDraft) {
   const meta = getDailyTypeMeta(draft.daily_type);
+
+  if (isOffDayPHLOptOut(row, draft)) return "off_day";
 
   if (isPotentialPHL(row, draft)) {
     if (row.log?.supervisor_approval_status === "approved") return "phl";
@@ -4569,6 +4686,9 @@ function formatDayName(value: string) {
 }
 
 function formatStatus(status: string, log?: AttendanceLog | null) {
+  // Off-day harus menang atas label absence historis agar keputusan
+  // "tidak mengajukan PHL" tidak kembali tampil sebagai Alpa.
+  if (status === "off_day") return "Hari Non-Kerja";
   if (log?.absence_request_label) return log.absence_request_label;
 
   if (status === "annual_leave") return "Cuti Tahunan";
@@ -4583,7 +4703,6 @@ function formatStatus(status: string, log?: AttendanceLog | null) {
   if (status === "phl_claim") return "Klaim PHL";
   if (status === "phl") return "PHL";
   if (status === "pending_phl") return "Menunggu PHL";
-  if (status === "off_day") return "-";
   if (status === "present") return "Present";
   if (status === "late") return "Late";
   if (status === "incomplete") return "Incomplete";
