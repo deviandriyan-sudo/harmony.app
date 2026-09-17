@@ -429,11 +429,13 @@ export default function HRAttendanceSafeReviewPage() {
         },
       });
 
-      setSuccessMessage(
-        `Approval HR berhasil. ${updatedLogs?.length || 0} log menjadi HR Approved. Data belum difinalisasi dan belum dikunci.`,
+      // Setelah Approval HR sukses, langsung kembali ke Queue HR Review.
+      // window.location.replace dipakai agar queue dimuat ulang dari database
+      // dan tombol Back tidak mengembalikan HR ke detail yang sudah selesai.
+      window.location.replace(
+        `/hr/attendance/approvals?period=${encodeURIComponent(periodMonth)}`,
       );
-
-      await fetchData();
+      return;
     } catch (error: any) {
       setErrorMessage(
         error?.message || "Approval HR gagal diproses.",
