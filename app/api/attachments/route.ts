@@ -5,6 +5,7 @@ export const runtime = 'nodejs'
 
 const BUCKET = 'leave-attachments'
 const MAX_FILES = 3
+const REQUIRED_FILES = 1
 const MAX_FILE_BYTES = 10 * 1024 * 1024
 const ENTITY_TYPES = new Set([
   'leave_request',
@@ -151,7 +152,7 @@ async function loadParent(
   if (entityType === 'leave_request') {
     const result = await admin
       .from('leave_requests')
-      .select('id,employee_id,status,supervisor_status,hr_status')
+      .select('id,employee_id,request_type,status,supervisor_status,hr_status')
       .eq('id', entityId)
       .maybeSingle()
     return { ...result, entityType }
@@ -179,7 +180,7 @@ async function loadParent(
     const result = await admin
       .from('attendance_logs')
       .select(
-        'id,employee_id,attendance_date,employee_confirmation_status,supervisor_approval_status,hr_approval_status,hr_final_status,is_locked,deleted_at,correction_proof_url,correction_proof_name,absence_proof_url,absence_proof_name,phl_proof_url,phl_proof_name',
+        'id,employee_id,attendance_date,employee_confirmation_type,absence_request_type,employee_confirmation_status,supervisor_approval_status,hr_approval_status,hr_final_status,is_locked,deleted_at,correction_proof_url,correction_proof_name,absence_proof_url,absence_proof_name,phl_proof_url,phl_proof_name',
       )
       .eq('id', entityId)
       .maybeSingle()
@@ -194,6 +195,27 @@ async function loadParent(
     .eq('id', entityId)
     .maybeSingle()
   return { ...result, entityType }
+}
+
+async function parentRequiresProof(admin: any, entityType: string, parent: any) {
+  let requestTypeCode = ''
+
+  if (entityType === 'leave_request') {
+    requestTypeCode = clean(parent?.request_type)
+  } else if (entityType === 'attendance_log') {
+    requestTypeCode = clean(parent?.absence_request_type || parent?.employee_confirmation_type)
+  }
+
+  if (!requestTypeCode) return false
+
+  const { data, error } = await admin
+    .from('harmony_request_types')
+    .select('requires_proof,is_active')
+    .eq('code', requestTypeCode)
+    .maybeSingle()
+
+  if (error || !data || data.is_active === false) return false
+  return data.requires_proof === true
 }
 
 async function isSupervisorOfOwner(
@@ -477,9 +499,26 @@ export async function POST(request: NextRequest) {
     const existingUrls = new Set(existing.map((item: any) => clean(item.file_url)).filter(Boolean))
     const requestedNewCount = (legacyUrl && !existingUrls.has(legacyUrl) ? 1 : 0) + files.length
 
-    if (existing.length + requestedNewCount > MAX_FILES) {
+    const finalAttachmentCount = existing.length + requestedNewCount
+
+    if (finalAttachmentCount > MAX_FILES) {
       return NextResponse.json(
         { success: false, error: 'Maksimal 3 dokumen pendukung untuk satu proses.' },
+        { status: 400 },
+      )
+    }
+
+    if (
+      isOwner &&
+      !auth.identity.isHR &&
+      (await parentRequiresProof(admin, entityType, parent)) &&
+      finalAttachmentCount < REQUIRED_FILES
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: `Jenis pengajuan ini wajib memiliki ${REQUIRED_FILES} dokumen pendukung sebelum dapat dikirim.`,
+        },
         { status: 400 },
       )
     }
@@ -487,6 +526,7 @@ export async function POST(request: NextRequest) {
     const usedSlots = new Set(existing.map((item: any) => Number(item.slot_no)))
     const availableSlots = [1, 2, 3].filter((slot) => !usedSlots.has(slot))
     const rowsToInsert: any[] = []
+    const uploadedPathsThisRequest: string[] = []
 
     if (legacyUrl && !existingUrls.has(legacyUrl)) {
       const slot = availableSlots.shift()
@@ -509,53 +549,53 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    for (const file of files) {
-      const slot = availableSlots.shift()
-      if (!slot) throw new Error('Slot lampiran tidak tersedia.')
+    try {
+      for (const file of files) {
+        const slot = availableSlots.shift()
+        if (!slot) throw new Error('Slot lampiran tidak tersedia.')
 
-      const storagePath = `${entityType}/${ownerEmployeeId || 'unknown'}/${entityId}/${slot}-${crypto.randomUUID()}-${safeFileName(file.name)}`
-      const buffer = Buffer.from(await file.arrayBuffer())
+        const storagePath = `${entityType}/${ownerEmployeeId || 'unknown'}/${entityId}/${slot}-${crypto.randomUUID()}-${safeFileName(file.name)}`
+        const buffer = Buffer.from(await file.arrayBuffer())
 
-      const upload = await admin.storage.from(BUCKET).upload(storagePath, buffer, {
-        contentType: file.type || 'application/octet-stream',
-        upsert: false,
-      })
+        const upload = await admin.storage.from(BUCKET).upload(storagePath, buffer, {
+          contentType: file.type || 'application/octet-stream',
+          upsert: false,
+        })
 
-      if (upload.error) throw upload.error
+        if (upload.error) throw upload.error
+        uploadedPathsThisRequest.push(storagePath)
 
-      const { data: publicUrlData } = admin.storage.from(BUCKET).getPublicUrl(storagePath)
+        const { data: publicUrlData } = admin.storage.from(BUCKET).getPublicUrl(storagePath)
 
-      rowsToInsert.push({
-        entity_type: entityType,
-        entity_id: entityId,
-        owner_employee_id: ownerEmployeeId || null,
-        slot_no: slot,
-        attachment_kind: attachmentKind,
-        file_url: publicUrlData.publicUrl,
-        file_name: file.name,
-        file_size: file.size,
-        file_type: file.type || null,
-        storage_bucket: BUCKET,
-        storage_path: storagePath,
-        is_legacy: false,
-        created_by_user_id: auth.identity.authUserId,
-      })
-    }
-
-    if (rowsToInsert.length > 0) {
-      const { error: insertError } = await admin
-        .from('harmony_request_attachments')
-        .insert(rowsToInsert)
-
-      if (insertError) {
-        const uploadedPaths = rowsToInsert
-          .map((row) => clean(row.storage_path))
-          .filter(Boolean)
-        if (uploadedPaths.length > 0) {
-          await admin.storage.from(BUCKET).remove(uploadedPaths)
-        }
-        throw insertError
+        rowsToInsert.push({
+          entity_type: entityType,
+          entity_id: entityId,
+          owner_employee_id: ownerEmployeeId || null,
+          slot_no: slot,
+          attachment_kind: attachmentKind,
+          file_url: publicUrlData.publicUrl,
+          file_name: file.name,
+          file_size: file.size,
+          file_type: file.type || null,
+          storage_bucket: BUCKET,
+          storage_path: storagePath,
+          is_legacy: false,
+          created_by_user_id: auth.identity.authUserId,
+        })
       }
+
+      if (rowsToInsert.length > 0) {
+        const { error: insertError } = await admin
+          .from('harmony_request_attachments')
+          .insert(rowsToInsert)
+
+        if (insertError) throw insertError
+      }
+    } catch (writeError) {
+      if (uploadedPathsThisRequest.length > 0) {
+        await admin.storage.from(BUCKET).remove(uploadedPathsThisRequest)
+      }
+      throw writeError
     }
 
     const { data: attachments, error: fetchError } = await admin
@@ -565,7 +605,15 @@ export async function POST(request: NextRequest) {
       .eq('entity_id', entityId)
       .order('slot_no', { ascending: true })
 
-    if (fetchError) throw fetchError
+    if (fetchError) {
+      const knownCount = existing.length + rowsToInsert.length
+      return NextResponse.json({
+        success: true,
+        attachments: rowsToInsert,
+        message: `${knownCount} dokumen pendukung tersimpan.`,
+        warning: 'Dokumen sudah tersimpan tetapi daftar lampiran belum dapat dimuat ulang.',
+      })
+    }
 
     return NextResponse.json({
       success: true,

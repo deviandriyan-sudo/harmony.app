@@ -858,8 +858,13 @@ export default function EmployeeApprovalDetailPage() {
 
     setSuccessMessage(`Periode absensi berhasil disetujui atasan, saldo PHL kerja hari libur sudah disinkronkan, dan data siap diproses HR. ${emailInfo}`)
     setProcessingPeriod(false)
-    await fetchData(false)
-  }
+
+    if (typeof window !== "undefined") {
+      window.location.replace(
+        `/employee/approvals?period=${encodeURIComponent(periodMonth)}`,
+      )
+      return
+    }}
 
   async function handleRejectPeriod() {
     if (!periodConfirmation || !rejectReason.trim()) {
@@ -1053,7 +1058,7 @@ export default function EmployeeApprovalDetailPage() {
           <div className="relative flex flex-col gap-5 2xl:flex-row 2xl:items-end 2xl:justify-between">
             <div className="min-w-0">
               <Link
-                href="/employee/approvals"
+                href={`/employee/approvals?period=${encodeURIComponent(periodMonth)}`}
                 className="mb-5 inline-flex min-h-10 items-center gap-2 rounded-full border border-white/10 bg-white/10 px-4 text-xs font-semibold text-white/75 backdrop-blur-xl transition hover:bg-white/15"
               >
                 <ArrowLeft size={15} />

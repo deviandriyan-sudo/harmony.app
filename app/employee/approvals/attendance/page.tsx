@@ -24,9 +24,10 @@ import {
 } from "lucide-react";
 
 import { Topbar } from "@/components/layout/Topbar";
-import { supabase } from "@/lib/supabase";
-import { useAttendancePeriodQuery } from "@/lib/use-attendance-period";
+import { supabase } from "@/lib/supabase"
 
+
+import { useAttendancePeriodQuery } from "@/lib/use-attendance-period";
 type AppUser = {
   id: string;
   email: string;
@@ -92,7 +93,7 @@ type StatusFilter =
 
 type SummaryTone = "blue" | "green" | "orange" | "red" | "purple";
 
-const ATTENDANCE_START_YEAR = 2026;
+const ATTENDANCE_START_YEAR = 2020;
 
 const MONTH_OPTIONS = [
   { value: "01", label: "Januari" },

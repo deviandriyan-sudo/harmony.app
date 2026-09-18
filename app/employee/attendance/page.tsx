@@ -27,7 +27,10 @@ import {
   HarmonyPendingAttachmentPicker,
 } from "@/components/attachments/HarmonyAttachments";
 import { supabase } from "@/lib/supabase";
-import { registerHarmonySubmissionAttachments } from "@/lib/harmony-attachments";
+import {
+  HARMONY_ATTACHMENT_REQUIRED_FILES,
+  registerHarmonySubmissionAttachments,
+} from "@/lib/harmony-attachments";
 import { sendHarmonyEmail } from "@/lib/notifications";
 import {
   getActiveHarmonyTypesForScope,
@@ -906,6 +909,7 @@ export default function EmployeeAttendancePage() {
       return {
         url: "",
         name: "",
+        storagePath: "",
         error: "",
       };
     }
@@ -925,6 +929,7 @@ export default function EmployeeAttendancePage() {
       return {
         url: "",
         name: "",
+        storagePath: "",
         error: error.message,
       };
     }
@@ -936,8 +941,14 @@ export default function EmployeeAttendancePage() {
     return {
       url: data.publicUrl,
       name: file.name,
+      storagePath: filePath,
       error: "",
     };
+  }
+
+  async function cleanupUploadedFile(storagePath: string) {
+    if (!storagePath) return;
+    await supabase.storage.from("leave-attachments").remove([storagePath]);
   }
 
   async function loadLiveManualAttendance(date: string) {
@@ -1104,11 +1115,11 @@ export default function EmployeeAttendancePage() {
     }
 
     if (
-      liveManualForm.proof_files.length === 0 &&
-      !liveManualForm.existing_proof_url
+      !liveManualForm.existing_proof_url &&
+      liveManualForm.proof_files.length < HARMONY_ATTACHMENT_REQUIRED_FILES
     ) {
       setErrorMessage(
-        "Upload bukti tugas luar/perintah atasan/dokumen pendukung sebelum menyimpan absensi manual.",
+        `Absensi manual baru wajib memiliki ${HARMONY_ATTACHMENT_REQUIRED_FILES} dokumen pendukung sebelum disimpan.`,
       );
       return;
     }
@@ -1119,7 +1130,7 @@ export default function EmployeeAttendancePage() {
       let proofUrl = liveManualForm.existing_proof_url;
       let proofName = liveManualForm.existing_proof_name;
 
-      let primaryUpload: { url: string; name: string; error: string } | null = null;
+      let primaryUpload: { url: string; name: string; storagePath: string; error: string } | null = null;
 
       if (!proofUrl && liveManualForm.proof_files[0]) {
         primaryUpload = await uploadFile(
@@ -1165,6 +1176,9 @@ export default function EmployeeAttendancePage() {
       const result = await response.json().catch(() => null);
 
       if (!response.ok || result?.success === false) {
+        if (primaryUpload?.storagePath) {
+          await cleanupUploadedFile(primaryUpload.storagePath);
+        }
         throw new Error(
           result?.error ||
             result?.message ||
@@ -1190,8 +1204,14 @@ export default function EmployeeAttendancePage() {
           entityType: "attendance_log",
           entityId: savedRecordId,
           legacy: primaryUpload?.url
-            ? { url: primaryUpload.url, name: primaryUpload.name }
-            : null,
+            ? {
+                url: primaryUpload.url,
+                name: primaryUpload.name,
+                storagePath: primaryUpload.storagePath,
+              }
+            : proofUrl
+              ? { url: proofUrl, name: proofName }
+              : null,
           extraFiles: primaryUpload
             ? liveManualForm.proof_files.slice(1)
             : liveManualForm.proof_files,
@@ -1301,9 +1321,12 @@ export default function EmployeeAttendancePage() {
       row.log?.correction_proof_name ||
       "";
 
-    if (draft.support_files.length === 0 && !existingProofUrl) {
+    if (
+      !existingProofUrl &&
+      draft.support_files.length < HARMONY_ATTACHMENT_REQUIRED_FILES
+    ) {
       setErrorMessage(
-        `${formatDisplayDate(row.date)}: upload bukti pendukung untuk absensi manual.`,
+        `${formatDisplayDate(row.date)}: absensi manual baru wajib memiliki ${HARMONY_ATTACHMENT_REQUIRED_FILES} dokumen pendukung.`,
       );
       return;
     }
@@ -1314,7 +1337,7 @@ export default function EmployeeAttendancePage() {
       let proofUrl = existingProofUrl;
       let proofName = existingProofName;
 
-      let primaryUpload: { url: string; name: string; error: string } | null = null;
+      let primaryUpload: { url: string; name: string; storagePath: string; error: string } | null = null;
 
       if (!proofUrl && draft.support_files[0]) {
         primaryUpload = await uploadFile(
@@ -1360,6 +1383,9 @@ export default function EmployeeAttendancePage() {
       const result = await response.json().catch(() => null);
 
       if (!response.ok || result?.success === false) {
+        if (primaryUpload?.storagePath) {
+          await cleanupUploadedFile(primaryUpload.storagePath);
+        }
         throw new Error(
           result?.error ||
             result?.message ||
@@ -1385,8 +1411,14 @@ export default function EmployeeAttendancePage() {
           entityType: "attendance_log",
           entityId: savedRecordId,
           legacy: primaryUpload?.url
-            ? { url: primaryUpload.url, name: primaryUpload.name }
-            : null,
+            ? {
+                url: primaryUpload.url,
+                name: primaryUpload.name,
+                storagePath: primaryUpload.storagePath,
+              }
+            : proofUrl
+              ? { url: proofUrl, name: proofName }
+              : null,
           extraFiles: primaryUpload
             ? draft.support_files.slice(1)
             : draft.support_files,
@@ -1619,7 +1651,7 @@ export default function EmployeeAttendancePage() {
       let phlProofName =
         row.log?.phl_proof_name ||
         (phlCandidate ? existingSharedProofName : "");
-      let primaryAttachment: { url: string; name: string; error: string } | null = null;
+      let primaryAttachment: { url: string; name: string; storagePath: string; error: string } | null = null;
 
       if (draft.support_files[0]) {
         primaryAttachment = await uploadFile(
@@ -1738,6 +1770,9 @@ export default function EmployeeAttendancePage() {
           .single();
 
         if (error) {
+          if (primaryAttachment?.storagePath) {
+            await cleanupUploadedFile(primaryAttachment.storagePath);
+          }
           setErrorMessage(error.message);
           setSubmittingPeriod(false);
           return;
@@ -1755,6 +1790,9 @@ export default function EmployeeAttendancePage() {
           .single();
 
         if (error) {
+          if (primaryAttachment?.storagePath) {
+            await cleanupUploadedFile(primaryAttachment.storagePath);
+          }
           setErrorMessage(error.message);
           setSubmittingPeriod(false);
           return;
@@ -1769,8 +1807,14 @@ export default function EmployeeAttendancePage() {
             entityType: "attendance_log",
             entityId: savedLogId,
             legacy: primaryAttachment?.url
-              ? { url: primaryAttachment.url, name: primaryAttachment.name }
-              : null,
+              ? {
+                  url: primaryAttachment.url,
+                  name: primaryAttachment.name,
+                  storagePath: primaryAttachment.storagePath,
+                }
+              : existingSharedProofUrl
+                ? { url: existingSharedProofUrl, name: existingSharedProofName }
+                : null,
             extraFiles: draft.support_files.slice(1),
             attachmentKind: phlCandidate
               ? "attendance_phl_support"
@@ -2135,9 +2179,9 @@ export default function EmployeeAttendancePage() {
     if (
       meta.requiresProof &&
       !existingStoredProofUrl &&
-      draft.support_files.length === 0
+      draft.support_files.length < HARMONY_ATTACHMENT_REQUIRED_FILES
     ) {
-      return `${label}: upload bukti/dokumen pendukung untuk ${meta.label}.`;
+      return `${label}: ${meta.label} wajib memiliki ${HARMONY_ATTACHMENT_REQUIRED_FILES} dokumen pendukung.`;
     }
 
     if (isPotentialPHL(row, draft)) {
@@ -3304,7 +3348,7 @@ function LiveManualAttendanceModal({
               onChange={(files) => onChange("proof_files", files)}
               required={!form.existing_proof_url}
               label="Bukti / Dokumen Pendukung"
-              description="Wajib untuk absensi manual. Maksimal 3 dokumen; file baru dapat dihapus sebelum Submit Periode ke atasan."
+              description="Absensi manual wajib minimal 1 dokumen dan dapat menambahkan hingga maksimal 3 file. File baru dapat dihapus sebelum Submit Periode ke atasan."
               disabled={loading || saving}
               maxFiles={form.existing_proof_url ? 2 : 3}
             />
@@ -3561,7 +3605,9 @@ function EditAttendanceModal({
                 description={
                   phl
                     ? "Maksimal 3 file. Lampirkan perintah atasan/dokumen kerja hari libur. File baru dapat dihapus sebelum Submit Periode."
-                    : "Maksimal 3 file. Lampiran baru dapat dihapus sebelum Submit Periode."
+                    : meta.requiresProof
+                      ? `Jenis ${meta.label} wajib minimal 1 dokumen dan dapat menambahkan hingga maksimal 3 file. File baru dapat dihapus sebelum Submit Periode.`
+                      : "Maksimal 3 file. Lampiran baru dapat dihapus sebelum Submit Periode."
                 }
                 disabled={locked}
                 maxFiles={

@@ -33,6 +33,7 @@ export type LegacyAttachmentLink = {
 }
 
 export const HARMONY_ATTACHMENT_MAX_FILES = 3
+export const HARMONY_ATTACHMENT_REQUIRED_FILES = 1
 export const HARMONY_ATTACHMENT_MAX_FILE_BYTES = 10 * 1024 * 1024
 export const HARMONY_ATTACHMENT_ACCEPT =
   '.pdf,.jpg,.jpeg,.png,.webp,.doc,.docx,.xls,.xlsx'

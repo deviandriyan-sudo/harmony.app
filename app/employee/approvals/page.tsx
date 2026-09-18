@@ -21,8 +21,8 @@ import {
 
 import { Topbar } from '@/components/layout/Topbar'
 import { supabase } from '@/lib/supabase'
-import { useAttendancePeriodQuery } from '@/lib/use-attendance-period'
 
+import { useAttendancePeriodQuery } from "@/lib/use-attendance-period";
 type AppUser = {
   id: string
   email: string
@@ -538,6 +538,22 @@ function PeriodFilterBar({
   onMonthChange: (value: string) => void
   onRefresh: () => void
 }) {
+  const approvalNormalizedPeriod = /^\d{4}-\d{2}$/.test(periodMonth)
+    ? periodMonth
+    : getCurrentPeriodMonth()
+  const [approvalSelectedYear, approvalSelectedMonth] =
+    approvalNormalizedPeriod.split("-")
+  const approvalCurrentYear = new Date().getFullYear()
+  const approvalStartYear = 2020
+  const approvalMaxYear = Math.max(
+    approvalCurrentYear + 5,
+    Number(approvalSelectedYear) || approvalCurrentYear,
+  )
+  const approvalYearOptions = Array.from(
+    { length: approvalMaxYear - approvalStartYear + 1 },
+    (_, index) => approvalStartYear + index,
+  )
+
   return (
     <div className="harmony-card overflow-hidden p-0">
       <div className="flex flex-col gap-4 p-5 lg:flex-row lg:items-center lg:justify-between lg:p-6">
@@ -558,15 +574,55 @@ function PeriodFilterBar({
         </div>
 
         <div className="grid gap-3 sm:grid-cols-2 lg:flex lg:items-center lg:justify-end">
-          <label className="min-w-0 lg:w-[190px]">
-            <span className="sr-only">Periode Cut-off</span>
-            <input
-              type="month"
-              min="2026-01"
-              value={periodMonth}
-              onChange={(event) => onMonthChange(event.target.value)}
+          <label className="min-w-0 lg:w-[170px]">
+            <span className="sr-only">Bulan Periode</span>
+            <select
+              value={approvalSelectedMonth}
+              onChange={(event) =>
+                onMonthChange(
+                  `${approvalSelectedYear}-${event.target.value}`,
+                )
+              }
               className="harmony-input h-12"
-            />
+            >
+              {[
+                ["01", "Januari"],
+                ["02", "Februari"],
+                ["03", "Maret"],
+                ["04", "April"],
+                ["05", "Mei"],
+                ["06", "Juni"],
+                ["07", "Juli"],
+                ["08", "Agustus"],
+                ["09", "September"],
+                ["10", "Oktober"],
+                ["11", "November"],
+                ["12", "Desember"],
+              ].map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="min-w-0 lg:w-[120px]">
+            <span className="sr-only">Tahun Periode</span>
+            <select
+              value={approvalSelectedYear}
+              onChange={(event) =>
+                onMonthChange(
+                  `${event.target.value}-${approvalSelectedMonth}`,
+                )
+              }
+              className="harmony-input h-12"
+            >
+              {approvalYearOptions.map((year) => (
+                <option key={year} value={String(year)}>
+                  {year}
+                </option>
+              ))}
+            </select>
           </label>
 
           <div className="flex min-h-12 items-center gap-3 rounded-2xl border border-black/5 bg-[#f5f5f7]/80 px-4">

@@ -29,7 +29,10 @@ import {
   HarmonyPendingAttachmentPicker,
 } from '@/components/attachments/HarmonyAttachments'
 import { supabase } from '@/lib/supabase'
-import { registerHarmonySubmissionAttachments } from '@/lib/harmony-attachments'
+import {
+  HARMONY_ATTACHMENT_REQUIRED_FILES,
+  registerHarmonySubmissionAttachments,
+} from '@/lib/harmony-attachments'
 import {
   getApprovalStageLabel,
   getApprovalStageTone,
@@ -683,6 +686,7 @@ export default function EmployeeLeavePage() {
         name: '',
         size: 0,
         type: '',
+        storagePath: '',
         error: '',
       }
     }
@@ -703,6 +707,7 @@ export default function EmployeeLeavePage() {
         name: '',
         size: 0,
         type: '',
+        storagePath: '',
         error: error.message,
       }
     }
@@ -716,7 +721,36 @@ export default function EmployeeLeavePage() {
       name: file.name,
       size: file.size,
       type: file.type,
+      storagePath: path,
       error: '',
+    }
+  }
+
+  async function cleanupUploadedProof(storagePath: string) {
+    if (!storagePath) return
+    await supabase.storage.from('leave-attachments').remove([storagePath])
+  }
+
+  async function rollbackCreatedRequest(requestId: string, requestType: string, note: string) {
+    if (!requestId) return { success: true, message: 'Tidak ada request yang perlu di-rollback.' }
+
+    const isPHL = normalizeText(requestType) === 'phl_claim'
+    const { data, error } = isPHL
+      ? await supabase.rpc('harmony_employee_cancel_phl_claim_v1', {
+          p_claim_record_id: requestId,
+          p_note: note,
+        })
+      : await supabase.rpc('harmony_employee_cancel_leave_request_v1', {
+          p_request_id: requestId,
+          p_note: note,
+        })
+
+    if (error) return { success: false, message: error.message }
+
+    const result = (data || {}) as { success?: boolean; message?: string }
+    return {
+      success: result.success !== false,
+      message: result.message || '',
     }
   }
 
@@ -785,8 +819,13 @@ export default function EmployeeLeavePage() {
       return
     }
 
-    if (requiresProof && form.proof_files.length === 0) {
-      setErrorMessage(`${selectedRequestMeta.label} wajib melampirkan bukti/dokumen pendukung.`)
+    if (
+      requiresProof &&
+      form.proof_files.length < HARMONY_ATTACHMENT_REQUIRED_FILES
+    ) {
+      setErrorMessage(
+        `${selectedRequestMeta.label} wajib melampirkan ${HARMONY_ATTACHMENT_REQUIRED_FILES} dokumen pendukung sebelum dapat dikirim.`,
+      )
       setSubmitting(false)
       return
     }
@@ -869,6 +908,7 @@ export default function EmployeeLeavePage() {
       )
 
       if (claimError) {
+        await cleanupUploadedProof(uploaded.storagePath)
         setErrorMessage(claimError.message)
         setSubmitting(false)
         return
@@ -881,6 +921,7 @@ export default function EmployeeLeavePage() {
       }
 
       if (!claimResult.success) {
+        await cleanupUploadedProof(uploaded.storagePath)
         setErrorMessage(claimResult.message || 'Klaim PHL belum berhasil disimpan.')
         setSubmitting(false)
         return
@@ -943,6 +984,7 @@ export default function EmployeeLeavePage() {
         .single<LeaveRequest>()
 
       if (error) {
+        await cleanupUploadedProof(uploaded.storagePath)
         setErrorMessage(error.message)
         setSubmitting(false)
         return
@@ -950,8 +992,6 @@ export default function EmployeeLeavePage() {
 
       insertedRequestId = insertedRequest?.id || ''
     }
-
-    let attachmentWarning = ''
 
     if (insertedRequestId && form.proof_files.length > 0) {
       try {
@@ -965,6 +1005,7 @@ export default function EmployeeLeavePage() {
                 name: uploaded.name,
                 size: uploaded.size,
                 type: uploaded.type,
+                storagePath: uploaded.storagePath,
               }
             : null,
           extraFiles: form.proof_files.slice(1),
@@ -974,7 +1015,23 @@ export default function EmployeeLeavePage() {
               : `${form.request_type}_support`,
         })
       } catch (attachmentError: any) {
-        attachmentWarning = ` Lampiran tambahan belum seluruhnya terdaftar: ${attachmentError?.message || 'terjadi kendala saat menyimpan lampiran'}.`
+        const rollback = await rollbackCreatedRequest(
+          insertedRequestId,
+          form.request_type,
+          'Pembatalan otomatis karena registrasi lampiran pengajuan gagal.',
+        )
+        if (rollback.success) {
+          await cleanupUploadedProof(uploaded.storagePath)
+        }
+
+        setErrorMessage(
+          rollback.success
+            ? `Pengajuan tidak diteruskan karena lampiran gagal disimpan lengkap. Request sudah dibatalkan otomatis sehingga tidak masuk approval. Detail: ${attachmentError?.message || 'registrasi lampiran gagal'}.`
+            : `Lampiran gagal disimpan dan rollback request juga gagal. Jangan submit ulang sebelum HR memeriksa request ${insertedRequestId}. Detail lampiran: ${attachmentError?.message || 'registrasi lampiran gagal'}. Detail rollback: ${rollback.message || 'tidak diketahui'}.`,
+        )
+        setSubmitting(false)
+        await fetchLeaveRequests(employee.id)
+        return
       }
     }
 
@@ -997,8 +1054,8 @@ export default function EmployeeLeavePage() {
 
     setSuccessMessage(
       notificationResult.success
-        ? `${selectedRequestMeta.label} berhasil diajukan dan email notifikasi terkirim ke ${notificationResult.count} penerima.${attachmentWarning}`
-        : `${selectedRequestMeta.label} berhasil diajukan, tetapi email notifikasi belum terkirim: ${notificationResult.message}.${attachmentWarning}`
+        ? `${selectedRequestMeta.label} berhasil diajukan dan email notifikasi terkirim ke ${notificationResult.count} penerima.`
+        : `${selectedRequestMeta.label} berhasil diajukan, tetapi email notifikasi belum terkirim: ${notificationResult.message}.`
     )
 
     resetForm()
@@ -1537,7 +1594,7 @@ function LeaveRequestModal({
               label="Lampiran Bukti / Dokumen Pendukung"
               description={
                 requiresProof
-                  ? `${selectedRequestMeta.label} wajib memiliki minimal 1 dokumen. Maksimal 3 dokumen dan semuanya dapat dihapus sebelum submit.`
+                  ? `${selectedRequestMeta.label} wajib memiliki minimal 1 dokumen pendukung dan dapat menambahkan hingga maksimal 3 file. File dapat dihapus sebelum submit.`
                   : 'Opsional. Maksimal 3 dokumen dan semuanya dapat dihapus sebelum submit.'
               }
               disabled={submitting}
