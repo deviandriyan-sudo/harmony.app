@@ -15,6 +15,17 @@ export type Employee = {
   annual_leave_balance: number | null
   phl_balance: number | null
   is_active: boolean | null
+
+  workforce_type?: 'organic' | 'outsource' | string | null
+  vendor_id?: string | null
+  job_function?: string | null
+
+  work_schedule_id?: string | null
+  work_schedule_name?: string | null
+  work_schedule_code?: string | null
+  schedule_group?: string | null
+  auto_detect_schedule?: boolean | null
+
   created_at: string | null
   updated_at: string | null
 }
