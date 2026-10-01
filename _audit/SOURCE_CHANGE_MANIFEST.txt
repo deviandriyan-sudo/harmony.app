@@ -1,0 +1,43 @@
+HARMONY + RE-MED V1.1 SOURCE CHANGE MANIFEST
+
+APPLICATION
+MODIFIED app/api/remed/hr/access/route.ts
+- preserve seeded employee_id on access update
+- reject employee access without canonical employee mapping
+- validate employee_id against public.employees
+- audit correct access row ID
+
+MODIFIED app/remed/hr/access/page.tsx
+- HR/Finance-only manual access form
+- employee access explicitly follows HARMONY master/Auth
+
+DATABASE SETUP
+MODIFIED _setup/HARMONY_REMED_V1_PRECHECK.sql
+- read-only live mapping audit for 39 legacy identities
+- verifies exact employee name mapping and existing Auth/app_users presence
+
+MODIFIED _setup/HARMONY_REMED_V1_MIGRATION.sql
+- embeds sanitized data from all 3 legacy CSV sources
+- never imports plaintext passwords
+- merges blank NIK/email/phone into canonical HARMONY employees only
+- seeds Re-Med access without altering HARMONY Finance role model
+- imports 2026 opening historical entitlement
+- preserves supplied historical claim without double deduction
+- adds remed_legacy_imports sanitized audit snapshot table
+
+MODIFIED _setup/HARMONY_REMED_V1_POSTCHECK.sql
+- verifies access counts, entitlement totals, legacy claim, sanitized import rows, private bucket and RLS
+
+HARMONY CORE
+UNCHANGED Attendance
+UNCHANGED Leave
+UNCHANGED PHL
+UNCHANGED Supervisor approvals
+UNCHANGED HR reporting/export
+UNCHANGED existing HARMONY auth role model
+
+OUTSOURCE
+NOT INCLUDED / HOLD
+
+V1.1.1 HOTFIX
+- _setup/HARMONY_REMED_V1_MIGRATION.sql: remove TEMP TABLE dependency; use restricted short-lived staging tables and cleanup.

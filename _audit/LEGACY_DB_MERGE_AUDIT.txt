@@ -1,0 +1,34 @@
+RE-MED LEGACY DATABASE AUDIT
+
+SOURCE FILES
+1. Users_rows (1).csv
+   - 39 rows
+   - 37 employee
+   - 1 HR
+   - 1 Finance
+   - no duplicate names
+   - no duplicate emails
+
+2. employees_rows (2).csv
+   - 37 rows
+   - every legacy employee has a matching employee-role user in Users_rows
+   - 28 employees with Rp3,000,000 plafond
+   - 9 employees with Rp5,000,000 plafond
+   - total plafond Rp129,000,000
+   - remaining Rp103,611,896
+   - historical usage Rp25,388,104
+   - 3 employees have zero remaining balance
+
+3. reimbursements_rows (1).csv
+   - 1 historical claim
+   - claim number CLM-1779177856945
+   - amount Rp250,000
+   - employee Vincentsius Felmi Ajang
+   - detail claim data is incomplete relative to historical balances
+
+DECISION
+- Do not calculate historical balance from reimbursements_rows.
+- employees_rows plafond/sisa_plafond is the opening historical balance source.
+- Password column from Users_rows is discarded completely.
+- Current HARMONY department/position is authoritative.
+- PRECHECK must verify live public.employees name mapping before migration.

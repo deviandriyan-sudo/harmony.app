@@ -1,0 +1,49 @@
+HARMONY + RE-MED V1.1 - DEEP ANALYSIS SUMMARY
+
+BASELINE
+- Source of truth: uploaded harmony.app.zip.
+- Re-Med V1 code in harmony.app.zip is functionally identical to the previously supplied HARMONY_REMED_V1_FULL_REPLACEMENT.zip.
+- HARMONY V8.1.2 Stable Pre-Outsource remains the protected baseline.
+- Outsource remains HOLD and no outsource route/code is included.
+
+LEGACY DATABASE CONSOLIDATION
+- Users_rows: 39 rows = 37 employee + 1 HR + 1 Finance.
+- employees_rows: 37 rows.
+- reimbursements_rows: 1 row.
+- 37/37 legacy employee names have a matching row inside the two legacy CSV sets; live HARMONY matching must still be confirmed using PRECHECK.
+- Total legacy plafond: Rp129,000,000.
+- Total legacy remaining balance: Rp103,611,896.
+- Opening historical usage: Rp25,388,104.
+- Legacy plaintext passwords are intentionally NOT migrated or copied into audit snapshots.
+
+MERGE STRATEGY
+- public.employees remains the only canonical employee master.
+- Legacy NIK/email/phone only fill blank HARMONY employee fields; current HARMONY values are never overwritten.
+- Legacy department/position are retained only in sanitized import history, not used to overwrite current HARMONY organization data.
+- Re-Med employee access prefers existing HARMONY app_users/Auth.
+- Generic legacy HR and Finance become Re-Med-only access rows.
+- Finance is never inserted into HARMONY app_users.
+- 2026 plafond + remaining balance becomes remed_entitlements opening historical balance.
+- The single supplied reimbursement is preserved as legacy_record with affects_entitlement=false to prevent double deduction.
+- All sanitized legacy source rows are stored in remed_legacy_imports for traceability.
+
+SECURITY
+- Re-Med uses the same Supabase Auth project.
+- Re-Med tables remain API-only from browser; RLS enabled and anon/authenticated direct table access revoked.
+- remed-private remains a private bucket.
+- Old public receipt/payment URLs are preserved only as historical legacy references.
+
+ACCESS HARDENING
+- Re-Med HR access API now preserves employee_id when an existing seeded access row is updated.
+- New Employee access cannot be created without linking to public.employees.
+- HR access UI is limited to HR Re-Med and Finance; Employee access follows HARMONY account/master mapping.
+
+VALIDATION
+- Route inventory: 81 total routes = 54 pages + 27 API routes.
+- Exact route conflicts: 0.
+- Normalized dynamic conflicts: 0.
+- Optional catch-all conflicts: 0.
+- Missing local @/ imports: 0.
+- Obsolete outsource route/code hits: 0.
+- TypeScript/TSX parser: 128 files, 0 syntax errors.
+- Full npm run build could not be executed in sandbox because node_modules was not included and npm registry dependency installation timed out. Do not treat this as a passed build gate.

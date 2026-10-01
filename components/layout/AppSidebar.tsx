@@ -51,6 +51,7 @@ export function AppSidebar({
       await supabase.auth.signOut()
       if (typeof window !== 'undefined') {
         localStorage.removeItem('harmony_user')
+        localStorage.removeItem('remed_user')
         sessionStorage.clear()
       }
       router.replace('/login')
@@ -59,6 +60,7 @@ export function AppSidebar({
       console.error('Logout error:', error)
       if (typeof window !== 'undefined') {
         localStorage.removeItem('harmony_user')
+        localStorage.removeItem('remed_user')
         sessionStorage.clear()
         window.location.href = '/login'
       }
