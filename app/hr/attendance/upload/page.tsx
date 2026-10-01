@@ -52,16 +52,9 @@ type WorkSchedule = {
   id: string
   schedule_name: string
   schedule_code: string
-  schedule_group: string | null
-  schedule_type: string | null
-  schedule_category: string | null
   expected_check_in: string
   expected_check_out: string
   late_tolerance_minutes: number | null
-  shift_start: string | null
-  shift_end: string | null
-  crosses_midnight: boolean | null
-  allow_double_shift: boolean | null
   description: string | null
   is_default: boolean | null
   is_active: boolean | null
@@ -124,14 +117,7 @@ const fallbackSchedule: WorkSchedule = {
   schedule_code: 'regular_poltek',
   expected_check_in: '08:00',
   expected_check_out: '17:00',
-  schedule_group: 'regular',
-  schedule_type: 'fixed',
-  schedule_category: 'regular',
   late_tolerance_minutes: 0,
-  shift_start: '08:00',
-  shift_end: '17:00',
-  crosses_midnight: false,
-  allow_double_shift: false,
   description: 'Fallback jam kerja reguler Poltek.',
   is_default: true,
   is_active: true,
@@ -142,7 +128,6 @@ const fallbackSchedule: WorkSchedule = {
 export default function HRAttendanceUploadPage() {
   const [uploads, setUploads] = useState<AttendanceUpload[]>([])
   const [employees, setEmployees] = useState<Employee[]>([])
-  const [workSchedules, setWorkSchedules] = useState<WorkSchedule[]>([fallbackSchedule])
   const [workSchedule, setWorkSchedule] = useState<WorkSchedule>(fallbackSchedule)
 
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
@@ -174,52 +159,6 @@ export default function HRAttendanceUploadPage() {
 
     return map
   }, [employees])
-
-  const workScheduleMap = useMemo(() => {
-    const byId = new Map<string, WorkSchedule>()
-    const byCode = new Map<string, WorkSchedule>()
-
-    workSchedules.forEach((schedule) => {
-      if (schedule.id) byId.set(schedule.id, schedule)
-      if (schedule.schedule_code) byCode.set(schedule.schedule_code, schedule)
-    })
-
-    return { byId, byCode }
-  }, [workSchedules])
-
-  function isSecurityEmployee(employee: Employee) {
-    return (
-      String(employee.schedule_group || '').toLowerCase() === 'security' ||
-      String(employee.job_function || '').toLowerCase() === 'security' ||
-      String(employee.work_schedule_code || '').toLowerCase() === 'security_dynamic'
-    )
-  }
-
-  function getEmployeeWorkSchedule(employee: Employee): WorkSchedule {
-    if (employee.work_schedule_id) {
-      const byId = workScheduleMap.byId.get(employee.work_schedule_id)
-      if (byId) return byId
-    }
-
-    if (employee.work_schedule_code) {
-      const byCode = workScheduleMap.byCode.get(employee.work_schedule_code)
-      if (byCode) return byCode
-    }
-
-    return workSchedule
-  }
-
-  function countDeferredSecurityRows(rows: ParsedRow[]) {
-    const keys = new Set<string>()
-
-    rows.forEach((row) => {
-      const employee = employeeMap.get(String(row.machine_pin).trim())
-      if (!employee || !isSecurityEmployee(employee)) return
-      keys.add(`${row.machine_pin}|${row.attendance_date}`)
-    })
-
-    return keys.size
-  }
 
   async function fetchData() {
     setLoading(true)
@@ -255,21 +194,15 @@ export default function HRAttendanceUploadPage() {
       .from('work_schedules')
       .select('*')
       .eq('is_active', true)
-      .order('schedule_name', { ascending: true })
+      .eq('is_default', true)
+      .order('updated_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
 
-    if (scheduleError || !scheduleData?.length) {
-      setWorkSchedules([fallbackSchedule])
+    if (scheduleError) {
       setWorkSchedule(fallbackSchedule)
     } else {
-      const schedules = scheduleData as WorkSchedule[]
-      const defaultSchedule =
-        schedules.find((item) => item.is_default === true) ||
-        schedules.find((item) => item.schedule_code === 'regular_poltek') ||
-        schedules[0] ||
-        fallbackSchedule
-
-      setWorkSchedules(schedules)
-      setWorkSchedule(defaultSchedule)
+      setWorkSchedule(scheduleData || fallbackSchedule)
     }
 
     setUploads(uploadData || [])
@@ -303,7 +236,7 @@ export default function HRAttendanceUploadPage() {
     }
 
     refreshPreview(fileToParse)
-  }, [selectedFile, employees, workSchedule, workSchedules])
+  }, [selectedFile, employees, workSchedule])
 
   function resetUploadForm() {
     setSelectedFile(null)
@@ -732,8 +665,7 @@ export default function HRAttendanceUploadPage() {
 
   function getAttendanceDecision(
     checkIn: string | null,
-    checkOut: string | null,
-    schedule: WorkSchedule,
+    checkOut: string | null
   ): AttendanceDecision {
     const workDuration = getWorkDurationMinutes(checkIn, checkOut)
 
@@ -746,7 +678,7 @@ export default function HRAttendanceUploadPage() {
     }
 
     const checkInMinutes = getTimeInMinutes(checkIn)
-    const expectedCheckInMinutes = getTimeInMinutes(schedule.expected_check_in)
+    const expectedCheckInMinutes = getTimeInMinutes(workSchedule.expected_check_in)
 
     if (checkInMinutes === null || expectedCheckInMinutes === null) {
       return {
@@ -756,20 +688,20 @@ export default function HRAttendanceUploadPage() {
       }
     }
 
-    const lateTolerance = Number(schedule.late_tolerance_minutes || 0)
+    const lateTolerance = Number(workSchedule.late_tolerance_minutes || 0)
     const lateLimit = expectedCheckInMinutes + lateTolerance
 
     if (checkInMinutes > lateLimit) {
       return {
         status: 'late',
-        note: `Terlambat. Jam masuk standar ${schedule.expected_check_in}, toleransi ${lateTolerance} menit.`,
+        note: `Terlambat. Jam masuk standar ${workSchedule.expected_check_in}, toleransi ${lateTolerance} menit.`,
         work_duration_minutes: workDuration,
       }
     }
 
     return {
       status: 'present',
-      note: `Hadir sesuai ${schedule.schedule_name} (${schedule.expected_check_in} - ${schedule.expected_check_out}).`,
+      note: `Hadir sesuai jam kerja reguler ${workSchedule.expected_check_in} - ${workSchedule.expected_check_out}.`,
       work_duration_minutes: workDuration,
     }
   }
@@ -824,24 +756,7 @@ export default function HRAttendanceUploadPage() {
         if (!employee) return null
 
         const { checkIn, checkOut } = getFinalScan(group)
-
-        if (isSecurityEmployee(employee)) {
-          return {
-            ...first,
-            check_in: checkIn,
-            check_out: checkOut,
-            full_name: employee.full_name || null,
-            employee_number: employee.employee_number || null,
-            department: employee.department || null,
-            position: employee.position || null,
-            attendance_status: 'security_deferred',
-            status_note: 'Security terdeteksi. Data belum ditulis pada Phase 1 dan akan diproses oleh Security Shift Detection Engine Phase 2.',
-            work_duration_minutes: getWorkDurationMinutes(checkIn, checkOut),
-          }
-        }
-
-        const schedule = getEmployeeWorkSchedule(employee)
-        const decision = getAttendanceDecision(checkIn, checkOut, schedule)
+        const decision = getAttendanceDecision(checkIn, checkOut)
 
         return {
           ...first,
@@ -865,7 +780,7 @@ export default function HRAttendanceUploadPage() {
   ): AttendanceLogPayload[] {
     const groupMap = groupRowsByEmployeeAndDate(rows)
 
-    return Array.from(groupMap.entries()).flatMap(([, group]) => {
+    return Array.from(groupMap.entries()).map(([, group]) => {
       const first = group[0]
       const employee = employeeMap.get(first.machine_pin)
       const { checkIn, checkOut, checkIns, checkOuts } = getFinalScan(group)
@@ -874,16 +789,9 @@ export default function HRAttendanceUploadPage() {
         throw new Error('Data karyawan tidak ditemukan.')
       }
 
-      // Phase 1 hanya mengaktifkan multi-schedule fixed. Security sengaja tidak
-      // ditulis agar tidak salah klasifikasi sebelum Shift Detection Engine Phase 2.
-      if (isSecurityEmployee(employee)) {
-        return []
-      }
+      const decision = getAttendanceDecision(checkIn, checkOut)
 
-      const schedule = getEmployeeWorkSchedule(employee)
-      const decision = getAttendanceDecision(checkIn, checkOut, schedule)
-
-      return [{
+      return {
         upload_id: uploadId,
 
         employee_id: employee.id || null,
@@ -910,30 +818,24 @@ export default function HRAttendanceUploadPage() {
           rows: group.map((item) => item.raw),
           check_ins: checkIns,
           check_outs: checkOuts,
-          workforce_type: employee.workforce_type || 'organic',
-          vendor_id: employee.vendor_id || null,
-          job_function: employee.job_function || null,
-          schedule_id: schedule.id,
-          schedule_code: schedule.schedule_code,
-          schedule_name: schedule.schedule_name,
-          schedule_group: schedule.schedule_group,
-          expected_check_in: schedule.expected_check_in,
-          expected_check_out: schedule.expected_check_out,
-          late_tolerance_minutes: schedule.late_tolerance_minutes || 0,
+          schedule_name: workSchedule.schedule_name,
+          expected_check_in: workSchedule.expected_check_in,
+          expected_check_out: workSchedule.expected_check_out,
+          late_tolerance_minutes: workSchedule.late_tolerance_minutes || 0,
           skipped_unmatched_machine_pin: false,
         },
 
         is_matched: true,
         notes: decision.note,
 
-        detected_schedule_name: schedule.schedule_name,
-        detected_schedule_group: schedule.schedule_group || 'regular',
+        detected_schedule_name: workSchedule.schedule_name,
+        detected_schedule_group: 'regular',
         work_duration_minutes: decision.work_duration_minutes,
         is_double_shift: false,
-        is_night_shift: Boolean(schedule.crosses_midnight),
+        is_night_shift: false,
 
         updated_at: new Date().toISOString(),
-      }]
+      }
     })
   }
 
@@ -1183,7 +1085,7 @@ export default function HRAttendanceUploadPage() {
 
     if (!scheduleConfirmed) {
       setErrorMessage(
-        'Konfirmasi kebijakan jadwal wajib dilakukan sebelum proses unggah.'
+        'Konfirmasi jam kerja reguler wajib dilakukan sebelum proses unggah.'
       )
       setUploading(false)
       return
@@ -1198,16 +1100,10 @@ export default function HRAttendanceUploadPage() {
     }
 
     const logsPreview = buildAttendanceLogs('preview', parseResult.rows)
-    const deferredSecurityRows = countDeferredSecurityRows(parseResult.rows)
-    const unmatchedRows = parseResult.rows.filter((row) => {
-      return !employeeMap.has(String(row.machine_pin).trim())
-    }).length
 
     if (logsPreview.length === 0) {
       setErrorMessage(
-        deferredSecurityRows > 0
-          ? `Berkas hanya berisi ${deferredSecurityRows} data Security. Phase 1 belum menulis absensi Security untuk mencegah salah deteksi shift. Lanjutkan ke Security Shift Detection Engine Phase 2.`
-          : 'Tidak ada data yang dapat diproses karena seluruh NIP pada berkas tidak sesuai dengan machine_pin pada data master karyawan.'
+        'Tidak ada data yang dapat diproses karena seluruh NIP pada berkas tidak sesuai dengan machine_pin pada data master karyawan.'
       )
       setUploading(false)
       return
@@ -1234,7 +1130,7 @@ export default function HRAttendanceUploadPage() {
       .from('attendance-uploads')
       .getPublicUrl(filePath)
 
-    const skippedRows = unmatchedRows
+    const skippedRows = parseResult.rows.length - logsPreview.length
 
     const { data: uploadRecord, error: insertError } = await supabase
       .from('attendance_uploads')
@@ -1250,7 +1146,7 @@ export default function HRAttendanceUploadPage() {
         upload_period: uploadPeriod || selectedFile.name,
         notes:
           notes ||
-          `Diproses menggunakan jadwal per karyawan. ${skippedRows} baris dilewati karena NIP tidak sesuai machine_pin. ${deferredSecurityRows} data Security ditahan untuk Shift Detection Engine Phase 2.`,
+          `Diproses menggunakan jam kerja reguler ${workSchedule.expected_check_in} - ${workSchedule.expected_check_out}. ${skippedRows} data dilewati karena NIP tidak sesuai dengan machine_pin data master karyawan.`,
         updated_at: new Date().toISOString(),
       })
       .select('id')
@@ -1322,13 +1218,13 @@ export default function HRAttendanceUploadPage() {
         total_rows: logs.length,
         notes:
           notes ||
-          `Diproses otomatis berdasarkan machine_pin dan jadwal per karyawan. ${skippedRows} baris NIP tidak sesuai dilewati. ${deferredSecurityRows} data Security ditahan untuk Phase 2. Sinkron cuti/izin/PHL approved berhasil dijalankan untuk ${syncResult.successCount} karyawan.`,
+          `Diproses otomatis berdasarkan machine_pin dan jam kerja reguler. ${skippedRows} data dilewati karena NIP tidak sesuai dengan machine_pin data master karyawan. Sinkron cuti/izin/PHL approved berhasil dijalankan untuk ${syncResult.successCount} karyawan.`,
         updated_at: new Date().toISOString(),
       })
       .eq('id', uploadRecord.id)
 
     setSuccessMessage(
-      `Berkas berhasil diproses. ${logs.length} data fingerprint dibuat/diperbarui dengan jadwal per karyawan. ${skippedRows} baris NIP tidak sesuai dilewati. ${deferredSecurityRows} data Security ditahan untuk Phase 2. Data manual dan bukti lama tetap dipertahankan. Sinkron request approved berhasil untuk ${syncResult.successCount} karyawan.`
+      `Berkas berhasil diproses. ${logs.length} data fingerprint dibuat/diperbarui dengan safe merge. Data manual employee dan dokumen bukti pada tanggal yang sama dipertahankan. ${skippedRows} data dilewati. Sinkron cuti/izin/PHL approved berhasil dijalankan untuk ${syncResult.successCount} karyawan.`
     )
 
     setSelectedFile(null)
@@ -1470,10 +1366,6 @@ Data fingerprint dari upload ini akan dilepas. Data manual employee, alasan, app
     (item) => item.attendance_status === 'incomplete'
   ).length
 
-  const securityDeferredPreviewCount = parsePreview.filter(
-    (item) => item.attendance_status === 'security_deferred'
-  ).length
-
   return (
     <>
       <Topbar
@@ -1601,7 +1493,7 @@ Data fingerprint dari upload ini akan dilepas. Data manual employee, alasan, app
                   </h2>
 
                   <p className="mt-1 max-w-3xl text-sm leading-6 text-[#6e6e73]">
-                    Pilih berkas XLS, XLSX, atau CSV, cek pratinjau, konfirmasi kebijakan jadwal,
+                    Pilih berkas XLS, XLSX, atau CSV, cek pratinjau, konfirmasi jam kerja,
                     lalu proses data ke attendance_logs.
                   </p>
                 </div>
@@ -1622,12 +1514,12 @@ Data fingerprint dari upload ini akan dilepas. Data manual employee, alasan, app
                     <div className="mb-4 flex items-center gap-2">
                       <Settings2 size={18} className="text-[#007aff]" />
                       <h3 className="font-semibold text-[#1d1d1f]">
-                        Konfirmasi Kebijakan Multi-Schedule
+                        Konfirmasi Jam Kerja Reguler
                       </h3>
                     </div>
 
                     <p className="mb-5 text-sm leading-6 text-[#6e6e73]">
-                      Sistem menggunakan jadwal yang terpasang pada masing-masing karyawan. Jadwal default hanya menjadi fallback untuk data organik lama yang belum memiliki assignment.
+                      Sistem akan menggunakan jam kerja default yang aktif pada menu Pengaturan.
                     </p>
 
                     <div className="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(180px,1fr))]">
@@ -1659,10 +1551,10 @@ Data fingerprint dari upload ini akan dilepas. Data manual employee, alasan, app
 
                       <div className="min-w-0">
                         <div className="font-semibold text-[#1d1d1f]">
-                          Saya mengonfirmasi bahwa assignment jadwal karyawan sudah benar.
+                          Saya mengonfirmasi bahwa jam kerja reguler sudah benar.
                         </div>
                         <p className="mt-1 text-sm leading-6 text-[#6e6e73]">
-                          Karyawan organik/fixed diproses sesuai assignment. Data Security dynamic ditahan pada Phase 1 agar tidak salah klasifikasi sebelum Shift Detection Engine aktif.
+                          Sistem akan memproses absensi menggunakan jam kerja {workSchedule.expected_check_in} - {workSchedule.expected_check_out}.
                         </p>
                       </div>
                     </label>
@@ -1729,7 +1621,7 @@ Data fingerprint dari upload ini akan dilepas. Data manual employee, alasan, app
 
                     <p className="mt-2 max-w-md text-sm leading-6 text-[#6e6e73]">
                       {selectedFile
-                        ? `${formatFileSize(selectedFile.size)} · Berkas siap diproses setelah konfirmasi kebijakan jadwal.`
+                        ? `${formatFileSize(selectedFile.size)} · Berkas siap diproses setelah konfirmasi jam kerja.`
                         : 'Unggah berkas hasil ekspor mesin absensi. Data dengan NIP yang tidak sesuai master karyawan tidak akan diproses.'}
                     </p>
 
@@ -1746,7 +1638,6 @@ Data fingerprint dari upload ini akan dilepas. Data manual employee, alasan, app
                       <MiniInfoCard title="Dilewati" value={String(skippedPreviewCount)} />
                       <MiniInfoCard title="Late" value={String(latePreviewCount)} />
                       <MiniInfoCard title="Incomplete" value={String(incompletePreviewCount)} />
-                      <MiniInfoCard title="Security Hold" value={String(securityDeferredPreviewCount)} />
                     </div>
                   )}
 
@@ -2196,7 +2087,7 @@ function ProcessingLogic() {
         <ProcessItem
           number="04"
           title="Status Otomatis"
-          description="Sistem menentukan present, late, atau incomplete berdasarkan jadwal yang terpasang pada masing-masing karyawan."
+          description="Sistem menentukan present, late, atau incomplete berdasarkan jam kerja reguler."
           icon={<Database size={18} />}
         />
 
@@ -2222,7 +2113,7 @@ function ProcessingLogic() {
             <AlertTriangle size={18} />
             Konfirmasi wajib
           </div>
-          Proses upload tidak dapat dilakukan sebelum HR mengonfirmasi assignment dan kebijakan jadwal.
+          Proses upload tidak dapat dilakukan sebelum HR mengonfirmasi jam kerja reguler.
         </div>
       </div>
     </div>
@@ -2417,7 +2308,6 @@ function formatAttendanceStatus(status: string) {
   if (status === 'present') return 'Present'
   if (status === 'late') return 'Late'
   if (status === 'incomplete') return 'Incomplete'
-  if (status === 'security_deferred') return 'Security Hold'
   return status
 }
 

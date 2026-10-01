@@ -1,5 +1,4 @@
 import {
-  Briefcase,
   CalendarDays,
   Clock3,
   Landmark,
@@ -21,12 +20,6 @@ export const hrMenu = [
     href: '/hr/employees',
     icon: Users,
     subtitle: 'Master employee',
-  },
-  {
-    title: 'Tenaga Kerja',
-    href: '/hr/workforce',
-    icon: Briefcase,
-    subtitle: 'Organik, outsource & jadwal',
   },
   {
     title: 'Absensi',
