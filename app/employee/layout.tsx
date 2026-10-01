@@ -6,7 +6,9 @@ import { useRouter } from 'next/navigation'
 import { Loader2, Menu, ShieldAlert, X } from 'lucide-react'
 
 import { AppSidebar } from '@/components/layout/AppSidebar'
-import { employeeMenu } from '@/lib/menu'
+import { employeeMenu, employeeRemedEntry } from '@/lib/menu'
+import { remedFetch } from '@/lib/remed-client'
+import type { RemedSession } from '@/types/remed'
 import { supabase } from '@/lib/supabase'
 
 type AppUser = {
@@ -24,6 +26,7 @@ export default function EmployeeLayout({ children }: { children: React.ReactNode
   const [userName, setUserName] = useState('Employee')
   const [message, setMessage] = useState('Memeriksa akses akun...')
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
+  const [hasRemedAccess, setHasRemedAccess] = useState(false)
 
   useEffect(() => {
     checkAccess()
@@ -88,6 +91,13 @@ export default function EmployeeLayout({ children }: { children: React.ReactNode
       setUserName(formatEmailName(appUser.email))
     }
 
+    try {
+      const remed = await remedFetch<{ session: RemedSession }>('/api/remed/session')
+      setHasRemedAccess(remed.session.role === 'employee')
+    } catch {
+      setHasRemedAccess(false)
+    }
+
     setAllowed(true)
     setLoading(false)
   }
@@ -113,7 +123,7 @@ export default function EmployeeLayout({ children }: { children: React.ReactNode
       <div className="flex min-h-screen w-full overflow-x-hidden">
         <div className="hidden lg:block">
           <AppSidebar
-            menu={employeeMenu}
+            menu={hasRemedAccess ? [...employeeMenu, employeeRemedEntry] : employeeMenu}
             title="HARMONY"
             subtitle="Human Attendance & Leave System"
             userName={userName}
@@ -127,7 +137,7 @@ export default function EmployeeLayout({ children }: { children: React.ReactNode
             <button type="button" aria-label="Tutup menu" onClick={() => setMobileSidebarOpen(false)} className="absolute inset-0 bg-black/35 backdrop-blur-sm" />
             <div className="absolute left-0 top-0 h-full max-w-[86vw]">
               <AppSidebar
-                menu={employeeMenu}
+                menu={hasRemedAccess ? [...employeeMenu, employeeRemedEntry] : employeeMenu}
                 title="HARMONY"
                 subtitle="Human Attendance & Leave System"
                 userName={userName}

@@ -3,12 +3,13 @@
 import Image from 'next/image'
 import { useEffect, useMemo, useState } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
-import { ArrowLeftRight, Loader2, Menu, ShieldAlert, X } from 'lucide-react'
+import { Loader2, Menu, ShieldAlert, X } from 'lucide-react'
 
 import { AppSidebar } from '@/components/layout/AppSidebar'
-import { remedEmployeeMenu, remedFinanceMenu, remedHrMenu } from '@/lib/remed-menu'
+import { employeeMenu, hrMenu } from '@/lib/menu'
 import { REMED_ROLE_LABELS } from '@/lib/remed'
 import { remedFetch } from '@/lib/remed-client'
+import { remedEmployeeMenu, remedFinanceMenu, remedHrMenu } from '@/lib/remed-menu'
 import type { RemedSession } from '@/types/remed'
 
 export default function RemedLayout({ children }: { children: React.ReactNode }) {
@@ -26,6 +27,7 @@ export default function RemedLayout({ children }: { children: React.ReactNode })
 
   useEffect(() => {
     if (!session) return
+
     const required = pathname.startsWith('/remed/hr')
       ? 'hr'
       : pathname.startsWith('/remed/finance')
@@ -33,13 +35,16 @@ export default function RemedLayout({ children }: { children: React.ReactNode })
         : pathname.startsWith('/remed/employee')
           ? 'employee'
           : null
+
     if (required && session.role !== required) router.replace(roleHome(session.role))
   }, [pathname, router, session])
 
   useEffect(() => {
     if (!mobileSidebarOpen) return
     document.body.style.overflow = 'hidden'
-    return () => { document.body.style.overflow = '' }
+    return () => {
+      document.body.style.overflow = ''
+    }
   }, [mobileSidebarOpen])
 
   async function loadSession() {
@@ -57,9 +62,9 @@ export default function RemedLayout({ children }: { children: React.ReactNode })
   }
 
   const menu = useMemo(() => {
-    if (session?.role === 'hr') return remedHrMenu
+    if (session?.role === 'hr') return [...hrMenu, ...remedHrMenu]
     if (session?.role === 'finance') return remedFinanceMenu
-    return remedEmployeeMenu
+    return [...employeeMenu, ...remedEmployeeMenu]
   }, [session?.role])
 
   if (loading) return <AccessLoading message={message} />
@@ -68,25 +73,35 @@ export default function RemedLayout({ children }: { children: React.ReactNode })
     return (
       <main className="flex min-h-screen items-center justify-center bg-[#f5f5f7] p-6">
         <div className="w-full max-w-md rounded-[32px] border border-red-100 bg-white p-8 text-center shadow-[0_24px_70px_rgba(15,23,42,0.12)]">
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-red-50 text-red-600"><ShieldAlert size={26} /></div>
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-red-50 text-red-600">
+            <ShieldAlert size={26} />
+          </div>
           <h1 className="mt-5 text-xl font-semibold text-[#1d1d1f]">Akses Re-Med Ditolak</h1>
           <p className="mt-2 text-sm leading-6 text-[#6e6e73]">{message}</p>
-          <button type="button" onClick={() => router.replace('/login?app=remed')} className="mt-5 rounded-2xl bg-[#1d1d1f] px-5 py-3 text-sm font-semibold text-white">Kembali ke Login</button>
+          <button type="button" onClick={() => router.replace('/login')} className="mt-5 rounded-2xl bg-[#1d1d1f] px-5 py-3 text-sm font-semibold text-white">
+            Kembali ke HARMONY
+          </button>
         </div>
       </main>
     )
   }
 
+  const roleLabel = session.role === 'finance'
+    ? 'Finance · Re-Med'
+    : session.role === 'hr'
+      ? 'HR Administrator · Re-Med'
+      : 'Employee · Re-Med'
+
   return (
-    <div className="min-h-screen overflow-x-hidden bg-[#f5f7f6]">
+    <div className="min-h-screen overflow-x-hidden bg-[#f5f5f7]">
       <div className="flex min-h-screen w-full overflow-x-hidden">
         <div className="hidden lg:block">
           <AppSidebar
             menu={menu}
-            title="Re-Med"
-            subtitle="Medical Reimbursement Management"
+            title="HARMONY"
+            subtitle="Human Attendance, Request, Monitoring & Leave System"
             userName={session.userName}
-            userRole={REMED_ROLE_LABELS[session.role]}
+            userRole={roleLabel}
             logoSrc="/logo.png"
           />
         </div>
@@ -95,21 +110,37 @@ export default function RemedLayout({ children }: { children: React.ReactNode })
           <div className="fixed inset-0 z-50 lg:hidden">
             <button type="button" aria-label="Tutup menu" onClick={() => setMobileSidebarOpen(false)} className="absolute inset-0 bg-black/35 backdrop-blur-sm" />
             <div className="absolute left-0 top-0 h-full max-w-[86vw]">
-              <AppSidebar menu={menu} title="Re-Med" subtitle="Medical Reimbursement Management" userName={session.userName} userRole={REMED_ROLE_LABELS[session.role]} logoSrc="/logo.png" onNavigate={() => setMobileSidebarOpen(false)} />
-              <button type="button" aria-label="Tutup menu" onClick={() => setMobileSidebarOpen(false)} className="absolute right-[-48px] top-4 flex h-10 w-10 items-center justify-center rounded-2xl bg-white text-[#1d1d1f] shadow-lg"><X size={20} /></button>
+              <AppSidebar
+                menu={menu}
+                title="HARMONY"
+                subtitle="Human Attendance, Request, Monitoring & Leave System"
+                userName={session.userName}
+                userRole={roleLabel}
+                logoSrc="/logo.png"
+                onNavigate={() => setMobileSidebarOpen(false)}
+              />
+              <button type="button" aria-label="Tutup menu" onClick={() => setMobileSidebarOpen(false)} className="absolute right-[-48px] top-4 flex h-10 w-10 items-center justify-center rounded-2xl bg-white text-[#1d1d1f] shadow-lg">
+                <X size={20} />
+              </button>
             </div>
           </div>
         )}
 
         <main className="min-w-0 flex-1 overflow-x-hidden">
-          <div className="sticky top-0 z-40 border-b border-black/5 bg-[#f5f7f6]/90 px-4 py-3 backdrop-blur-xl lg:hidden">
+          <div className="sticky top-0 z-40 border-b border-black/5 bg-[#f5f5f7]/90 px-4 py-3 backdrop-blur-xl lg:hidden">
             <div className="flex items-center justify-between gap-3">
-              <button type="button" onClick={() => setMobileSidebarOpen(true)} className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white text-[#1d1d1f] shadow-sm"><Menu size={22} /></button>
+              <button type="button" onClick={() => setMobileSidebarOpen(true)} className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white text-[#1d1d1f] shadow-sm" aria-label="Buka menu">
+                <Menu size={22} />
+              </button>
               <div className="flex min-w-0 flex-1 items-center gap-3 rounded-2xl bg-white px-3 py-2 shadow-sm">
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-black/5 bg-white"><Image src="/logo.png" alt="Re-Med" width={30} height={30} className="h-7 w-7 object-contain" /></div>
-                <div className="min-w-0"><p className="truncate text-sm font-bold text-[#1d1d1f]">Re-Med</p><p className="truncate text-[11px] font-medium text-[#6e6e73]">{REMED_ROLE_LABELS[session.role]}</p></div>
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-black/5 bg-white">
+                  <Image src="/logo.png" alt="HARMONY Logo" width={30} height={30} className="h-7 w-7 object-contain" />
+                </div>
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-bold text-[#1d1d1f]">HARMONY</p>
+                  <p className="truncate text-[11px] font-medium text-[#6e6e73]">Re-Med · {REMED_ROLE_LABELS[session.role]}</p>
+                </div>
               </div>
-              <button type="button" onClick={() => router.push('/login?app=harmony')} className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white text-[#1d1d1f] shadow-sm" aria-label="Ganti aplikasi"><ArrowLeftRight size={19} /></button>
             </div>
           </div>
           <div className="w-full min-w-0">{children}</div>
@@ -127,9 +158,11 @@ function roleHome(role: RemedSession['role']) {
 
 function AccessLoading({ message }: { message: string }) {
   return (
-    <main className="flex min-h-screen items-center justify-center bg-[#f5f7f6] p-6">
+    <main className="flex min-h-screen items-center justify-center bg-[#f5f5f7] p-6">
       <div className="w-full max-w-md rounded-[32px] border border-black/5 bg-white p-8 text-center shadow-[0_24px_70px_rgba(15,23,42,0.12)]">
-        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[#e8f7f1] text-[#18794e]"><Loader2 size={26} className="animate-spin" /></div>
+        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[#e8f7f1] text-[#18794e]">
+          <Loader2 size={26} className="animate-spin" />
+        </div>
         <h1 className="mt-5 text-xl font-semibold text-[#1d1d1f]">Memeriksa Akses Re-Med</h1>
         <p className="mt-2 text-sm leading-6 text-[#6e6e73]">{message}</p>
       </div>

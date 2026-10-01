@@ -1,0 +1,49 @@
+HARMONY + RE-MED V1.2.0 SOURCE CHANGE MANIFEST
+
+CHANGED
+- app/login/page.tsx
+  Single HARMONY login. Removed swipe/carousel and separate Re-Med login mode.
+  Finance fallback is resolved from remed_user_access without changing app_users.role.
+
+- app/auth/callback/page.tsx
+  Google OAuth now has one callback flow. HARMONY employee/HR resolves first; Finance Re-Med is a controlled fallback.
+
+- app/employee/layout.tsx
+  Adds Re-Med menu entry only when active remed_user_access resolves as employee.
+
+- app/hr/layout.tsx
+  Adds Re-Med menu entry only when active remed_user_access resolves as HR.
+
+- app/remed/layout.tsx
+  Re-Med pages now render inside HARMONY branding/navigation.
+  Employee/HR can navigate between core HARMONY and Re-Med from one sidebar.
+  Finance sees Re-Med-only menu.
+
+- app/remed/page.tsx
+  Removed redirect to /login?app=remed. Uses the single /login entry.
+
+- app/remed/employee/account/page.tsx
+  Removed old switch-app action and points account settings back to HARMONY.
+
+- components/layout/AppSidebar.tsx
+  Added section-aware navigation headings so HARMONY and RE-MED can coexist clearly in one sidebar.
+
+- lib/menu.ts
+  Added conditional Employee/HR Re-Med entry definitions.
+
+- lib/remed-menu.ts
+  Re-Med submenus now identify themselves under the RE-MED sidebar section.
+
+UNCHANGED / PRESERVED
+- Attendance business process
+- Leave business process
+- PHL canonical flow
+- Supervisor approvals
+- HR reporting/export
+- /api/remed business API
+- Re-Med consolidated database
+- Re-Med entitlement historical balances
+- Supabase Auth project
+- employees canonical master
+- .env.local
+- Outsource remains HOLD

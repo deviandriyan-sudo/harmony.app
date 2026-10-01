@@ -6,7 +6,9 @@ import { useRouter } from 'next/navigation'
 import { Loader2, Menu, ShieldAlert, X } from 'lucide-react'
 
 import { AppSidebar } from '@/components/layout/AppSidebar'
-import { hrMenu } from '@/lib/menu'
+import { hrMenu, hrRemedEntry } from '@/lib/menu'
+import { remedFetch } from '@/lib/remed-client'
+import type { RemedSession } from '@/types/remed'
 import { supabase } from '@/lib/supabase'
 
 type AppUser = {
@@ -24,6 +26,7 @@ export default function HRLayout({ children }: { children: React.ReactNode }) {
   const [userName, setUserName] = useState('HR Administrator')
   const [message, setMessage] = useState('Memeriksa akses akun...')
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
+  const [hasRemedAccess, setHasRemedAccess] = useState(false)
 
   useEffect(() => {
     checkAccess()
@@ -78,6 +81,12 @@ export default function HRLayout({ children }: { children: React.ReactNode }) {
       .replace(/\b\w/g, (char) => char.toUpperCase()) || 'HR Administrator'
 
     setUserName(fallbackName)
+    try {
+      const remed = await remedFetch<{ session: RemedSession }>('/api/remed/session')
+      setHasRemedAccess(remed.session.role === 'hr')
+    } catch {
+      setHasRemedAccess(false)
+    }
     setAllowed(true)
     setLoading(false)
   }
@@ -110,14 +119,14 @@ export default function HRLayout({ children }: { children: React.ReactNode }) {
     <div className="min-h-screen overflow-x-hidden bg-[#f5f5f7]">
       <div className="flex min-h-screen w-full overflow-x-hidden">
         <div className="hidden lg:block">
-          <AppSidebar menu={hrMenu} title="HARMONY" subtitle="Human Attendance & Leave System" userName={userName} userRole="HR Administrator" logoSrc="/logo.png" />
+          <AppSidebar menu={hasRemedAccess ? [...hrMenu, hrRemedEntry] : hrMenu} title="HARMONY" subtitle="Human Attendance & Leave System" userName={userName} userRole="HR Administrator" logoSrc="/logo.png" />
         </div>
 
         {mobileSidebarOpen && (
           <div className="fixed inset-0 z-50 lg:hidden">
             <button type="button" aria-label="Tutup menu" onClick={() => setMobileSidebarOpen(false)} className="absolute inset-0 bg-black/35 backdrop-blur-sm" />
             <div className="absolute left-0 top-0 h-full max-w-[86vw]">
-              <AppSidebar menu={hrMenu} title="HARMONY" subtitle="Human Attendance & Leave System" userName={userName} userRole="HR Administrator" logoSrc="/logo.png" onNavigate={() => setMobileSidebarOpen(false)} />
+              <AppSidebar menu={hasRemedAccess ? [...hrMenu, hrRemedEntry] : hrMenu} title="HARMONY" subtitle="Human Attendance & Leave System" userName={userName} userRole="HR Administrator" logoSrc="/logo.png" onNavigate={() => setMobileSidebarOpen(false)} />
               <button type="button" aria-label="Tutup menu" onClick={() => setMobileSidebarOpen(false)} className="absolute right-[-48px] top-4 flex h-10 w-10 items-center justify-center rounded-2xl bg-white text-[#1d1d1f] shadow-lg"><X size={20} /></button>
             </div>
           </div>

@@ -3,7 +3,7 @@
 import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { useState } from 'react'
+import { Fragment, useState } from 'react'
 import { ChevronRight, Loader2, LogOut, ShieldCheck } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 
@@ -12,6 +12,7 @@ type SidebarMenuItem = {
   href: string
   icon: React.ElementType
   subtitle?: string
+  section?: string
 }
 
 type AppSidebarProps = {
@@ -102,35 +103,44 @@ export function AppSidebar({
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto px-3 py-4">
-          <p className="mb-3 px-2 text-[11px] font-bold uppercase tracking-[0.22em] text-[#8e8e93]">Navigation</p>
           <nav className="space-y-1.5">
-            {menu.map((item) => {
+            {menu.map((item, index) => {
               const active = isActive(item.href)
               const Icon = item.icon
+              const section = item.section || 'Navigation'
+              const previousSection = index > 0 ? (menu[index - 1].section || 'Navigation') : null
+              const showSection = index === 0 || section !== previousSection
+
               return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  onClick={onNavigate}
-                  className={[
-                    'group flex items-center gap-3 rounded-[22px] px-3 py-2.5 transition-all duration-200',
-                    active
-                      ? 'bg-[#1d1d1f] text-white shadow-[0_10px_28px_rgba(15,23,42,0.18)]'
-                      : 'text-[#1d1d1f] hover:bg-white hover:shadow-sm',
-                  ].join(' ')}
-                >
-                  <div className={[
-                    'flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl transition',
-                    active ? 'bg-white/12 text-white' : 'bg-[#eef1f5] text-[#3a3a3c] group-hover:bg-[#e8f2ff] group-hover:text-[#007aff]',
-                  ].join(' ')}>
-                    <Icon size={18} strokeWidth={2.2} />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className={['truncate text-[14px] font-semibold', active ? 'text-white' : 'text-[#1d1d1f]'].join(' ')}>{item.title}</p>
-                    {item.subtitle && <p className={['truncate text-[12px]', active ? 'text-white/70' : 'text-[#7c7c80]'].join(' ')}>{item.subtitle}</p>}
-                  </div>
-                  <ChevronRight size={16} className={active ? 'text-white/70' : 'text-[#b0b0b5]'} />
-                </Link>
+                <Fragment key={item.href}>
+                  {showSection && (
+                    <p className={`${index === 0 ? 'mb-3' : 'mb-3 mt-6'} px-2 text-[11px] font-bold uppercase tracking-[0.22em] text-[#8e8e93]`}>
+                      {section}
+                    </p>
+                  )}
+                  <Link
+                    href={item.href}
+                    onClick={onNavigate}
+                    className={[
+                      'group flex items-center gap-3 rounded-[22px] px-3 py-2.5 transition-all duration-200',
+                      active
+                        ? 'bg-[#1d1d1f] text-white shadow-[0_10px_28px_rgba(15,23,42,0.18)]'
+                        : 'text-[#1d1d1f] hover:bg-white hover:shadow-sm',
+                    ].join(' ')}
+                  >
+                    <div className={[
+                      'flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl transition',
+                      active ? 'bg-white/12 text-white' : 'bg-[#eef1f5] text-[#3a3a3c] group-hover:bg-[#e8f2ff] group-hover:text-[#007aff]',
+                    ].join(' ')}>
+                      <Icon size={18} strokeWidth={2.2} />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className={['truncate text-[14px] font-semibold', active ? 'text-white' : 'text-[#1d1d1f]'].join(' ')}>{item.title}</p>
+                      {item.subtitle && <p className={['truncate text-[12px]', active ? 'text-white/70' : 'text-[#7c7c80]'].join(' ')}>{item.subtitle}</p>}
+                    </div>
+                    <ChevronRight size={16} className={active ? 'text-white/70' : 'text-[#b0b0b5]'} />
+                  </Link>
+                </Fragment>
               )
             })}
           </nav>
