@@ -1,0 +1,25 @@
+HARMONY RE-MED V2.3 STATIC AUDIT
+
+Source baseline: HARMONY_REMED_ADMIN_TOOLS_V2_2_FULL_REPLACEMENT
+Scope: Re-Med signature management and payment-form signatures
+
+Static checks:
+- Routes: 88 total
+- Pages: 58
+- API routes: 30
+- Exact route conflicts: 0
+- Dynamic normalized conflicts: 0
+- Optional catch-all conflicts: 0
+- Missing local imports: 0
+- TypeScript parse/syntax errors: 0
+- New/changed-file non-environment TypeScript diagnostics: 0
+- Signature files under public/: 0
+- Private seed image mappings: 34
+- Private signature seed folder ignored by Git: yes
+- Node seed script syntax: passed (node --check)
+- SQL function/default DO dollar delimiters: balanced
+
+Build status:
+- Full npm run build NOT VERIFIED in sandbox.
+- npm ci timed out before dependencies could be installed.
+- Do not treat this report as a successful Next.js production build.

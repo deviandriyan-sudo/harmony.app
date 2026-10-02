@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { REMED_BUCKET } from '@/lib/remed'
 import { requireRemedApi, remedApiError } from '@/lib/server/remed-api-auth'
 import { enrichRemedClaims } from '@/lib/server/remed-data'
+import { getRemedPrintSignatures } from '@/lib/server/remed-signatures'
 
 export async function GET(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
@@ -22,7 +23,13 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
     }
 
     const claims = await enrichRemedClaims(ctx.admin, [data])
-    return NextResponse.json({ claim: claims[0] })
+    const claim = claims[0]
+    const signatures = await getRemedPrintSignatures(ctx.admin, {
+      employeeId: claim.employee_id,
+      hrSignatoryEmployeeId: claim.hr_signatory_employee_id || null,
+      financeSignatoryEmployeeId: claim.finance_signatory_employee_id || null,
+    })
+    return NextResponse.json({ claim, signatures })
   } catch (error) {
     const issue = remedApiError(error)
     return NextResponse.json({ message: issue.message }, { status: issue.status })

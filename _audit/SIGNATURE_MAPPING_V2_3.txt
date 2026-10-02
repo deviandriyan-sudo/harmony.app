@@ -1,0 +1,45 @@
+AUTOMATICALLY MAPPED SIGNATURES (34)
+1010689 Fanny Rizki
+1010767 Dewi Safitriani
+1010770 Dedy Sufriansyah
+1010771 Zulkarnaen
+1010772 Masnur
+1010773 Munawar Yulianto
+1010774 Renal Fajri
+1010775 Hamim Rachman
+1010776 Okki Mandasari
+1010777 Maria Relita Ndeto
+1010778 Arjuliska Nazar Eka Saputri
+1010779 Ilmawan Suryapradana
+1010780 Fajariyah Mulyani
+1010781 Loryena Ayu Karondia
+1010782 Feri Putra Prakus Tidar
+1010784 Arfan Halim
+1010785 Gita Amelia
+1010786 Muhammad Fadly Dani
+1010787 Nadya Novi Rahmadana
+1010788 Dzul Fadli
+1010789 Kamelia Saputri
+1010791 Faisal Fachrureza
+1010792 Irma Yusiyanti
+1010793 Devi Andriyan Subakti (separate uploaded Devi signature)
+1010795 Zulfahmi Noor
+1010796 Murdawati
+1010797 Syaiful Muflichin Purnama
+1010799 Nurya Ramadhania
+1010800 Nur Ainun Musvirah
+1010803 Devika Rahma Damayanti Yusuf
+1010804 Nurmasitya Kemalaintan
+1010809 Tiffany Fredy
+1010810 Muhammad Masbukhin
+1010811 Vincentsius Felmi Ajang
+
+KNOWN LEGACY EMPLOYEES WITHOUT AN IDENTIFIABLE MATCH IN THE SUPPLIED SIGNATURE ZIP
+1010794 Muhammad Noor Arridho
+1010801 Nova Tri Anggraini
+1010808 Gilang Restu Prakoso
+
+NOTE
+- Finance signatory is assigned to Nova Tri Anggraini, but no Nova signature image was identifiable in the supplied files.
+- Upload Nova's signature later from Re-Med > Manajemen Tanda Tangan.
+- Newer Harmony employees not present in the legacy mapping can upload their own signature or be assisted by HR.

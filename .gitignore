@@ -39,3 +39,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# private local signature seed files (never commit)
+/_setup/_private_signature_seed/

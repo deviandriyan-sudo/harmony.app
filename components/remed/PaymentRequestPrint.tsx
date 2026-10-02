@@ -7,17 +7,21 @@ import { useRouter } from 'next/navigation'
 import { ClaimStatusBadge } from '@/components/remed/ClaimStatusBadge'
 import { formatRemedDate, formatRupiah } from '@/lib/remed'
 import { remedFetch } from '@/lib/remed-client'
-import type { RemedClaim } from '@/types/remed'
+import type { RemedClaim, RemedPrintSignatures, RemedSignatureDisplay } from '@/types/remed'
 
 export function PaymentRequestPrint({ claimId }: { claimId: string }) {
   const router = useRouter()
   const [claim, setClaim] = useState<RemedClaim | null>(null)
+  const [signatures, setSignatures] = useState<RemedPrintSignatures | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
   useEffect(() => {
-    remedFetch<{ claim: RemedClaim }>(`/api/remed/claims/${claimId}`)
-      .then((payload) => setClaim(payload.claim))
+    remedFetch<{ claim: RemedClaim; signatures: RemedPrintSignatures }>(`/api/remed/claims/${claimId}`)
+      .then((payload) => {
+        setClaim(payload.claim)
+        setSignatures(payload.signatures)
+      })
       .catch((issue: any) => setError(issue?.message || 'Gagal memuat form pembayaran.'))
       .finally(() => setLoading(false))
   }, [claimId])
@@ -31,6 +35,8 @@ export function PaymentRequestPrint({ claimId }: { claimId: string }) {
   }
 
   const approvedAmount = claim.approved_amount ?? (claim.status === 'legacy_record' ? claim.submitted_amount : null)
+  const hrApproved = ['pending_finance', 'waiting_payment', 'paid'].includes(claim.status)
+  const financeApproved = ['waiting_payment', 'paid'].includes(claim.status)
 
   return (
     <section className="mx-auto max-w-[1000px] p-4 sm:p-6 lg:p-8 print:max-w-none print:p-0">
@@ -102,9 +108,27 @@ export function PaymentRequestPrint({ claimId }: { claimId: string }) {
         </div>
 
         <div className="mt-6 grid gap-5 sm:grid-cols-3">
-          <ApprovalBox title="Diajukan Oleh" name={claim.employee?.full_name || 'Karyawan'} date={formatRemedDate(claim.created_at)} />
-          <ApprovalBox title="Diperiksa HR" name={claim.hr_reviewed_at ? 'HR Re-Med' : '-'} date={formatRemedDate(claim.hr_reviewed_at)} />
-          <ApprovalBox title="Diproses Finance" name={claim.finance_reviewed_at ? 'Finance Re-Med' : '-'} date={formatRemedDate(claim.finance_reviewed_at || claim.payment_date)} />
+          <ApprovalBox
+            title="Diajukan Oleh"
+            signature={signatures?.employee || null}
+            fallbackName={claim.employee?.full_name || 'Karyawan'}
+            date={formatRemedDate(claim.created_at)}
+            showSignature
+          />
+          <ApprovalBox
+            title="Diperiksa HR"
+            signature={signatures?.hr || null}
+            fallbackName={hrApproved ? 'HR Re-Med' : '-'}
+            date={formatRemedDate(claim.hr_reviewed_at)}
+            showSignature={hrApproved}
+          />
+          <ApprovalBox
+            title="Diproses Finance"
+            signature={signatures?.finance || null}
+            fallbackName={financeApproved ? 'Finance Re-Med' : '-'}
+            date={formatRemedDate(claim.finance_reviewed_at || claim.payment_date)}
+            showSignature={financeApproved}
+          />
         </div>
 
         {(claim.payment_date || claim.payment_reference) && (
@@ -118,7 +142,7 @@ export function PaymentRequestPrint({ claimId }: { claimId: string }) {
         )}
 
         <footer className="mt-8 border-t border-black/10 pt-4 text-[11px] leading-5 text-[#6e6e73]">
-          Form ini dihasilkan otomatis oleh HARMONY Re-Med. Pastikan data rekening dan nominal pembayaran telah diverifikasi sebelum proses transfer.
+          Form ini dihasilkan otomatis oleh HARMONY Re-Med. Tanda tangan HR/Finance mengikuti pejabat fungsi yang aktif pada saat approval; karyawan dapat memperbarui tanda tangannya melalui Akun & Tanda Tangan Re-Med.
         </footer>
       </article>
     </section>
@@ -134,11 +158,32 @@ function Field({ label, value, strong = false }: { label: string; value: string;
   )
 }
 
-function ApprovalBox({ title, name, date }: { title: string; name: string; date: string }) {
+function ApprovalBox({
+  title,
+  signature,
+  fallbackName,
+  date,
+  showSignature,
+}: {
+  title: string
+  signature: RemedSignatureDisplay | null
+  fallbackName: string
+  date: string
+  showSignature: boolean
+}) {
+  const name = showSignature ? signature?.full_name || fallbackName : fallbackName
+
   return (
-    <div className="min-h-[150px] rounded-2xl border border-black/10 p-4 text-center">
+    <div className="min-h-[190px] rounded-2xl border border-black/10 p-4 text-center">
       <p className="text-xs font-bold uppercase tracking-wide text-[#6e6e73]">{title}</p>
-      <div className="h-16" />
+      <div className="mt-2 flex h-20 items-center justify-center">
+        {showSignature && signature?.signature_url ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={signature.signature_url} alt={`Tanda tangan ${signature.full_name}`} className="max-h-20 max-w-[180px] object-contain" />
+        ) : showSignature && signature ? (
+          <p className="text-[10px] font-medium text-amber-700">Tanda tangan belum diunggah</p>
+        ) : null}
+      </div>
       <p className="border-t border-black/30 pt-2 text-sm font-semibold text-[#1d1d1f]">{name}</p>
       <p className="mt-1 text-xs text-[#6e6e73]">{date}</p>
     </div>

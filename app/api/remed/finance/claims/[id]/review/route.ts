@@ -22,6 +22,21 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
     })
     if (error) throw Object.assign(new Error(error.message), { status: 400 })
 
+    if (decision === 'approve') {
+      const { data: signatory } = await ctx.admin
+        .from('remed_signature_profiles')
+        .select('employee_id')
+        .eq('signer_role', 'finance')
+        .maybeSingle()
+
+      if (signatory?.employee_id) {
+        await ctx.admin
+          .from('remed_claims')
+          .update({ finance_signatory_employee_id: signatory.employee_id })
+          .eq('id', id)
+      }
+    }
+
     return NextResponse.json({ success: true })
   } catch (error) {
     const issue = remedApiError(error)

@@ -71,9 +71,11 @@ export type RemedClaim = {
   hr_note: string | null
   hr_reviewed_by: string | null
   hr_reviewed_at: string | null
+  hr_signatory_employee_id: string | null
   finance_note: string | null
   finance_reviewed_by: string | null
   finance_reviewed_at: string | null
+  finance_signatory_employee_id: string | null
   bank_name: string | null
   bank_account_number: string | null
   bank_account_name: string | null
@@ -115,4 +117,37 @@ export type RemedProcessHistory = {
   note: string | null
   event_at: string
   is_deleted: boolean
+}
+
+export type RemedSignatureDisplay = {
+  employee_id: string | null
+  employee_number: string | null
+  full_name: string
+  department: string | null
+  position: string | null
+  role: 'employee' | 'hr' | 'finance'
+  signature_url: string | null
+  signature_source: 'upload' | 'seed' | 'none'
+  updated_at: string | null
+}
+
+export type RemedSignatureManagementRow = {
+  id: string
+  employee_number: string | null
+  full_name: string | null
+  department: string | null
+  position: string | null
+  email: string | null
+  is_active: boolean | null
+  signer_role: 'hr' | 'finance' | null
+  signature_url: string | null
+  signature_source: 'upload' | 'seed' | 'none'
+  signature_file_name: string | null
+  updated_at: string | null
+}
+
+export type RemedPrintSignatures = {
+  employee: RemedSignatureDisplay | null
+  hr: RemedSignatureDisplay | null
+  finance: RemedSignatureDisplay | null
 }

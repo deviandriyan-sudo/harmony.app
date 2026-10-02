@@ -1,6 +1,9 @@
 import type { RemedClaimStatus, RemedRole } from '@/types/remed'
 
 export const REMED_BUCKET = 'remed-private'
+export const REMED_SIGNATURE_BUCKET = 'remed-signatures'
+export const REMED_SIGNATURE_MAX_FILE_SIZE = 2 * 1024 * 1024
+export const REMED_SIGNATURE_ALLOWED_MIME_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp'])
 export const REMED_MAX_FILES = 3
 export const REMED_MAX_FILE_SIZE = 10 * 1024 * 1024
 export const REMED_ALLOWED_MIME_TYPES = new Set([
