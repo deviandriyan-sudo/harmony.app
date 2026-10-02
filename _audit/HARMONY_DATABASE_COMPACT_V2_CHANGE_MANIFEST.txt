@@ -1,0 +1,34 @@
+HARMONY DATABASE COMPACT V2 — CHANGE MANIFEST
+
+DATABASE
+- public PHL tables reduced from 10 to 2 business tables.
+- public Re-Med tables reduced from 10 to 5 business tables.
+- Added schemas: harmony_internal, harmony_audit, harmony_archive.
+- No live rows are intentionally deleted.
+- 23 PostgreSQL functions updated to point to relocated relations.
+- Added public.remed_write_audit_v1 for server-side Re-Med audit writes.
+- Added compatibility view public.remed_audit_logs during transition.
+
+SOURCE
+- app/api/remed/claims/route.ts
+  Re-Med receipt-upload audit now calls remed_write_audit_v1.
+- app/api/remed/hr/access/route.ts
+  Re-Med access audit now calls remed_write_audit_v1.
+
+SETUP
+- Added HARMONY_DATABASE_COMPACT_V2_PRECHECK.sql
+- Added HARMONY_DATABASE_COMPACT_V2_MIGRATION.sql
+- Added HARMONY_DATABASE_COMPACT_V2_POSTCHECK.sql
+- Added HARMONY_DATABASE_COMPACT_V2_ROLLBACK.sql
+- Legacy Re-Med bootstrap migration is disabled in the active _setup path to prevent it from recreating technical tables in public.
+- Original legacy SQL retained under _setup/_legacy_reference.
+
+UNCHANGED
+- Attendance business flow
+- Leave business flow
+- PHL canonical `phl_records`
+- PHL HR manual adjustment UI/table
+- Re-Med claims/plafond/access business tables
+- Supabase Auth
+- employee master
+- Outsource remains HOLD

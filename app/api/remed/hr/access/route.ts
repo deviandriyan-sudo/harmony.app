@@ -98,14 +98,14 @@ export async function POST(request: NextRequest) {
       accessId = inserted.id
     }
 
-    await ctx.admin.from('remed_audit_logs').insert({
-      actor_auth_user_id: ctx.authUserId,
-      actor_email: ctx.access.email,
-      actor_role: ctx.access.role,
-      action: 'access_upserted',
-      entity_type: 'remed_user_access',
-      entity_id: accessId,
-      metadata: { email, role, employee_id: employeeId, is_active: isActive },
+    await ctx.admin.rpc('remed_write_audit_v1', {
+      p_actor_auth_user_id: ctx.authUserId,
+      p_actor_email: ctx.access.email,
+      p_actor_role: ctx.access.role,
+      p_action: 'access_upserted',
+      p_entity_type: 'remed_user_access',
+      p_entity_id: accessId,
+      p_metadata: { email, role, employee_id: employeeId, is_active: isActive },
     })
 
     return NextResponse.json({ success: true })

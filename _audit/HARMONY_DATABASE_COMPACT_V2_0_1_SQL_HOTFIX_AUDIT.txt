@@ -1,0 +1,27 @@
+HARMONY DATABASE COMPACT V2.0.1 SQL HOTFIX AUDIT
+
+Observed SQL error:
+ERROR 42601 syntax error at or near "CREATE"
+LINE 349: CREATE OR REPLACE FUNCTION public.get_my_phl_balance_summary()
+
+ROOT CAUSE
+The function immediately before line 349 ended with the dollar-quote terminator "$function$" but without the SQL statement terminator ";". The same generated pattern existed for all 23 imported live function definitions.
+
+FIX
+- MIGRATION: all 23 imported function closures changed from "$function$" to "$function$;".
+- ROLLBACK: the same 23 imported function closures were corrected so rollback is executable if ever required.
+- Existing helper functions using custom dollar tags were already terminated correctly and were left unchanged.
+- No table move target, row data, balance calculation, PHL business rule, Re-Med business rule, route, or UI logic was modified by this hotfix.
+
+STATIC SQL VALIDATION
+- Migration CREATE OR REPLACE FUNCTION statements: 25 total.
+  - 23 imported live functions using $function$.
+  - 2 Compact V2 helper functions using custom dollar tags.
+- Migration AS $function$ openings: 23.
+- Migration $function$; closings: 23.
+- Migration bare $function$ closings: 0.
+- Rollback AS $function$ openings: 23.
+- Rollback $function$; closings: 23.
+- Rollback bare $function$ closings: 0.
+- Dollar quote tags are balanced.
+- BEGIN/COMMIT wrapper retained.

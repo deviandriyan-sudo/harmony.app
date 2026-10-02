@@ -1,0 +1,36 @@
+HARMONY DATABASE COMPACT V2 — STATIC VALIDATION
+
+BASELINE:
+HARMONY_REMED_V1_2_0_SINGLE_LOGIN_FULL_REPLACEMENT
+
+ROUTES:
+- Total routes: 81
+- Pages: 54
+- API routes: 27
+- Exact route conflicts: 0
+- Normalized dynamic conflicts: 0
+- Page/API same-path conflicts: 0
+- Optional catch-all routes: 0
+
+IMPORTS:
+- Missing application local imports: 0
+- `next-env.d.ts -> .next/types/routes.d.ts` is build-generated and intentionally absent before Next.js build.
+
+TYPESCRIPT PARSE:
+- TS/TSX files parsed: 128
+- Syntax diagnostics: 0
+
+COMPACT SOURCE CHECK:
+- Direct source references to technical tables moved out of public: 0
+- Re-Med server audit writes now use RPC `remed_write_audit_v1`.
+
+SQL PACKAGE:
+- Compact migration includes 23 live function replacements generated from the live PRECHECK definitions.
+- Migration is wrapped in one transaction.
+- Rollback SQL is included.
+- Postcheck is read-only and returns one result grid.
+
+BUILD STATUS:
+- npm ci/build could not be completed in the sandbox because package installation timed out.
+- STATIC CHECK PASSED.
+- npm run build MUST be run locally before Git commit/push/deploy.

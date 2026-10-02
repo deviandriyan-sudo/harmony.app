@@ -122,14 +122,14 @@ export async function POST(request: NextRequest) {
       if (attachmentError) throw attachmentError
     }
 
-    await ctx.admin.from('remed_audit_logs').insert({
-      actor_auth_user_id: ctx.authUserId,
-      actor_email: ctx.access.email,
-      actor_role: ctx.access.role,
-      action: 'claim_receipts_uploaded',
-      entity_type: 'remed_claim',
-      entity_id: createdClaimId,
-      metadata: { file_count: files.length },
+    await ctx.admin.rpc('remed_write_audit_v1', {
+      p_actor_auth_user_id: ctx.authUserId,
+      p_actor_email: ctx.access.email,
+      p_actor_role: ctx.access.role,
+      p_action: 'claim_receipts_uploaded',
+      p_entity_type: 'remed_claim',
+      p_entity_id: createdClaimId,
+      p_metadata: { file_count: files.length },
     })
 
     return NextResponse.json({ claimId: createdClaimId, claimNumber }, { status: 201 })
