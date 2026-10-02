@@ -95,7 +95,7 @@ export default function RemedLayout({ children }: { children: React.ReactNode })
   return (
     <div className="min-h-screen overflow-x-hidden bg-[#f5f5f7]">
       <div className="flex min-h-screen w-full overflow-x-hidden">
-        <div className="hidden lg:block">
+        <div className="hidden print:hidden lg:block">
           <AppSidebar
             menu={menu}
             title="HARMONY"
@@ -107,7 +107,7 @@ export default function RemedLayout({ children }: { children: React.ReactNode })
         </div>
 
         {mobileSidebarOpen && (
-          <div className="fixed inset-0 z-50 lg:hidden">
+          <div className="fixed inset-0 z-50 print:hidden lg:hidden">
             <button type="button" aria-label="Tutup menu" onClick={() => setMobileSidebarOpen(false)} className="absolute inset-0 bg-black/35 backdrop-blur-sm" />
             <div className="absolute left-0 top-0 h-full max-w-[86vw]">
               <AppSidebar
@@ -127,7 +127,7 @@ export default function RemedLayout({ children }: { children: React.ReactNode })
         )}
 
         <main className="min-w-0 flex-1 overflow-x-hidden">
-          <div className="sticky top-0 z-40 border-b border-black/5 bg-[#f5f5f7]/90 px-4 py-3 backdrop-blur-xl lg:hidden">
+          <div className="sticky top-0 z-40 border-b border-black/5 bg-[#f5f5f7]/90 px-4 py-3 backdrop-blur-xl print:hidden lg:hidden">
             <div className="flex items-center justify-between gap-3">
               <button type="button" onClick={() => setMobileSidebarOpen(true)} className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white text-[#1d1d1f] shadow-sm" aria-label="Buka menu">
                 <Menu size={22} />

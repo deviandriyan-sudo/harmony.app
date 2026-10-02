@@ -3,6 +3,7 @@ import {
   Banknote,
   ClipboardCheck,
   FileClock,
+  History,
   FilePlus2,
   Files,
   LayoutDashboard,
@@ -21,6 +22,7 @@ export const remedEmployeeMenu = [
 export const remedHrMenu = [
   { section: 'RE-MED', title: 'Dashboard Re-Med', href: '/remed/hr/dashboard', icon: LayoutDashboard, subtitle: 'Ringkasan reimbursement' },
   { section: 'RE-MED', title: 'Review Klaim', href: '/remed/hr/claims', icon: ClipboardCheck, subtitle: 'Approve / reject' },
+  { section: 'RE-MED', title: 'Riwayat Proses', href: '/remed/hr/history', icon: History, subtitle: 'Approval, reject & alasan' },
   { section: 'RE-MED', title: 'Plafond Karyawan', href: '/remed/hr/employees', icon: WalletCards, subtitle: 'Entitlement tahunan' },
   { section: 'RE-MED', title: 'Akses Re-Med', href: '/remed/hr/access', icon: UserCog, subtitle: 'Employee, HR & Finance' },
   { section: 'RE-MED', title: 'Laporan Re-Med', href: '/remed/hr/reports', icon: BadgeDollarSign, subtitle: 'Rekap reimbursement' },
@@ -30,6 +32,6 @@ export const remedFinanceMenu = [
   { section: 'RE-MED', title: 'Dashboard Finance', href: '/remed/finance/dashboard', icon: LayoutDashboard, subtitle: 'Ringkasan pembayaran' },
   { section: 'RE-MED', title: 'Review Finance', href: '/remed/finance/claims', icon: ClipboardCheck, subtitle: 'Approve / reject' },
   { section: 'RE-MED', title: 'Pembayaran', href: '/remed/finance/payments', icon: Banknote, subtitle: 'Upload bukti bayar' },
-  { section: 'RE-MED', title: 'Riwayat Pembayaran', href: '/remed/finance/history', icon: FileClock, subtitle: 'Klaim dibayar' },
+  { section: 'RE-MED', title: 'Riwayat Proses', href: '/remed/finance/history', icon: History, subtitle: 'Approval, reject & alasan' },
   { section: 'RE-MED', title: 'Akses', href: '/remed/finance/access', icon: Users, subtitle: 'Profil Finance' },
 ]

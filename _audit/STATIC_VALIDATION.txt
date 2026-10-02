@@ -1,33 +1,27 @@
-HARMONY + RE-MED V1.2.0 STATIC VALIDATION
+HARMONY + RE-MED V2.2 STATIC VALIDATION
 
-STATUS: PASSED (STATIC CHECK)
+Source baseline: HARMONY HR REQUEST UNIFIED V2.1 FULL REPLACEMENT
 
 ROUTES
-- Total routes: 81
-- Pages: 54
-- API routes: 27
-- Exact route conflicts: 0
+- Total: 86
+- Page routes: 57
+- API routes: 29
+- Exact conflicts: 0
 - Normalized dynamic conflicts: 0
-- Optional catch-all conflicts: 0
+- Optional catch-all routes: 0
 
-SOURCE
-- Application TS/TSX syntax checked: 127 files
-- Syntax errors: 0
+IMPORTS
 - Missing local @/ or relative imports: 0
-- Obsolete /login?app=remed references: 0
-- Swipe / separate Re-Med login references: 0
-- Re-Med namespace remains /remed/** and /api/remed/**
-- Outsource routes/features remain HOLD / absent
 
-ARCHITECTURE
-- /login is the only authentication entry UI.
-- Employee/HR Re-Med is exposed as a HARMONY sidebar menu.
-- Re-Med pages use HARMONY branding/sidebar.
-- Finance uses the same /login but remains isolated from HARMONY HR role.
-- app_users role model is not expanded to finance.
-- remed_user_access remains the Re-Med authorization source.
+TYPESCRIPT SYNTAX
+- TS/TSX files parsed: 136
+- Syntax errors: 0
+
+SQL
+- New migration dollar-quote pairs: balanced
+- Transaction terminator: COMMIT present
 
 FULL NEXT.JS BUILD
-NOT VERIFIED IN SANDBOX.
-Dependency installation timed out in the execution environment.
-Run npm run build locally before git push/deployment.
+- NOT VERIFIED in sandbox.
+- npm dependency installation could not complete within tool environment timeout.
+- Run npm run build locally before git push/deploy.

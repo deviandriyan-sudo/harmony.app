@@ -69,7 +69,11 @@ export type RemedClaim = {
   employee_note: string | null
   status: RemedClaimStatus
   hr_note: string | null
+  hr_reviewed_by: string | null
+  hr_reviewed_at: string | null
   finance_note: string | null
+  finance_reviewed_by: string | null
+  finance_reviewed_at: string | null
   bank_name: string | null
   bank_account_number: string | null
   bank_account_name: string | null
@@ -91,4 +95,24 @@ export type RemedClaim = {
   } | null
   claim_type?: RemedClaimType | null
   attachments?: RemedClaimAttachment[]
+}
+
+export type RemedProcessHistory = {
+  event_id: string
+  claim_id: string
+  claim_number: string
+  employee_id: string | null
+  employee_name: string | null
+  claim_type_name: string | null
+  treatment_date: string | null
+  submitted_amount: number | null
+  approved_amount: number | null
+  from_status: string | null
+  to_status: string
+  current_status: string
+  actor_role: string | null
+  actor_email: string | null
+  note: string | null
+  event_at: string
+  is_deleted: boolean
 }

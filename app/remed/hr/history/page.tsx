@@ -31,7 +31,7 @@ export default function Page() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="text-3xl font-semibold text-[#1d1d1f]">Riwayat Proses Re-Med</h1>
-          <p className="mt-2 text-sm text-[#6e6e73]">Approval HR/Finance, reject beserta alasan, pembayaran, pembatalan, dan penghapusan dalam satu menu.</p>
+          <p className="mt-2 text-sm text-[#6e6e73]">Satu riwayat untuk approval, reject, pembayaran, pembatalan, dan penghapusan klaim.</p>
         </div>
         <button type="button" onClick={load} disabled={loading} className="inline-flex items-center justify-center gap-2 rounded-xl border border-black/10 bg-white px-4 py-2 text-sm font-semibold shadow-sm disabled:opacity-50">
           {loading ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />} Refresh
