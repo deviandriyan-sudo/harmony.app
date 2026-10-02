@@ -38,7 +38,7 @@ export default function Page() {
         </button>
       </div>
       {error ? <div className="mt-5 rounded-2xl border border-red-100 bg-red-50 p-4 text-sm text-red-700">{error}</div> : null}
-      <div className="mt-6"><RemedProcessHistory history={history} /></div>
+      <div className="mt-6"><RemedProcessHistory history={history} allowDelete onDeleted={load} /></div>
     </section>
   )
 }
