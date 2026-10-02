@@ -4,14 +4,12 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import {
   AlertTriangle,
   BriefcaseBusiness,
-  CalendarDays,
   CheckCircle2,
   Clock3,
   FileText,
   History,
   Landmark,
   Loader2,
-  Plane,
   RefreshCcw,
   RotateCcw,
   Search,
@@ -34,8 +32,6 @@ import {
   isSupervisorApproved,
 } from '@/lib/leave-workflow-status'
 import { sendHarmonyEmail } from '@/lib/notifications'
-
-type ActiveTab = 'leave' | 'leave-balance' | 'phl-claim' | 'phl-balance' | 'phl-audit' | 'history'
 
 type AppUser = {
   id: string
@@ -671,8 +667,6 @@ function appendNotificationText(baseMessage: string, notification: { success: bo
 }
 
 export default function HRLeavePage() {
-  const [activeTab, setActiveTab] = useState<ActiveTab>('leave')
-
   const [appUser, setAppUser] = useState<AppUser | null>(null)
   const [employeeDirectory, setEmployeeDirectory] = useState<EmployeeDirectoryRow[]>([])
   const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>([])
@@ -807,6 +801,31 @@ export default function HRLeavePage() {
       )
     })
   }, [phlClaims, searchKeyword])
+
+  const filteredPendingLeaveRequests = useMemo(() => {
+    return filteredLeaveRequests.filter((item) => {
+      const status = normalizeStatus(item.hr_status || item.status || item.supervisor_status)
+
+      return (
+        status === 'pending' ||
+        status === 'waiting_supervisor' ||
+        status === 'waiting_hr' ||
+        status === 'submitted'
+      )
+    })
+  }, [filteredLeaveRequests])
+
+  const filteredPendingPHLClaims = useMemo(() => {
+    return filteredPHLClaims.filter((item) => {
+      const status = normalizeStatus(item.hr_status || item.status)
+
+      return (
+        status === 'pending' ||
+        status === 'submitted' ||
+        status === 'waiting_hr'
+      )
+    })
+  }, [filteredPHLClaims])
 
   const filteredPHLBalances = useMemo(() => {
     const keyword = searchKeyword.trim().toLowerCase()
@@ -1847,48 +1866,19 @@ export default function HRLeavePage() {
 
         <div className="harmony-card overflow-hidden">
           <div className="flex flex-col gap-4 border-b border-black/5 p-5 xl:flex-row xl:items-center xl:justify-between">
-            <div className="flex flex-wrap gap-2">
-              <TabButton
-                active={activeTab === 'leave'}
-                label="Pengajuan Cuti & Izin"
-                icon={<CalendarDays size={17} />}
-                onClick={() => setActiveTab('leave')}
-              />
-
-              <TabButton
-                active={activeTab === 'leave-balance'}
-                label="Saldo Cuti"
-                icon={<WalletCards size={17} />}
-                onClick={() => setActiveTab('leave-balance')}
-              />
-
-              <TabButton
-                active={activeTab === 'phl-claim'}
-                label="Approval Klaim PHL"
-                icon={<Plane size={17} />}
-                onClick={() => setActiveTab('phl-claim')}
-              />
-
-              <TabButton
-                active={activeTab === 'phl-balance'}
-                label="Saldo PHL"
-                icon={<Landmark size={17} />}
-                onClick={() => setActiveTab('phl-balance')}
-              />
-
-              <TabButton
-                active={activeTab === 'phl-audit'}
-                label="Audit PHL"
-                icon={<ShieldCheck size={17} />}
-                onClick={() => setActiveTab('phl-audit')}
-              />
-
-              <TabButton
-                active={activeTab === 'history'}
-                label="Riwayat"
-                icon={<History size={17} />}
-                onClick={() => setActiveTab('history')}
-              />
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="inline-flex items-center gap-2 rounded-full bg-[#1d1d1f] px-4 py-2 text-xs font-bold text-white">
+                  <ShieldCheck size={15} />
+                  Monitoring Terpadu
+                </span>
+                <span className="inline-flex items-center rounded-full bg-orange-50 px-3 py-2 text-xs font-bold text-orange-700">
+                  {filteredPendingLeaveRequests.length + filteredPendingPHLClaims.length} outstanding
+                </span>
+              </div>
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-[#6e6e73]">
+                Seluruh persetujuan Cuti/Izin dan klaim PHL yang masih outstanding ditampilkan dalam satu antrean. Saldo, audit, dan riwayat tersedia di panel yang sama tanpa berpindah menu.
+              </p>
             </div>
 
             <div className="flex flex-col gap-3 md:flex-row md:items-center">
@@ -1909,7 +1899,7 @@ export default function HRLeavePage() {
                 <input
                   value={searchKeyword}
                   onChange={(event) => setSearchKeyword(event.target.value)}
-                  placeholder="Cari nama, unit, job pending..."
+                  placeholder="Cari nama, unit, jenis, job pending..."
                   className="min-h-12 w-full bg-transparent text-sm outline-none placeholder:text-[#9a9aa0]"
                 />
               </div>
@@ -1932,87 +1922,95 @@ export default function HRLeavePage() {
             </div>
           )}
 
-          {!loading && activeTab === 'leave' && (
-            <LeaveRequestTab
-              requests={filteredLeaveRequests}
-              processingId={processingId}
-              onApprove={approveLeaveRequest}
-              onReject={(item) => {
-                setRejectLeaveRecord(item)
-                setRejectLeaveReason('')
-              }}
-              onCancel={(item) => {
-                setCancelLeaveRecord(item)
-                setCancelLeaveReason('')
-              }}
-              onDelete={requestDeleteLeave}
-              onDetail={setSelectedLeaveRequest}
-            />
-          )}
+          {!loading && (
+            <>
+              <UnifiedApprovalQueue
+                leaveRequests={filteredPendingLeaveRequests}
+                phlClaims={filteredPendingPHLClaims}
+                processingId={processingId}
+                onApproveLeave={approveLeaveRequest}
+                onRejectLeave={(item) => {
+                  setRejectLeaveRecord(item)
+                  setRejectLeaveReason('')
+                }}
+                onDeleteLeave={requestDeleteLeave}
+                onLeaveDetail={setSelectedLeaveRequest}
+                onApprovePHL={approvePHLClaim}
+                onRejectPHL={(record) => {
+                  setRejectPHLRecord(record)
+                  setRejectPHLReason('')
+                }}
+                onDeletePHL={requestDeletePHL}
+                onPHLDetail={setSelectedPHLRecord}
+              />
 
-          {!loading && activeTab === 'leave-balance' && (
-            <LeaveBalanceLifecycleTab
-              rows={filteredLeaveBalanceLifecycle}
-              totalRegularDays={totalRegularLeaveDays}
-              totalPostponeDays={totalActivePostponeDays}
-              totalExpiredPostponeDays={totalExpiredPostponeDays}
-              totalManualPostponeNetDays={totalManualPostponeNetDays}
-            />
-          )}
+              <UnifiedDashboardSection
+                id="saldo-cuti"
+                title="Saldo Cuti"
+                description="Cuti tahunan matang, postpone/carry forward, adjustment HR, dan total saldo tersedia."
+                icon={<WalletCards size={18} />}
+              >
+                <LeaveBalanceLifecycleTab
+                  rows={filteredLeaveBalanceLifecycle}
+                  totalRegularDays={totalRegularLeaveDays}
+                  totalPostponeDays={totalActivePostponeDays}
+                  totalExpiredPostponeDays={totalExpiredPostponeDays}
+                  totalManualPostponeNetDays={totalManualPostponeNetDays}
+                />
+              </UnifiedDashboardSection>
 
-          {!loading && activeTab === 'phl-claim' && (
-            <PHLClaimApprovalTab
-              claims={filteredPHLClaims}
-              processingId={processingId}
-              onApprove={approvePHLClaim}
-              onReject={(record) => {
-                setRejectPHLRecord(record)
-                setRejectPHLReason('')
-              }}
-              onCancel={(record) => {
-                setCancelPHLRecord(record)
-                setCancelPHLReason('')
-              }}
-              onDelete={requestDeletePHL}
-              onDetail={setSelectedPHLRecord}
-            />
-          )}
+              <UnifiedDashboardSection
+                id="saldo-phl"
+                title="Saldo PHL"
+                description="Saldo PHL aktif, sumber saldo, penggunaan, dan masa berlaku per karyawan."
+                icon={<Landmark size={18} />}
+              >
+                <PHLBalanceTab
+                  summaries={filteredBalanceSummary}
+                  balances={filteredPHLBalances}
+                  onDelete={requestDeletePHL}
+                  onDetail={setSelectedPHLRecord}
+                />
+              </UnifiedDashboardSection>
 
-          {!loading && activeTab === 'phl-balance' && (
-            <PHLBalanceTab
-              summaries={filteredBalanceSummary}
-              balances={filteredPHLBalances}
-              onDelete={requestDeletePHL}
-              onDetail={setSelectedPHLRecord}
-            />
-          )}
+              <UnifiedDashboardSection
+                id="audit-phl"
+                title="Audit PHL"
+                description="Rekonsiliasi ledger, saldo legacy, penggunaan FIFO, dan review klaim lama."
+                icon={<ShieldCheck size={18} />}
+              >
+                <PHLReconciliationTab
+                  rows={filteredPHLReconciliationRows}
+                  legacyClaims={filteredLegacyPHLClaims}
+                  auditError={phlAuditError}
+                  processingId={processingId}
+                  onReviewEmployee={(item) => {
+                    setEmployeePHLReviewTarget(item)
+                    setEmployeePHLReviewNote(item.last_review_note || '')
+                  }}
+                  onReviewLegacy={(item) => {
+                    setLegacyPHLReviewTarget(item)
+                    setLegacyPHLReviewNote(item.legacy_review_note || '')
+                  }}
+                />
+              </UnifiedDashboardSection>
 
-          {!loading && activeTab === 'phl-audit' && (
-            <PHLReconciliationTab
-              rows={filteredPHLReconciliationRows}
-              legacyClaims={filteredLegacyPHLClaims}
-              auditError={phlAuditError}
-              processingId={processingId}
-              onReviewEmployee={(item) => {
-                setEmployeePHLReviewTarget(item)
-                setEmployeePHLReviewNote(item.last_review_note || '')
-              }}
-              onReviewLegacy={(item) => {
-                setLegacyPHLReviewTarget(item)
-                setLegacyPHLReviewNote(item.legacy_review_note || '')
-              }}
-            />
-          )}
-
-          {!loading && activeTab === 'history' && (
-            <HistoryTab
-              leaveRequests={filteredLeaveRequests}
-              phlRecords={filteredPHLClaims}
-              onLeaveDetail={setSelectedLeaveRequest}
-              onPHLDetail={setSelectedPHLRecord}
-              onDeleteLeave={requestDeleteLeave}
-              onDeletePHL={requestDeletePHL}
-            />
+              <UnifiedDashboardSection
+                id="riwayat"
+                title="Riwayat Cuti, Izin & PHL"
+                description="Seluruh pengajuan yang sudah diproses tetap tersedia untuk penelusuran dan audit."
+                icon={<History size={18} />}
+              >
+                <HistoryTab
+                  leaveRequests={filteredLeaveRequests}
+                  phlRecords={filteredPHLClaims}
+                  onLeaveDetail={setSelectedLeaveRequest}
+                  onPHLDetail={setSelectedPHLRecord}
+                  onDeleteLeave={requestDeleteLeave}
+                  onDeletePHL={requestDeletePHL}
+                />
+              </UnifiedDashboardSection>
+            </>
           )}
         </div>
 
@@ -2133,156 +2131,365 @@ export default function HRLeavePage() {
   )
 }
 
-function LeaveRequestTab({
-  requests,
+function UnifiedApprovalQueue({
+  leaveRequests,
+  phlClaims,
   processingId,
-  onApprove,
-  onReject,
-  onCancel,
-  onDelete,
-  onDetail,
+  onApproveLeave,
+  onRejectLeave,
+  onDeleteLeave,
+  onLeaveDetail,
+  onApprovePHL,
+  onRejectPHL,
+  onDeletePHL,
+  onPHLDetail,
 }: {
-  requests: LeaveRequest[]
+  leaveRequests: LeaveRequest[]
+  phlClaims: PHLRecord[]
   processingId: string
-  onApprove: (item: LeaveRequest) => void
-  onReject: (item: LeaveRequest) => void
-  onCancel: (item: LeaveRequest) => void
-  onDelete: (item: LeaveRequest) => void
-  onDetail: (item: LeaveRequest) => void
+  onApproveLeave: (item: LeaveRequest) => void
+  onRejectLeave: (item: LeaveRequest) => void
+  onDeleteLeave: (item: LeaveRequest) => void
+  onLeaveDetail: (item: LeaveRequest) => void
+  onApprovePHL: (record: PHLRecord) => void
+  onRejectPHL: (record: PHLRecord) => void
+  onDeletePHL: (record: PHLRecord) => void
+  onPHLDetail: (record: PHLRecord) => void
+}) {
+  type QueueItem =
+    | { key: string; kind: 'leave'; dateValue: string; record: LeaveRequest }
+    | { key: string; kind: 'phl'; dateValue: string; record: PHLRecord }
+
+  const queue: QueueItem[] = [
+    ...leaveRequests.map((record) => ({
+      key: `leave-${record.id}`,
+      kind: 'leave' as const,
+      dateValue: record.submitted_at || record.start_date || record.created_at || '',
+      record,
+    })),
+    ...phlClaims.map((record) => ({
+      key: `phl-${record.id}`,
+      kind: 'phl' as const,
+      dateValue: record.created_at || record.phl_date || '',
+      record,
+    })),
+  ].sort((a, b) => {
+    const left = a.dateValue ? new Date(a.dateValue).getTime() : 0
+    const right = b.dateValue ? new Date(b.dateValue).getTime() : 0
+    return right - left
+  })
+
+  return (
+    <div id="outstanding-approval">
+      <div className="border-b border-black/5 p-5 md:p-6">
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+          <div>
+            <div className="flex flex-wrap items-center gap-2">
+              <h2 className="text-xl font-bold tracking-[-0.02em] text-[#1d1d1f]">
+                Outstanding Persetujuan
+              </h2>
+              <span className="rounded-full bg-orange-50 px-3 py-1 text-xs font-bold text-orange-700">
+                {queue.length} perlu dipantau
+              </span>
+            </div>
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-[#6e6e73]">
+              Cuti/Izin dan klaim PHL digabung dalam satu antrean. HR dapat melihat item yang masih menunggu atasan maupun yang sudah siap diproses tanpa berpindah tab.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-3 gap-2 text-center sm:min-w-[390px]">
+            <QueueMetric label="Total" value={queue.length} tone="dark" />
+            <QueueMetric label="Cuti/Izin" value={leaveRequests.length} tone="blue" />
+            <QueueMetric label="Klaim PHL" value={phlClaims.length} tone="orange" />
+          </div>
+        </div>
+      </div>
+
+      {queue.length === 0 ? (
+        <div className="p-6">
+          <div className="flex items-start gap-3 rounded-[24px] border border-green-100 bg-green-50 p-5 text-green-800">
+            <CheckCircle2 size={22} className="mt-0.5 shrink-0" />
+            <div>
+              <p className="font-bold">Tidak ada persetujuan outstanding</p>
+              <p className="mt-1 text-sm leading-6 text-green-700">
+                Semua pengajuan Cuti/Izin dan klaim PHL yang masuk saat ini sudah selesai diproses atau belum mencapai tahap HR.
+              </p>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <DataTable
+          emptyTitle="Tidak ada outstanding"
+          emptyDescription="Semua persetujuan sudah selesai diproses."
+          minWidth="1550px"
+          headers={[
+            'Karyawan',
+            'Kategori',
+            'Tanggal',
+            'Hari',
+            'Alasan / Job Pending',
+            'Atasan',
+            'HR',
+            'Detail',
+            'Action',
+          ]}
+        >
+          {queue.map((item) => {
+            if (item.kind === 'leave') {
+              const record = item.record
+              const hrStatus = normalizeStatus(record.hr_status)
+              const supervisorApproved = isSupervisorApproved(record)
+              const canProcess = canHRProcessApproval(record)
+
+              return (
+                <tr key={item.key} className="border-b border-black/5 transition hover:bg-[#f5f5f7]/70">
+                  <td className="px-5 py-4">
+                    <EmployeeCell
+                      name={record.full_name || '-'}
+                      meta={`${record.employee_number || '-'} · ${record.department || '-'} · ${record.position || '-'}`}
+                    />
+                  </td>
+                  <td className="px-5 py-4">
+                    <div className="space-y-2">
+                      <span className="inline-flex rounded-full bg-blue-50 px-3 py-1 text-[11px] font-bold text-blue-700">
+                        CUTI / IZIN
+                      </span>
+                      <p className="max-w-[180px] font-semibold text-[#1d1d1f]">
+                        {record.leave_type || record.request_type || '-'}
+                      </p>
+                    </div>
+                  </td>
+                  <td className="px-5 py-4 text-sm font-semibold text-[#1d1d1f]">
+                    {formatDisplayDate(record.start_date || '')}
+                    <span className="mx-1 text-[#86868b]">–</span>
+                    {formatDisplayDate(record.end_date || '')}
+                  </td>
+                  <td className="px-5 py-4 text-sm font-bold text-[#1d1d1f]">
+                    {record.total_days || 0} hari
+                  </td>
+                  <td className="px-5 py-4">
+                    <p className="mb-2 line-clamp-2 max-w-[260px] text-sm leading-6 text-[#6e6e73]">
+                      {record.reason || '-'}
+                    </p>
+                    <JobPendingPreview
+                      summary={record.job_pending_summary}
+                      handoverName={record.handover_to_full_name}
+                    />
+                  </td>
+                  <td className="px-5 py-4">
+                    <WorkflowTextBadge label={getSupervisorApprovalLabel(record.supervisor_status)} />
+                  </td>
+                  <td className="px-5 py-4">
+                    <WorkflowTextBadge label={getHRApprovalLabel(record)} />
+                  </td>
+                  <td className="px-5 py-4">
+                    <button
+                      type="button"
+                      onClick={() => onLeaveDetail(record)}
+                      className="inline-flex min-h-9 items-center gap-2 rounded-2xl bg-[#e8f2ff] px-4 text-xs font-bold text-[#0059b8]"
+                    >
+                      <FileText size={15} />
+                      Detail
+                    </button>
+                  </td>
+                  <td className="px-5 py-4">
+                    <div className="flex flex-wrap items-center gap-2">
+                      {!supervisorApproved && hrStatus !== 'approved' && (
+                        <span className="rounded-full bg-orange-50 px-3 py-2 text-[11px] font-bold text-orange-700">
+                          Menunggu atasan
+                        </span>
+                      )}
+
+                      {canProcess && (
+                        <>
+                          <SmallActionButton
+                            label="Approve"
+                            icon={<CheckCircle2 size={14} />}
+                            tone="green"
+                            disabled={processingId === record.id}
+                            onClick={() => onApproveLeave(record)}
+                          />
+                          <SmallActionButton
+                            label="Reject"
+                            icon={<XCircle size={14} />}
+                            tone="red"
+                            disabled={processingId === record.id}
+                            onClick={() => onRejectLeave(record)}
+                          />
+                        </>
+                      )}
+
+                      {hrStatus !== 'approved' && (
+                        <SmallActionButton
+                          label="Hapus"
+                          icon={<Trash2 size={14} />}
+                          tone="red"
+                          disabled={processingId === record.id}
+                          onClick={() => onDeleteLeave(record)}
+                        />
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              )
+            }
+
+            const record = item.record
+            const status = normalizeStatus(record.hr_status || record.status)
+            const supervisorStatus = normalizeStatus(record.supervisor_status)
+            const canProcess = canHRProcessApproval(record)
+
+            return (
+              <tr key={item.key} className="border-b border-black/5 transition hover:bg-[#f5f5f7]/70">
+                <td className="px-5 py-4">
+                  <EmployeeCell
+                    name={record.full_name || '-'}
+                    meta={`${record.employee_number || '-'} · ${record.department || '-'} · ${record.position || '-'}`}
+                  />
+                </td>
+                <td className="px-5 py-4">
+                  <div className="space-y-2">
+                    <span className="inline-flex rounded-full bg-orange-50 px-3 py-1 text-[11px] font-bold text-orange-700">
+                      KLAIM PHL
+                    </span>
+                    <p className="text-xs font-semibold text-[#6e6e73]">FIFO saldo aktif</p>
+                  </div>
+                </td>
+                <td className="px-5 py-4 text-sm font-semibold text-[#1d1d1f]">
+                  {formatDisplayDate(record.phl_date || record.valid_from || '')}
+                </td>
+                <td className="px-5 py-4 text-sm font-bold text-[#1d1d1f]">
+                  {record.used_days || record.balance_days || 0} hari
+                </td>
+                <td className="px-5 py-4">
+                  <p className="mb-2 line-clamp-2 max-w-[260px] text-sm leading-6 text-[#6e6e73]">
+                    {record.reason || record.notes || '-'}
+                  </p>
+                  <JobPendingPreview
+                    summary={record.job_pending_summary}
+                    handoverName={record.handover_to_full_name}
+                  />
+                </td>
+                <td className="px-5 py-4">
+                  <WorkflowTextBadge label={getSupervisorApprovalLabel(record.supervisor_status)} />
+                </td>
+                <td className="px-5 py-4">
+                  <WorkflowTextBadge label={getHRApprovalLabel(record)} />
+                </td>
+                <td className="px-5 py-4">
+                  <button
+                    type="button"
+                    onClick={() => onPHLDetail(record)}
+                    className="inline-flex min-h-9 items-center gap-2 rounded-2xl bg-[#e8f2ff] px-4 text-xs font-bold text-[#0059b8]"
+                  >
+                    <FileText size={15} />
+                    Detail
+                  </button>
+                </td>
+                <td className="px-5 py-4">
+                  <div className="flex flex-wrap items-center gap-2">
+                    {canProcess ? (
+                      <>
+                        <SmallActionButton
+                          label="Approve"
+                          icon={<CheckCircle2 size={14} />}
+                          tone="green"
+                          disabled={processingId === record.id}
+                          onClick={() => onApprovePHL(record)}
+                        />
+                        <SmallActionButton
+                          label="Reject"
+                          icon={<XCircle size={14} />}
+                          tone="red"
+                          disabled={processingId === record.id}
+                          onClick={() => onRejectPHL(record)}
+                        />
+                        <SmallActionButton
+                          label="Hapus"
+                          icon={<Trash2 size={14} />}
+                          tone="red"
+                          disabled={processingId === record.id}
+                          onClick={() => onDeletePHL(record)}
+                        />
+                      </>
+                    ) : (
+                      <>
+                        <span className="rounded-full bg-orange-50 px-3 py-2 text-[11px] font-bold text-orange-700">
+                          {supervisorStatus !== 'approved' && ['pending', 'submitted', 'waiting_hr'].includes(status)
+                            ? 'Menunggu atasan'
+                            : 'Menunggu proses'}
+                        </span>
+                        <span className="rounded-full bg-[#f5f5f7] px-3 py-2 text-[11px] font-bold text-[#86868b]">
+                          Audit terkunci
+                        </span>
+                      </>
+                    )}
+                  </div>
+                </td>
+              </tr>
+            )
+          })}
+        </DataTable>
+      )}
+    </div>
+  )
+}
+
+function QueueMetric({
+  label,
+  value,
+  tone,
+}: {
+  label: string
+  value: number
+  tone: 'dark' | 'blue' | 'orange'
+}) {
+  const classes = {
+    dark: 'bg-[#1d1d1f] text-white',
+    blue: 'bg-blue-50 text-blue-700',
+    orange: 'bg-orange-50 text-orange-700',
+  }[tone]
+
+  return (
+    <div className={`rounded-[18px] px-3 py-3 ${classes}`}>
+      <p className="text-[10px] font-bold uppercase tracking-wide opacity-65">{label}</p>
+      <p className="mt-1 text-xl font-bold">{value}</p>
+    </div>
+  )
+}
+
+function UnifiedDashboardSection({
+  id,
+  title,
+  description,
+  icon,
+  children,
+}: {
+  id: string
+  title: string
+  description: string
+  icon: ReactNode
+  children: ReactNode
 }) {
   return (
-    <div>
-      <SectionIntro
-        title="Pengajuan Cuti & Izin"
-        description="Review pengajuan cuti, izin, sakit, tugas luar, dan job pending karyawan."
-      />
-
-      <DataTable
-        emptyTitle="Belum ada pengajuan cuti/izin"
-        emptyDescription="Pengajuan karyawan akan muncul di sini."
-        minWidth="1450px"
-        headers={[
-          'Karyawan',
-          'Jenis',
-          'Tanggal',
-          'Hari',
-          'Job Pending',
-          'Atasan',
-          'HR',
-          'Detail',
-          'Action',
-        ]}
-      >
-        {requests.map((item) => {
-          const hrStatus = normalizeStatus(item.hr_status)
-          const supervisorApproved = isSupervisorApproved(item)
-          const canProcess = canHRProcessApproval(item)
-
-          return (
-            <tr key={item.id} className="border-b border-black/5 transition hover:bg-[#f5f5f7]/70">
-              <td className="px-5 py-4">
-                <EmployeeCell
-                  name={item.full_name || '-'}
-                  meta={`${item.employee_number || '-'} · ${item.department || '-'} · ${item.position || '-'}`}
-                />
-              </td>
-
-              <td className="px-5 py-4">
-                <p className="font-semibold text-[#1d1d1f]">
-                  {item.leave_type || item.request_type || '-'}
-                </p>
-                <p className="mt-1 line-clamp-2 text-xs text-[#6e6e73]">
-                  {item.reason || '-'}
-                </p>
-              </td>
-
-              <td className="px-5 py-4 text-sm text-[#1d1d1f]">
-                {formatDisplayDate(item.start_date || '')} - {formatDisplayDate(item.end_date || '')}
-              </td>
-
-              <td className="px-5 py-4 text-sm font-semibold text-[#1d1d1f]">
-                {item.total_days || 0} hari
-              </td>
-
-              <td className="px-5 py-4">
-                <JobPendingPreview
-                  summary={item.job_pending_summary}
-                  handoverName={item.handover_to_full_name}
-                />
-              </td>
-
-              <td className="px-5 py-4">
-                <WorkflowTextBadge label={getSupervisorApprovalLabel(item.supervisor_status)} />
-              </td>
-
-              <td className="px-5 py-4">
-                <WorkflowTextBadge label={getHRApprovalLabel(item)} />
-              </td>
-
-              <td className="px-5 py-4">
-                <button
-                  type="button"
-                  onClick={() => onDetail(item)}
-                  className="inline-flex min-h-9 items-center gap-2 rounded-2xl bg-[#e8f2ff] px-4 text-xs font-bold text-[#0059b8]"
-                >
-                  <FileText size={15} />
-                  Detail
-                </button>
-              </td>
-
-              <td className="px-5 py-4">
-                <div className="flex flex-wrap items-center gap-2">
-                  {!supervisorApproved && hrStatus !== 'approved' && (
-                    <span className="rounded-full bg-orange-50 px-3 py-2 text-[11px] font-bold text-orange-700">
-                      Menunggu atasan
-                    </span>
-                  )}
-
-                  {canProcess && (
-                    <>
-                      <SmallActionButton
-                        label="Approve"
-                        icon={<CheckCircle2 size={14} />}
-                        tone="green"
-                        disabled={processingId === item.id}
-                        onClick={() => onApprove(item)}
-                      />
-                      <SmallActionButton
-                        label="Reject"
-                        icon={<XCircle size={14} />}
-                        tone="red"
-                        disabled={processingId === item.id}
-                        onClick={() => onReject(item)}
-                      />
-                    </>
-                  )}
-
-                  {hrStatus === 'approved' && (
-                    <SmallActionButton
-                      label="Batalkan"
-                      icon={<RotateCcw size={14} />}
-                      tone="blue"
-                      disabled={processingId === item.id}
-                      onClick={() => onCancel(item)}
-                    />
-                  )}
-
-                  {hrStatus !== 'approved' && (
-                    <SmallActionButton
-                      label="Hapus"
-                      icon={<Trash2 size={14} />}
-                      tone="red"
-                      disabled={processingId === item.id}
-                      onClick={() => onDelete(item)}
-                    />
-                  )}
-                </div>
-              </td>
-            </tr>
-          )
-        })}
-      </DataTable>
-    </div>
+    <details id={id} className="group border-t border-black/5">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-4 p-5 transition hover:bg-[#f8f8fa] [&::-webkit-details-marker]:hidden">
+        <div className="flex min-w-0 items-start gap-3">
+          <span className="mt-0.5 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#f5f5f7] text-[#1d1d1f]">
+            {icon}
+          </span>
+          <div className="min-w-0">
+            <h3 className="font-bold text-[#1d1d1f]">{title}</h3>
+            <p className="mt-1 text-sm leading-6 text-[#6e6e73]">{description}</p>
+          </div>
+        </div>
+        <span className="inline-flex shrink-0 rounded-full bg-[#f5f5f7] px-3 py-2 text-xs font-bold text-[#6e6e73] group-open:bg-[#1d1d1f] group-open:text-white">
+          <span className="group-open:hidden">Buka</span>
+          <span className="hidden group-open:inline">Tutup</span>
+        </span>
+      </summary>
+      <div className="border-t border-black/5">{children}</div>
+    </details>
   )
 }
 
@@ -2568,194 +2775,6 @@ function formatSignedNumber(value: number | null | undefined) {
   if (num > 0) return `+${text}`
   if (num < 0) return `-${text}`
   return '0'
-}
-
-function PHLClaimApprovalTab({
-  claims,
-  processingId,
-  onApprove,
-  onReject,
-  onCancel,
-  onDelete,
-  onDetail,
-}: {
-  claims: PHLRecord[]
-  processingId: string
-  onApprove: (record: PHLRecord) => void
-  onReject: (record: PHLRecord) => void
-  onCancel: (record: PHLRecord) => void
-  onDelete: (record: PHLRecord) => void
-  onDetail: (record: PHLRecord) => void
-}) {
-  const pending = claims.filter((item) => {
-    const status = normalizeStatus(item.hr_status || item.status)
-
-    return (
-      status === 'pending' ||
-      status === 'submitted' ||
-      status === 'waiting_hr'
-    )
-  })
-
-  const approved = claims.filter((item) => {
-    return normalizeStatus(item.hr_status || item.status) === 'approved'
-  })
-
-  const cancelled = claims.filter((item) => {
-    const status = normalizeStatus(item.hr_status || item.status)
-    return status === 'cancelled' || status === 'canceled'
-  })
-
-  return (
-    <div>
-      <SectionIntro
-        title="Approval Klaim PHL"
-        description="Approval mencatat alokasi FIFO per saldo sumber. Klaim approved dapat dibatalkan secara atomik dan saldo dikembalikan ke sumber dengan masa berlaku asli."
-      />
-
-      <div className="grid gap-5 p-6 md:grid-cols-4">
-        <MiniPanel title="Pending Klaim" value={`${pending.length}`} icon={<Clock3 size={20} />} />
-        <MiniPanel title="Approved" value={`${approved.length}`} icon={<CheckCircle2 size={20} />} />
-        <MiniPanel title="Dibatalkan" value={`${cancelled.length}`} icon={<RotateCcw size={20} />} />
-        <MiniPanel title="Metode Saldo" value="FIFO Audit" icon={<ShieldCheck size={20} />} />
-      </div>
-
-      <DataTable
-        emptyTitle="Belum ada klaim PHL"
-        emptyDescription="Pengajuan klaim PHL karyawan akan muncul di sini."
-        minWidth="1500px"
-        headers={[
-          'Karyawan',
-          'Tanggal Klaim',
-          'Hari',
-          'Alasan',
-          'Job Pending',
-          'Atasan',
-          'HR',
-          'Detail',
-          'Action',
-        ]}
-      >
-        {claims.map((item) => {
-          const status = normalizeStatus(item.hr_status)
-
-          const supervisorStatus = normalizeStatus(item.supervisor_status)
-          const canProcess = canHRProcessApproval(item)
-
-          const canCancel = isFinalApproved(item)
-          const isCancelled = status === 'cancelled' || status === 'canceled'
-
-          return (
-            <tr key={item.id} className="border-b border-black/5 transition hover:bg-[#f5f5f7]/70">
-              <td className="px-5 py-4">
-                <EmployeeCell
-                  name={item.full_name || '-'}
-                  meta={`${item.employee_number || '-'} · ${item.department || '-'} · ${item.position || '-'}`}
-                />
-              </td>
-
-              <td className="px-5 py-4 text-sm font-semibold text-[#1d1d1f]">
-                {formatDisplayDate(item.phl_date || '')}
-              </td>
-
-              <td className="px-5 py-4 text-sm font-semibold text-[#1d1d1f]">
-                {item.used_days || item.balance_days || 0} hari
-              </td>
-
-              <td className="px-5 py-4">
-                <p className="line-clamp-2 max-w-[240px] text-sm leading-6 text-[#6e6e73]">
-                  {item.reason || item.notes || '-'}
-                </p>
-              </td>
-
-              <td className="px-5 py-4">
-                <JobPendingPreview
-                  summary={item.job_pending_summary}
-                  handoverName={item.handover_to_full_name}
-                />
-              </td>
-
-              <td className="px-5 py-4">
-                <WorkflowTextBadge label={getSupervisorApprovalLabel(item.supervisor_status)} />
-              </td>
-
-              <td className="px-5 py-4">
-                <WorkflowTextBadge label={getHRApprovalLabel(item)} />
-              </td>
-
-              <td className="px-5 py-4">
-                <button
-                  type="button"
-                  onClick={() => onDetail(item)}
-                  className="inline-flex min-h-9 items-center gap-2 rounded-2xl bg-[#e8f2ff] px-4 text-xs font-bold text-[#0059b8]"
-                >
-                  <FileText size={15} />
-                  Detail
-                </button>
-              </td>
-
-              <td className="px-5 py-4">
-                <div className="flex flex-wrap items-center gap-2">
-                  {canProcess && (
-                    <>
-                      <SmallActionButton
-                        label="Approve"
-                        icon={<CheckCircle2 size={14} />}
-                        tone="green"
-                        disabled={processingId === item.id}
-                        onClick={() => onApprove(item)}
-                      />
-                      <SmallActionButton
-                        label="Reject"
-                        icon={<XCircle size={14} />}
-                        tone="red"
-                        disabled={processingId === item.id}
-                        onClick={() => onReject(item)}
-                      />
-                    </>
-                  )}
-
-                  {canCancel && (
-                    <SmallActionButton
-                      label="Batalkan"
-                      icon={<RotateCcw size={14} />}
-                      tone="orange"
-                      disabled={processingId === item.id}
-                      onClick={() => onCancel(item)}
-                    />
-                  )}
-
-                  {!canProcess && !canCancel && (
-                    <span className="rounded-full bg-[#f5f5f7] px-3 py-2 text-[11px] font-bold text-[#86868b]">
-                      {isCancelled
-                        ? 'Reversal selesai'
-                        : supervisorStatus !== 'approved' && ['pending', 'submitted', 'waiting_hr'].includes(status)
-                          ? 'Menunggu atasan'
-                          : 'Proses selesai'}
-                    </span>
-                  )}
-
-                  {canProcess ? (
-                    <SmallActionButton
-                      label="Hapus"
-                      icon={<Trash2 size={14} />}
-                      tone="red"
-                      disabled={processingId === item.id}
-                      onClick={() => onDelete(item)}
-                    />
-                  ) : (
-                    <span className="rounded-full bg-[#f5f5f7] px-3 py-2 text-[11px] font-bold text-[#86868b]">
-                      Audit terkunci
-                    </span>
-                  )}
-                </div>
-              </td>
-            </tr>
-          )
-        })}
-      </DataTable>
-    </div>
-  )
 }
 
 function PHLBalanceTab({
@@ -4380,34 +4399,6 @@ function ModalShell({
         </div>
       </div>
     </div>
-  )
-}
-
-function TabButton({
-  active,
-  label,
-  icon,
-  onClick,
-}: {
-  active: boolean
-  label: string
-  icon: ReactNode
-  onClick: () => void
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={[
-        'inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl px-4 text-sm font-bold transition',
-        active
-          ? 'bg-[#1d1d1f] text-white shadow-sm'
-          : 'bg-[#f5f5f7] text-[#6e6e73] hover:bg-white hover:text-[#1d1d1f]',
-      ].join(' ')}
-    >
-      {icon}
-      {label}
-    </button>
   )
 }
 

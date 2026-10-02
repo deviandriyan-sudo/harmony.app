@@ -1,0 +1,34 @@
+HARMONY HR REQUEST CONTROL V2.1 STATIC AUDIT
+
+SOURCE OF TRUTH
+HARMONY_DATABASE_COMPACT_V2_0_1_FULL_REPLACEMENT + unified HR leave/PHL UI change.
+
+ROUTE AUDIT
+Total routes: 81
+Pages: 54
+API routes: 27
+Exact conflicts: 0
+Normalized dynamic conflicts: 0
+Optional catch-all: 0
+
+IMPORT / SYNTAX AUDIT
+Missing local imports: 0
+TS/TSX parsed: 128
+Syntax errors: 0
+
+DATABASE IMPACT
+None. Existing Compact V2 schema retained.
+
+MAIN ROOT CAUSE ADDRESSED
+HR request control was technically consolidated in one route, but six mutually-exclusive tabs forced HR to switch views to discover outstanding approvals. This could hide outstanding Cuti/Izin while PHL was selected (and vice versa).
+
+NEW FLOW
+/hr/leave
+  -> Outstanding Persetujuan (Cuti/Izin + Klaim PHL, one queue)
+  -> Saldo Cuti (expandable)
+  -> Saldo PHL (expandable)
+  -> Audit PHL (expandable)
+  -> Riwayat (expandable)
+
+NO BUSINESS-RULE CHANGES
+Approval/rejection handlers, PHL FIFO RPC logic, reversal logic, and data sources are unchanged.
