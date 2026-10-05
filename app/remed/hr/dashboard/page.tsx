@@ -53,6 +53,9 @@ export default function Page() {
             <Link href="/remed/hr/history" className="harmony-action-soft inline-flex items-center justify-center gap-2 px-4 text-sm font-bold transition">
               <History size={16} /> Riwayat Proses
             </Link>
+            <Link href="/remed/hr/employees" className="harmony-action-soft inline-flex items-center justify-center gap-2 px-4 text-sm font-bold transition">
+              <WalletCards size={16} /> Edit Plafond
+            </Link>
           </div>
         </div>
       </div>

@@ -29,8 +29,6 @@ type AppUser = {
   is_active: boolean | null
 }
 
-const harmonyExpansion = 'Human Administration, Requests, Monitoring, Operations, aNd paYments'
-
 export default function LoginPage() {
   const router = useRouter()
   const [email, setEmail] = useState('')
@@ -213,15 +211,11 @@ export default function LoginPage() {
             <div className="relative flex h-full flex-col justify-between gap-6">
               <div>
                 <div className="inline-flex items-center gap-2 rounded-full border border-white/16 bg-white/10 px-4 py-2 text-[11px] font-semibold text-white/78 backdrop-blur-xl sm:text-xs">
-                  <Sparkles size={14} /> Human Attendance, Request, Monitoring & Leave System
+                  <Sparkles size={14} /> Integrated HR Platform
                 </div>
 
                 <div className="harmony-login-brand-panel mt-6 flex min-h-[236px] flex-col items-center justify-center rounded-[28px] border border-white/14 px-5 py-8 text-center backdrop-blur-3xl sm:mt-8 sm:min-h-[280px] sm:rounded-[32px] sm:px-8 lg:min-h-[360px] lg:rounded-[34px] lg:py-10">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.42em] text-white/52 sm:text-[12px]">HARMONY</p>
-                  <h1 className="mt-3 max-w-[30rem] text-base font-medium leading-6 text-white/78 sm:text-lg sm:leading-7">
-                    {harmonyExpansion}
-                  </h1>
-
+                  <h1 className="text-2xl font-semibold tracking-[0.18em] text-white sm:text-3xl">HARMONY</h1>
                   <div className="relative mt-8 sm:mt-10">
                     <div className="absolute inset-[-16px] rounded-[34px] bg-white/14 blur-2xl sm:inset-[-18px] sm:rounded-[38px]" />
                     <div className="relative flex h-[132px] w-[132px] items-center justify-center rounded-[34px] border border-white/18 bg-white/16 shadow-[0_24px_60px_rgba(11,18,34,0.35)] backdrop-blur-3xl sm:h-[168px] sm:w-[168px] sm:rounded-[38px] lg:h-[180px] lg:w-[180px] lg:rounded-[42px]">
