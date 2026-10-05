@@ -684,9 +684,9 @@ function InputField({
         {label}
       </span>
 
-      <div className="flex min-h-12 items-center gap-3 rounded-[18px] border border-black/5 bg-[#f5f5f7]/85 px-4 shadow-sm transition focus-within:border-[#007aff]/40 focus-within:bg-white focus-within:shadow-md">
+      <div className="flex min-h-12 items-center gap-3 rounded-[22px] border border-white/80 bg-white/60 px-4 shadow-sm transition focus-within:border-[#007aff]/40 focus-within:bg-white focus-within:shadow-md">
         {icon && (
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-white text-[#86868b] shadow-sm">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[16px] bg-white/80 text-[#86868b] shadow-sm">
             {icon}
           </div>
         )}
@@ -721,9 +721,9 @@ function TextareaField({
         {label}
       </span>
 
-      <div className="flex min-h-32 items-start gap-3 rounded-[18px] border border-black/5 bg-[#f5f5f7]/85 px-4 py-3 shadow-sm transition focus-within:border-[#007aff]/40 focus-within:bg-white focus-within:shadow-md">
+      <div className="flex min-h-32 items-start gap-3 rounded-[22px] border border-white/80 bg-white/60 px-4 py-3 shadow-sm transition focus-within:border-[#007aff]/40 focus-within:bg-white focus-within:shadow-md">
         {icon && (
-          <div className="mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-white text-[#86868b] shadow-sm">
+          <div className="mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-[16px] bg-white/80 text-[#86868b] shadow-sm">
             {icon}
           </div>
         )}
@@ -758,8 +758,8 @@ function PasswordField({
         {label}
       </span>
 
-      <div className="flex min-h-12 items-center gap-3 rounded-[18px] border border-black/5 bg-[#f5f5f7]/85 px-4 shadow-sm transition focus-within:border-[#007aff]/40 focus-within:bg-white focus-within:shadow-md">
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-white text-[#86868b] shadow-sm">
+      <div className="flex min-h-12 items-center gap-3 rounded-[22px] border border-white/80 bg-white/60 px-4 shadow-sm transition focus-within:border-[#007aff]/40 focus-within:bg-white focus-within:shadow-md">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[16px] bg-white/80 text-[#86868b] shadow-sm">
           <Lock size={17} />
         </div>
 

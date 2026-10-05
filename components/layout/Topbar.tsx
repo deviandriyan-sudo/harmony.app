@@ -401,13 +401,13 @@ export function Topbar({
         </div>
 
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-          <div className="harmony-topbar-search flex h-11 min-w-0 items-center gap-3 rounded-[17px] border px-4 transition focus-within:border-blue-300 sm:w-[300px]">
+          <div className="harmony-topbar-search flex h-11 min-w-0 items-center gap-3 rounded-full border px-4 transition focus-within:border-blue-300 sm:w-[320px]">
             <Search size={18} className="shrink-0 text-[#86868b]" />
 
             <input
               type="text"
               placeholder="Search anything..."
-              className="w-full bg-transparent text-sm text-[#1d1d1f] outline-none placeholder:text-[#86868b]"
+              className="w-full rounded-full border-0 bg-transparent text-sm text-[#1d1d1f] shadow-none outline-none ring-0 placeholder:text-[#86868b] focus:border-0 focus:outline-none focus:ring-0"
             />
           </div>
 
@@ -415,7 +415,7 @@ export function Topbar({
             <button
               type="button"
               onClick={handleToggleNotification}
-              className="harmony-topbar-action relative flex h-11 items-center justify-center gap-2 rounded-[17px] border px-4 text-sm font-semibold text-[#25272c] transition"
+              className="harmony-topbar-action relative flex h-11 items-center justify-center gap-2 rounded-full border px-4 text-sm font-semibold text-[#25272c] transition"
             >
               <span className="relative">
                 <Bell size={18} className="text-[#007aff]" />

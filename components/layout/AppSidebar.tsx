@@ -39,8 +39,11 @@ export function AppSidebar({
   const [loggingOut, setLoggingOut] = useState(false)
 
   function isActive(href: string) {
-    if (href === pathname) return true
-    if (href !== '/' && pathname.startsWith(href)) return true
+    const normalizedPath = pathname.endsWith('/') && pathname.length > 1 ? pathname.slice(0, -1) : pathname
+    const normalizedHref = href.endsWith('/') && href.length > 1 ? href.slice(0, -1) : href
+
+    if (normalizedHref === normalizedPath) return true
+    if (normalizedHref !== '/' && normalizedPath.startsWith(`${normalizedHref}/`)) return true
     return false
   }
 

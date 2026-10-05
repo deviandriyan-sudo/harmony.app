@@ -47,10 +47,10 @@ export default function Page() {
             <p className="mt-3 max-w-2xl text-sm leading-7 text-white/65">Proses klaim yang telah disetujui HR, siapkan form pembayaran, dan pantau pembayaran tanpa berpindah workflow.</p>
           </div>
           <div className="harmony-action-group border-white/10 bg-white/10 p-1">
-            <Link href="/remed/finance/claims" className="harmony-action-soft inline-flex items-center justify-center gap-2 px-4 text-sm font-bold">
+            <Link href="/remed/finance/claims" className="harmony-action-primary inline-flex items-center justify-center gap-2 px-4 text-sm font-bold">
               <ClipboardCheck size={16} /> Review Finance
             </Link>
-            <Link href="/remed/finance/history" className="inline-flex items-center justify-center gap-2 rounded-[14px] px-4 text-sm font-bold text-white transition hover:bg-white/10">
+            <Link href="/remed/finance/history" className="harmony-action-soft inline-flex items-center justify-center gap-2 px-4 text-sm font-bold transition">
               <History size={16} /> Riwayat Proses
             </Link>
           </div>

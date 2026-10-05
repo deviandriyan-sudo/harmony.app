@@ -329,7 +329,7 @@ function HeroSection({
           <div className="harmony-action-group mt-5 border-white/10 bg-white/10 p-1">
             <Link
               href="/hr/attendance/upload"
-              className="harmony-action-soft inline-flex min-h-10 items-center justify-center gap-2 px-4 text-xs font-bold transition"
+              className="harmony-action-primary inline-flex min-h-10 items-center justify-center gap-2 px-4 text-xs font-bold transition"
             >
               <Upload size={15} />
               Upload Absensi
@@ -337,7 +337,7 @@ function HeroSection({
 
             <Link
               href="/hr/attendance/data"
-              className="inline-flex min-h-10 items-center justify-center gap-2 px-4 text-xs font-bold text-white transition hover:bg-white/10"
+              className="harmony-action-soft inline-flex min-h-10 items-center justify-center gap-2 px-4 text-xs font-bold transition"
             >
               <Database size={15} />
               Data Absensi
@@ -347,7 +347,7 @@ function HeroSection({
               type="button"
               onClick={onRefresh}
               disabled={refreshing}
-              className="inline-flex min-h-10 items-center justify-center gap-2 px-4 text-xs font-bold text-white transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
+              className="harmony-action-soft inline-flex min-h-10 items-center justify-center gap-2 px-4 text-xs font-bold transition disabled:cursor-not-allowed disabled:opacity-60"
             >
               <RefreshCw size={15} className={refreshing ? 'animate-spin' : ''} />
               Refresh
