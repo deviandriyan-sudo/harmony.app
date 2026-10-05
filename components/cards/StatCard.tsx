@@ -12,15 +12,15 @@ export function StatCard({
   icon: LucideIcon
 }) {
   return (
-    <div className="harmony-card p-6">
-      <div className="flex items-start justify-between">
-        <div>
-          <p className="text-sm font-medium text-[#6e6e73]">{title}</p>
-          <h3 className="mt-3 text-3xl font-semibold tracking-tight text-[#1d1d1f]">{value}</h3>
-          <p className="mt-2 text-sm text-[#6e6e73]">{description}</p>
+    <div className="harmony-metric-card p-5 sm:p-6">
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0">
+          <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-[#858a93]">{title}</p>
+          <h3 className="mt-2.5 text-[28px] font-semibold tracking-[-0.04em] text-[#17181b]">{value}</h3>
+          <p className="mt-1.5 text-[12px] leading-5 text-[#747982]">{description}</p>
         </div>
-        <div className="rounded-2xl bg-[#f5f5f7] p-3 text-[#007aff]">
-          <Icon size={22} />
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[15px] border border-blue-100 bg-blue-50 text-blue-600 shadow-sm">
+          <Icon size={20} strokeWidth={2.1} />
         </div>
       </div>
     </div>

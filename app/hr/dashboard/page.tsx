@@ -326,10 +326,10 @@ function HeroSection({
             Cut-off absensi {formatReadableDate(startDate)} sampai {formatReadableDate(endDate)}. Pantau submit employee, approval atasan, ready HR, finalisasi, dan lock periode dari satu halaman.
           </p>
 
-          <div className="mt-5 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+          <div className="harmony-action-group mt-5 border-white/10 bg-white/10 p-1">
             <Link
               href="/hr/attendance/upload"
-              className="inline-flex min-h-10 items-center justify-center gap-2 rounded-2xl bg-white px-4 text-xs font-bold text-[#1d1d1f] transition hover:-translate-y-0.5 hover:bg-[#f5f5f7]"
+              className="harmony-action-soft inline-flex min-h-10 items-center justify-center gap-2 px-4 text-xs font-bold transition"
             >
               <Upload size={15} />
               Upload Absensi
@@ -337,7 +337,7 @@ function HeroSection({
 
             <Link
               href="/hr/attendance/data"
-              className="inline-flex min-h-10 items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/10 px-4 text-xs font-bold text-white backdrop-blur-xl transition hover:-translate-y-0.5 hover:bg-white/15"
+              className="inline-flex min-h-10 items-center justify-center gap-2 px-4 text-xs font-bold text-white transition hover:bg-white/10"
             >
               <Database size={15} />
               Data Absensi
@@ -347,7 +347,7 @@ function HeroSection({
               type="button"
               onClick={onRefresh}
               disabled={refreshing}
-              className="inline-flex min-h-10 items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/10 px-4 text-xs font-bold text-white backdrop-blur-xl transition hover:-translate-y-0.5 hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex min-h-10 items-center justify-center gap-2 px-4 text-xs font-bold text-white transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
             >
               <RefreshCw size={15} className={refreshing ? 'animate-spin' : ''} />
               Refresh
@@ -390,28 +390,6 @@ function HeroSection({
             </div>
           </div>
 
-          <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-1">
-            <StatusRow
-              label="Belum Submit"
-              value={loading ? '...' : formatNumber(metrics.notSubmittedEmployees)}
-              tone={metrics.notSubmittedEmployees > 0 ? 'orange' : 'green'}
-            />
-            <StatusRow
-              label="Pending Atasan"
-              value={loading ? '...' : formatNumber(metrics.pendingSupervisor)}
-              tone={metrics.pendingSupervisor > 0 ? 'orange' : 'green'}
-            />
-            <StatusRow
-              label="Ready HR"
-              value={loading ? '...' : formatNumber(metrics.readyForHr)}
-              tone="blue"
-            />
-            <StatusRow
-              label="Locked"
-              value={loading ? '...' : formatNumber(metrics.lockedEmployees)}
-              tone="purple"
-            />
-          </div>
         </div>
       </div>
     </div>

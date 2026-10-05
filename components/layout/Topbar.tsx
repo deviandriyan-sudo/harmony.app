@@ -381,15 +381,15 @@ export function Topbar({
   }
 
   return (
-    <header className="sticky top-0 z-30 border-b border-black/5 bg-[#f5f5f7]/85 backdrop-blur-2xl">
-      <div className="flex min-h-[116px] flex-col gap-5 px-6 py-5 xl:flex-row xl:items-center xl:justify-between">
+    <header className="sticky top-0 z-30 border-b border-black/[0.055] bg-[#f4f6f9]/[0.88] backdrop-blur-2xl">
+      <div className="flex min-h-[108px] flex-col gap-4 px-5 py-4 sm:px-6 xl:flex-row xl:items-center xl:justify-between">
         <div className="min-w-0">
-          <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-black/5 bg-white px-4 py-2 text-xs font-semibold text-[#6e6e73] shadow-sm">
+          <div className="mb-2.5 inline-flex items-center gap-2 rounded-full border border-black/[0.055] bg-white/90 px-3.5 py-1.5 text-[11px] font-bold text-[#747982] shadow-sm">
             <Sparkles size={14} className="text-[#007aff]" />
             {badge}
           </div>
 
-          <h1 className="truncate text-[30px] font-semibold tracking-[-0.04em] text-[#1d1d1f]">
+          <h1 className="truncate text-[28px] font-semibold tracking-[-0.045em] text-[#17181b]">
             {title}
           </h1>
 
@@ -401,7 +401,7 @@ export function Topbar({
         </div>
 
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-          <div className="flex h-12 min-w-0 items-center gap-3 rounded-[20px] border border-black/5 bg-white px-4 shadow-sm transition focus-within:border-[#007aff]/40 focus-within:shadow-md sm:w-[320px]">
+          <div className="flex h-11 min-w-0 items-center gap-3 rounded-[17px] border border-black/[0.055] bg-white/[0.92] px-4 shadow-sm transition focus-within:border-blue-300 focus-within:shadow-md sm:w-[300px]">
             <Search size={18} className="shrink-0 text-[#86868b]" />
 
             <input
@@ -415,7 +415,7 @@ export function Topbar({
             <button
               type="button"
               onClick={handleToggleNotification}
-              className="relative flex h-12 items-center justify-center gap-2 rounded-[20px] border border-black/5 bg-white px-5 text-sm font-semibold text-[#1d1d1f] shadow-sm transition hover:-translate-y-0.5 hover:bg-[#f5f5f7] hover:shadow-md"
+              className="relative flex h-11 items-center justify-center gap-2 rounded-[17px] border border-black/[0.055] bg-white px-4 text-sm font-semibold text-[#25272c] shadow-sm transition hover:bg-[#f8f9fb] hover:shadow-md"
             >
               <span className="relative">
                 <Bell size={18} className="text-[#007aff]" />

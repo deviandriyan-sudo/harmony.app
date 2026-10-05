@@ -712,7 +712,7 @@ export default function EmployeeLeaveApprovalPage() {
   return (
     <main className="min-h-screen bg-[#f5f5f7] px-4 py-6 text-slate-950 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-7xl space-y-6">
-        <section className="rounded-[2rem] border border-white/70 bg-white p-6 shadow-sm sm:p-8">
+        <section className="harmony-unified-surface p-6 sm:p-8">
           <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
             <div>
               <Link
@@ -781,7 +781,7 @@ export default function EmployeeLeaveApprovalPage() {
           <StatCard label="Rejected" value={stats.rejected} icon={XCircle} />
         </section>
 
-        <section className="rounded-[1.75rem] border border-white/70 bg-white p-5 shadow-sm">
+        <section className="harmony-unified-toolbar p-4 sm:p-5">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div className="relative w-full lg:max-w-md">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -809,7 +809,7 @@ export default function EmployeeLeaveApprovalPage() {
           </div>
         </section>
 
-        <section className="overflow-hidden rounded-[1.75rem] border border-white/70 bg-white shadow-sm">
+        <section className="harmony-unified-surface">
           {loading ? (
             <div className="flex min-h-[360px] items-center justify-center">
               <div className="flex items-center gap-3 text-sm font-semibold text-slate-600">
@@ -1050,7 +1050,7 @@ function StatCard({
   icon: any
 }) {
   return (
-    <div className="rounded-[1.5rem] border border-white/70 bg-white p-5 shadow-sm">
+    <div className="harmony-metric-card p-5">
       <div className="flex items-center justify-between gap-3">
         <div>
           <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">

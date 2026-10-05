@@ -1152,7 +1152,7 @@ export default function EmployeeLeavePage() {
           </AlertBox>
         )}
 
-        <div className="relative overflow-hidden rounded-[34px] border border-black/5 bg-[#1d1d1f] p-5 text-white shadow-[0_24px_80px_rgba(0,0,0,0.16)] sm:p-7">
+        <div className="harmony-hero-v25 p-5 sm:p-7">
           <div className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-[#007aff]/35 blur-3xl" />
           <div className="pointer-events-none absolute -bottom-28 -left-20 h-72 w-72 rounded-full bg-[#34c759]/20 blur-3xl" />
 
@@ -1172,12 +1172,6 @@ export default function EmployeeLeavePage() {
               </p>
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-              <HeroMetric label="Total Cuti Tersedia" value={`${annualRemaining} hari`} />
-              <HeroMetric label="Postpone Aktif" value={`${postponeActiveRemaining} hari`} />
-              <HeroMetric label="Saldo PHL" value={`${phlRemaining} hari`} />
-              <HeroMetric label="Pending" value={String(pendingCount)} />
-            </div>
           </div>
         </div>
 
@@ -1273,11 +1267,11 @@ export default function EmployeeLeavePage() {
               </p>
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-3 lg:min-w-[560px]">
+            <div className="harmony-action-group w-full lg:w-auto">
               <button
                 type="button"
                 onClick={openForm}
-                className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-[#1d1d1f] px-4 text-sm font-bold text-white transition hover:bg-black"
+                className="harmony-action-primary inline-flex min-h-12 items-center justify-center gap-2 px-4 text-sm font-bold transition"
               >
                 <Plus size={18} />
                 Ajukan
@@ -1285,7 +1279,7 @@ export default function EmployeeLeavePage() {
 
               <Link
                 href="/employee/leave/postpone"
-                className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-[#e8f2ff] px-4 text-sm font-bold text-[#0059b8] transition hover:bg-blue-100"
+                className="harmony-action-info inline-flex min-h-12 items-center justify-center gap-2 px-4 text-sm font-bold transition"
               >
                 <RotateCcw size={18} />
                 Postpone Cuti
@@ -1295,7 +1289,7 @@ export default function EmployeeLeavePage() {
                 type="button"
                 onClick={fetchData}
                 disabled={loading}
-                className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-black/5 bg-white px-4 text-sm font-bold text-[#1d1d1f] shadow-sm transition hover:bg-[#f5f5f7] disabled:opacity-60"
+                className="harmony-action-soft inline-flex min-h-12 items-center justify-center gap-2 px-4 text-sm font-bold transition disabled:opacity-60"
               >
                 {loading ? <Loader2 size={18} className="animate-spin" /> : <RefreshCcw size={18} />}
                 Refresh
@@ -1929,7 +1923,7 @@ function SummaryCard({
   }[tone]
 
   return (
-    <div className="harmony-card harmony-hover-lift p-5 sm:p-6">
+    <div className="harmony-metric-card p-5 sm:p-6">
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0 flex-1">
           <p className="text-sm text-[#6e6e73]">{title}</p>

@@ -2,7 +2,8 @@
 
 import { FormEvent, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Loader2, Paperclip, Send, X } from 'lucide-react'
+import { FilePlus2, Loader2, Paperclip, Send, X } from 'lucide-react'
+import { RemedPageHeader } from '@/components/remed/RemedPageHeader'
 import { remedFetch } from '@/lib/remed-client'
 import type { RemedClaimType } from '@/types/remed'
 
@@ -15,24 +16,27 @@ export default function NewRemedClaimPage() {
 
   useEffect(() => {
     remedFetch<{ claimTypes: RemedClaimType[] }>('/api/remed/claim-types')
-      .then((x) => setTypes(x.claimTypes))
-      .catch((e) => setMessage(e.message))
+      .then((payload) => setTypes(payload.claimTypes || []))
+      .catch((error) => setMessage(error?.message || 'Gagal memuat jenis klaim.'))
   }, [])
 
   function onFiles(input: FileList | null) {
-    const next = [...files, ...(input ? Array.from(input) : [])].slice(0, 3)
-    setFiles(next)
+    setFiles((current) => [...current, ...(input ? Array.from(input) : [])].slice(0, 3))
   }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setMessage('')
-    if (files.length < 1) { setMessage('Minimal 1 bukti kuitansi wajib diunggah.'); return }
+    if (files.length < 1) {
+      setMessage('Minimal 1 bukti kuitansi wajib diunggah.')
+      return
+    }
+
     setLoading(true)
     try {
-      const fd = new FormData(event.currentTarget)
-      files.forEach((file) => fd.append('receipts', file))
-      const result = await remedFetch<{ claimId: string; claimNumber: string }>('/api/remed/claims', { method: 'POST', body: fd })
+      const formData = new FormData(event.currentTarget)
+      files.forEach((file) => formData.append('receipts', file))
+      const result = await remedFetch<{ claimId: string; claimNumber: string }>('/api/remed/claims', { method: 'POST', body: formData })
       window.alert(`Klaim ${result.claimNumber} berhasil diajukan.`)
       router.push('/remed/employee/claims')
     } catch (error: any) {
@@ -43,34 +47,87 @@ export default function NewRemedClaimPage() {
   }
 
   return (
-    <section className="mx-auto w-full max-w-5xl p-4 sm:p-6 lg:p-8">
-      <div><p className="text-xs font-bold uppercase tracking-[0.18em] text-[#18794e]">Re-Med Employee</p><h1 className="mt-2 text-3xl font-semibold tracking-tight">Ajukan Reimbursement</h1><p className="mt-2 text-sm text-[#6e6e73]">Minimal 1 bukti, maksimal 3 file. Format PDF/JPG/PNG/WEBP, maksimal 10 MB per file.</p></div>
-      <form onSubmit={submit} className="mt-6 space-y-5 rounded-[30px] border border-black/5 bg-white p-5 shadow-sm sm:p-7">
-        {message ? <div className="rounded-2xl border border-red-100 bg-red-50 p-4 text-sm text-red-700">{message}</div> : null}
-        <div className="grid gap-5 md:grid-cols-2">
-          <label className="block"><span className="text-sm font-semibold">Jenis Klaim</span><select name="claim_type_id" required defaultValue="" className="mt-2 w-full rounded-2xl border border-black/10 bg-[#f5f5f7] px-4 py-3 text-sm outline-none"><option value="" disabled>Pilih jenis klaim</option>{types.map((type) => <option key={type.id} value={type.id}>{type.name}</option>)}</select></label>
-          <label className="block"><span className="text-sm font-semibold">Tanggal Pengobatan</span><input name="treatment_date" type="date" required className="mt-2 w-full rounded-2xl border border-black/10 bg-[#f5f5f7] px-4 py-3 text-sm outline-none" /></label>
-          <label className="block"><span className="text-sm font-semibold">Provider / Rumah Sakit / Toko</span><input name="provider_name" className="mt-2 w-full rounded-2xl border border-black/10 bg-[#f5f5f7] px-4 py-3 text-sm outline-none" placeholder="Opsional" /></label>
-          <label className="block"><span className="text-sm font-semibold">Nominal</span><input name="submitted_amount" type="number" min="1" step="1" required className="mt-2 w-full rounded-2xl border border-black/10 bg-[#f5f5f7] px-4 py-3 text-sm outline-none" placeholder="250000" /></label>
-        </div>
-        <label className="block"><span className="text-sm font-semibold">Catatan</span><textarea name="employee_note" rows={3} className="mt-2 w-full rounded-2xl border border-black/10 bg-[#f5f5f7] px-4 py-3 text-sm outline-none" placeholder="Keterangan singkat reimbursement" /></label>
+    <section className="mx-auto w-full max-w-5xl space-y-6 p-4 sm:p-6 lg:p-8">
+      <RemedPageHeader
+        eyebrow="Re-Med · Employee"
+        title="Ajukan Reimbursement"
+        description="Isi data pengobatan, rekening pembayaran, dan lampirkan minimal 1 bukti. Maksimal 3 file PDF/JPG/PNG/WEBP, 10 MB per file."
+        icon={FilePlus2}
+      />
 
-        <div className="rounded-[24px] bg-[#f5f7f6] p-4">
-          <p className="text-sm font-semibold">Rekening Pembayaran</p>
-          <div className="mt-3 grid gap-4 md:grid-cols-3">
-            <input name="bank_name" required className="rounded-2xl border border-black/10 bg-white px-4 py-3 text-sm outline-none" placeholder="Nama bank" />
-            <input name="bank_account_number" required className="rounded-2xl border border-black/10 bg-white px-4 py-3 text-sm outline-none" placeholder="Nomor rekening" />
-            <input name="bank_account_name" required className="rounded-2xl border border-black/10 bg-white px-4 py-3 text-sm outline-none" placeholder="Nama pemilik rekening" />
+      <form onSubmit={submit} className="harmony-unified-surface space-y-6 p-5 sm:p-7">
+        {message ? <div className="rounded-[18px] border border-red-100 bg-red-50 p-4 text-sm text-red-700">{message}</div> : null}
+
+        <div>
+          <h2 className="harmony-section-title">Data Reimbursement</h2>
+          <p className="harmony-section-copy">Informasi utama klaim medical reimbursement.</p>
+          <div className="mt-4 grid gap-4 md:grid-cols-2">
+            <label className="block">
+              <span className="harmony-label">Jenis Klaim</span>
+              <select name="claim_type_id" required defaultValue="" className="harmony-select">
+                <option value="" disabled>Pilih jenis klaim</option>
+                {types.map((type) => <option key={type.id} value={type.id}>{type.name}</option>)}
+              </select>
+            </label>
+            <label className="block">
+              <span className="harmony-label">Tanggal Pengobatan</span>
+              <input name="treatment_date" type="date" required className="harmony-input" />
+            </label>
+            <label className="block">
+              <span className="harmony-label">Provider / Rumah Sakit / Toko</span>
+              <input name="provider_name" className="harmony-input" placeholder="Opsional" />
+            </label>
+            <label className="block">
+              <span className="harmony-label">Nominal</span>
+              <input name="submitted_amount" type="number" min="1" step="1" required className="harmony-input" placeholder="250000" />
+            </label>
+          </div>
+          <label className="mt-4 block">
+            <span className="harmony-label">Catatan</span>
+            <textarea name="employee_note" rows={3} className="harmony-textarea" placeholder="Keterangan singkat reimbursement" />
+          </label>
+        </div>
+
+        <div className="harmony-subtle-panel p-5">
+          <h2 className="harmony-section-title">Rekening Pembayaran</h2>
+          <p className="harmony-section-copy">Pastikan rekening aktif dan nama pemilik sesuai.</p>
+          <div className="mt-4 grid gap-4 md:grid-cols-3">
+            <input name="bank_name" required className="harmony-input" placeholder="Nama bank" />
+            <input name="bank_account_number" required className="harmony-input" placeholder="Nomor rekening" />
+            <input name="bank_account_name" required className="harmony-input" placeholder="Nama pemilik rekening" />
           </div>
         </div>
 
         <div>
-          <div className="flex items-center justify-between"><span className="text-sm font-semibold">Bukti Kuitansi</span><span className="text-xs text-[#6e6e73]">{files.length}/3 file</span></div>
-          <label className="mt-2 flex cursor-pointer items-center justify-center gap-2 rounded-[22px] border border-dashed border-[#18794e]/30 bg-emerald-50/40 p-5 text-sm font-semibold text-[#18794e]"><Paperclip size={18} /> Pilih File<input type="file" multiple accept="application/pdf,image/jpeg,image/png,image/webp" className="hidden" onChange={(e) => { onFiles(e.target.files); e.currentTarget.value = '' }} disabled={files.length >= 3} /></label>
-          {files.length ? <div className="mt-3 space-y-2">{files.map((file, index) => <div key={`${file.name}-${index}`} className="flex items-center justify-between rounded-2xl bg-[#f5f5f7] px-4 py-3 text-sm"><span className="truncate pr-3">{file.name}</span><button type="button" onClick={() => setFiles((prev) => prev.filter((_, i) => i !== index))} className="text-red-500"><X size={17} /></button></div>)}</div> : null}
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <h2 className="harmony-section-title">Bukti Kuitansi</h2>
+              <p className="harmony-section-copy">Minimal 1 file dan maksimal 3 file.</p>
+            </div>
+            <span className="rounded-full bg-[#eef0f3] px-3 py-1 text-xs font-bold text-[#646971]">{files.length}/3</span>
+          </div>
+
+          <label className="mt-4 flex cursor-pointer items-center justify-center gap-2 rounded-[20px] border border-dashed border-emerald-200 bg-emerald-50/60 p-5 text-sm font-bold text-emerald-700 transition hover:bg-emerald-50">
+            <Paperclip size={18} /> Pilih File
+            <input type="file" multiple accept="application/pdf,image/jpeg,image/png,image/webp" className="hidden" onChange={(event) => { onFiles(event.target.files); event.currentTarget.value = '' }} disabled={files.length >= 3} />
+          </label>
+
+          {files.length ? (
+            <div className="mt-3 space-y-2">
+              {files.map((file, index) => (
+                <div key={`${file.name}-${index}`} className="flex items-center justify-between rounded-[16px] border border-black/[0.055] bg-[#f8f9fb] px-4 py-3 text-sm">
+                  <span className="truncate pr-3">{file.name}</span>
+                  <button type="button" onClick={() => setFiles((current) => current.filter((_, itemIndex) => itemIndex !== index))} className="flex h-8 w-8 items-center justify-center rounded-[11px] text-red-500 transition hover:bg-red-50"><X size={17} /></button>
+                </div>
+              ))}
+            </div>
+          ) : null}
         </div>
 
-        <button disabled={loading} type="submit" className="inline-flex w-full items-center justify-center gap-2 rounded-[22px] bg-[#18794e] px-5 py-3.5 text-sm font-bold text-white shadow-[0_15px_35px_rgba(24,121,78,0.2)] disabled:opacity-60">{loading ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}{loading ? 'Mengirim...' : 'Ajukan Reimbursement'}</button>
+        <button disabled={loading} type="submit" className="harmony-button-primary inline-flex min-h-12 w-full items-center justify-center gap-2 px-5 disabled:opacity-60">
+          {loading ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
+          {loading ? 'Mengirim...' : 'Ajukan Reimbursement'}
+        </button>
       </form>
     </section>
   )

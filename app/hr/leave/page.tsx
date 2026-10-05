@@ -1835,7 +1835,7 @@ export default function HRLeavePage() {
           </div>
         )}
 
-        <div className="relative overflow-hidden rounded-[34px] border border-black/5 bg-[#1d1d1f] p-7 text-white shadow-[0_24px_80px_rgba(0,0,0,0.16)]">
+        <div className="harmony-hero-v25 p-7">
           <div className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-[#007aff]/35 blur-3xl" />
           <div className="pointer-events-none absolute -bottom-28 -left-20 h-72 w-72 rounded-full bg-[#34c759]/20 blur-3xl" />
 
@@ -1881,37 +1881,39 @@ export default function HRLeavePage() {
               </p>
             </div>
 
-            <div className="flex flex-col gap-3 md:flex-row md:items-center">
-              <button
-                type="button"
-                onClick={() => {
-                  window.location.href = '/hr/leave/administration'
-                }}
-                className="harmony-button-secondary whitespace-nowrap"
-                title="Kelola lifecycle saldo, postpone manual, dan master jenis kehadiran/ketidakhadiran"
-              >
-                <WalletCards size={18} />
-                Administrasi Saldo & Jenis
-              </button>
-
-              <div className="flex min-h-12 w-full items-center gap-3 rounded-[18px] border border-black/5 bg-[#f5f5f7]/85 px-4 shadow-sm md:w-[340px]">
-                <Search size={18} className="shrink-0 text-[#86868b]" />
+            <div className="flex w-full flex-col gap-3 md:w-auto md:flex-row md:items-center">
+              <div className="flex min-h-11 w-full items-center gap-3 rounded-[16px] border border-black/[0.07] bg-[#f6f7f9] px-4 md:w-[340px]">
+                <Search size={17} className="shrink-0 text-[#8a8f98]" />
                 <input
                   value={searchKeyword}
                   onChange={(event) => setSearchKeyword(event.target.value)}
                   placeholder="Cari nama, unit, jenis, job pending..."
-                  className="min-h-12 w-full bg-transparent text-sm outline-none placeholder:text-[#9a9aa0]"
+                  className="min-h-10 w-full border-0 bg-transparent text-sm outline-none shadow-none placeholder:text-[#9a9aa0]"
                 />
               </div>
 
-              <button
-                type="button"
-                onClick={() => fetchData()}
-                className="harmony-button-secondary"
-              >
-                <RefreshCcw size={18} />
-                Refresh
-              </button>
+              <div className="harmony-action-group">
+                <button
+                  type="button"
+                  onClick={() => {
+                    window.location.href = '/hr/leave/administration'
+                  }}
+                  className="harmony-action-soft inline-flex items-center justify-center gap-2 px-4 text-sm font-bold whitespace-nowrap"
+                  title="Kelola lifecycle saldo, postpone manual, dan master jenis kehadiran/ketidakhadiran"
+                >
+                  <WalletCards size={17} />
+                  Administrasi
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => fetchData()}
+                  className="harmony-action-soft inline-flex items-center justify-center gap-2 px-4 text-sm font-bold"
+                >
+                  <RefreshCcw size={17} />
+                  Refresh
+                </button>
+              </div>
             </div>
           </div>
 

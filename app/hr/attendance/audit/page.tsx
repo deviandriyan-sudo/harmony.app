@@ -607,7 +607,7 @@ function SummaryCard({
   }[tone];
 
   return (
-    <div className="harmony-card harmony-hover-lift min-w-0 p-5">
+    <div className="harmony-metric-card min-w-0 p-5">
       <div className="flex min-w-0 items-start justify-between gap-4">
         <div className="min-w-0">
           <p className="break-words text-sm font-medium leading-5 text-[#6e6e73]">

@@ -382,7 +382,7 @@ export default function EmployeeAttendanceApprovalListPage() {
           </div>
         )}
 
-        <div className="relative overflow-hidden rounded-[32px] border border-black/5 bg-[#1d1d1f] p-5 text-white shadow-[0_24px_80px_rgba(0,0,0,0.16)] sm:p-6">
+        <div className="harmony-hero-v25 p-5 sm:p-6">
           <div className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-[#007aff]/35 blur-3xl" />
           <div className="pointer-events-none absolute -bottom-28 -left-20 h-72 w-72 rounded-full bg-[#34c759]/20 blur-3xl" />
 
@@ -412,12 +412,6 @@ export default function EmployeeAttendanceApprovalListPage() {
               </p>
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:min-w-[600px]">
-              <HeroMetric label="Bawahan" value={String(subordinates.length)} />
-              <HeroMetric label="Submit" value={String(summary.total)} />
-              <HeroMetric label="Pending" value={String(summary.pending)} />
-              <HeroMetric label="Approved" value={String(summary.approved)} />
-            </div>
           </div>
         </div>
 
@@ -948,7 +942,7 @@ function SummaryCard({
   }[tone];
 
   return (
-    <div className="harmony-card harmony-hover-lift p-5">
+    <div className="harmony-metric-card p-5">
       <div className="flex items-center justify-between gap-4">
         <div className="min-w-0">
           <p className="truncate text-sm text-[#6e6e73]">{title}</p>

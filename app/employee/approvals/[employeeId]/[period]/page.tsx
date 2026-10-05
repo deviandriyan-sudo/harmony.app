@@ -1961,7 +1961,7 @@ function SummaryCard({
   }[tone]
 
   return (
-    <div className="harmony-card harmony-hover-lift p-6">
+    <div className="harmony-metric-card p-6">
       <div className="flex items-center justify-between gap-4">
         <div className="min-w-0">
           <p className="truncate text-sm text-[#6e6e73]">

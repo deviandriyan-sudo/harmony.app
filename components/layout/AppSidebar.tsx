@@ -71,50 +71,51 @@ export function AppSidebar({
   }
 
   return (
-    <aside className="flex h-screen w-[280px] max-w-[86vw] shrink-0 flex-col border-r border-black/5 bg-[#f7f7f8] px-3 py-3 sm:px-4 sm:py-4">
-      <div className="flex h-full flex-col overflow-hidden rounded-[26px] border border-black/5 bg-[#fbfbfc] shadow-[0_12px_40px_rgba(15,23,42,0.08)] sm:rounded-[28px]">
-        <div className="border-b border-black/5 px-4 py-4">
+    <aside className="flex h-screen w-[272px] max-w-[86vw] shrink-0 flex-col border-r border-black/[0.045] bg-[#f4f6f9] px-3 py-3 sm:px-3.5 sm:py-3.5">
+      <div className="flex h-full flex-col overflow-hidden rounded-[28px] border border-black/[0.055] bg-white/90 shadow-[0_16px_48px_rgba(15,23,42,0.075)] backdrop-blur-xl">
+        <div className="border-b border-black/[0.055] px-4 py-4">
           <div className="flex items-start gap-3">
-            <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-black/5 bg-white shadow-sm">
-              <Image src={logoSrc} alt="HARMONY Logo" width={44} height={44} className="h-11 w-11 object-contain" priority />
+            <div className="flex h-[52px] w-[52px] shrink-0 items-center justify-center overflow-hidden rounded-[17px] border border-black/[0.055] bg-white shadow-[0_6px_20px_rgba(15,23,42,0.06)]">
+              <Image src={logoSrc} alt="HARMONY Logo" width={42} height={42} className="h-10 w-10 object-contain" priority />
             </div>
-            <div className="min-w-0 flex-1 pt-1">
+            <div className="min-w-0 flex-1 pt-0.5">
               <div className="flex items-center gap-2">
-                <h1 className="truncate text-[15px] font-semibold tracking-tight text-[#1d1d1f]">{title}</h1>
-                <span className="text-[#007aff]">✣</span>
+                <h1 className="truncate text-[15px] font-bold tracking-[-0.02em] text-[#17181b]">{title}</h1>
+                <span className="text-[#3b82f6]">✣</span>
               </div>
-              <p className="mt-1 line-clamp-2 text-[12px] leading-4 text-[#6e6e73]">{subtitle}</p>
+              <p className="mt-1 line-clamp-2 text-[11px] leading-4 text-[#737780]">{subtitle}</p>
             </div>
           </div>
 
-          <div className="mt-4 rounded-[22px] border border-black/5 bg-[#f4f4f6] p-3 shadow-sm">
+          <div className="mt-4 rounded-[20px] border border-black/[0.055] bg-gradient-to-br from-[#f8f9fb] to-[#f2f4f7] p-3">
             <div className="flex items-center gap-3">
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#1d1d1f] text-sm font-bold text-white">{getInitials(userName)}</div>
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[14px] bg-[#17181b] text-[12px] font-bold text-white shadow-[0_8px_20px_rgba(15,23,42,.14)]">{getInitials(userName)}</div>
               <div className="min-w-0 flex-1">
-                <p className="truncate text-[14px] font-semibold text-[#1d1d1f]">{userName}</p>
-                <p className="truncate text-[12px] text-[#6e6e73]">{userRole}</p>
+                <p className="truncate text-[13px] font-bold text-[#17181b]">{userName}</p>
+                <p className="truncate text-[11px] text-[#737780]">{userRole}</p>
               </div>
             </div>
-            <div className="mt-3 inline-flex items-center gap-2 rounded-full border border-green-100 bg-white px-3 py-2 text-[12px] font-semibold text-green-700 shadow-sm">
-              <ShieldCheck size={14} />
+            <div className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-emerald-100 bg-white px-2.5 py-1.5 text-[10px] font-bold text-emerald-700 shadow-sm">
+              <ShieldCheck size={12} />
               Secure workspace
             </div>
           </div>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto px-3 py-4">
-          <nav className="space-y-1.5">
+        <div className="min-h-0 flex-1 overflow-y-auto px-2.5 py-3.5">
+          <nav className="space-y-1">
             {menu.map((item, index) => {
               const active = isActive(item.href)
               const Icon = item.icon
               const section = item.section || 'Navigation'
               const previousSection = index > 0 ? (menu[index - 1].section || 'Navigation') : null
               const showSection = index === 0 || section !== previousSection
+              const isRemed = section.toLowerCase().includes('re-med') || item.href.startsWith('/remed')
 
               return (
                 <Fragment key={item.href}>
                   {showSection && (
-                    <p className={`${index === 0 ? 'mb-3' : 'mb-3 mt-6'} px-2 text-[11px] font-bold uppercase tracking-[0.22em] text-[#8e8e93]`}>
+                    <p className={`${index === 0 ? 'mb-2.5' : 'mb-2.5 mt-5'} px-2.5 text-[10px] font-bold uppercase tracking-[0.22em] ${isRemed ? 'text-emerald-700/75' : 'text-[#9599a1]'}`}>
                       {section}
                     </p>
                   )}
@@ -122,23 +123,28 @@ export function AppSidebar({
                     href={item.href}
                     onClick={onNavigate}
                     className={[
-                      'group flex items-center gap-3 rounded-[22px] px-3 py-2.5 transition-all duration-200',
+                      'group relative flex items-center gap-2.5 overflow-hidden rounded-[18px] px-2.5 py-2 transition-all duration-200',
                       active
-                        ? 'bg-[#1d1d1f] text-white shadow-[0_10px_28px_rgba(15,23,42,0.18)]'
-                        : 'text-[#1d1d1f] hover:bg-white hover:shadow-sm',
+                        ? 'bg-[#17181b] text-white shadow-[0_9px_24px_rgba(15,23,42,0.17)]'
+                        : 'text-[#25272c] hover:bg-white hover:shadow-[0_5px_18px_rgba(15,23,42,0.05)]',
                     ].join(' ')}
                   >
+                    {active ? <span className={`absolute inset-y-2 left-0 w-[3px] rounded-r-full ${isRemed ? 'bg-emerald-400' : 'bg-blue-400'}`} /> : null}
                     <div className={[
-                      'flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl transition',
-                      active ? 'bg-white/12 text-white' : 'bg-[#eef1f5] text-[#3a3a3c] group-hover:bg-[#e8f2ff] group-hover:text-[#007aff]',
+                      'flex h-9 w-9 shrink-0 items-center justify-center rounded-[13px] transition',
+                      active
+                        ? 'bg-white/[0.10] text-white'
+                        : isRemed
+                          ? 'bg-emerald-50 text-emerald-700 group-hover:bg-emerald-100'
+                          : 'bg-[#eef1f5] text-[#4b5058] group-hover:bg-blue-50 group-hover:text-blue-600',
                     ].join(' ')}>
-                      <Icon size={18} strokeWidth={2.2} />
+                      <Icon size={17} strokeWidth={2.15} />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className={['truncate text-[14px] font-semibold', active ? 'text-white' : 'text-[#1d1d1f]'].join(' ')}>{item.title}</p>
-                      {item.subtitle && <p className={['truncate text-[12px]', active ? 'text-white/70' : 'text-[#7c7c80]'].join(' ')}>{item.subtitle}</p>}
+                      <p className={['truncate text-[13px] font-bold', active ? 'text-white' : 'text-[#25272c]'].join(' ')}>{item.title}</p>
+                      {item.subtitle ? <p className={['truncate text-[10.5px]', active ? 'text-white/58' : 'text-[#8a8f98]'].join(' ')}>{item.subtitle}</p> : null}
                     </div>
-                    <ChevronRight size={16} className={active ? 'text-white/70' : 'text-[#b0b0b5]'} />
+                    <ChevronRight size={14} className={active ? 'text-white/55' : 'text-[#b1b5bc]'} />
                   </Link>
                 </Fragment>
               )
@@ -146,14 +152,14 @@ export function AppSidebar({
           </nav>
         </div>
 
-        <div className="border-t border-black/5 px-4 py-4">
+        <div className="border-t border-black/[0.055] px-3.5 py-3.5">
           <button
             type="button"
             onClick={handleLogout}
             disabled={loggingOut}
-            className="flex w-full items-center justify-center gap-2 rounded-[20px] border border-black/5 bg-white px-4 py-3 text-[14px] font-medium text-[#1d1d1f] shadow-sm transition hover:bg-[#f5f5f7] disabled:cursor-not-allowed disabled:opacity-60"
+            className="flex w-full items-center justify-center gap-2 rounded-[17px] border border-black/[0.055] bg-white px-4 py-2.5 text-[13px] font-semibold text-[#25272c] shadow-sm transition hover:border-red-100 hover:bg-red-50 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {loggingOut ? <><Loader2 size={16} className="animate-spin text-red-500" />Keluar...</> : <><LogOut size={16} className="text-red-500" />Keluar</>}
+            {loggingOut ? <><Loader2 size={15} className="animate-spin text-red-500" />Keluar...</> : <><LogOut size={15} className="text-red-500" />Keluar</>}
           </button>
         </div>
       </div>

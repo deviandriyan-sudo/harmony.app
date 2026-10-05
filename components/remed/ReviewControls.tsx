@@ -20,14 +20,28 @@ export function HrReviewControls({ claim, onDone }: { claim: RemedClaim; onDone:
         body: JSON.stringify({ decision, approved_amount: decision === 'approve' ? Number(amountText) : null, note: note || '' }),
       })
       onDone()
-    } catch (error: any) { window.alert(error.message) } finally { setLoading(false) }
+    } catch (error: any) {
+      window.alert(error?.message || 'Gagal memproses klaim.')
+    } finally {
+      setLoading(false)
+    }
   }
 
-  return <div className="flex flex-wrap gap-2">{loading ? <div className="flex items-center gap-2 rounded-xl bg-[#f5f5f7] px-3 py-2 text-xs"><Loader2 size={14} className="animate-spin" /> Memproses</div> : <><button onClick={() => decide('approve')} className="inline-flex items-center gap-1 rounded-xl bg-emerald-600 px-3 py-2 text-xs font-semibold text-white"><Check size={14} /> Approve</button><button onClick={() => decide('reject')} className="inline-flex items-center gap-1 rounded-xl bg-red-50 px-3 py-2 text-xs font-semibold text-red-700"><X size={14} /> Reject</button></>}</div>
+  if (loading) {
+    return <div className="inline-flex min-h-9 items-center gap-2 rounded-[13px] bg-[#eef0f3] px-3 text-xs font-bold text-[#646971]"><Loader2 size={14} className="animate-spin" /> Memproses</div>
+  }
+
+  return (
+    <div className="harmony-action-group">
+      <button type="button" onClick={() => decide('approve')} className="inline-flex items-center gap-1.5 bg-emerald-600 px-3 text-xs font-bold text-white transition hover:bg-emerald-700"><Check size={14} /> Approve</button>
+      <button type="button" onClick={() => decide('reject')} className="harmony-action-danger inline-flex items-center gap-1.5 px-3 text-xs font-bold"><X size={14} /> Reject</button>
+    </div>
+  )
 }
 
 export function FinanceReviewControls({ claim, onDone }: { claim: RemedClaim; onDone: () => void }) {
   const [loading, setLoading] = useState(false)
+
   async function decide(decision: 'approve' | 'reject') {
     const note = window.prompt(decision === 'approve' ? 'Catatan Finance (opsional):' : 'Alasan penolakan Finance:', '')
     if (decision === 'reject' && note === null) return
@@ -35,9 +49,21 @@ export function FinanceReviewControls({ claim, onDone }: { claim: RemedClaim; on
     try {
       await remedFetch(`/api/remed/finance/claims/${claim.id}/review`, { method: 'POST', body: JSON.stringify({ decision, note: note || '' }) })
       onDone()
-    } catch (error: any) { window.alert(error.message) } finally { setLoading(false) }
+    } catch (error: any) {
+      window.alert(error?.message || 'Gagal memproses klaim.')
+    } finally {
+      setLoading(false)
+    }
   }
-  return <div className="flex flex-wrap gap-2">{loading ? <Loader2 size={18} className="animate-spin" /> : <><button onClick={() => decide('approve')} className="inline-flex items-center gap-1 rounded-xl bg-emerald-600 px-3 py-2 text-xs font-semibold text-white"><Check size={14} /> Approve</button><button onClick={() => decide('reject')} className="inline-flex items-center gap-1 rounded-xl bg-red-50 px-3 py-2 text-xs font-semibold text-red-700"><X size={14} /> Reject</button></>}</div>
+
+  if (loading) return <div className="inline-flex min-h-9 items-center rounded-[13px] bg-[#eef0f3] px-3 text-[#646971]"><Loader2 size={16} className="animate-spin" /></div>
+
+  return (
+    <div className="harmony-action-group">
+      <button type="button" onClick={() => decide('approve')} className="inline-flex items-center gap-1.5 bg-emerald-600 px-3 text-xs font-bold text-white transition hover:bg-emerald-700"><Check size={14} /> Approve</button>
+      <button type="button" onClick={() => decide('reject')} className="harmony-action-danger inline-flex items-center gap-1.5 px-3 text-xs font-bold"><X size={14} /> Reject</button>
+    </div>
+  )
 }
 
 export function PaymentControls({ claim, onDone }: { claim: RemedClaim; onDone: () => void }) {
@@ -47,17 +73,37 @@ export function PaymentControls({ claim, onDone }: { claim: RemedClaim; onDone: 
   const [file, setFile] = useState<File | null>(null)
 
   async function pay() {
-    if (!file) { window.alert('Upload bukti pembayaran terlebih dahulu.'); return }
+    if (!file) {
+      window.alert('Upload bukti pembayaran terlebih dahulu.')
+      return
+    }
     setLoading(true)
     try {
-      const fd = new FormData()
-      fd.append('payment_date', date)
-      fd.append('payment_reference', reference)
-      fd.append('payment_proof', file)
-      await remedFetch(`/api/remed/finance/claims/${claim.id}/payment`, { method: 'POST', body: fd })
+      const formData = new FormData()
+      formData.append('payment_date', date)
+      formData.append('payment_reference', reference)
+      formData.append('payment_proof', file)
+      await remedFetch(`/api/remed/finance/claims/${claim.id}/payment`, { method: 'POST', body: formData })
       onDone()
-    } catch (error: any) { window.alert(error.message) } finally { setLoading(false) }
+    } catch (error: any) {
+      window.alert(error?.message || 'Gagal memproses pembayaran.')
+    } finally {
+      setLoading(false)
+    }
   }
 
-  return <div className="w-full max-w-sm space-y-2 rounded-2xl bg-[#f5f5f7] p-3"><input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-xs" /><input value={reference} onChange={(e) => setReference(e.target.value)} placeholder="Referensi pembayaran (opsional)" className="w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-xs" /><label className="flex cursor-pointer items-center gap-2 rounded-xl border border-dashed border-black/10 bg-white px-3 py-2 text-xs font-semibold"><Upload size={14} />{file ? file.name : 'Upload bukti bayar'}<input type="file" accept="application/pdf,image/jpeg,image/png,image/webp" className="hidden" onChange={(e) => setFile(e.target.files?.[0] || null)} /></label><button type="button" onClick={pay} disabled={loading} className="w-full rounded-xl bg-[#18794e] px-3 py-2 text-xs font-semibold text-white disabled:opacity-50">{loading ? 'Memproses...' : 'Tandai Dibayar'}</button></div>
+  return (
+    <div className="w-full max-w-sm space-y-2 rounded-[18px] border border-black/[0.055] bg-[#f7f8fa] p-3.5">
+      <input type="date" value={date} onChange={(event) => setDate(event.target.value)} className="harmony-input min-h-10 text-xs" />
+      <input value={reference} onChange={(event) => setReference(event.target.value)} placeholder="Referensi pembayaran (opsional)" className="harmony-input min-h-10 text-xs" />
+      <label className="flex min-h-10 cursor-pointer items-center gap-2 rounded-[13px] border border-dashed border-black/[0.09] bg-white px-3 text-xs font-bold text-[#646971] transition hover:border-emerald-200 hover:text-emerald-700">
+        <Upload size={14} />
+        <span className="truncate">{file ? file.name : 'Upload bukti bayar'}</span>
+        <input type="file" accept="application/pdf,image/jpeg,image/png,image/webp" className="hidden" onChange={(event) => setFile(event.target.files?.[0] || null)} />
+      </label>
+      <button type="button" onClick={pay} disabled={loading} className="harmony-button-primary min-h-10 w-full text-xs disabled:opacity-50">
+        {loading ? <><Loader2 size={14} className="animate-spin" /> Memproses...</> : 'Tandai Dibayar'}
+      </button>
+    </div>
+  )
 }

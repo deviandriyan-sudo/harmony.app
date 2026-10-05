@@ -147,7 +147,7 @@ export default function HRLayout({ children }: { children: React.ReactNode }) {
               </div>
             </div>
           </div>
-          <div className="w-full min-w-0">{children}</div>
+          <div className="harmony-workspace w-full min-w-0">{children}</div>
         </main>
       </div>
     </div>
