@@ -198,13 +198,13 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="relative min-h-screen overflow-hidden bg-[#f4f7fb] px-5 py-6 text-[#1d1d1f]">
+    <main className="harmony-login-bg relative min-h-screen overflow-hidden px-5 py-6 text-[#1d1d1f]">
       <div className="pointer-events-none absolute -left-32 -top-32 h-96 w-96 rounded-full bg-[#007aff]/20 blur-3xl" />
       <div className="pointer-events-none absolute -bottom-36 right-0 h-[30rem] w-[30rem] rounded-full bg-[#af52de]/18 blur-3xl" />
 
       <section className="relative mx-auto flex min-h-[calc(100vh-48px)] w-full max-w-6xl items-center justify-center">
-        <div className="grid w-full overflow-hidden rounded-[42px] border border-white/70 bg-white/75 shadow-[0_35px_100px_rgba(15,23,42,0.16)] backdrop-blur-2xl lg:grid-cols-[1.05fr_0.95fr]">
-          <section className="relative hidden min-h-[660px] overflow-hidden bg-[#111113] p-9 text-white lg:block">
+        <div className="harmony-login-shell grid w-full overflow-hidden rounded-[42px] border lg:grid-cols-[1.05fr_0.95fr]">
+          <section className="harmony-login-dark relative hidden min-h-[660px] overflow-hidden p-9 text-white lg:block">
             <div className="relative flex h-full flex-col justify-between">
               <div>
                 <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-4 py-2 text-xs font-semibold text-white/70">
@@ -276,7 +276,7 @@ export default function LoginPage() {
                 <div className="h-px flex-1 bg-black/10" />
               </div>
 
-              <button onClick={handleGoogleLogin} disabled={loading || googleLoading} className="flex min-h-13 w-full items-center justify-center gap-3 rounded-[22px] border border-black/5 bg-white px-5 text-sm font-bold shadow-sm disabled:opacity-60">
+              <button onClick={handleGoogleLogin} disabled={loading || googleLoading} className="harmony-login-google flex min-h-13 w-full items-center justify-center gap-3 rounded-[22px] border px-5 text-sm font-bold disabled:opacity-60">
                 {googleLoading ? <Loader2 size={18} className="animate-spin" /> : <GoogleIcon />}
                 {googleLoading ? 'Menghubungkan Google...' : 'Masuk dengan Google'}
               </button>
@@ -297,7 +297,7 @@ function Field({ icon, label, children }: { icon: React.ReactNode; label: string
   return (
     <label className="block">
       <span className="text-sm font-semibold">{label}</span>
-      <div className="mt-2 flex min-h-13 items-center gap-3 rounded-[22px] border border-black/5 bg-[#f5f5f7] px-4 text-[#86868b]">
+      <div className="harmony-login-field mt-2 flex min-h-13 items-center gap-3 rounded-[22px] border px-4 text-[#86868b]">
         {icon}
         {children}
       </div>
@@ -307,7 +307,7 @@ function Field({ icon, label, children }: { icon: React.ReactNode; label: string
 
 function Feature({ icon, title, text }: { icon: React.ReactNode; title: string; text: string }) {
   return (
-    <div className="rounded-[24px] border border-white/10 bg-white/[0.08] p-4">
+    <div className="harmony-login-feature rounded-[24px] border p-4">
       <div className="flex items-center gap-3">
         <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white/10">{icon}</div>
         <div>

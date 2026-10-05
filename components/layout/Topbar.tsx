@@ -381,10 +381,10 @@ export function Topbar({
   }
 
   return (
-    <header className="sticky top-0 z-30 border-b border-black/[0.055] bg-[#f4f6f9]/[0.88] backdrop-blur-2xl">
+    <header className="harmony-topbar sticky top-0 z-30 border-b">
       <div className="flex min-h-[108px] flex-col gap-4 px-5 py-4 sm:px-6 xl:flex-row xl:items-center xl:justify-between">
         <div className="min-w-0">
-          <div className="mb-2.5 inline-flex items-center gap-2 rounded-full border border-black/[0.055] bg-white/90 px-3.5 py-1.5 text-[11px] font-bold text-[#747982] shadow-sm">
+          <div className="harmony-topbar-badge mb-2.5 inline-flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-[11px] font-bold text-[#747982]">
             <Sparkles size={14} className="text-[#007aff]" />
             {badge}
           </div>
@@ -401,7 +401,7 @@ export function Topbar({
         </div>
 
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-          <div className="flex h-11 min-w-0 items-center gap-3 rounded-[17px] border border-black/[0.055] bg-white/[0.92] px-4 shadow-sm transition focus-within:border-blue-300 focus-within:shadow-md sm:w-[300px]">
+          <div className="harmony-topbar-search flex h-11 min-w-0 items-center gap-3 rounded-[17px] border px-4 transition focus-within:border-blue-300 sm:w-[300px]">
             <Search size={18} className="shrink-0 text-[#86868b]" />
 
             <input
@@ -415,7 +415,7 @@ export function Topbar({
             <button
               type="button"
               onClick={handleToggleNotification}
-              className="relative flex h-11 items-center justify-center gap-2 rounded-[17px] border border-black/[0.055] bg-white px-4 text-sm font-semibold text-[#25272c] shadow-sm transition hover:bg-[#f8f9fb] hover:shadow-md"
+              className="harmony-topbar-action relative flex h-11 items-center justify-center gap-2 rounded-[17px] border px-4 text-sm font-semibold text-[#25272c] transition"
             >
               <span className="relative">
                 <Bell size={18} className="text-[#007aff]" />
@@ -431,7 +431,7 @@ export function Topbar({
             </button>
 
             {isOpen && (
-              <div className="absolute right-0 top-[58px] z-50 w-[min(460px,calc(100vw-32px))] overflow-hidden rounded-[28px] border border-black/5 bg-white shadow-[0_24px_80px_rgba(15,23,42,0.18)]">
+              <div className="harmony-popover-glass absolute right-0 top-[58px] z-50 w-[min(460px,calc(100vw-32px))] overflow-hidden rounded-[28px] border">
                 <div className="flex items-start justify-between gap-3 border-b border-black/5 p-5">
                   <div>
                     <h2 className="text-base font-bold tracking-[-0.02em] text-[#1d1d1f]">

@@ -5,11 +5,11 @@ type ButtonVariant = 'default' | 'outline' | 'secondary' | 'ghost' | 'destructiv
 type ButtonSize = 'default' | 'xs' | 'sm' | 'lg' | 'icon' | 'icon-xs' | 'icon-sm' | 'icon-lg'
 
 const variantClasses: Record<ButtonVariant, string> = {
-  default: 'bg-[#17181b] text-white shadow-[0_8px_20px_rgba(15,23,42,.12)] hover:bg-black hover:shadow-[0_10px_24px_rgba(15,23,42,.16)]',
-  outline: 'border border-black/[0.08] bg-white text-[#25272c] shadow-sm hover:bg-[#f7f8fa]',
-  secondary: 'bg-[#eef1f5] text-[#25272c] hover:bg-[#e7eaf0]',
-  ghost: 'bg-transparent text-[#25272c] hover:bg-black/[0.045]',
-  destructive: 'border border-red-100 bg-red-50 text-red-700 hover:bg-red-100',
+  default: 'harmony-button-native bg-[#17181b] text-white hover:bg-black',
+  outline: 'harmony-button-native harmony-button-native-outline text-[#25272c] hover:bg-white/80',
+  secondary: 'harmony-button-native harmony-button-native-secondary text-[#25272c] hover:bg-white/70',
+  ghost: 'text-[#25272c] hover:bg-white/45',
+  destructive: 'harmony-button-native border border-red-100/80 bg-red-50/75 text-red-700 hover:bg-red-100/85',
   link: 'bg-transparent text-blue-600 underline-offset-4 hover:underline',
 }
 

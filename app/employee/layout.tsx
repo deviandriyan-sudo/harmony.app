@@ -119,7 +119,7 @@ export default function EmployeeLayout({ children }: { children: React.ReactNode
   }
 
   return (
-    <div className="min-h-screen overflow-x-hidden bg-[#f5f5f7]">
+    <div className="harmony-shell min-h-screen overflow-x-hidden">
       <div className="flex min-h-screen w-full overflow-x-hidden">
         <div className="hidden lg:block">
           <AppSidebar
@@ -151,10 +151,10 @@ export default function EmployeeLayout({ children }: { children: React.ReactNode
         )}
 
         <main className="min-w-0 flex-1 overflow-x-hidden">
-          <div className="sticky top-0 z-40 border-b border-black/5 bg-[#f5f5f7]/90 px-4 py-3 backdrop-blur-xl lg:hidden">
+          <div className="harmony-mobile-topbar sticky top-0 z-40 border-b px-4 py-3 lg:hidden">
             <div className="flex items-center justify-between gap-3">
-              <button type="button" onClick={() => setMobileSidebarOpen(true)} className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white text-[#1d1d1f] shadow-sm" aria-label="Buka menu"><Menu size={22} /></button>
-              <div className="flex min-w-0 flex-1 items-center gap-3 rounded-2xl bg-white px-3 py-2 shadow-sm">
+              <button type="button" onClick={() => setMobileSidebarOpen(true)} className="harmony-mobile-glass flex h-11 w-11 items-center justify-center rounded-2xl text-[#1d1d1f]" aria-label="Buka menu"><Menu size={22} /></button>
+              <div className="harmony-mobile-brand flex min-w-0 flex-1 items-center gap-3 rounded-2xl px-3 py-2">
                 <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-black/5 bg-white">
                   <Image src="/logo.png" alt="HARMONY Logo" width={30} height={30} className="h-7 w-7 object-contain" priority />
                 </div>

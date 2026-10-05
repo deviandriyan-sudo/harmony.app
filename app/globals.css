@@ -489,128 +489,325 @@ button:disabled {
 }
 
 /* =========================================================
-   HARMONY VISUAL SYSTEM V2.5
-   Unified surfaces · compact controls · calm variation
+   HARMONY LIQUID GLASS SYSTEM V2.6
+   Stronger Apple-inspired glass · layered depth · restrained color
 ========================================================= */
 
 :root {
-  --harmony-ink: #17181b;
-  --harmony-ink-soft: #22252b;
-  --harmony-panel: rgba(255, 255, 255, 0.88);
-  --harmony-panel-strong: #ffffff;
-  --harmony-line: rgba(20, 24, 31, 0.075);
-  --harmony-line-strong: rgba(20, 24, 31, 0.12);
+  --harmony-ink: #16181d;
+  --harmony-ink-soft: #272b33;
+  --harmony-line: rgba(40, 48, 62, 0.075);
+  --harmony-line-strong: rgba(40, 48, 62, 0.13);
   --harmony-blue-2: #3b82f6;
-  --harmony-indigo: #6d5dfc;
-  --harmony-teal: #0f9f86;
-  --harmony-amber: #d97706;
-  --harmony-workspace-bg: #f4f6f9;
+  --harmony-indigo: #7167f9;
+  --harmony-teal: #11a88b;
+  --harmony-amber: #d98913;
+  --harmony-workspace-bg: #eef3f9;
+
+  --glass-white: rgba(255, 255, 255, 0.58);
+  --glass-white-strong: rgba(255, 255, 255, 0.72);
+  --glass-white-soft: rgba(255, 255, 255, 0.42);
+  --glass-border: rgba(255, 255, 255, 0.72);
+  --glass-border-soft: rgba(255, 255, 255, 0.50);
+  --glass-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.90) inset,
+    0 -1px 0 rgba(255, 255, 255, 0.25) inset,
+    0 0 0 1px rgba(44, 55, 74, 0.045),
+    0 18px 48px rgba(58, 72, 96, 0.11),
+    0 3px 10px rgba(58, 72, 96, 0.05);
+  --glass-shadow-hover:
+    0 1px 0 rgba(255, 255, 255, 0.94) inset,
+    0 -1px 0 rgba(255, 255, 255, 0.30) inset,
+    0 0 0 1px rgba(44, 55, 74, 0.055),
+    0 26px 64px rgba(58, 72, 96, 0.145),
+    0 7px 16px rgba(58, 72, 96, 0.065);
+}
+
+body {
+  background:
+    radial-gradient(circle at 8% -8%, rgba(83, 153, 255, 0.24), transparent 30%),
+    radial-gradient(circle at 93% 2%, rgba(142, 117, 255, 0.18), transparent 30%),
+    radial-gradient(circle at 70% 108%, rgba(49, 202, 161, 0.14), transparent 34%),
+    linear-gradient(145deg, #f7f9fc 0%, #eef3f9 48%, #f4f2fb 100%);
+  background-attachment: fixed;
+}
+
+.harmony-shell {
+  background:
+    radial-gradient(circle at 4% 3%, rgba(74, 144, 246, 0.14), transparent 27%),
+    radial-gradient(circle at 96% 9%, rgba(124, 100, 246, 0.12), transparent 30%),
+    linear-gradient(145deg, #f4f7fb 0%, #edf2f8 56%, #f5f3fa 100%);
 }
 
 .harmony-workspace {
+  position: relative;
+  isolation: isolate;
   min-height: 100%;
+  overflow: hidden;
   background:
-    radial-gradient(circle at 8% 0%, rgba(59, 130, 246, 0.055), transparent 26%),
-    radial-gradient(circle at 92% 8%, rgba(109, 93, 252, 0.045), transparent 28%),
-    radial-gradient(circle at 62% 100%, rgba(15, 159, 134, 0.035), transparent 30%),
-    var(--harmony-workspace-bg);
+    radial-gradient(circle at 8% 0%, rgba(79, 149, 255, 0.16), transparent 26%),
+    radial-gradient(circle at 92% 9%, rgba(126, 105, 246, 0.13), transparent 29%),
+    radial-gradient(circle at 62% 104%, rgba(24, 184, 147, 0.10), transparent 32%),
+    linear-gradient(148deg, rgba(249, 251, 254, 0.96), rgba(237, 243, 249, 0.94) 56%, rgba(246, 243, 251, 0.96));
+}
+
+.harmony-workspace::before,
+.harmony-workspace::after {
+  content: '';
+  position: fixed;
+  z-index: 0;
+  border-radius: 999px;
+  pointer-events: none;
+  filter: blur(18px);
+  opacity: 0.72;
+}
+
+.harmony-workspace::before {
+  top: 8vh;
+  right: 5vw;
+  width: min(34vw, 520px);
+  height: min(34vw, 520px);
+  background: radial-gradient(circle, rgba(114, 153, 255, 0.18), rgba(118, 102, 246, 0.08) 48%, transparent 72%);
+}
+
+.harmony-workspace::after {
+  bottom: 2vh;
+  left: 18vw;
+  width: min(32vw, 480px);
+  height: min(32vw, 480px);
+  background: radial-gradient(circle, rgba(40, 196, 158, 0.12), rgba(72, 166, 255, 0.07) 48%, transparent 72%);
 }
 
 .harmony-workspace > * {
   position: relative;
+  z-index: 1;
 }
 
-.harmony-workspace .harmony-card,
-.harmony-workspace .harmony-card-solid,
-.harmony-workspace .harmony-card-soft {
-  border-color: var(--harmony-line);
-  box-shadow:
-    0 1px 1px rgba(15, 23, 42, 0.025),
-    0 12px 32px rgba(15, 23, 42, 0.055);
-}
+/* ------------------------- Core liquid-glass surfaces ---------------------- */
 
-.harmony-workspace .harmony-card {
+.harmony-card,
+.harmony-card-solid,
+.harmony-card-soft,
+.harmony-unified-surface,
+.harmony-metric-card {
+  border-color: var(--glass-border) !important;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.93), rgba(251, 252, 254, 0.88));
+    linear-gradient(145deg, rgba(255, 255, 255, 0.73), rgba(255, 255, 255, 0.48)) !important;
+  box-shadow: var(--glass-shadow) !important;
+  backdrop-filter: blur(34px) saturate(175%) contrast(102%);
+  -webkit-backdrop-filter: blur(34px) saturate(175%) contrast(102%);
 }
 
-.harmony-workspace .harmony-glass-dark {
-  background:
-    radial-gradient(circle at 100% 0%, rgba(59, 130, 246, 0.34), transparent 32%),
-    radial-gradient(circle at 0% 100%, rgba(15, 159, 134, 0.20), transparent 34%),
-    linear-gradient(135deg, #17181b 0%, #202329 55%, #18243a 100%);
-  border-color: rgba(255, 255, 255, 0.10);
-  box-shadow: 0 24px 64px rgba(15, 23, 42, 0.16);
+.harmony-card,
+.harmony-card-solid,
+.harmony-card-soft,
+.harmony-unified-surface,
+.harmony-metric-card,
+.harmony-unified-toolbar,
+.harmony-subtle-panel {
+  position: relative;
 }
 
-.harmony-workspace input:not([type='checkbox']):not([type='radio']):not([type='file']),
-.harmony-workspace select,
-.harmony-workspace textarea {
-  border-color: rgba(20, 24, 31, 0.09);
-  background-color: rgba(255, 255, 255, 0.90);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.70);
+.harmony-card,
+.harmony-card-solid,
+.harmony-card-soft {
+  border-radius: 28px;
 }
 
-.harmony-workspace input:not([type='checkbox']):not([type='radio']):not([type='file']):focus,
-.harmony-workspace select:focus,
-.harmony-workspace textarea:focus {
-  border-color: rgba(59, 130, 246, 0.55);
-  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.10);
+.harmony-card:hover,
+.harmony-card-solid:hover,
+.harmony-card-soft:hover,
+.harmony-metric-card:hover {
+  border-color: rgba(255, 255, 255, 0.92) !important;
 }
 
-.harmony-workspace table {
-  border-color: var(--harmony-line);
-}
-
-.harmony-workspace table thead {
-  background: #f6f7f9;
-}
-
-.harmony-workspace table tbody tr {
-  transition: background-color 160ms ease, transform 160ms ease;
-}
-
-.harmony-workspace table tbody tr:hover {
-  background: #fafbfc;
+.harmony-glass {
+  border: 1px solid rgba(255, 255, 255, 0.74);
+  background: linear-gradient(145deg, rgba(255,255,255,.66), rgba(255,255,255,.42));
+  box-shadow: var(--glass-shadow);
+  backdrop-filter: blur(38px) saturate(185%);
+  -webkit-backdrop-filter: blur(38px) saturate(185%);
 }
 
 .harmony-unified-surface {
   overflow: hidden;
-  border: 1px solid var(--harmony-line);
-  border-radius: 26px;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(251, 252, 254, 0.91));
-  box-shadow:
-    0 1px 1px rgba(15, 23, 42, 0.025),
-    0 14px 38px rgba(15, 23, 42, 0.055);
+  border-radius: 28px;
 }
 
 .harmony-unified-toolbar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  border: 1px solid var(--harmony-line);
+  border: 1px solid rgba(255, 255, 255, 0.72);
   border-radius: 22px;
-  background: rgba(255, 255, 255, 0.86);
-  padding: 10px;
-  box-shadow: 0 8px 26px rgba(15, 23, 42, 0.045);
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
+  background:
+    linear-gradient(145deg, rgba(255,255,255,.66), rgba(255,255,255,.43));
+  padding: 9px;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.9),
+    0 0 0 1px rgba(44,55,74,.035),
+    0 12px 34px rgba(58,72,96,.085);
+  backdrop-filter: blur(30px) saturate(180%);
+  -webkit-backdrop-filter: blur(30px) saturate(180%);
+}
+
+.harmony-subtle-panel {
+  border: 1px solid rgba(255,255,255,.64);
+  border-radius: 21px;
+  background: linear-gradient(145deg, rgba(248,250,253,.66), rgba(255,255,255,.40));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.82), 0 8px 22px rgba(58,72,96,.045);
+  backdrop-filter: blur(24px) saturate(150%);
+  -webkit-backdrop-filter: blur(24px) saturate(150%);
+}
+
+/* Make legacy white utility surfaces participate in the same glass language. */
+.harmony-workspace .bg-white {
+  background-color: rgba(255,255,255,.63) !important;
+  backdrop-filter: blur(28px) saturate(170%);
+  -webkit-backdrop-filter: blur(28px) saturate(170%);
+}
+
+.harmony-workspace [class*='bg-white/'] {
+  backdrop-filter: blur(28px) saturate(170%);
+  -webkit-backdrop-filter: blur(28px) saturate(170%);
+}
+
+/* ------------------------- Metrics ----------------------------------------- */
+
+.harmony-metric-card {
+  overflow: hidden;
+  border-radius: 25px;
+  transition: transform 220ms cubic-bezier(.2,.8,.2,1), box-shadow 220ms ease, border-color 220ms ease;
+}
+
+.harmony-metric-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 12% 0%, rgba(255,255,255,.76), transparent 34%),
+    radial-gradient(circle at 100% 100%, rgba(83,153,255,.065), transparent 38%);
+  opacity: .9;
+}
+
+.harmony-metric-card::after {
+  content: '';
+  position: absolute;
+  inset: auto 20px 0 20px;
+  height: 2px;
+  border-radius: 999px 999px 0 0;
+  background: linear-gradient(90deg, transparent, rgba(74,136,255,.48), rgba(126,105,246,.33), transparent);
+  opacity: .8;
+}
+
+.harmony-metric-card > * {
+  position: relative;
+  z-index: 1;
+}
+
+.harmony-metric-card:hover {
+  transform: translateY(-3px) scale(1.003);
+  box-shadow: var(--glass-shadow-hover) !important;
+}
+
+/* ------------------------- Deep glass hero --------------------------------- */
+
+.harmony-glass-dark,
+.harmony-hero-v25 {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,.20) !important;
+  background:
+    radial-gradient(circle at 95% 0%, rgba(74,145,255,.34), transparent 31%),
+    radial-gradient(circle at 0% 100%, rgba(45,203,162,.21), transparent 34%),
+    linear-gradient(135deg, rgba(20,24,31,.91), rgba(29,34,43,.82) 53%, rgba(26,42,65,.84)) !important;
+  color: white;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.22),
+    inset 0 -1px 0 rgba(255,255,255,.04),
+    0 30px 80px rgba(30,42,63,.20) !important;
+  backdrop-filter: blur(42px) saturate(165%);
+  -webkit-backdrop-filter: blur(42px) saturate(165%);
+}
+
+.harmony-glass-dark::before,
+.harmony-hero-v25::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  left: -10%;
+  right: -10%;
+  top: -56%;
+  height: 72%;
+  border-radius: 50%;
+  background: linear-gradient(180deg, rgba(255,255,255,.20), transparent);
+  filter: blur(8px);
+}
+
+.harmony-hero-v25[data-accent='remed'] {
+  background:
+    radial-gradient(circle at 96% 4%, rgba(45,203,162,.32), transparent 31%),
+    radial-gradient(circle at 5% 100%, rgba(75,147,255,.23), transparent 36%),
+    linear-gradient(135deg, rgba(15,32,27,.92), rgba(25,39,35,.83) 52%, rgba(16,57,45,.86)) !important;
+}
+
+/* ------------------------- Buttons & segmented actions --------------------- */
+
+.harmony-button-primary,
+.harmony-button-blue,
+.harmony-button-secondary,
+.harmony-action-group > a,
+.harmony-action-group > button {
+  position: relative;
+  overflow: hidden;
+}
+
+.harmony-button-primary {
+  border: 1px solid rgba(255,255,255,.13);
+  background: linear-gradient(180deg, rgba(37,40,47,.96), rgba(13,15,19,.96));
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.17),
+    0 10px 25px rgba(26,32,43,.18);
+}
+
+.harmony-button-primary:hover {
+  background: linear-gradient(180deg, #2c3038, #050608);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.20), 0 14px 34px rgba(26,32,43,.23);
+}
+
+.harmony-button-blue {
+  border: 1px solid rgba(255,255,255,.26);
+  background: linear-gradient(180deg, #1585ff, #0874e8);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.28), 0 12px 27px rgba(0,122,255,.24);
+}
+
+.harmony-button-secondary {
+  border: 1px solid rgba(255,255,255,.78);
+  background: linear-gradient(145deg, rgba(255,255,255,.70), rgba(255,255,255,.46));
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.95),
+    0 0 0 1px rgba(44,55,74,.04),
+    0 8px 20px rgba(58,72,96,.07);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+}
+
+.harmony-button-secondary:hover {
+  border-color: rgba(255,255,255,.95);
+  background: rgba(255,255,255,.78);
+  box-shadow: var(--glass-shadow);
 }
 
 .harmony-action-group {
-  display: inline-flex;
-  min-width: 0;
-  align-items: stretch;
-  gap: 1px;
-  overflow: hidden;
-  border: 1px solid var(--harmony-line);
-  border-radius: 17px;
-  background: #eef0f3;
-  padding: 2px;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,.78);
+  border: 1px solid rgba(255,255,255,.66);
+  border-radius: 18px;
+  background: rgba(230,235,243,.52);
+  padding: 3px;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.86),
+    0 0 0 1px rgba(44,55,74,.035),
+    0 8px 22px rgba(58,72,96,.065);
+  backdrop-filter: blur(26px) saturate(170%);
+  -webkit-backdrop-filter: blur(26px) saturate(170%);
 }
 
 .harmony-action-group > a,
@@ -621,109 +818,330 @@ button:disabled {
   box-shadow: none !important;
 }
 
-.harmony-action-group > a:not(:first-child),
-.harmony-action-group > button:not(:first-child) {
-  margin-left: 0;
-}
-
 .harmony-action-primary {
-  background: var(--harmony-ink) !important;
-  color: white !important;
-}
-
-.harmony-action-primary:hover {
-  background: #050506 !important;
+  background: linear-gradient(180deg, #2b2e35, #111318) !important;
+  color: #fff !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.16) !important;
 }
 
 .harmony-action-soft {
-  background: rgba(255, 255, 255, 0.92) !important;
+  background: rgba(255,255,255,.58) !important;
   color: #30343a !important;
 }
 
 .harmony-action-soft:hover {
-  background: white !important;
+  background: rgba(255,255,255,.86) !important;
 }
 
 .harmony-action-info {
-  background: #eaf2ff !important;
+  background: rgba(229,240,255,.75) !important;
   color: #245ea9 !important;
 }
 
 .harmony-action-danger {
-  background: #fff0f0 !important;
+  background: rgba(255,237,237,.79) !important;
   color: #c33030 !important;
 }
 
-.harmony-metric-card {
-  position: relative;
-  overflow: hidden;
-  border: 1px solid var(--harmony-line);
-  border-radius: 24px;
-  background: rgba(255, 255, 255, 0.91);
-  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.045);
-  transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
+/* ------------------------- Inputs ------------------------------------------ */
+
+.harmony-workspace input:not([type='checkbox']):not([type='radio']):not([type='file']),
+.harmony-workspace select,
+.harmony-workspace textarea,
+.harmony-input,
+.harmony-select,
+.harmony-textarea {
+  border-color: rgba(255,255,255,.76) !important;
+  background: linear-gradient(145deg, rgba(255,255,255,.67), rgba(255,255,255,.47)) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.92),
+    0 0 0 1px rgba(44,55,74,.045),
+    0 7px 19px rgba(58,72,96,.055);
+  backdrop-filter: blur(22px) saturate(165%);
+  -webkit-backdrop-filter: blur(22px) saturate(165%);
 }
 
-.harmony-metric-card::after {
-  content: '';
-  position: absolute;
-  inset: auto 18px 0 18px;
-  height: 2px;
-  border-radius: 999px 999px 0 0;
-  background: linear-gradient(90deg, transparent, rgba(59,130,246,.42), transparent);
-  opacity: .7;
+.harmony-workspace input:not([type='checkbox']):not([type='radio']):not([type='file']):focus,
+.harmony-workspace select:focus,
+.harmony-workspace textarea:focus,
+.harmony-input:focus,
+.harmony-select:focus,
+.harmony-textarea:focus {
+  border-color: rgba(105,164,255,.80) !important;
+  background: rgba(255,255,255,.78) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.96),
+    0 0 0 4px rgba(56,132,255,.12),
+    0 10px 26px rgba(58,72,96,.08) !important;
 }
 
-.harmony-metric-card:hover {
-  transform: translateY(-2px);
-  border-color: var(--harmony-line-strong);
-  box-shadow: 0 16px 38px rgba(15, 23, 42, 0.07);
+/* ------------------------- Tables ------------------------------------------ */
+
+.harmony-workspace table {
+  border-color: rgba(54,63,78,.06);
 }
 
-.harmony-hero-v25 {
-  position: relative;
-  overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.10);
-  border-radius: 30px;
+.harmony-workspace table thead,
+.harmony-table thead {
+  background: rgba(239,243,248,.56) !important;
+  backdrop-filter: blur(20px) saturate(150%);
+  -webkit-backdrop-filter: blur(20px) saturate(150%);
+}
+
+.harmony-workspace table tbody tr,
+.harmony-table tbody tr {
+  transition: background-color 160ms ease, transform 160ms ease;
+}
+
+.harmony-workspace table tbody tr:hover,
+.harmony-table tbody tr:hover {
+  background: rgba(255,255,255,.45) !important;
+}
+
+/* ------------------------- Sidebar ----------------------------------------- */
+
+.harmony-sidebar-shell {
+  border-right: 0 !important;
+  background: transparent !important;
+}
+
+.harmony-sidebar-panel {
+  border: 1px solid rgba(255,255,255,.70) !important;
   background:
-    radial-gradient(circle at 96% 6%, rgba(59,130,246,.30), transparent 28%),
-    radial-gradient(circle at 4% 100%, rgba(15,159,134,.18), transparent 32%),
-    linear-gradient(135deg, #17181b 0%, #202329 58%, #17263d 100%);
-  color: white;
-  box-shadow: 0 24px 68px rgba(15,23,42,.15);
+    linear-gradient(155deg, rgba(255,255,255,.66), rgba(247,249,253,.43)) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.96),
+    inset 0 -1px 0 rgba(255,255,255,.26),
+    0 0 0 1px rgba(44,55,74,.045),
+    0 22px 58px rgba(58,72,96,.13) !important;
+  backdrop-filter: blur(38px) saturate(190%) !important;
+  -webkit-backdrop-filter: blur(38px) saturate(190%) !important;
 }
 
-.harmony-hero-v25[data-accent='remed'] {
+.harmony-sidebar-header,
+.harmony-sidebar-footer {
+  border-color: rgba(74,83,100,.07) !important;
+}
+
+.harmony-logo-glass {
+  border-color: rgba(255,255,255,.78) !important;
+  background: rgba(255,255,255,.62) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.96), 0 12px 30px rgba(58,72,96,.10) !important;
+  backdrop-filter: blur(24px) saturate(170%);
+  -webkit-backdrop-filter: blur(24px) saturate(170%);
+}
+
+.harmony-sidebar-user {
+  border: 1px solid rgba(255,255,255,.70) !important;
   background:
-    radial-gradient(circle at 96% 6%, rgba(52,199,89,.24), transparent 30%),
-    radial-gradient(circle at 0% 100%, rgba(0,122,255,.18), transparent 34%),
-    linear-gradient(135deg, #14211c 0%, #1d2421 52%, #153329 100%);
+    radial-gradient(circle at 0 0, rgba(255,255,255,.82), transparent 48%),
+    linear-gradient(145deg, rgba(255,255,255,.54), rgba(235,240,248,.40)) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.88), 0 10px 28px rgba(58,72,96,.07);
+  backdrop-filter: blur(28px) saturate(175%);
+  -webkit-backdrop-filter: blur(28px) saturate(175%);
 }
 
-.harmony-subtle-panel {
-  border: 1px solid var(--harmony-line);
-  border-radius: 20px;
-  background: rgba(246, 247, 249, 0.78);
+.harmony-secure-pill {
+  border-color: rgba(255,255,255,.82) !important;
+  background: rgba(255,255,255,.62) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.92), 0 6px 14px rgba(58,72,96,.055) !important;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
 }
 
-.harmony-section-title {
-  color: #17181b;
-  font-size: 1.05rem;
-  font-weight: 750;
-  letter-spacing: -0.015em;
+.harmony-nav-item:not(.harmony-nav-active) {
+  border: 1px solid transparent;
 }
 
-.harmony-section-copy {
-  margin-top: 4px;
-  color: #747982;
-  font-size: .83rem;
-  line-height: 1.55;
+.harmony-nav-item:not(.harmony-nav-active):hover {
+  border-color: rgba(255,255,255,.74);
+  background: rgba(255,255,255,.50) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.90), 0 8px 22px rgba(58,72,96,.07) !important;
+  backdrop-filter: blur(22px) saturate(170%);
+  -webkit-backdrop-filter: blur(22px) saturate(170%);
 }
 
-.harmony-workspace .rounded-\[28px\][class*='bg-white'],
-.harmony-workspace .rounded-\[26px\][class*='bg-white'],
-.harmony-workspace .rounded-\[24px\][class*='bg-white'] {
-  border-color: var(--harmony-line);
+.harmony-nav-active {
+  border: 1px solid rgba(255,255,255,.16);
+  background:
+    radial-gradient(circle at 90% 0%, rgba(80,144,255,.20), transparent 40%),
+    linear-gradient(145deg, rgba(29,33,40,.96), rgba(14,16,20,.93)) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.15),
+    0 12px 29px rgba(31,38,52,.20) !important;
+}
+
+.harmony-nav-active.harmony-nav-remed {
+  background:
+    radial-gradient(circle at 90% 0%, rgba(43,201,159,.22), transparent 40%),
+    linear-gradient(145deg, rgba(24,39,34,.97), rgba(12,23,20,.94)) !important;
+}
+
+.harmony-nav-icon {
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.70);
+}
+
+.harmony-logout {
+  border-color: rgba(255,255,255,.74) !important;
+  background: rgba(255,255,255,.54) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.92), 0 8px 20px rgba(58,72,96,.06) !important;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+/* ------------------------- Topbar & popovers ------------------------------- */
+
+.harmony-topbar {
+  border-color: rgba(66,76,94,.06) !important;
+  background: rgba(242,246,251,.54) !important;
+  box-shadow: 0 1px 0 rgba(255,255,255,.65), 0 12px 34px rgba(58,72,96,.055);
+  backdrop-filter: blur(34px) saturate(190%) !important;
+  -webkit-backdrop-filter: blur(34px) saturate(190%) !important;
+}
+
+.harmony-topbar-badge,
+.harmony-topbar-search,
+.harmony-topbar-action {
+  border-color: rgba(255,255,255,.76) !important;
+  background: rgba(255,255,255,.56) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.94), 0 8px 20px rgba(58,72,96,.065) !important;
+  backdrop-filter: blur(22px) saturate(170%);
+  -webkit-backdrop-filter: blur(22px) saturate(170%);
+}
+
+.harmony-topbar-search:focus-within,
+.harmony-topbar-action:hover {
+  background: rgba(255,255,255,.76) !important;
+  box-shadow: var(--glass-shadow) !important;
+}
+
+.harmony-popover-glass {
+  border: 1px solid rgba(255,255,255,.80) !important;
+  background: rgba(249,251,254,.70) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.96), 0 28px 88px rgba(44,55,74,.20) !important;
+  backdrop-filter: blur(40px) saturate(185%) !important;
+  -webkit-backdrop-filter: blur(40px) saturate(185%) !important;
+}
+
+/* ------------------------- Mobile shell ------------------------------------ */
+
+.harmony-mobile-topbar {
+  border-color: rgba(66,76,94,.06) !important;
+  background: rgba(242,246,251,.55) !important;
+  box-shadow: 0 8px 26px rgba(58,72,96,.055);
+  backdrop-filter: blur(30px) saturate(185%) !important;
+  -webkit-backdrop-filter: blur(30px) saturate(185%) !important;
+}
+
+.harmony-mobile-glass,
+.harmony-mobile-brand {
+  border: 1px solid rgba(255,255,255,.76) !important;
+  background: rgba(255,255,255,.58) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.94), 0 8px 22px rgba(58,72,96,.07) !important;
+  backdrop-filter: blur(22px) saturate(170%);
+  -webkit-backdrop-filter: blur(22px) saturate(170%);
+}
+
+/* ------------------------- Login ------------------------------------------- */
+
+.harmony-login-bg {
+  background:
+    radial-gradient(circle at 10% 0%, rgba(61,145,255,.30), transparent 31%),
+    radial-gradient(circle at 93% 8%, rgba(139,111,255,.25), transparent 33%),
+    radial-gradient(circle at 75% 100%, rgba(43,203,162,.16), transparent 35%),
+    linear-gradient(145deg, #eff5fb, #f6f5fb 52%, #edf5f4) !important;
+}
+
+.harmony-login-shell {
+  border: 1px solid rgba(255,255,255,.74) !important;
+  background: rgba(255,255,255,.50) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.96),
+    0 0 0 1px rgba(44,55,74,.045),
+    0 38px 110px rgba(49,65,89,.20) !important;
+  backdrop-filter: blur(42px) saturate(190%) !important;
+  -webkit-backdrop-filter: blur(42px) saturate(190%) !important;
+}
+
+.harmony-login-dark {
+  background:
+    radial-gradient(circle at 5% 0%, rgba(80,145,255,.32), transparent 35%),
+    radial-gradient(circle at 100% 100%, rgba(48,202,160,.19), transparent 42%),
+    linear-gradient(145deg, rgba(20,24,31,.94), rgba(26,31,39,.88)) !important;
+  box-shadow: inset -1px 0 0 rgba(255,255,255,.07);
+}
+
+.harmony-login-feature {
+  border-color: rgba(255,255,255,.14) !important;
+  background: rgba(255,255,255,.085) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.10);
+  backdrop-filter: blur(22px) saturate(135%);
+  -webkit-backdrop-filter: blur(22px) saturate(135%);
+}
+
+.harmony-login-field {
+  border-color: rgba(255,255,255,.78) !important;
+  background: rgba(255,255,255,.52) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.94), 0 8px 22px rgba(58,72,96,.06);
+  backdrop-filter: blur(20px) saturate(165%);
+  -webkit-backdrop-filter: blur(20px) saturate(165%);
+}
+
+.harmony-login-google {
+  border-color: rgba(255,255,255,.84) !important;
+  background: rgba(255,255,255,.64) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.96), 0 10px 24px rgba(58,72,96,.075) !important;
+  backdrop-filter: blur(22px) saturate(170%);
+  -webkit-backdrop-filter: blur(22px) saturate(170%);
+}
+
+/* ------------------------- Native Button component ------------------------- */
+
+.harmony-button-native {
+  border: 1px solid rgba(255,255,255,.68);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.18), 0 8px 20px rgba(58,72,96,.08);
+}
+
+.harmony-button-native-outline {
+  border-color: rgba(255,255,255,.78) !important;
+  background: rgba(255,255,255,.58) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.95), 0 7px 18px rgba(58,72,96,.06) !important;
+  backdrop-filter: blur(20px) saturate(170%);
+  -webkit-backdrop-filter: blur(20px) saturate(170%);
+}
+
+.harmony-button-native-secondary {
+  border-color: rgba(255,255,255,.64) !important;
+  background: rgba(229,235,243,.58) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.80) !important;
+  backdrop-filter: blur(18px) saturate(155%);
+  -webkit-backdrop-filter: blur(18px) saturate(155%);
+}
+
+/* ------------------------- Motion & responsive ----------------------------- */
+
+.harmony-hover-lift {
+  transition: transform 220ms cubic-bezier(.2,.8,.2,1), box-shadow 220ms ease, border-color 220ms ease;
+}
+
+.harmony-hover-lift:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--glass-shadow-hover);
+  border-color: rgba(255,255,255,.92);
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .harmony-card,
+  .harmony-card-solid,
+  .harmony-card-soft,
+  .harmony-unified-surface,
+  .harmony-metric-card,
+  .harmony-unified-toolbar,
+  .harmony-sidebar-panel,
+  .harmony-topbar,
+  .harmony-login-shell {
+    background: rgba(255,255,255,.94) !important;
+  }
 }
 
 @media (max-width: 1024px) {
@@ -735,5 +1153,64 @@ button:disabled {
   .harmony-action-group > a,
   .harmony-action-group > button {
     flex: 1 1 0%;
+  }
+}
+
+@media (max-width: 768px) {
+  .harmony-section {
+    padding: 16px;
+  }
+
+  .harmony-card,
+  .harmony-card-solid,
+  .harmony-card-soft,
+  .harmony-unified-surface,
+  .harmony-metric-card {
+    border-radius: 22px;
+    backdrop-filter: blur(26px) saturate(165%);
+    -webkit-backdrop-filter: blur(26px) saturate(165%);
+  }
+
+  .harmony-workspace::before,
+  .harmony-workspace::after {
+    opacity: .46;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .harmony-hover-lift,
+  .harmony-metric-card,
+  .harmony-nav-item,
+  .harmony-button-primary,
+  .harmony-button-secondary,
+  .harmony-button-blue {
+    transition: none !important;
+  }
+}
+
+/* Page roots stay transparent so the liquid background remains visible. */
+.harmony-page-bg,
+.harmony-page,
+.harmony-workspace > .min-h-screen {
+  background-color: transparent !important;
+  background-image: none !important;
+}
+
+@media print {
+  .harmony-workspace,
+  .harmony-page-bg,
+  .harmony-page {
+    background: #fff !important;
+  }
+
+  .harmony-workspace::before,
+  .harmony-workspace::after {
+    display: none !important;
+  }
+
+  .harmony-workspace .bg-white {
+    background: #fff !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
   }
 }

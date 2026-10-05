@@ -71,11 +71,11 @@ export function AppSidebar({
   }
 
   return (
-    <aside className="flex h-screen w-[272px] max-w-[86vw] shrink-0 flex-col border-r border-black/[0.045] bg-[#f4f6f9] px-3 py-3 sm:px-3.5 sm:py-3.5">
-      <div className="flex h-full flex-col overflow-hidden rounded-[28px] border border-black/[0.055] bg-white/90 shadow-[0_16px_48px_rgba(15,23,42,0.075)] backdrop-blur-xl">
-        <div className="border-b border-black/[0.055] px-4 py-4">
+    <aside className="harmony-sidebar-shell flex h-screen w-[272px] max-w-[86vw] shrink-0 flex-col px-3 py-3 sm:px-3.5 sm:py-3.5">
+      <div className="harmony-sidebar-panel flex h-full flex-col overflow-hidden rounded-[30px]">
+        <div className="harmony-sidebar-header border-b px-4 py-4">
           <div className="flex items-start gap-3">
-            <div className="flex h-[52px] w-[52px] shrink-0 items-center justify-center overflow-hidden rounded-[17px] border border-black/[0.055] bg-white shadow-[0_6px_20px_rgba(15,23,42,0.06)]">
+            <div className="harmony-logo-glass flex h-[52px] w-[52px] shrink-0 items-center justify-center overflow-hidden rounded-[17px] border">
               <Image src={logoSrc} alt="HARMONY Logo" width={42} height={42} className="h-10 w-10 object-contain" priority />
             </div>
             <div className="min-w-0 flex-1 pt-0.5">
@@ -87,7 +87,7 @@ export function AppSidebar({
             </div>
           </div>
 
-          <div className="mt-4 rounded-[20px] border border-black/[0.055] bg-gradient-to-br from-[#f8f9fb] to-[#f2f4f7] p-3">
+          <div className="harmony-sidebar-user mt-4 rounded-[21px] border p-3">
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[14px] bg-[#17181b] text-[12px] font-bold text-white shadow-[0_8px_20px_rgba(15,23,42,.14)]">{getInitials(userName)}</div>
               <div className="min-w-0 flex-1">
@@ -95,7 +95,7 @@ export function AppSidebar({
                 <p className="truncate text-[11px] text-[#737780]">{userRole}</p>
               </div>
             </div>
-            <div className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-emerald-100 bg-white px-2.5 py-1.5 text-[10px] font-bold text-emerald-700 shadow-sm">
+            <div className="harmony-secure-pill mt-3 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-[10px] font-bold text-emerald-700">
               <ShieldCheck size={12} />
               Secure workspace
             </div>
@@ -123,15 +123,14 @@ export function AppSidebar({
                     href={item.href}
                     onClick={onNavigate}
                     className={[
-                      'group relative flex items-center gap-2.5 overflow-hidden rounded-[18px] px-2.5 py-2 transition-all duration-200',
-                      active
-                        ? 'bg-[#17181b] text-white shadow-[0_9px_24px_rgba(15,23,42,0.17)]'
-                        : 'text-[#25272c] hover:bg-white hover:shadow-[0_5px_18px_rgba(15,23,42,0.05)]',
+                      'harmony-nav-item group relative flex items-center gap-2.5 overflow-hidden rounded-[18px] px-2.5 py-2 transition-all duration-200',
+                      active ? 'harmony-nav-active text-white' : 'text-[#25272c]',
+                      isRemed ? 'harmony-nav-remed' : '',
                     ].join(' ')}
                   >
                     {active ? <span className={`absolute inset-y-2 left-0 w-[3px] rounded-r-full ${isRemed ? 'bg-emerald-400' : 'bg-blue-400'}`} /> : null}
                     <div className={[
-                      'flex h-9 w-9 shrink-0 items-center justify-center rounded-[13px] transition',
+                      'harmony-nav-icon flex h-9 w-9 shrink-0 items-center justify-center rounded-[13px] transition',
                       active
                         ? 'bg-white/[0.10] text-white'
                         : isRemed
@@ -152,12 +151,12 @@ export function AppSidebar({
           </nav>
         </div>
 
-        <div className="border-t border-black/[0.055] px-3.5 py-3.5">
+        <div className="harmony-sidebar-footer border-t px-3.5 py-3.5">
           <button
             type="button"
             onClick={handleLogout}
             disabled={loggingOut}
-            className="flex w-full items-center justify-center gap-2 rounded-[17px] border border-black/[0.055] bg-white px-4 py-2.5 text-[13px] font-semibold text-[#25272c] shadow-sm transition hover:border-red-100 hover:bg-red-50 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+            className="harmony-logout flex w-full items-center justify-center gap-2 rounded-[17px] border px-4 py-2.5 text-[13px] font-semibold text-[#25272c] transition hover:border-red-100 hover:bg-red-50/80 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {loggingOut ? <><Loader2 size={15} className="animate-spin text-red-500" />Keluar...</> : <><LogOut size={15} className="text-red-500" />Keluar</>}
           </button>
