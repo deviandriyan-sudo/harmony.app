@@ -1,6 +1,6 @@
 'use client'
 
-import { FormEvent, useEffect, useState } from 'react'
+import { FormEvent, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { FilePlus2, Loader2, Paperclip, Send, X } from 'lucide-react'
 import { RemedPageHeader } from '@/components/remed/RemedPageHeader'
@@ -11,6 +11,7 @@ import type { RemedClaimType, RemedSession } from '@/types/remed'
 
 export default function NewRemedClaimPage() {
   const router = useRouter()
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const [types, setTypes] = useState<RemedClaimType[]>([])
   const [files, setFiles] = useState<File[]>([])
   const [loading, setLoading] = useState(false)
@@ -40,7 +41,51 @@ export default function NewRemedClaimPage() {
   }, [])
 
   function onFiles(input: FileList | null) {
-    setFiles((current) => [...current, ...(input ? Array.from(input) : [])].slice(0, 3))
+    // FileList is a live browser object. Snapshot it before the native input is
+    // cleared, otherwise React's queued state updater can observe an empty list.
+    const selectedFiles = input ? Array.from(input) : []
+    if (!selectedFiles.length) return
+
+    const allowedTypes = new Set([
+      'application/pdf',
+      'image/jpeg',
+      'image/png',
+      'image/webp',
+    ])
+    const maxFileSize = 10 * 1024 * 1024
+
+    const accepted: File[] = []
+    for (const file of selectedFiles) {
+      const extension = file.name.split('.').pop()?.toLowerCase() || ''
+      const typeAllowed = allowedTypes.has(file.type) || ['pdf', 'jpg', 'jpeg', 'png', 'webp'].includes(extension)
+
+      if (!typeAllowed) {
+        setMessage(`Format ${file.name} tidak didukung. Gunakan PDF/JPG/PNG/WEBP.`)
+        continue
+      }
+      if (file.size <= 0) {
+        setMessage(`File ${file.name} kosong atau tidak dapat dibaca.`)
+        continue
+      }
+      if (file.size > maxFileSize) {
+        setMessage(`File ${file.name} melebihi 10 MB.`)
+        continue
+      }
+      accepted.push(file)
+    }
+
+    if (!accepted.length) return
+
+    setFiles((current) => {
+      const remainingSlots = Math.max(0, 3 - current.length)
+      const nextFiles = [...current, ...accepted.slice(0, remainingSlots)]
+      if (accepted.length > remainingSlots) {
+        queueMicrotask(() => setMessage('Maksimal 3 file bukti kuitansi.'))
+      } else {
+        queueMicrotask(() => setMessage(''))
+      }
+      return nextFiles
+    })
   }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -173,10 +218,27 @@ export default function NewRemedClaimPage() {
             <span className="rounded-full bg-[#eef0f3] px-3 py-1 text-xs font-bold text-[#646971]">{files.length}/3</span>
           </div>
 
-          <label className="mt-4 flex cursor-pointer items-center justify-center gap-2 rounded-[20px] border border-dashed border-emerald-200 bg-emerald-50/60 p-5 text-sm font-bold text-emerald-700 transition hover:bg-emerald-50">
-            <Paperclip size={18} /> Pilih File
-            <input type="file" multiple accept="application/pdf,image/jpeg,image/png,image/webp" className="hidden" onChange={(event) => { onFiles(event.target.files); event.currentTarget.value = '' }} disabled={files.length >= 3} />
-          </label>
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            accept="application/pdf,.pdf,image/jpeg,.jpg,.jpeg,image/png,.png,image/webp,.webp"
+            className="sr-only"
+            onChange={(event) => {
+              // Snapshot synchronously before resetting the native input.
+              onFiles(event.currentTarget.files)
+              event.currentTarget.value = ''
+            }}
+            disabled={files.length >= 3}
+          />
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={files.length >= 3}
+            className="mt-4 flex w-full items-center justify-center gap-2 rounded-[20px] border border-dashed border-emerald-200 bg-emerald-50/60 p-5 text-sm font-bold text-emerald-700 transition hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <Paperclip size={18} /> {files.length >= 3 ? 'Maksimal 3 File' : 'Pilih File'}
+          </button>
 
           {files.length ? (
             <div className="mt-3 space-y-2">
