@@ -116,8 +116,6 @@ export default function LoginPage() {
       return
     }
 
-    // Finance Re-Med memakai Supabase Auth HARMONY yang sama, tetapi tidak perlu
-    // diberi role HR/employee pada app_users HARMONY.
     try {
       const result = await remedFetch<{ session: RemedSession }>('/api/remed/session')
       if (result.session.role === 'finance') {
@@ -126,7 +124,7 @@ export default function LoginPage() {
         return
       }
     } catch {
-      // Ditangani oleh pesan akses HARMONY di bawah.
+      // fallback ke pesan error umum
     }
 
     throw new Error('Akun belum terdaftar atau tidak aktif pada HARMONY.')
@@ -199,26 +197,33 @@ export default function LoginPage() {
 
   return (
     <main className="harmony-login-bg relative min-h-screen overflow-hidden px-5 py-6 text-[#1d1d1f]">
-      <div className="pointer-events-none absolute -left-32 -top-32 h-96 w-96 rounded-full bg-[#007aff]/20 blur-3xl" />
-      <div className="pointer-events-none absolute -bottom-36 right-0 h-[30rem] w-[30rem] rounded-full bg-[#af52de]/18 blur-3xl" />
+      <div className="pointer-events-none absolute -left-24 -top-20 h-[26rem] w-[26rem] rounded-full bg-[#4da1ff]/30 blur-[120px]" />
+      <div className="pointer-events-none absolute left-1/2 top-[10%] h-[24rem] w-[24rem] -translate-x-1/2 rounded-full bg-white/20 blur-[140px]" />
+      <div className="pointer-events-none absolute -bottom-32 right-0 h-[32rem] w-[32rem] rounded-full bg-[#8b6fff]/22 blur-[130px]" />
+      <div className="pointer-events-none absolute bottom-0 left-[18%] h-[22rem] w-[22rem] rounded-full bg-[#30caa0]/18 blur-[120px]" />
 
       <section className="relative mx-auto flex min-h-[calc(100vh-48px)] w-full max-w-6xl items-center justify-center">
         <div className="harmony-login-shell grid w-full overflow-hidden rounded-[42px] border lg:grid-cols-[1.05fr_0.95fr]">
           <section className="harmony-login-dark relative hidden min-h-[660px] overflow-hidden p-9 text-white lg:block">
+            <div className="pointer-events-none absolute left-[10%] top-[12%] h-44 w-44 rounded-full bg-[#2d9cff]/22 blur-[80px]" />
+            <div className="pointer-events-none absolute bottom-[18%] right-[8%] h-48 w-48 rounded-full bg-[#34d0a8]/16 blur-[90px]" />
+
             <div className="relative flex h-full flex-col justify-between">
               <div>
-                <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-4 py-2 text-xs font-semibold text-white/70">
+                <div className="inline-flex items-center gap-2 rounded-full border border-white/16 bg-white/10 px-4 py-2 text-xs font-semibold text-white/78 backdrop-blur-xl">
                   <Sparkles size={14} /> Human Attendance, Request, Monitoring & Leave System
                 </div>
 
-                <div className="mt-10 rounded-[34px] border border-white/10 bg-white/[0.07] p-7 backdrop-blur-2xl">
-                  <div className="flex items-center gap-5">
-                    <div className="flex h-24 w-24 items-center justify-center rounded-[32px] bg-white shadow-xl">
-                      <Image src="/logo.png" alt="HARMONY Logo" width={72} height={72} />
-                    </div>
-                    <div>
-                      <h1 className="text-4xl font-semibold">HARMONY</h1>
-                      <p className="mt-3 text-sm text-white/60">Satu akun untuk layanan karyawan, HR, dan Re-Med.</p>
+                <div className="harmony-login-brand-panel mt-8 flex min-h-[360px] flex-col items-center justify-center rounded-[34px] border border-white/14 px-8 py-10 text-center backdrop-blur-3xl">
+                  <p className="text-[12px] font-semibold uppercase tracking-[0.42em] text-white/52">HARMONY</p>
+                  <h1 className="mt-3 max-w-[28rem] text-lg font-medium leading-7 text-white/74">
+                    Human Attendance, Request, Monitoring &amp; Leave System
+                  </h1>
+
+                  <div className="relative mt-10">
+                    <div className="absolute inset-[-18px] rounded-[38px] bg-white/12 blur-2xl" />
+                    <div className="relative flex h-[180px] w-[180px] items-center justify-center rounded-[42px] border border-white/18 bg-white/16 shadow-[0_24px_60px_rgba(11,18,34,0.35)] backdrop-blur-3xl">
+                      <Image src="/logo.png" alt="HARMONY Logo" width={126} height={126} className="object-contain" priority />
                     </div>
                   </div>
                 </div>
@@ -235,15 +240,14 @@ export default function LoginPage() {
           <section className="relative p-6 sm:p-8 md:p-10">
             <div className="mx-auto flex min-h-[660px] max-w-md flex-col justify-center">
               <div className="mb-7">
-                <div className="inline-flex items-center gap-2 rounded-full bg-[#e8f2ff] px-3 py-1.5 text-xs font-bold text-[#0059b8]">
+                <div className="inline-flex items-center gap-2 rounded-full border border-white/45 bg-white/38 px-3 py-1.5 text-xs font-bold text-[#0059b8] shadow-[inset_0_1px_0_rgba(255,255,255,0.85)] backdrop-blur-xl">
                   <Lock size={13} /> Secure Login
                 </div>
                 <h2 className="mt-5 text-3xl font-semibold tracking-tight md:text-4xl">Masuk ke HARMONY</h2>
-                <p className="mt-3 text-sm leading-6 text-[#6e6e73]">Re-Med sudah menjadi bagian dari HARMONY. Tidak ada login Re-Med terpisah.</p>
               </div>
 
               {message && (
-                <div className={`mb-5 rounded-2xl border p-4 text-sm ${messageType === 'info' ? 'border-blue-100 bg-blue-50 text-blue-700' : 'border-red-100 bg-red-50 text-red-700'}`}>
+                <div className={`mb-5 rounded-[24px] border p-4 text-sm backdrop-blur-xl ${messageType === 'info' ? 'border-blue-100/80 bg-blue-50/78 text-blue-700' : 'border-red-100/80 bg-red-50/78 text-red-700'}`}>
                   {message}
                 </div>
               )}
@@ -264,7 +268,7 @@ export default function LoginPage() {
                   <button type="button" onClick={handleForgotPassword} className="text-sm font-semibold text-[#007aff]">Lupa password?</button>
                 </div>
 
-                <button disabled={loading || googleLoading} className="flex min-h-13 w-full items-center justify-center gap-2 rounded-[22px] bg-[#007aff] px-5 text-sm font-bold text-white disabled:opacity-60">
+                <button disabled={loading || googleLoading} className="harmony-login-primary flex min-h-13 w-full items-center justify-center gap-2 rounded-[24px] px-5 text-sm font-bold text-white disabled:opacity-60">
                   {loading ? <Loader2 size={18} className="animate-spin" /> : <ArrowRight size={18} />}
                   {loading ? 'Memproses...' : 'Masuk'}
                 </button>
@@ -276,7 +280,7 @@ export default function LoginPage() {
                 <div className="h-px flex-1 bg-black/10" />
               </div>
 
-              <button onClick={handleGoogleLogin} disabled={loading || googleLoading} className="harmony-login-google flex min-h-13 w-full items-center justify-center gap-3 rounded-[22px] border px-5 text-sm font-bold disabled:opacity-60">
+              <button onClick={handleGoogleLogin} disabled={loading || googleLoading} className="harmony-login-google flex min-h-13 w-full items-center justify-center gap-3 rounded-[24px] border px-5 text-sm font-bold disabled:opacity-60">
                 {googleLoading ? <Loader2 size={18} className="animate-spin" /> : <GoogleIcon />}
                 {googleLoading ? 'Menghubungkan Google...' : 'Masuk dengan Google'}
               </button>
@@ -297,7 +301,7 @@ function Field({ icon, label, children }: { icon: React.ReactNode; label: string
   return (
     <label className="block">
       <span className="text-sm font-semibold">{label}</span>
-      <div className="harmony-login-field mt-2 flex min-h-13 items-center gap-3 rounded-[22px] border px-4 text-[#86868b]">
+      <div className="harmony-login-field mt-2 flex min-h-13 items-center gap-3 rounded-[24px] border px-4 text-[#86868b]">
         {icon}
         {children}
       </div>
@@ -307,7 +311,7 @@ function Field({ icon, label, children }: { icon: React.ReactNode; label: string
 
 function Feature({ icon, title, text }: { icon: React.ReactNode; title: string; text: string }) {
   return (
-    <div className="harmony-login-feature rounded-[24px] border p-4">
+    <div className="harmony-login-feature rounded-[26px] border p-4">
       <div className="flex items-center gap-3">
         <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white/10">{icon}</div>
         <div>
