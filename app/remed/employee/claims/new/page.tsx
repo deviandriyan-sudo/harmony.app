@@ -90,6 +90,12 @@ export default function NewRemedClaimPage() {
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
+
+    // React's currentTarget is only guaranteed during the synchronous event
+    // callback. Capture the form payload before the first await so FormData
+    // never receives a cleared/non-form currentTarget after the upload step.
+    const formData = new FormData(event.currentTarget)
+
     setMessage('')
     if (files.length < 1) {
       setMessage('Minimal 1 bukti kuitansi wajib diunggah.')
@@ -118,7 +124,6 @@ export default function NewRemedClaimPage() {
         }
 
         setUploadLabel('Menyimpan pengajuan...')
-        const formData = new FormData(event.currentTarget)
         formData.append('staged_receipts', JSON.stringify(tickets.map(({ path, fileName, mimeType, fileSize }) => ({ path, fileName, mimeType, fileSize }))))
         const result = await remedFetch<{ claimId: string; claimNumber: string }>('/api/remed/claims', { method: 'POST', body: formData })
         window.alert(`Klaim ${result.claimNumber} berhasil diajukan.`)
