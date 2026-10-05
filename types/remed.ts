@@ -39,6 +39,7 @@ export type RemedEntitlement = {
   legacy_used: number
   current_used: number
   reserved_amount: number
+  balance_adjustment: number
   available_amount: number
   employee?: {
     id: string

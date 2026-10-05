@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
       const [entitlementResult, claimsResult] = await Promise.all([
         ctx.admin
           .from('remed_entitlements')
-          .select('id,employee_id,period_year,plafond_total,legacy_used,current_used,reserved_amount')
+          .select('id,employee_id,period_year,plafond_total,legacy_used,current_used,reserved_amount,balance_adjustment')
           .eq('employee_id', ctx.access.employee_id)
           .eq('period_year', year)
           .maybeSingle(),
@@ -33,13 +33,12 @@ export async function GET(request: NextRequest) {
       const entitlement = entitlementResult.data
         ? {
             ...entitlementResult.data,
-            available_amount: Math.max(
-              0,
-              Number(entitlementResult.data.plafond_total || 0) -
-                Number(entitlementResult.data.legacy_used || 0) -
-                Number(entitlementResult.data.current_used || 0) -
-                Number(entitlementResult.data.reserved_amount || 0),
-            ),
+            available_amount:
+              Number(entitlementResult.data.plafond_total || 0) +
+              Number(entitlementResult.data.balance_adjustment || 0) -
+              Number(entitlementResult.data.legacy_used || 0) -
+              Number(entitlementResult.data.current_used || 0) -
+              Number(entitlementResult.data.reserved_amount || 0),
           }
         : null
 
