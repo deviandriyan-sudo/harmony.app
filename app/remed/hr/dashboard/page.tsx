@@ -47,7 +47,7 @@ export default function Page() {
             <p className="mt-3 max-w-2xl text-sm leading-7 text-white/65">Review klaim, kelola plafond, cetak form pembayaran, dan pantau seluruh proses reimbursement dalam satu workspace.</p>
           </div>
           <div className="harmony-action-group border-white/10 bg-white/10 p-1">
-            <Link href="/remed/hr/claims" className="harmony-action-primary inline-flex items-center justify-center gap-2 px-4 text-sm font-bold">
+            <Link href="/remed/hr/claims" className="harmony-action-soft inline-flex items-center justify-center gap-2 px-4 text-sm font-bold transition">
               <ClipboardCheck size={16} /> Review Klaim
             </Link>
             <Link href="/remed/hr/history" className="harmony-action-soft inline-flex items-center justify-center gap-2 px-4 text-sm font-bold transition">

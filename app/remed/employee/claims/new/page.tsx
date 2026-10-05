@@ -5,19 +5,38 @@ import { useRouter } from 'next/navigation'
 import { FilePlus2, Loader2, Paperclip, Send, X } from 'lucide-react'
 import { RemedPageHeader } from '@/components/remed/RemedPageHeader'
 import { remedFetch } from '@/lib/remed-client'
-import type { RemedClaimType } from '@/types/remed'
+import { supabase } from '@/lib/supabase'
+import { REMED_BUCKET } from '@/lib/remed'
+import type { RemedClaimType, RemedSession } from '@/types/remed'
 
 export default function NewRemedClaimPage() {
   const router = useRouter()
   const [types, setTypes] = useState<RemedClaimType[]>([])
   const [files, setFiles] = useState<File[]>([])
   const [loading, setLoading] = useState(false)
+  const [uploadLabel, setUploadLabel] = useState('')
   const [message, setMessage] = useState('')
+  const [bankName, setBankName] = useState('Bank Sinarmas')
+  const [bankAccountNumber, setBankAccountNumber] = useState('')
+  const [bankAccountName, setBankAccountName] = useState('')
+  const [bankFromMaster, setBankFromMaster] = useState(false)
 
   useEffect(() => {
-    remedFetch<{ claimTypes: RemedClaimType[] }>('/api/remed/claim-types')
-      .then((payload) => setTypes(payload.claimTypes || []))
-      .catch((error) => setMessage(error?.message || 'Gagal memuat jenis klaim.'))
+    Promise.all([
+      remedFetch<{ claimTypes: RemedClaimType[] }>('/api/remed/claim-types'),
+      remedFetch<{ session: RemedSession }>('/api/remed/session'),
+    ])
+      .then(([claimTypePayload, sessionPayload]) => {
+        setTypes(claimTypePayload.claimTypes || [])
+        const session = sessionPayload.session
+        const savedNumber = String(session.bankAccountNumber || '').trim()
+        const savedName = String(session.bankAccountName || '').trim()
+        setBankName(String(session.bankName || 'Bank Sinarmas').trim() || 'Bank Sinarmas')
+        setBankAccountNumber(savedNumber)
+        setBankAccountName(savedName)
+        setBankFromMaster(Boolean(savedNumber && savedName))
+      })
+      .catch((error) => setMessage(error?.message || 'Gagal memuat data Re-Med.'))
   }, [])
 
   function onFiles(input: FileList | null) {
@@ -34,14 +53,42 @@ export default function NewRemedClaimPage() {
 
     setLoading(true)
     try {
-      const formData = new FormData(event.currentTarget)
-      files.forEach((file) => formData.append('receipts', file))
-      const result = await remedFetch<{ claimId: string; claimNumber: string }>('/api/remed/claims', { method: 'POST', body: formData })
-      window.alert(`Klaim ${result.claimNumber} berhasil diajukan.`)
-      router.push('/remed/employee/claims')
+      const ticketPayload = await remedFetch<{ tickets: Array<{ path: string; token: string; fileName: string; mimeType: string; fileSize: number }> }>('/api/remed/uploads/receipts', {
+        method: 'POST',
+        body: JSON.stringify({ files: files.map((file) => ({ name: file.name, mimeType: file.type, size: file.size })) }),
+      })
+
+      const tickets = ticketPayload.tickets || []
+      if (tickets.length !== files.length) throw new Error('Upload ticket kuitansi tidak lengkap.')
+
+      try {
+        for (let index = 0; index < files.length; index += 1) {
+          const file = files[index]
+          const ticket = tickets[index]
+          setUploadLabel(`Mengunggah bukti ${index + 1}/${files.length}...`)
+          const { error: uploadError } = await supabase.storage
+            .from(REMED_BUCKET)
+            .uploadToSignedUrl(ticket.path, ticket.token, file, { contentType: ticket.mimeType })
+          if (uploadError) throw new Error(`Gagal mengunggah ${file.name}: ${uploadError.message}`)
+        }
+
+        setUploadLabel('Menyimpan pengajuan...')
+        const formData = new FormData(event.currentTarget)
+        formData.append('staged_receipts', JSON.stringify(tickets.map(({ path, fileName, mimeType, fileSize }) => ({ path, fileName, mimeType, fileSize }))))
+        const result = await remedFetch<{ claimId: string; claimNumber: string }>('/api/remed/claims', { method: 'POST', body: formData })
+        window.alert(`Klaim ${result.claimNumber} berhasil diajukan.`)
+        router.push('/remed/employee/claims')
+      } catch (uploadError) {
+        await remedFetch('/api/remed/uploads/receipts', {
+          method: 'DELETE',
+          body: JSON.stringify({ paths: tickets.map((ticket) => ticket.path) }),
+        }).catch(() => null)
+        throw uploadError
+      }
     } catch (error: any) {
       setMessage(error?.message || 'Gagal mengajukan reimbursement.')
     } finally {
+      setUploadLabel('')
       setLoading(false)
     }
   }
@@ -89,13 +136,32 @@ export default function NewRemedClaimPage() {
         </div>
 
         <div className="harmony-subtle-panel p-5">
-          <h2 className="harmony-section-title">Rekening Pembayaran</h2>
-          <p className="harmony-section-copy">Pastikan rekening aktif dan nama pemilik sesuai.</p>
-          <div className="mt-4 grid gap-4 md:grid-cols-3">
-            <input name="bank_name" required className="harmony-input" placeholder="Nama bank" />
-            <input name="bank_account_number" required className="harmony-input" placeholder="Nomor rekening" />
-            <input name="bank_account_name" required className="harmony-input" placeholder="Nama pemilik rekening" />
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h2 className="harmony-section-title">Rekening Pembayaran</h2>
+              <p className="harmony-section-copy">Rekening Bank Sinarmas diambil otomatis dari master karyawan berdasarkan nama pemilik rekening.</p>
+            </div>
+            <span className={`rounded-full px-3 py-1.5 text-[11px] font-bold ${bankFromMaster ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>
+              {bankFromMaster ? 'Terisi otomatis' : 'Belum tersimpan di master'}
+            </span>
           </div>
+          <div className="mt-4 grid gap-4 md:grid-cols-3">
+            <label className="block">
+              <span className="harmony-label">Bank</span>
+              <input name="bank_name" required readOnly value={bankName} onChange={(event) => setBankName(event.target.value)} className="harmony-input bg-white/55" />
+            </label>
+            <label className="block">
+              <span className="harmony-label">Nomor Rekening</span>
+              <input name="bank_account_number" required readOnly={bankFromMaster} value={bankAccountNumber} onChange={(event) => setBankAccountNumber(event.target.value)} className="harmony-input bg-white/55" placeholder="Nomor rekening Bank Sinarmas" />
+            </label>
+            <label className="block">
+              <span className="harmony-label">Nama Pemilik Rekening</span>
+              <input name="bank_account_name" required readOnly={bankFromMaster} value={bankAccountName} onChange={(event) => setBankAccountName(event.target.value)} className="harmony-input bg-white/55" placeholder="Nama pemilik rekening" />
+            </label>
+          </div>
+          {!bankFromMaster ? (
+            <p className="mt-3 text-xs leading-5 text-amber-700">Data rekening belum tersedia di master HARMONY. Anda masih dapat mengisi nomor rekening dan nama pemilik secara manual untuk klaim ini.</p>
+          ) : null}
         </div>
 
         <div>
@@ -116,7 +182,7 @@ export default function NewRemedClaimPage() {
             <div className="mt-3 space-y-2">
               {files.map((file, index) => (
                 <div key={`${file.name}-${index}`} className="flex items-center justify-between rounded-[16px] border border-black/[0.055] bg-[#f8f9fb] px-4 py-3 text-sm">
-                  <span className="truncate pr-3">{file.name}</span>
+                  <div className="min-w-0 pr-3"><span className="block truncate font-semibold">{file.name}</span><span className="mt-0.5 block text-[11px] text-[#8a8f98]">{Math.max(1, Math.round(file.size / 1024))} KB · siap diunggah saat pengajuan dikirim</span></div>
                   <button type="button" onClick={() => setFiles((current) => current.filter((_, itemIndex) => itemIndex !== index))} className="flex h-8 w-8 items-center justify-center rounded-[11px] text-red-500 transition hover:bg-red-50"><X size={17} /></button>
                 </div>
               ))}
@@ -126,7 +192,7 @@ export default function NewRemedClaimPage() {
 
         <button disabled={loading} type="submit" className="harmony-button-primary inline-flex min-h-12 w-full items-center justify-center gap-2 px-5 disabled:opacity-60">
           {loading ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
-          {loading ? 'Mengirim...' : 'Ajukan Reimbursement'}
+          {loading ? (uploadLabel || 'Mengirim...') : 'Ajukan Reimbursement'}
         </button>
       </form>
     </section>

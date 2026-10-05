@@ -20,6 +20,8 @@ export type RemedEmployeeIdentity = {
   position: string | null
   email: string | null
   is_active: boolean | null
+  sinarmas_account_number: string | null
+  sinarmas_account_name: string | null
 }
 
 export type RemedApiContext = {
@@ -107,7 +109,7 @@ export async function requireRemedApi(
   if (access.employee_id) {
     const result = await admin
       .from('employees')
-      .select('id,employee_number,full_name,department,position,email,is_active')
+      .select('id,employee_number,full_name,department,position,email,is_active,sinarmas_account_number,sinarmas_account_name')
       .eq('id', access.employee_id)
       .maybeSingle()
     if (!result.error && result.data) employee = result.data as RemedEmployeeIdentity

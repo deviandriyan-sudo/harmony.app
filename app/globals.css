@@ -1310,3 +1310,118 @@ body {
     border-radius: 24px !important;
   }
 }
+
+/* =========================================================
+   HARMONY LIQUID GLASS V2.7
+   Consistent rounded geometry + single visual language
+========================================================= */
+
+.harmony-workspace .harmony-hero-v25,
+.harmony-workspace .harmony-glass-dark {
+  border-radius: 34px !important;
+  overflow: hidden;
+}
+
+.harmony-workspace .harmony-unified-surface,
+.harmony-workspace .harmony-card,
+.harmony-workspace .harmony-card-solid,
+.harmony-workspace .harmony-card-soft,
+.harmony-workspace .harmony-metric-card,
+.harmony-workspace .harmony-subtle-panel,
+.harmony-workspace .harmony-unified-toolbar {
+  border-radius: 30px !important;
+  overflow: hidden;
+}
+
+.harmony-workspace :where(
+  input:not([type='checkbox']):not([type='radio']):not([type='file']),
+  select,
+  textarea
+) {
+  border-radius: 22px !important;
+}
+
+.harmony-workspace :where(button, a.harmony-button-primary, a.harmony-button-secondary, a.harmony-button-blue) {
+  border-radius: 18px !important;
+}
+
+.harmony-workspace .harmony-action-group,
+.harmony-workspace .harmony-action-group > a,
+.harmony-workspace .harmony-action-group > button {
+  border-radius: 20px !important;
+}
+
+/* Normalize legacy Tailwind radii that made individual screens look square. */
+.harmony-workspace .rounded-lg,
+.harmony-workspace .rounded-xl {
+  border-radius: 20px !important;
+}
+
+.harmony-workspace .rounded-2xl {
+  border-radius: 24px !important;
+}
+
+.harmony-workspace .rounded-3xl {
+  border-radius: 30px !important;
+}
+
+.harmony-workspace .rounded-\[11px\],
+.harmony-workspace .rounded-\[12px\],
+.harmony-workspace .rounded-\[13px\],
+.harmony-workspace .rounded-\[14px\],
+.harmony-workspace .rounded-\[15px\],
+.harmony-workspace .rounded-\[16px\],
+.harmony-workspace .rounded-\[17px\],
+.harmony-workspace .rounded-\[18px\] {
+  border-radius: 20px !important;
+}
+
+.harmony-workspace .rounded-\[20px\],
+.harmony-workspace .rounded-\[21px\],
+.harmony-workspace .rounded-\[22px\],
+.harmony-workspace .rounded-\[24px\] {
+  border-radius: 24px !important;
+}
+
+.harmony-workspace .rounded-\[26px\],
+.harmony-workspace .rounded-\[28px\],
+.harmony-workspace .rounded-\[30px\],
+.harmony-workspace .rounded-\[32px\] {
+  border-radius: 30px !important;
+}
+
+/* Search is a single pill; the native input must never draw a second box. */
+.harmony-topbar-search {
+  overflow: hidden;
+  border-radius: 999px !important;
+}
+
+.harmony-topbar-search input,
+.harmony-topbar-search input:focus,
+.harmony-topbar-search input:focus-visible {
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  outline: none !important;
+  ring: 0 !important;
+}
+
+.harmony-topbar-action,
+.harmony-topbar-badge,
+.harmony-secure-pill,
+.harmony-logout {
+  border-radius: 999px !important;
+}
+
+@media (max-width: 768px) {
+  .harmony-workspace .harmony-hero-v25,
+  .harmony-workspace .harmony-glass-dark,
+  .harmony-workspace .harmony-unified-surface,
+  .harmony-workspace .harmony-card,
+  .harmony-workspace .harmony-card-solid,
+  .harmony-workspace .harmony-card-soft,
+  .harmony-workspace .harmony-metric-card {
+    border-radius: 24px !important;
+  }
+}

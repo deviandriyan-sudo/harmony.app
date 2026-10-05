@@ -16,6 +16,9 @@ export async function GET(request: NextRequest) {
         authUserId: ctx.authUserId,
         employeeId: ctx.access.employee_id,
         userName,
+        bankName: ctx.employee?.sinarmas_account_number ? 'Bank Sinarmas' : null,
+        bankAccountNumber: ctx.employee?.sinarmas_account_number || null,
+        bankAccountName: ctx.employee?.sinarmas_account_name || null,
         isActive: ctx.access.is_active,
       },
     })

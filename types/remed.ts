@@ -17,6 +17,9 @@ export type RemedSession = {
   authUserId: string
   employeeId: string | null
   userName: string
+  bankName: string | null
+  bankAccountNumber: string | null
+  bankAccountName: string | null
   isActive: boolean
 }
 

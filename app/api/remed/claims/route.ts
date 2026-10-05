@@ -11,6 +11,25 @@ import {
 import { requireRemedApi, remedApiError } from '@/lib/server/remed-api-auth'
 import { enrichRemedClaims } from '@/lib/server/remed-data'
 
+type StagedReceipt = {
+  path: string
+  fileName: string
+  mimeType: string
+  fileSize: number
+}
+
+function inferredMimeType(name: string, mimeType: string) {
+  const current = mimeType.trim().toLowerCase()
+  if (REMED_ALLOWED_MIME_TYPES.has(current)) return current
+
+  const extension = name.split('.').pop()?.toLowerCase() || ''
+  if (extension === 'pdf') return 'application/pdf'
+  if (extension === 'jpg' || extension === 'jpeg') return 'image/jpeg'
+  if (extension === 'png') return 'image/png'
+  if (extension === 'webp') return 'image/webp'
+  return current
+}
+
 function normalizeFiles(formData: FormData) {
   return formData
     .getAll('receipts')
@@ -18,12 +37,44 @@ function normalizeFiles(formData: FormData) {
 }
 
 function validateFiles(files: File[]) {
-  if (files.length < 1) throw Object.assign(new Error('Minimal 1 bukti kuitansi wajib diunggah.'), { status: 400 })
   if (files.length > REMED_MAX_FILES) throw Object.assign(new Error(`Maksimal ${REMED_MAX_FILES} file bukti.`), { status: 400 })
   for (const file of files) {
+    const mimeType = inferredMimeType(file.name, file.type)
     if (file.size > REMED_MAX_FILE_SIZE) throw Object.assign(new Error(`File ${file.name} melebihi 10 MB.`), { status: 400 })
-    if (!REMED_ALLOWED_MIME_TYPES.has(file.type)) throw Object.assign(new Error(`Format ${file.name} tidak didukung.`), { status: 400 })
+    if (!REMED_ALLOWED_MIME_TYPES.has(mimeType)) throw Object.assign(new Error(`Format ${file.name} tidak didukung.`), { status: 400 })
   }
+}
+
+function parseStagedReceipts(formData: FormData, employeeId: string) {
+  const raw = String(formData.get('staged_receipts') || '').trim()
+  if (!raw) return [] as StagedReceipt[]
+
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(raw)
+  } catch {
+    throw Object.assign(new Error('Metadata upload kuitansi tidak valid.'), { status: 400 })
+  }
+
+  if (!Array.isArray(parsed)) throw Object.assign(new Error('Metadata upload kuitansi tidak valid.'), { status: 400 })
+  if (parsed.length > REMED_MAX_FILES) throw Object.assign(new Error(`Maksimal ${REMED_MAX_FILES} file bukti.`), { status: 400 })
+
+  const prefix = `_staging/claims/${employeeId}/`
+  return parsed.map((item) => {
+    const row = (item || {}) as Partial<StagedReceipt>
+    const path = String(row.path || '').trim()
+    const fileName = String(row.fileName || '').trim()
+    const fileSize = Number(row.fileSize || 0)
+    const mimeType = inferredMimeType(fileName, String(row.mimeType || ''))
+
+    if (!path.startsWith(prefix) || !fileName || !Number.isFinite(fileSize) || fileSize <= 0) {
+      throw Object.assign(new Error('Metadata upload kuitansi tidak sesuai dengan employee aktif.'), { status: 400 })
+    }
+    if (fileSize > REMED_MAX_FILE_SIZE) throw Object.assign(new Error(`File ${fileName} melebihi 10 MB.`), { status: 400 })
+    if (!REMED_ALLOWED_MIME_TYPES.has(mimeType)) throw Object.assign(new Error(`Format ${fileName} tidak didukung.`), { status: 400 })
+
+    return { path, fileName, fileSize, mimeType }
+  })
 }
 
 export async function GET(request: NextRequest) {
@@ -53,6 +104,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   const uploadedPaths: string[] = []
+  const stagedPaths = new Set<string>()
   let createdClaimId = ''
 
   try {
@@ -62,14 +114,22 @@ export async function POST(request: NextRequest) {
     const formData = await request.formData()
     const files = normalizeFiles(formData)
     validateFiles(files)
+    const stagedReceipts = parseStagedReceipts(formData, ctx.access.employee_id)
+    stagedReceipts.forEach((receipt) => stagedPaths.add(receipt.path))
+
+    const receiptCount = files.length + stagedReceipts.length
+    if (receiptCount < 1) throw Object.assign(new Error('Minimal 1 bukti kuitansi wajib diunggah.'), { status: 400 })
+    if (receiptCount > REMED_MAX_FILES) throw Object.assign(new Error(`Maksimal ${REMED_MAX_FILES} file bukti.`), { status: 400 })
 
     const claimTypeId = String(formData.get('claim_type_id') || '').trim()
     const treatmentDate = String(formData.get('treatment_date') || '').trim()
     const providerName = String(formData.get('provider_name') || '').trim()
     const employeeNote = String(formData.get('employee_note') || '').trim()
-    const bankName = String(formData.get('bank_name') || '').trim()
-    const bankAccountNumber = String(formData.get('bank_account_number') || '').trim()
-    const bankAccountName = String(formData.get('bank_account_name') || '').trim()
+    const masterAccountNumber = String(ctx.employee?.sinarmas_account_number || '').trim()
+    const masterAccountName = String(ctx.employee?.sinarmas_account_name || '').trim()
+    const bankName = masterAccountNumber ? 'Bank Sinarmas' : (String(formData.get('bank_name') || 'Bank Sinarmas').trim() || 'Bank Sinarmas')
+    const bankAccountNumber = masterAccountNumber || String(formData.get('bank_account_number') || '').trim()
+    const bankAccountName = masterAccountName || String(formData.get('bank_account_name') || '').trim()
     const amount = Number(formData.get('submitted_amount') || 0)
 
     if (!claimTypeId || !treatmentDate || !Number.isFinite(amount) || amount <= 0) {
@@ -99,14 +159,37 @@ export async function POST(request: NextRequest) {
     const claimNumber = String(result?.claim_number || '')
     if (!createdClaimId) throw new Error('Claim berhasil dibuat tetapi ID tidak diterima dari database.')
 
-    for (const [index, file] of files.entries()) {
-      const extensionName = safeFileName(file.name)
-      const storagePath = `claims/${ctx.access.employee_id}/${createdClaimId}/${String(index + 1).padStart(2, '0')}-${randomUUID()}-${extensionName}`
+    let attachmentIndex = 0
+
+    for (const receipt of stagedReceipts) {
+      attachmentIndex += 1
+      const finalPath = `claims/${ctx.access.employee_id}/${createdClaimId}/${String(attachmentIndex).padStart(2, '0')}-${randomUUID()}-${safeFileName(receipt.fileName)}`
+      const { error: moveError } = await ctx.admin.storage.from(REMED_BUCKET).move(receipt.path, finalPath)
+      if (moveError) throw moveError
+      stagedPaths.delete(receipt.path)
+      uploadedPaths.push(finalPath)
+
+      const { error: attachmentError } = await ctx.admin.from('remed_claim_attachments').insert({
+        claim_id: createdClaimId,
+        storage_path: finalPath,
+        file_name: receipt.fileName,
+        mime_type: receipt.mimeType,
+        file_size: receipt.fileSize,
+        attachment_kind: 'receipt',
+        uploaded_by: ctx.authUserId,
+      })
+      if (attachmentError) throw attachmentError
+    }
+
+    for (const file of files) {
+      attachmentIndex += 1
+      const mimeType = inferredMimeType(file.name, file.type)
+      const storagePath = `claims/${ctx.access.employee_id}/${createdClaimId}/${String(attachmentIndex).padStart(2, '0')}-${randomUUID()}-${safeFileName(file.name)}`
       const bytes = Buffer.from(await file.arrayBuffer())
 
       const { error: uploadError } = await ctx.admin.storage
         .from(REMED_BUCKET)
-        .upload(storagePath, bytes, { contentType: file.type, upsert: false })
+        .upload(storagePath, bytes, { contentType: mimeType, upsert: false })
       if (uploadError) throw uploadError
       uploadedPaths.push(storagePath)
 
@@ -114,7 +197,7 @@ export async function POST(request: NextRequest) {
         claim_id: createdClaimId,
         storage_path: storagePath,
         file_name: file.name,
-        mime_type: file.type,
+        mime_type: mimeType,
         file_size: file.size,
         attachment_kind: 'receipt',
         uploaded_by: ctx.authUserId,
@@ -129,40 +212,28 @@ export async function POST(request: NextRequest) {
       p_action: 'claim_receipts_uploaded',
       p_entity_type: 'remed_claim',
       p_entity_id: createdClaimId,
-      p_metadata: { file_count: files.length },
+      p_metadata: { file_count: receiptCount, upload_mode: stagedReceipts.length ? 'signed-direct' : 'server-multipart' },
     })
 
     return NextResponse.json({ claimId: createdClaimId, claimNumber }, { status: 201 })
   } catch (error) {
     try {
-      if (uploadedPaths.length) {
-        const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-        const key = process.env.SUPABASE_SERVICE_ROLE_KEY
-        if (url && key) {
-          const { createClient } = await import('@supabase/supabase-js')
-          const admin = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } })
-          await admin.storage.from(REMED_BUCKET).remove(uploadedPaths)
-          if (createdClaimId) {
-            await admin.from('remed_claim_attachments').delete().eq('claim_id', createdClaimId)
-            await admin.rpc('remed_cancel_claim_v1', {
-              p_claim_id: createdClaimId,
-              p_actor_auth_user_id: null,
-              p_actor_email: 'system@rollback',
-              p_reason: 'Rollback otomatis karena upload bukti gagal.',
-            })
-          }
-        }
-      } else if (createdClaimId) {
-        const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-        const key = process.env.SUPABASE_SERVICE_ROLE_KEY
-        if (url && key) {
-          const { createClient } = await import('@supabase/supabase-js')
-          const admin = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } })
+      const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+      const key = process.env.SUPABASE_SERVICE_ROLE_KEY
+      if (url && key) {
+        const { createClient } = await import('@supabase/supabase-js')
+        const admin = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } })
+
+        const cleanupPaths = [...uploadedPaths, ...stagedPaths]
+        if (cleanupPaths.length) await admin.storage.from(REMED_BUCKET).remove(cleanupPaths)
+
+        if (createdClaimId) {
+          await admin.from('remed_claim_attachments').delete().eq('claim_id', createdClaimId)
           await admin.rpc('remed_cancel_claim_v1', {
             p_claim_id: createdClaimId,
             p_actor_auth_user_id: null,
             p_actor_email: 'system@rollback',
-            p_reason: 'Rollback otomatis karena proses lampiran gagal.',
+            p_reason: 'Rollback otomatis karena upload bukti gagal.',
           })
         }
       }

@@ -38,13 +38,26 @@ export function AppSidebar({
   const router = useRouter()
   const [loggingOut, setLoggingOut] = useState(false)
 
-  function isActive(href: string) {
-    const normalizedPath = pathname.endsWith('/') && pathname.length > 1 ? pathname.slice(0, -1) : pathname
-    const normalizedHref = href.endsWith('/') && href.length > 1 ? href.slice(0, -1) : href
+  function normalizeRoute(value: string) {
+    if (!value) return '/'
+    return value.endsWith('/') && value.length > 1 ? value.slice(0, -1) : value
+  }
 
-    if (normalizedHref === normalizedPath) return true
-    if (normalizedHref !== '/' && normalizedPath.startsWith(`${normalizedHref}/`)) return true
-    return false
+  const normalizedPath = normalizeRoute(pathname)
+  const activeHref = (() => {
+    const exact = menu.find((item) => normalizeRoute(item.href) === normalizedPath)
+    if (exact) return normalizeRoute(exact.href)
+
+    const candidates = menu
+      .map((item) => normalizeRoute(item.href))
+      .filter((href) => href !== '/' && normalizedPath.startsWith(`${href}/`))
+      .sort((a, b) => b.length - a.length)
+
+    return candidates[0] || ''
+  })()
+
+  function isActive(href: string) {
+    return normalizeRoute(href) === activeHref
   }
 
   async function handleLogout() {
