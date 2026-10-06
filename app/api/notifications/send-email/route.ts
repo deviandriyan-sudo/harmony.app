@@ -253,21 +253,23 @@ export async function GET(request: Request) {
   const domain =
     await getResendDomainDiagnostic()
 
-  const ready =
+  const sendTestReady =
     environment.resendApiKeyConfigured &&
-    environment.fromConfigured &&
-    (
-      !domain.checked ||
-      (
-        domain.found &&
-        domain.status === 'verified' &&
-        domain.sendingCapability !== 'disabled'
-      )
-    )
+    environment.fromConfigured
+
+  const domainVerified =
+    domain.found &&
+    domain.status === 'verified' &&
+    domain.sendingCapability !== 'disabled'
+
+  const ready =
+    sendTestReady &&
+    (domainVerified || domain.permissionLimited === true || !domain.checked)
 
   return NextResponse.json({
     ok: true,
     ready,
+    send_test_ready: sendTestReady,
     environment: {
       resend_api_key_configured:
         environment.resendApiKeyConfigured,

@@ -25,6 +25,7 @@ export type ResendDomainDiagnostic = {
   status: string
   sendingCapability: string
   message: string
+  permissionLimited?: boolean
 }
 
 export type HarmonyServerEmailResult = {
@@ -193,6 +194,19 @@ export async function getResendDomainDiagnostic(): Promise<ResendDomainDiagnosti
       .catch(() => null)
 
     if (!response.ok) {
+      if (response.status === 401 || response.status === 403) {
+        return {
+          checked: false,
+          found: false,
+          name: environment.senderDomain,
+          status: 'sending_only_key',
+          sendingCapability: 'send_only',
+          permissionLimited: true,
+          message:
+            'API key Resend memakai Sending Access. Pengiriman email tetap dapat digunakan, tetapi status domain tidak dapat dibaca melalui Domain API. Gunakan Kirim Test Email untuk verifikasi aktual.',
+        }
+      }
+
       return {
         checked: true,
         found: false,

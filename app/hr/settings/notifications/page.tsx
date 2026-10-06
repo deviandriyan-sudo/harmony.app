@@ -23,6 +23,7 @@ import { sendHarmonyEmail } from '@/lib/notifications'
 type DiagnosticData = {
   ok?: boolean
   ready?: boolean
+  send_test_ready?: boolean
   environment?: {
     resend_api_key_configured?: boolean
     notification_from_configured?: boolean
@@ -39,6 +40,7 @@ type DiagnosticData = {
     status?: string
     sendingCapability?: string
     message?: string
+    permissionLimited?: boolean
   }
   checked_at?: string
 }
@@ -403,9 +405,11 @@ export default function HRNotificationDiagnosticsPage() {
                   </div>
 
                   <h1 className="mt-2 text-2xl font-bold tracking-tight text-[#1d1d1f]">
-                    {diagnostic?.ready
-                      ? 'Email siap digunakan'
-                      : 'Email belum siap digunakan'}
+                    {domain?.permissionLimited
+                      ? 'Konfigurasi siap diuji'
+                      : diagnostic?.ready
+                        ? 'Email siap digunakan'
+                        : 'Email belum siap digunakan'}
                   </h1>
 
                   <p className="mt-2 max-w-3xl text-sm leading-6 text-[#6e6e73]">
@@ -423,9 +427,11 @@ export default function HRNotificationDiagnosticsPage() {
                       : 'bg-orange-500 text-white',
                   ].join(' ')}
                 >
-                  {diagnostic?.ready
-                    ? 'READY'
-                    : 'NEEDS SETUP'}
+                  {domain?.permissionLimited
+                    ? 'TEST READY'
+                    : diagnostic?.ready
+                      ? 'READY'
+                      : 'NEEDS SETUP'}
                 </div>
               </div>
             </section>
@@ -467,15 +473,19 @@ export default function HRNotificationDiagnosticsPage() {
                   'Belum tersedia'
                 }
                 subvalue={
-                  domain?.status
-                    ? `Status: ${domain.status}`
-                    : domain?.message
+                  domain?.permissionLimited
+                    ? 'Sending Access aktif · status domain tidak dapat dibaca via API'
+                    : domain?.status
+                      ? `Status: ${domain.status}`
+                      : domain?.message
                 }
                 ok={
-                  Boolean(domain?.found) &&
-                  domain?.status === 'verified' &&
-                  domain?.sendingCapability !==
-                    'disabled'
+                  domain?.permissionLimited === true ||
+                  (
+                    Boolean(domain?.found) &&
+                    domain?.status === 'verified' &&
+                    domain?.sendingCapability !== 'disabled'
+                  )
                 }
               />
 
@@ -529,7 +539,7 @@ export default function HRNotificationDiagnosticsPage() {
                   disabled={
                     sending ||
                     loading ||
-                    !diagnostic?.ready
+                    diagnostic?.send_test_ready === false
                   }
                   className="mt-4 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-2xl bg-[#007aff] px-4 text-sm font-bold text-white transition hover:bg-[#0066d6] disabled:cursor-not-allowed disabled:opacity-50"
                 >
@@ -579,18 +589,25 @@ export default function HRNotificationDiagnosticsPage() {
                   />
                   <Checklist
                     done={
-                      Boolean(domain?.found) &&
-                      domain?.status === 'verified'
+                      domain?.permissionLimited === true ||
+                      (Boolean(domain?.found) && domain?.status === 'verified')
                     }
-                    text="Domain sender sudah verified di Resend."
+                    text={
+                      domain?.permissionLimited
+                        ? 'Domain tidak dapat dibaca dengan Sending Access; verifikasi aktual melalui email test.'
+                        : 'Domain sender sudah verified di Resend.'
+                    }
                   />
                   <Checklist
                     done={
-                      domain?.sendingCapability !==
-                        'disabled' &&
-                      Boolean(domain?.found)
+                      domain?.permissionLimited === true ||
+                      (domain?.sendingCapability !== 'disabled' && Boolean(domain?.found))
                     }
-                    text="Capability sending tidak disabled."
+                    text={
+                      domain?.permissionLimited
+                        ? 'API key memiliki izin pengiriman email (Sending Access).'
+                        : 'Capability sending tidak disabled.'
+                    }
                   />
                   <Checklist
                     done={Boolean(environment?.app_url)}
