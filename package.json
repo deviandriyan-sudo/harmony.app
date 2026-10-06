@@ -1,12 +1,13 @@
 {
   "name": "harmony",
-  "version": "0.1.0",
+  "version": "3.0.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test:smoke": "node scripts/smoke-check.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.107.0",

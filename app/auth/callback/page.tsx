@@ -4,17 +4,11 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Loader2, ShieldCheck } from 'lucide-react'
 
+import { harmonyFetch } from '@/lib/harmony-client'
 import { remedFetch } from '@/lib/remed-client'
 import { supabase } from '@/lib/supabase'
 import type { RemedSession } from '@/types/remed'
 
-type AppUser = {
-  id: string
-  email: string
-  role: 'hr' | 'employee'
-  employee_id: string | null
-  is_active: boolean | null
-}
 
 export default function AuthCallbackPage() {
   const router = useRouter()
@@ -39,48 +33,29 @@ export default function AuthCallbackPage() {
       if (error || !data.user) throw new Error('Sesi Google tidak ditemukan.')
 
       setMessage('Memeriksa akses HARMONY...')
-      const email = (data.user.email || '').trim().toLowerCase()
 
-      let appUser: AppUser | null = null
-      const byId = await supabase
-        .from('app_users')
-        .select('id,email,role,employee_id,is_active')
-        .eq('id', data.user.id)
-        .maybeSingle()
+      const access = await harmonyFetch<{
+        kind: 'harmony' | 'finance'
+        appUser: {
+          id: string
+          email: string
+          role: 'hr' | 'employee'
+          employee_id: string | null
+        } | null
+        home: string
+      }>('/api/auth/access')
 
-      if (byId.data) appUser = byId.data as AppUser
-
-      if (!appUser && email) {
-        const byEmail = await supabase
-          .from('app_users')
-          .select('id,email,role,employee_id,is_active')
-          .ilike('email', email)
-          .maybeSingle()
-        if (byEmail.data) appUser = byEmail.data as AppUser
-      }
-
-      if (appUser) {
-        if (appUser.is_active === false) throw new Error('Akun HARMONY tidak aktif.')
-        localStorage.setItem('harmony_user', JSON.stringify({
-          id: appUser.id,
-          email: appUser.email,
-          role: appUser.role,
-          employee_id: appUser.employee_id,
-        }))
-        router.replace(appUser.role === 'hr' ? '/hr/dashboard' : '/employee/dashboard')
+      if (access.kind === 'harmony' && access.appUser) {
+        localStorage.setItem('harmony_user', JSON.stringify(access.appUser))
+        router.replace(access.home)
         return
       }
 
-      // Finance menggunakan login HARMONY yang sama tanpa memperoleh role HR HARMONY.
-      try {
-        const result = await remedFetch<{ session: RemedSession }>('/api/remed/session')
-        if (result.session.role === 'finance') {
-          localStorage.setItem('remed_user', JSON.stringify(result.session))
-          router.replace('/remed/finance/dashboard')
-          return
-        }
-      } catch {
-        // Lanjut ke error akses tunggal di bawah.
+      if (access.kind === 'finance') {
+        const remed = await remedFetch<{ session: RemedSession }>('/api/remed/session')
+        localStorage.setItem('remed_user', JSON.stringify(remed.session))
+        router.replace(access.home || '/remed/finance/dashboard')
+        return
       }
 
       throw new Error('Email Google belum terdaftar atau tidak aktif pada HARMONY.')

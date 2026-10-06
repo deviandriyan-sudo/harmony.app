@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import type { ReactNode } from 'react'
 import {
+  Activity,
   AlertTriangle,
   BadgeCheck,
   CheckCircle2,
@@ -690,6 +691,27 @@ export default function HRSettingsPage() {
 
           <span className="inline-flex shrink-0 items-center justify-center rounded-2xl bg-[#007aff] px-4 py-2.5 text-xs font-bold text-white transition group-hover:bg-[#0066d6]">
             Buka Diagnostik
+          </span>
+        </Link>
+
+        <Link
+          href="/hr/settings/system-health"
+          className="group flex flex-col gap-4 rounded-[28px] border border-[#c9e9dc] bg-gradient-to-br from-[#f2fbf7] to-white p-5 shadow-sm transition hover:border-[#179b68]/40 hover:shadow-md sm:flex-row sm:items-center sm:justify-between"
+        >
+          <div className="flex items-start gap-4">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-3xl bg-[#e8f7f1] text-[#18794e]">
+              <Activity size={22} />
+            </div>
+            <div>
+              <p className="text-sm font-bold text-[#1d1d1f]">System Health HARMONY</p>
+              <p className="mt-1 max-w-3xl text-sm leading-6 text-[#6e6e73]">
+                Cek kompatibilitas schema database, tabel/RPC kritis, storage Re-Med, dan environment production.
+              </p>
+            </div>
+          </div>
+
+          <span className="inline-flex shrink-0 items-center justify-center rounded-2xl bg-[#18794e] px-4 py-2.5 text-xs font-bold text-white transition group-hover:bg-[#12643f]">
+            Buka System Health
           </span>
         </Link>
 

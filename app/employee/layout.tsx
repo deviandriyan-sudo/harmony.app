@@ -7,6 +7,7 @@ import { Loader2, Menu, ShieldAlert, X } from 'lucide-react'
 
 import { AppSidebar } from '@/components/layout/AppSidebar'
 import { employeeMenu, employeeRemedEntry } from '@/lib/menu'
+import { harmonyFetch } from '@/lib/harmony-client'
 import { remedFetch } from '@/lib/remed-client'
 import type { RemedSession } from '@/types/remed'
 import { supabase } from '@/lib/supabase'
@@ -46,60 +47,42 @@ export default function EmployeeLayout({ children }: { children: React.ReactNode
     setAllowed(false)
     setMessage('Memeriksa akses akun...')
 
-    const { data: authData, error: authError } = await supabase.auth.getUser()
-    if (authError || !authData.user) {
-      router.replace('/login')
-      return
-    }
+    try {
+      const payload = await harmonyFetch<{
+        kind: 'harmony' | 'finance'
+        appUser: AppUser | null
+        employee: { full_name?: string | null } | null
+        home: string
+      }>('/api/auth/access')
 
-    const { data: appUser, error: appUserError } = await supabase
-      .from('app_users')
-      .select('id,email,role,employee_id,is_active')
-      .eq('id', authData.user.id)
-      .maybeSingle<AppUser>()
+      if (payload.kind !== 'harmony' || !payload.appUser) {
+        router.replace(payload.home || '/login')
+        return
+      }
 
-    if (appUserError) {
-      setMessage(appUserError.message)
-      setLoading(false)
-      return
-    }
+      if (String(payload.appUser.role || '').toLowerCase() === 'hr') {
+        router.replace(payload.home || '/hr/dashboard')
+        return
+      }
 
-    if (!appUser || appUser.is_active === false) {
+      setUserName(payload.employee?.full_name || formatEmailName(payload.appUser.email))
+
+      try {
+        const remed = await remedFetch<{ session: RemedSession }>('/api/remed/session')
+        setHasRemedAccess(remed.session.role === 'employee')
+      } catch {
+        setHasRemedAccess(false)
+      }
+
+      setAllowed(true)
+    } catch (error: any) {
+      setMessage(error?.message || 'Akses Employee tidak dapat diverifikasi.')
       await supabase.auth.signOut()
       router.replace('/login')
       return
+    } finally {
+      setLoading(false)
     }
-
-    if (String(appUser.role || '').toLowerCase() === 'hr') {
-      router.replace('/hr/dashboard')
-      return
-    }
-
-    if (appUser.employee_id) {
-      const { data: employee } = await supabase
-        .from('employees')
-        .select('full_name')
-        .eq('id', appUser.employee_id)
-        .maybeSingle<{ full_name: string | null }>()
-
-      if (employee?.full_name) {
-        setUserName(employee.full_name)
-      } else {
-        setUserName(formatEmailName(appUser.email))
-      }
-    } else {
-      setUserName(formatEmailName(appUser.email))
-    }
-
-    try {
-      const remed = await remedFetch<{ session: RemedSession }>('/api/remed/session')
-      setHasRemedAccess(remed.session.role === 'employee')
-    } catch {
-      setHasRemedAccess(false)
-    }
-
-    setAllowed(true)
-    setLoading(false)
   }
 
   if (loading) {
@@ -125,7 +108,7 @@ export default function EmployeeLayout({ children }: { children: React.ReactNode
           <AppSidebar
             menu={hasRemedAccess ? [...employeeMenu, employeeRemedEntry] : employeeMenu}
             title="HARMONY"
-            subtitle="Human Attendance & Leave System"
+            subtitle="Integrated HR Platform"
             userName={userName}
             userRole="Employee"
             logoSrc="/logo.png"
@@ -139,7 +122,7 @@ export default function EmployeeLayout({ children }: { children: React.ReactNode
               <AppSidebar
                 menu={hasRemedAccess ? [...employeeMenu, employeeRemedEntry] : employeeMenu}
                 title="HARMONY"
-                subtitle="Human Attendance & Leave System"
+                subtitle="Integrated HR Platform"
                 userName={userName}
                 userRole="Employee"
                 logoSrc="/logo.png"

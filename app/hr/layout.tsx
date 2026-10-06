@@ -7,6 +7,7 @@ import { Loader2, Menu, ShieldAlert, X } from 'lucide-react'
 
 import { AppSidebar } from '@/components/layout/AppSidebar'
 import { hrMenu, hrRemedEntry } from '@/lib/menu'
+import { harmonyFetch } from '@/lib/harmony-client'
 import { remedFetch } from '@/lib/remed-client'
 import type { RemedSession } from '@/types/remed'
 import { supabase } from '@/lib/supabase'
@@ -46,49 +47,47 @@ export default function HRLayout({ children }: { children: React.ReactNode }) {
     setAllowed(false)
     setMessage('Memeriksa akses akun...')
 
-    const { data: authData, error: authError } = await supabase.auth.getUser()
-    if (authError || !authData.user) {
-      router.replace('/login')
-      return
-    }
+    try {
+      const payload = await harmonyFetch<{
+        kind: 'harmony' | 'finance'
+        appUser: AppUser | null
+        employee: { full_name?: string | null } | null
+        home: string
+      }>('/api/auth/access')
 
-    const { data: appUser, error: appUserError } = await supabase
-      .from('app_users')
-      .select('id,email,role,employee_id,is_active')
-      .eq('id', authData.user.id)
-      .maybeSingle<AppUser>()
+      if (payload.kind !== 'harmony' || !payload.appUser) {
+        router.replace(payload.home || '/login')
+        return
+      }
 
-    if (appUserError) {
-      setMessage(appUserError.message)
-      setLoading(false)
-      return
-    }
+      if (String(payload.appUser.role || '').toLowerCase() !== 'hr') {
+        router.replace(payload.home || '/employee/dashboard')
+        return
+      }
 
-    if (!appUser || appUser.is_active === false) {
+      const fallbackName = String(payload.appUser.email || '')
+        .split('@')[0]
+        .replace(/[._-]/g, ' ')
+        .replace(/\b\w/g, (char) => char.toUpperCase()) || 'HR Administrator'
+
+      setUserName(payload.employee?.full_name || fallbackName)
+
+      try {
+        const remed = await remedFetch<{ session: RemedSession }>('/api/remed/session')
+        setHasRemedAccess(remed.session.role === 'hr')
+      } catch {
+        setHasRemedAccess(false)
+      }
+
+      setAllowed(true)
+    } catch (error: any) {
+      setMessage(error?.message || 'Akses HR tidak dapat diverifikasi.')
       await supabase.auth.signOut()
       router.replace('/login')
       return
+    } finally {
+      setLoading(false)
     }
-
-    if (String(appUser.role || '').toLowerCase() !== 'hr') {
-      router.replace('/employee/dashboard')
-      return
-    }
-
-    const fallbackName = String(appUser.email || '')
-      .split('@')[0]
-      .replace(/[._-]/g, ' ')
-      .replace(/\b\w/g, (char) => char.toUpperCase()) || 'HR Administrator'
-
-    setUserName(fallbackName)
-    try {
-      const remed = await remedFetch<{ session: RemedSession }>('/api/remed/session')
-      setHasRemedAccess(remed.session.role === 'hr')
-    } catch {
-      setHasRemedAccess(false)
-    }
-    setAllowed(true)
-    setLoading(false)
   }
 
   if (loading) {
@@ -119,14 +118,14 @@ export default function HRLayout({ children }: { children: React.ReactNode }) {
     <div className="harmony-shell min-h-screen overflow-x-hidden">
       <div className="flex min-h-screen w-full overflow-x-hidden">
         <div className="hidden lg:block">
-          <AppSidebar menu={hasRemedAccess ? [...hrMenu, hrRemedEntry] : hrMenu} title="HARMONY" subtitle="Human Attendance & Leave System" userName={userName} userRole="HR Administrator" logoSrc="/logo.png" />
+          <AppSidebar menu={hasRemedAccess ? [...hrMenu, hrRemedEntry] : hrMenu} title="HARMONY" subtitle="Integrated HR Platform" userName={userName} userRole="HR Administrator" logoSrc="/logo.png" />
         </div>
 
         {mobileSidebarOpen && (
           <div className="fixed inset-0 z-50 lg:hidden">
             <button type="button" aria-label="Tutup menu" onClick={() => setMobileSidebarOpen(false)} className="absolute inset-0 bg-black/35 backdrop-blur-sm" />
             <div className="absolute left-0 top-0 h-full max-w-[86vw]">
-              <AppSidebar menu={hasRemedAccess ? [...hrMenu, hrRemedEntry] : hrMenu} title="HARMONY" subtitle="Human Attendance & Leave System" userName={userName} userRole="HR Administrator" logoSrc="/logo.png" onNavigate={() => setMobileSidebarOpen(false)} />
+              <AppSidebar menu={hasRemedAccess ? [...hrMenu, hrRemedEntry] : hrMenu} title="HARMONY" subtitle="Integrated HR Platform" userName={userName} userRole="HR Administrator" logoSrc="/logo.png" onNavigate={() => setMobileSidebarOpen(false)} />
               <button type="button" aria-label="Tutup menu" onClick={() => setMobileSidebarOpen(false)} className="absolute right-[-48px] top-4 flex h-10 w-10 items-center justify-center rounded-2xl bg-white text-[#1d1d1f] shadow-lg"><X size={20} /></button>
             </div>
           </div>

@@ -17,6 +17,7 @@ import {
   UserRound,
 } from 'lucide-react'
 
+import { harmonyFetch } from '@/lib/harmony-client'
 import { remedFetch } from '@/lib/remed-client'
 import { supabase } from '@/lib/supabase'
 import type { RemedSession } from '@/types/remed'
@@ -67,31 +68,10 @@ export default function LoginPage() {
     }
 
     try {
-      await redirectAuthenticatedUser(data.user.id, data.user.email || '')
+      await redirectAuthenticatedUser()
     } catch {
       setCheckingSession(false)
     }
-  }
-
-  async function findAppUser(authUserId: string, userEmail: string) {
-    const byId = await supabase
-      .from('app_users')
-      .select('id,email,role,employee_id,is_active')
-      .eq('id', authUserId)
-      .maybeSingle()
-
-    if (byId.data) return byId.data as AppUser
-
-    const cleanEmail = userEmail.trim().toLowerCase()
-    if (!cleanEmail) return null
-
-    const byEmail = await supabase
-      .from('app_users')
-      .select('id,email,role,employee_id,is_active')
-      .ilike('email', cleanEmail)
-      .maybeSingle()
-
-    return (byEmail.data || null) as AppUser | null
   }
 
   function saveHarmonySession(appUser: AppUser) {
@@ -106,29 +86,24 @@ export default function LoginPage() {
     )
   }
 
-  function redirectHarmony(role: AppUser['role']) {
-    router.replace(role === 'hr' ? '/hr/dashboard' : '/employee/dashboard')
-  }
+  async function redirectAuthenticatedUser() {
+    const result = await harmonyFetch<{
+      kind: 'harmony' | 'finance'
+      appUser: AppUser | null
+      home: string
+    }>('/api/auth/access')
 
-  async function redirectAuthenticatedUser(authUserId: string, userEmail: string) {
-    const appUser = await findAppUser(authUserId, userEmail)
-
-    if (appUser) {
-      if (appUser.is_active === false) throw new Error('Akun HARMONY tidak aktif.')
-      saveHarmonySession(appUser)
-      redirectHarmony(appUser.role)
+    if (result.kind === 'harmony' && result.appUser) {
+      saveHarmonySession(result.appUser)
+      router.replace(result.home)
       return
     }
 
-    try {
-      const result = await remedFetch<{ session: RemedSession }>('/api/remed/session')
-      if (result.session.role === 'finance') {
-        localStorage.setItem('remed_user', JSON.stringify(result.session))
-        router.replace('/remed/finance/dashboard')
-        return
-      }
-    } catch {
-      // Gunakan pesan akses umum di bawah.
+    if (result.kind === 'finance') {
+      const remed = await remedFetch<{ session: RemedSession }>('/api/remed/session')
+      localStorage.setItem('remed_user', JSON.stringify(remed.session))
+      router.replace(result.home || '/remed/finance/dashboard')
+      return
     }
 
     throw new Error('Akun belum terdaftar atau tidak aktif pada HARMONY.')
@@ -149,7 +124,7 @@ export default function LoginPage() {
       })
 
       if (error || !data.user) throw new Error(error?.message || 'Login gagal.')
-      await redirectAuthenticatedUser(data.user.id, data.user.email || email)
+      await redirectAuthenticatedUser()
     } catch (error: any) {
       setMessage(error?.message || 'Login gagal.')
       setLoading(false)

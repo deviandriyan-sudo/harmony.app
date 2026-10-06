@@ -99,7 +99,7 @@ export default function RemedLayout({ children }: { children: React.ReactNode })
           <AppSidebar
             menu={menu}
             title="HARMONY"
-            subtitle="Human Attendance, Request, Monitoring & Leave System"
+            subtitle="Integrated HR Platform"
             userName={session.userName}
             userRole={roleLabel}
             logoSrc="/logo.png"
@@ -113,7 +113,7 @@ export default function RemedLayout({ children }: { children: React.ReactNode })
               <AppSidebar
                 menu={menu}
                 title="HARMONY"
-                subtitle="Human Attendance, Request, Monitoring & Leave System"
+                subtitle="Integrated HR Platform"
                 userName={session.userName}
                 userRole={roleLabel}
                 logoSrc="/logo.png"
