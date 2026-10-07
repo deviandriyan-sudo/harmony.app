@@ -31,6 +31,7 @@ import {
 } from 'lucide-react'
 
 import { Topbar } from '@/components/layout/Topbar'
+import { changeHarmonyPassword } from '@/lib/account-password'
 import { supabase } from '@/lib/supabase'
 
 type AppUser = {
@@ -343,12 +344,11 @@ export default function HRSettingsPage() {
       return
     }
 
-    const { error: updateError } = await supabase.auth.updateUser({
-      password: form.new_password,
-    })
-
-    if (updateError) {
-      setErrorMessage(updateError.message)
+    let passwordResult
+    try {
+      passwordResult = await changeHarmonyPassword(form.new_password, 'self_service')
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Gagal memperbarui password HR.')
       setSaving(false)
       return
     }
@@ -357,10 +357,11 @@ export default function HRSettingsPage() {
       actionType: 'hr_changed_own_password',
       metadata: {
         source: 'hr_settings',
+        notification_ok: passwordResult.notification?.ok ?? false,
       },
     })
 
-    setSuccessMessage('Password HR berhasil diperbarui.')
+    setSuccessMessage(passwordResult.message)
     setForm(initialPasswordForm)
     setSaving(false)
   }

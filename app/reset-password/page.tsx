@@ -13,6 +13,7 @@ import {
   ShieldCheck,
 } from 'lucide-react'
 
+import { changeHarmonyPassword } from '@/lib/account-password'
 import { supabase } from '@/lib/supabase'
 
 export default function ResetPasswordPage() {
@@ -108,21 +109,12 @@ export default function ResetPasswordPage() {
     setLoading(true)
 
     try {
-      const { error } = await supabase.auth.updateUser({
-        password,
-      })
-
-      if (error) {
-        setMessage(error.message)
-        setMessageType('error')
-        setLoading(false)
-        return
-      }
+      const result = await changeHarmonyPassword(password, 'recovery')
 
       await supabase.auth.signOut()
       localStorage.removeItem('harmony_user')
 
-      setMessage('Password berhasil diperbarui. Silakan login kembali.')
+      setMessage(`${result.message} Silakan login kembali.`)
       setMessageType('info')
 
       setTimeout(() => {

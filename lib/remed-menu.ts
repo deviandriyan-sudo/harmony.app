@@ -36,5 +36,5 @@ export const remedFinanceMenu = [
   { section: 'RE-MED', title: 'Review Finance', href: '/remed/finance/claims', icon: ClipboardCheck, subtitle: 'Approve / reject' },
   { section: 'RE-MED', title: 'Pembayaran', href: '/remed/finance/payments', icon: Banknote, subtitle: 'Upload bukti bayar' },
   { section: 'RE-MED', title: 'Riwayat Proses', href: '/remed/finance/history', icon: History, subtitle: 'Approval, reject & alasan' },
-  { section: 'RE-MED', title: 'Akses', href: '/remed/finance/access', icon: Users, subtitle: 'Profil Finance' },
+  { section: 'RE-MED', title: 'Akun & Keamanan', href: '/remed/finance/access', icon: Users, subtitle: 'Profil & password' },
 ]
