@@ -269,9 +269,12 @@ export default function LoginPage() {
                 {googleLoading ? 'Menghubungkan Google...' : 'Masuk dengan Google'}
               </button>
 
-              <div className="mt-7 flex items-center justify-center gap-2 text-center text-xs text-[#7c8ca4]">
-                <UserRound size={14} />
-                <span>© {new Date().getFullYear()} HARMONY · Poltek Sinar Mas Berau Coal</span>
+              <div className="mt-7 flex flex-col items-center justify-center gap-1.5 text-center text-xs text-[#7c8ca4]">
+                <div className="flex items-center justify-center gap-2">
+                  <UserRound size={14} />
+                  <span>© {new Date().getFullYear()} HARMONY · Poltek Sinar Mas Berau Coal</span>
+                </div>
+                <span className="text-[10px] font-semibold tracking-[0.1em] text-[#98a4b6]">Developed by Devan</span>
               </div>
             </div>
           </section>

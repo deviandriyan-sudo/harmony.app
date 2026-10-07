@@ -176,6 +176,9 @@ export function AppSidebar({
           >
             {loggingOut ? <><Loader2 size={15} className="animate-spin text-red-500" />Keluar...</> : <><LogOut size={15} className="text-red-500" />Keluar</>}
           </button>
+          <p className="mt-3 text-center text-[10px] font-medium tracking-[0.08em] text-[#9aa0aa]">
+            Developed by <span className="font-bold text-[#6f7680]">Devan</span>
+          </p>
         </div>
       </div>
     </aside>
