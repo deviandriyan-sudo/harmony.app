@@ -344,7 +344,7 @@ async function notifyPostponeRequestSubmitted({
     await sendHarmonyEmail({
       to: toEmails.length > 0 ? toEmails : ccEmails,
       cc: toEmails.length > 0 ? ccEmails : [],
-      subject: `Pengajuan Postpone Cuti - ${getName(employee)}`,
+      subject: `[HARMONY] Pengajuan Postpone Cuti - ${getName(employee)}`,
       title: 'Pengajuan Postpone Cuti Baru',
       message: [
         `Karyawan ${getName(employee)} mengajukan postpone sisa cuti tahunan.`,

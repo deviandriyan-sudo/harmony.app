@@ -2,6 +2,7 @@ import { randomUUID } from 'crypto'
 import { NextRequest, NextResponse } from 'next/server'
 import { REMED_ALLOWED_MIME_TYPES, REMED_BUCKET, REMED_MAX_FILE_SIZE, safeFileName } from '@/lib/remed'
 import { requireRemedApi, remedApiError } from '@/lib/server/remed-api-auth'
+import { notifyRemedPaymentCompleted } from '@/lib/server/workflow-notifications'
 
 export async function POST(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   let uploadedPath = ''
@@ -57,7 +58,27 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
       throw Object.assign(new Error(rpcError.message), { status: 400 })
     }
 
-    return NextResponse.json({ success: true })
+    let notification = null
+    try {
+      notification = await notifyRemedPaymentCompleted(
+        ctx.admin,
+        id,
+        ctx.access.email,
+        note,
+        paymentDate,
+        paymentReference,
+      )
+    } catch (notificationError: any) {
+      notification = {
+        ok: false,
+        sent: 0,
+        failed: 1,
+        message: notificationError?.message || 'Notifikasi email pembayaran gagal diproses.',
+      }
+      console.warn('Re-Med payment email notification warning:', notificationError)
+    }
+
+    return NextResponse.json({ success: true, notification })
   } catch (error) {
     if (uploadedPath) {
       try {

@@ -45,6 +45,7 @@ const requiredFiles = [
   'lib/server/remed-api-auth.ts',
   'lib/harmony-client.ts',
   'lib/version.ts',
+  'lib/server/workflow-notifications.ts',
 ]
 
 for (const file of requiredFiles) {
@@ -82,9 +83,15 @@ const sourceText = walk(root)
 assert(!sourceText.includes(['security','shift','detection'].join('-')), 'Legacy security-shift-detection masih ditemukan.')
 assert(sourceText.includes("'/api/auth/access'"), 'Server access guard belum direferensikan.')
 assert(sourceText.includes("'/api/health'"), 'System Health belum direferensikan.')
+assert(!fs.existsSync(path.join(root, 'lib/absence-notifications.ts')), 'Helper dormant absence-notifications.ts masih ada.')
+assert(sourceText.includes('notifyRemedClaimSubmitted'), 'Notifikasi submit Re-Med belum terpasang.')
+assert(sourceText.includes('notifyRemedHrDecision'), 'Notifikasi keputusan HR Re-Med belum terpasang.')
+assert(sourceText.includes('notifyRemedFinanceDecision'), 'Notifikasi keputusan Finance Re-Med belum terpasang.')
+assert(sourceText.includes('notifyRemedPaymentCompleted'), 'Notifikasi pembayaran Re-Med belum terpasang.')
+assert(sourceText.includes('notifyRemedEntitlementChanged'), 'Notifikasi perubahan plafond Re-Med belum terpasang.')
 
 const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'))
-assert(pkg.version === '3.0.0', `package.json version harus 3.0.0, saat ini ${pkg.version}`)
+assert(pkg.version === '3.1.0', `package.json version harus 3.1.0, saat ini ${pkg.version}`)
 assert(Boolean(pkg.scripts?.['test:smoke']), 'Script test:smoke belum tersedia.')
 
 if (failures.length) {

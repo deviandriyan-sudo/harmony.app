@@ -1948,7 +1948,7 @@ export default function EmployeeAttendancePage() {
 
       await sendHarmonyEmail({
         to: recipients,
-        subject: `Pengajuan Absensi Menunggu Approval - ${employee.full_name || appUser.email}`,
+        subject: `[HARMONY] Pengajuan Absensi Menunggu Approval - ${employee.full_name || appUser.email}`,
         title: "Pengajuan Absensi Menunggu Approval",
         message: [
           `Ada pengajuan absensi baru yang menunggu approval atasan.`,

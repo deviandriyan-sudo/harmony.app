@@ -1,5 +1,32 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireRemedApi, remedApiError } from '@/lib/server/remed-api-auth'
+import { notifyRemedEntitlementChanged } from '@/lib/server/workflow-notifications'
+
+async function getEntitlementSnapshot(admin: any, employeeId: string, year: number) {
+  const { data } = await admin
+    .from('remed_entitlements')
+    .select('plafond_total,legacy_used,current_used,reserved_amount,balance_adjustment')
+    .eq('employee_id', employeeId)
+    .eq('period_year', year)
+    .maybeSingle()
+
+  if (!data) return null
+
+  const plafond = Number(data.plafond_total || 0)
+  const legacy = Number(data.legacy_used || 0)
+  const current = Number(data.current_used || 0)
+  const reserved = Number(data.reserved_amount || 0)
+  const adjustment = Number(data.balance_adjustment || 0)
+
+  return {
+    plafond_total: plafond,
+    legacy_used: legacy,
+    current_used: current,
+    reserved_amount: reserved,
+    balance_adjustment: adjustment,
+    available_amount: plafond + adjustment - legacy - current - reserved,
+  }
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -62,6 +89,8 @@ export async function PUT(request: NextRequest) {
       throw Object.assign(new Error('Employee atau tahun tidak valid.'), { status: 400 })
     }
 
+    const before = await getEntitlementSnapshot(ctx.admin, employeeId, year)
+
     if (action === 'adjust_balance') {
       const targetAvailable = Number(body?.target_available)
       if (!Number.isFinite(targetAvailable) || targetAvailable < 0) {
@@ -77,7 +106,30 @@ export async function PUT(request: NextRequest) {
         p_actor_email: ctx.access.email,
       })
       if (error) throw Object.assign(new Error(error.message), { status: 400 })
-      return NextResponse.json({ success: true })
+
+      const after = await getEntitlementSnapshot(ctx.admin, employeeId, year)
+      let notification = null
+      try {
+        notification = await notifyRemedEntitlementChanged(ctx.admin, {
+          employeeId,
+          year,
+          action: 'adjust_balance',
+          actorEmail: ctx.access.email,
+          note,
+          before,
+          after,
+        })
+      } catch (notificationError: any) {
+        notification = {
+          ok: false,
+          sent: 0,
+          failed: 1,
+          message: notificationError?.message || 'Notifikasi penyesuaian sisa plafond gagal diproses.',
+        }
+        console.warn('Re-Med balance adjustment email notification warning:', notificationError)
+      }
+
+      return NextResponse.json({ success: true, notification })
     }
 
     if (action === 'set_plafond') {
@@ -95,7 +147,30 @@ export async function PUT(request: NextRequest) {
         p_actor_email: ctx.access.email,
       })
       if (error) throw Object.assign(new Error(error.message), { status: 400 })
-      return NextResponse.json({ success: true })
+
+      const after = await getEntitlementSnapshot(ctx.admin, employeeId, year)
+      let notification = null
+      try {
+        notification = await notifyRemedEntitlementChanged(ctx.admin, {
+          employeeId,
+          year,
+          action: 'set_plafond',
+          actorEmail: ctx.access.email,
+          note,
+          before,
+          after,
+        })
+      } catch (notificationError: any) {
+        notification = {
+          ok: false,
+          sent: 0,
+          failed: 1,
+          message: notificationError?.message || 'Notifikasi perubahan plafond dasar gagal diproses.',
+        }
+        console.warn('Re-Med plafond email notification warning:', notificationError)
+      }
+
+      return NextResponse.json({ success: true, notification })
     }
 
     throw Object.assign(new Error('Jenis penyesuaian tidak valid.'), { status: 400 })

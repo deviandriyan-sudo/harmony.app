@@ -287,7 +287,7 @@ async function notifyLeaveRequestSubmitted({
     await sendHarmonyEmail({
       to: toEmails.length > 0 ? toEmails : ccEmails,
       cc: toEmails.length > 0 ? ccEmails : [],
-      subject: `Pengajuan ${requestTypeLabel} - ${requester.full_name || requester.email || 'Employee'}`,
+      subject: `[HARMONY] Pengajuan ${requestTypeLabel} - ${requester.full_name || requester.email || 'Employee'}`,
       title: `Pengajuan ${requestTypeLabel} Baru`,
       message: [
         `Karyawan ${requester.full_name || requester.email || '-'} mengajukan ${requestTypeLabel}.`,

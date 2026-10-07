@@ -10,6 +10,7 @@ import {
 } from '@/lib/remed'
 import { requireRemedApi, remedApiError } from '@/lib/server/remed-api-auth'
 import { enrichRemedClaims } from '@/lib/server/remed-data'
+import { notifyRemedClaimSubmitted } from '@/lib/server/workflow-notifications'
 
 type StagedReceipt = {
   path: string
@@ -215,7 +216,20 @@ export async function POST(request: NextRequest) {
       p_metadata: { file_count: receiptCount, upload_mode: stagedReceipts.length ? 'signed-direct' : 'server-multipart' },
     })
 
-    return NextResponse.json({ claimId: createdClaimId, claimNumber }, { status: 201 })
+    let notification = null
+    try {
+      notification = await notifyRemedClaimSubmitted(ctx.admin, createdClaimId)
+    } catch (notificationError: any) {
+      notification = {
+        ok: false,
+        sent: 0,
+        failed: 1,
+        message: notificationError?.message || 'Notifikasi email Re-Med gagal diproses.',
+      }
+      console.warn('Re-Med submit email notification warning:', notificationError)
+    }
+
+    return NextResponse.json({ claimId: createdClaimId, claimNumber, notification }, { status: 201 })
   } catch (error) {
     try {
       const url = process.env.NEXT_PUBLIC_SUPABASE_URL
