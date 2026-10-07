@@ -38,7 +38,7 @@ export default function Page() {
         )}
       />
       <div className="harmony-unified-surface p-4 sm:p-5">
-        <RemedClaimList claims={claims} showEmployee action={(claim) => <HrReviewControls claim={claim} onDone={load} />} />
+        <RemedClaimList claims={claims} showEmployee showBalanceImpact action={(claim) => <HrReviewControls claim={claim} onDone={load} />} />
       </div>
     </section>
   )

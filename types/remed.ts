@@ -101,6 +101,7 @@ export type RemedClaim = {
   } | null
   claim_type?: RemedClaimType | null
   attachments?: RemedClaimAttachment[]
+  entitlement?: RemedEntitlement | null
 }
 
 export type RemedProcessHistory = {

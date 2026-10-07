@@ -78,6 +78,7 @@ export default function Page() {
           <RemedClaimList
             claims={data?.recentClaims || []}
             showEmployee
+            showBalanceImpact
             action={(claim) => <ClaimAdminActions claim={claim} role="finance" onDone={load} />}
           />
         </div>
