@@ -519,7 +519,7 @@ export default function HRHolidaysPage() {
               </h2>
 
               <p className="mt-1 text-sm text-[#6e6e73]">
-                Semua tanggal libur di halaman ini bisa diedit oleh HR dan akan dipakai untuk deteksi PHL.
+                Semua tanggal libur di halaman ini dipakai untuk klasifikasi weekday/weekend/hari libur pada pengajuan PHL.
               </p>
             </div>
 

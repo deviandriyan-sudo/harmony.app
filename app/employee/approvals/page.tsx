@@ -17,10 +17,12 @@ import {
   ShieldCheck,
   UserRound,
   UsersRound,
+  WalletCards,
 } from 'lucide-react'
 
 import { Topbar } from '@/components/layout/Topbar'
 import { supabase } from '@/lib/supabase'
+import { fetchPHLWorkRequests, type PHLWorkRequest } from '@/lib/phl-work'
 
 import { useAttendancePeriodQuery } from "@/lib/use-attendance-period";
 type AppUser = {
@@ -149,6 +151,7 @@ export default function EmployeeApprovalsPage() {
   const [employeeAssignments, setEmployeeAssignments] = useState<EmployeeAssignment[]>([])
   const [attendanceConfirmations, setAttendanceConfirmations] = useState<AttendancePeriodConfirmation[]>([])
   const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>([])
+  const [phlWorkRequests, setPHLWorkRequests] = useState<PHLWorkRequest[]>([])
 
   const { periodMonth, setPeriodMonth, periodReady } = useAttendancePeriodQuery()
 
@@ -200,6 +203,13 @@ export default function EmployeeApprovalsPage() {
       }
     )
   }, [leaveRequests])
+
+  const phlWorkSummary = useMemo(() => ({
+    total: phlWorkRequests.length,
+    pending: phlWorkRequests.filter((item) => item.status === 'pending_supervisor').length,
+    approved: phlWorkRequests.filter((item) => item.status === 'approved').length,
+    rejected: phlWorkRequests.filter((item) => item.status === 'rejected').length,
+  }), [phlWorkRequests])
 
   useEffect(() => {
     if (!periodReady) return
@@ -303,6 +313,7 @@ export default function EmployeeApprovalsPage() {
       setSubordinateRelations(new Map())
       setAttendanceConfirmations([])
       setLeaveRequests([])
+      setPHLWorkRequests([])
       setLoading(false)
       return
     }
@@ -347,6 +358,13 @@ export default function EmployeeApprovalsPage() {
       ])
     }
 
+    try {
+      setPHLWorkRequests(await fetchPHLWorkRequests('team'))
+    } catch (phlError: any) {
+      setErrorMessage(phlError?.message || 'Data approval PHL kerja gagal dimuat.')
+      setPHLWorkRequests([])
+    }
+
     setLoading(false)
   }
 
@@ -354,7 +372,7 @@ export default function EmployeeApprovalsPage() {
     <>
       <Topbar
         title="Approval Tim"
-        description="Pusat approval untuk absensi, cuti, izin, tugas luar, dan PHL bawahan."
+        description="Pusat approval untuk absensi, cuti/izin, dan PHL kerja bawahan."
       />
 
       <section className="space-y-6 p-4 sm:p-6">
@@ -384,16 +402,15 @@ export default function EmployeeApprovalsPage() {
               </h1>
 
               <p className="mt-5 max-w-2xl text-sm leading-7 text-white/62">
-                Review pengajuan bawahan dalam satu tempat. Absensi menggunakan approval periode,
-                sedangkan cuti, izin, sakit, tugas luar, dan klaim PHL menggunakan approval pengajuan.
+                Review pengajuan bawahan dalam satu tempat. Absensi tetap per periode, cuti/izin mengikuti workflow HR, sedangkan PHL kerja mempunyai approval khusus yang langsung membentuk saldo.
               </p>
             </div>
 
             <div className="grid gap-3 sm:grid-cols-2 xl:min-w-[580px] 2xl:grid-cols-4">
               <HeroMetric label="Bawahan" value={String(subordinates.length)} />
               <HeroMetric label="Absensi Pending" value={String(attendanceSummary.pending)} />
-              <HeroMetric label="Cuti / PHL Pending" value={String(leaveSummary.pending)} />
-              <HeroMetric label="Selesai Atasan" value={String(attendanceSummary.approved + leaveSummary.approved)} />
+              <HeroMetric label="Cuti Pending" value={String(leaveSummary.pending)} />
+              <HeroMetric label="PHL Pending" value={String(phlWorkSummary.pending)} />
             </div>
           </div>
         </div>
@@ -417,10 +434,10 @@ export default function EmployeeApprovalsPage() {
           loading={loading}
         />
 
-        <div className="grid gap-6 xl:grid-cols-2">
+        <div className="grid gap-6 xl:grid-cols-3">
           <ApprovalModuleCard
             title="Approval Absensi"
-            description="Review absensi bawahan per periode. Atasan bisa melihat detail harian, bukti, PHL, cuti/izin dari absensi, lalu approve atau reject periode."
+            description="Review absensi bawahan per periode. PHL kerja tidak lagi dibentuk dari cutoff absensi."
             href={`/employee/approvals/attendance?period=${encodeURIComponent(periodMonth)}`}
             icon={<CalendarCheck size={25} />}
             tone="blue"
@@ -445,13 +462,13 @@ export default function EmployeeApprovalsPage() {
             highlights={[
               'Approval absensi per periode',
               'Detail harian, bukti, dan keterangan',
-              'PHL, cuti, izin, sakit, tugas luar terlihat di detail',
+              'PHL approved hanya tampil sebagai hasil workflow PHL terpisah',
             ]}
           />
 
           <ApprovalModuleCard
-            title="Approval Cuti, Izin & PHL"
-            description="Review pengajuan cuti tahunan, cuti khusus, sakit, izin, tugas luar, dan klaim PHL. Approval atasan hanya meneruskan ke HR; saldo baru berubah pada final approval HR sesuai engine canonical."
+            title="Approval Cuti & Izin"
+            description="Review cuti tahunan, cuti khusus, sakit, izin, tugas luar, serta klaim penggunaan saldo PHL yang sudah dimiliki."
             href="/employee/approvals/leave"
             icon={<FileText size={25} />}
             tone="purple"
@@ -475,8 +492,27 @@ export default function EmployeeApprovalsPage() {
             ]}
             highlights={[
               'Approval cuti, izin, sakit, tugas luar',
+              'Klaim penggunaan saldo PHL tetap di workflow cuti',
               'Approval atasan meneruskan request ke HR',
-              'Saldo cuti/PHL hanya berubah pada final approval HR',
+            ]}
+          />
+
+          <ApprovalModuleCard
+            title="Approval PHL Kerja"
+            description="Review penugasan PHL berdasarkan Surat Tugas, jam kerja, dan absensi minimal 4 jam. Approve langsung menambah +1 saldo PHL."
+            href="/employee/approvals/phl"
+            icon={<WalletCards size={25} />}
+            tone="purple"
+            metrics={[
+              { label: 'Total Request', value: phlWorkSummary.total },
+              { label: 'Pending', value: phlWorkSummary.pending },
+              { label: 'Approved', value: phlWorkSummary.approved },
+              { label: 'Rejected', value: phlWorkSummary.rejected },
+            ]}
+            highlights={[
+              'Terpisah dari cutoff absensi',
+              'Minimal 4 jam kerja tercatat + evidence',
+              'Approve atasan langsung membentuk saldo 90 hari',
             ]}
           />
         </div>

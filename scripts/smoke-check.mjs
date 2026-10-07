@@ -49,6 +49,13 @@ const requiredFiles = [
   'lib/server/workflow-notifications.ts',
   'lib/server/core-workflow-notifications.ts',
   'types/notificationWorkflow.ts',
+  'app/employee/phl/page.tsx',
+  'app/employee/approvals/phl/page.tsx',
+  'app/hr/phl/page.tsx',
+  'app/api/phl/work-requests/route.ts',
+  'app/api/phl/work-requests/[id]/review/route.ts',
+  'lib/phl-work.ts',
+  'lib/server/phl-work.ts',
 ]
 
 for (const file of requiredFiles) {
@@ -96,6 +103,10 @@ assert(sourceText.includes('notifyRemedClaimCancelled'), 'Notifikasi pembatalan 
 assert(sourceText.includes('CUSTOM_EMAIL_FORBIDDEN'), 'Hardening endpoint email custom belum terpasang.')
 assert(sourceText.includes('leave_request_cancelled'), 'Notifikasi pembatalan Cuti/Izin/PHL belum terpasang.')
 assert(sourceText.includes('postpone_request_cancelled'), 'Notifikasi pembatalan Postpone belum terpasang.')
+assert(sourceText.includes('harmony_review_phl_work_request_v1'), 'Independent PHL approval RPC belum direferensikan.')
+assert(sourceText.includes('phl_work_request_id'), 'Link PHL independen ke attendance belum terpasang.')
+assert(!sourceText.includes('harmony_sync_phl_balance_from_attendance_v2'), 'Legacy sync saldo PHL dari approval attendance masih direferensikan.')
+assert(!sourceText.includes("'harmony_reconcile_attendance_period_v1'"), 'Recovery attendance legacy masih dapat memanggil Auto-PHL.')
 
 const employeeSourceText = walk(path.join(root, 'app', 'employee'))
   .filter((file) => /\.(ts|tsx)$/.test(file))
@@ -104,7 +115,7 @@ const employeeSourceText = walk(path.join(root, 'app', 'employee'))
 assert(!employeeSourceText.includes('sendHarmonyEmail('), 'Employee/supervisor masih dapat memanggil email custom; wajib memakai workflow template server.')
 
 const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'))
-assert(pkg.version === '3.2.2', `package.json version harus 3.2.2, saat ini ${pkg.version}`)
+assert(pkg.version === '3.3.0', `package.json version harus 3.3.0, saat ini ${pkg.version}`)
 assert(Boolean(pkg.scripts?.['test:smoke']), 'Script test:smoke belum tersedia.')
 
 if (warnings.length) {

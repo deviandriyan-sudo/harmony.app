@@ -104,6 +104,7 @@ type AttendanceLog = {
   hr_note: string | null
 
   is_phl_candidate: boolean | null
+  phl_work_request_id?: string | null
   phl_proof_url: string | null
   phl_proof_name: string | null
   absence_proof_url: string | null
@@ -778,8 +779,6 @@ export default function EmployeeApprovalDetailPage() {
       return
     }
 
-    await syncPHLBalance(employeeId, periodRange.start, periodRange.end)
-
     let emailInfo = ''
 
     try {
@@ -794,7 +793,7 @@ export default function EmployeeApprovalDetailPage() {
       emailInfo = `Email notifikasi belum terkirim: ${emailError?.message || 'Terjadi kendala saat mengirim email.'}`
     }
 
-    setSuccessMessage(`Periode absensi berhasil disetujui atasan, saldo PHL kerja hari libur sudah disinkronkan, dan data siap diproses HR. ${emailInfo}`)
+    setSuccessMessage(`Periode absensi berhasil disetujui atasan dan data siap diproses HR. Saldo PHL hanya dibentuk melalui Approval PHL terpisah. ${emailInfo}`)
     setProcessingPeriod(false)
 
     if (typeof window !== "undefined") {
@@ -903,22 +902,6 @@ export default function EmployeeApprovalDetailPage() {
     setRejectReason('')
   }
 
-  async function syncPHLBalance(
-    targetEmployeeId: string,
-    periodStart: string,
-    periodEnd: string
-  ) {
-    const { error } = await supabase.rpc('harmony_sync_phl_balance_from_attendance_v2', {
-      p_employee_id: targetEmployeeId,
-      p_period_start: periodStart,
-      p_period_end: periodEnd,
-    })
-
-    if (error) {
-      setErrorMessage(`Approval berhasil, tetapi sync saldo PHL gagal: ${error.message}`)
-      return
-    }
-  }
 
   return (
     <>
@@ -1014,7 +997,7 @@ export default function EmployeeApprovalDetailPage() {
 
               <p className="mt-4 max-w-3xl text-sm leading-7 text-white/62">
                 Periode {formatDisplayDate(periodRange.start)} s.d. {formatDisplayDate(periodRange.end)}.
-                Review data harian, bukti ketidakhadiran, cuti khusus, klaim PHL, dan potensi PHL sebelum approve.
+                Review data harian, bukti ketidakhadiran, cuti khusus, dan PHL approved yang berasal dari workflow PHL terpisah sebelum approve.
               </p>
             </div>
 
@@ -1023,7 +1006,7 @@ export default function EmployeeApprovalDetailPage() {
               <HeroMetric label="Approved" value={String(approvedDailyCount)} />
               <HeroMetric label="Rejected" value={String(rejectedDailyCount)} />
               <HeroMetric label="Keterangan" value={String(absenceRequestCount)} />
-              <HeroMetric label="PHL" value={String(phlCount)} />
+              <HeroMetric label="PHL Tertaut" value={String(phlCount)} />
             </div>
           </div>
         </div>
@@ -2081,7 +2064,9 @@ function getDisplayStatus(row: CalendarRow) {
     return log.absence_request_type
   }
 
-  if (hasAttendance && (row.is_weekend || row.holiday_name)) {
+  if (log?.phl_work_request_id) return 'phl'
+
+  if (hasAttendance && (row.is_weekend || row.holiday_name) && log?.is_phl_candidate) {
     if (log?.supervisor_approval_status === 'approved') return 'phl'
     return 'pending_phl'
   }

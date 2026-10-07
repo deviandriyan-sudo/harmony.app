@@ -158,54 +158,11 @@ export default function HRAttendanceSyncPage() {
   }
 
   async function handleReconcile() {
-    const confirmed = window.confirm(
-      [
-        `Jalankan Recovery/Reconciliation untuk ${range.label}?`,
-        '',
-        'Normal workflow HARMONY sudah menggunakan Auto Sync.',
-        'Tombol ini hanya membaca ulang sumber approved/cancelled dan memperbaiki data lama atau data yang tertinggal.',
-        '',
-        'Tidak memotong saldo cuti/PHL untuk kedua kali.',
-      ].join('\n'),
-    )
-
-    if (!confirmed) return
-
-    setReconciling(true)
-    setMessage(null)
     setLastResult(null)
-
-    try {
-      const { data, error } = await supabase.rpc(
-        'harmony_reconcile_attendance_period_v1',
-        { p_period_month: periodMonth },
-      )
-
-      if (error) throw error
-
-      const result = (data || {}) as ReconcileResult
-      setLastResult(result)
-
-      setMessage({
-        type: result.success === false ? 'info' : 'success',
-        text:
-          result.message ||
-          `Reconciliation ${range.label} selesai. Normal workflow tetap Auto Sync.`,
-      })
-
-      await fetchData(false)
-    } catch (error: any) {
-      const text = String(error?.message || '')
-
-      setMessage({
-        type: 'error',
-        text:
-          text ||
-          'Reconciliation gagal. Pastikan HARMONY_AUTO_SYNC_V7_4_NON_DESTRUCTIVE.sql sudah SUCCESS.',
-      })
-    } finally {
-      setReconciling(false)
-    }
+    setMessage({
+      type: 'info',
+      text: 'Recovery periode legacy dinonaktifkan agar saldo PHL tidak lagi dapat terbentuk dari attendance/cutoff. Gunakan workflow PHL terpisah untuk saldo baru.',
+    })
   }
 
   return (
@@ -237,7 +194,7 @@ export default function HRAttendanceSyncPage() {
 
               <h1 className="mt-3 text-3xl font-semibold">Closed-Loop Attendance Sync</h1>
               <p className="mt-2 max-w-4xl text-sm leading-7 text-white/60">
-                Cuti/Izin/Sakit/ST/Tugas Luar direkonsiliasi saat status final berubah. Klaim PHL final juga dimaterialisasi otomatis. Kerja hari libur tetap memakai Auto-PHL setelah approval atasan. Final Report dan Export membaca sumber approved langsung sehingga tidak perlu menunggu tombol Sync.
+                Cuti/Izin/Sakit/ST/Tugas Luar direkonsiliasi saat status final berubah. Klaim saldo PHL final tetap dimaterialisasi otomatis. PHL kerja sekarang berasal dari workflow PHL terpisah dan ditautkan ke attendance setelah disetujui atasan. Final Report dan Export membaca sumber approved langsung sehingga tidak perlu menunggu tombol Sync.
               </p>
             </div>
 
@@ -285,12 +242,12 @@ export default function HRAttendanceSyncPage() {
                 text="HR final approve/cancel → attendance_logs otomatis direkonsiliasi oleh engine existing."
               />
               <FlowRow
-                title="Klaim PHL"
-                text="HR final approve → Klaim PHL otomatis ditautkan ke tanggal attendance; cancel/reject → materialisasi dibersihkan."
+                title="Klaim Saldo PHL"
+                text="HR final approve → penggunaan saldo PHL ditautkan ke tanggal attendance; cancel/reject → materialisasi dibersihkan."
               />
               <FlowRow
-                title="Kerja Sabtu/Minggu/Libur"
-                text="Supervisor approve periode → Auto-PHL +1 melalui engine V5.2 jika sudah terpasang."
+                title="PHL Kerja"
+                text="Employee submit bukti/ST → supervisor approve → saldo +1 langsung dan tanggal kerja ditautkan ke attendance, tanpa menunggu cutoff."
               />
               <FlowRow
                 title="Final Report / Export"
@@ -307,7 +264,7 @@ export default function HRAttendanceSyncPage() {
               <div>
                 <h2 className="text-lg font-bold text-[#1d1d1f]">Recovery Tool</h2>
                 <p className="mt-1 text-sm leading-6 text-[#6e6e73]">
-                  Gunakan hanya jika ada data lama, deployment sebelumnya gagal, atau HR menemukan perbedaan sumber dengan attendance.
+                  Recovery periode lama tidak lagi menjalankan Auto-PHL. Saldo PHL baru hanya boleh berasal dari pengajuan PHL terpisah yang disetujui atasan.
                 </p>
               </div>
             </div>
@@ -323,7 +280,7 @@ export default function HRAttendanceSyncPage() {
               ) : (
                 <Database size={18} />
               )}
-              {reconciling ? 'Reconciliation berjalan...' : 'Reconcile Periode Sekarang'}
+              Recovery Legacy Dinonaktifkan
             </button>
 
             <button
@@ -335,17 +292,6 @@ export default function HRAttendanceSyncPage() {
               <RefreshCcw size={17} /> Refresh Monitoring
             </button>
 
-            {lastResult && (
-              <div className="mt-4 rounded-[22px] border border-black/5 bg-[#f5f5f7] p-4 text-xs leading-6 text-[#515154]">
-                <ResultLine label="Leave employee" value={lastResult.leave_employees_processed} error={lastResult.leave_errors} />
-                <ResultLine label="Klaim PHL" value={lastResult.phl_claims_processed} error={lastResult.phl_claim_errors} />
-                <ResultLine label="Auto-PHL employee" value={lastResult.auto_phl_employees_processed} error={lastResult.auto_phl_errors} />
-                <div className="mt-2 border-t border-black/5 pt-2">
-                  Auto-PHL V5.2:{' '}
-                  <strong>{lastResult.auto_phl_v5_2_available ? 'Terdeteksi' : 'Belum terdeteksi'}</strong>
-                </div>
-              </div>
-            )}
           </div>
         </section>
 

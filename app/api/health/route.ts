@@ -63,16 +63,26 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    const [employees, phlRecords, remedClaims, remedEntitlements] = await Promise.all([
+    const [employees, phlRecords, phlWorkRequests, remedClaims, remedEntitlements, phlWorkRpc] = await Promise.all([
       admin.from('employees').select('id', { count: 'exact', head: true }),
       admin.from('phl_records').select('id', { count: 'exact', head: true }),
+      admin.from('phl_work_requests').select('id', { count: 'exact', head: true }),
       admin.from('remed_claims').select('id', { count: 'exact', head: true }),
       admin.from('remed_entitlements').select('id', { count: 'exact', head: true }),
+      admin.rpc('harmony_review_phl_work_request_v1', {
+        p_request_id: '00000000-0000-0000-0000-000000000000',
+        p_action: 'approve',
+        p_supervisor_id: '00000000-0000-0000-0000-000000000000',
+        p_supervisor_name: 'health-check',
+        p_supervisor_email: null,
+        p_note: 'health-check',
+      }),
     ])
 
     const rowChecks = [
       ['employees_rows', 'Master Karyawan', employees, 'employee'],
       ['phl_rows', 'PHL Records', phlRecords, 'record'],
+      ['phl_work_rows', 'PHL Work Requests', phlWorkRequests, 'request'],
       ['remed_claim_rows', 'Re-Med Claims', remedClaims, 'claim'],
       ['remed_entitlement_rows', 'Re-Med Entitlements', remedEntitlements, 'entitlement'],
     ] as const
@@ -85,6 +95,16 @@ export async function GET(request: NextRequest) {
         detail: result.error ? result.error.message : `${result.count ?? 0} ${noun} terbaca.`,
       })
     }
+
+
+    checks.push({
+      key: 'phl_work_review_rpc',
+      label: 'PHL Independent Approval RPC',
+      status: phlWorkRpc.error ? 'error' : 'ok',
+      detail: phlWorkRpc.error
+        ? phlWorkRpc.error.message
+        : 'harmony_review_phl_work_request_v1 tersedia.',
+    })
 
     const [receiptBucket, signatureBucket] = await Promise.all([
       admin.storage.getBucket(REMED_BUCKET),

@@ -112,6 +112,7 @@ type AttendanceLog = {
   hr_finalized_by: string | null;
 
   is_phl_candidate: boolean | null;
+  phl_work_request_id?: string | null;
   phl_proof_url: string | null;
   phl_proof_name: string | null;
   absence_proof_url: string | null;
@@ -2069,9 +2070,9 @@ export default function EmployeeAttendancePage() {
       return `${label}: ${meta.label} wajib memiliki ${HARMONY_ATTACHMENT_REQUIRED_FILES} dokumen pendukung.`;
     }
 
-    if (isPotentialPHL(row, draft)) {
+    if (isPotentialPHL(row, draft) && !row.log?.phl_work_request_id) {
       if (!existingStoredProofUrl && draft.support_files.length === 0) {
-        return `${label}: upload bukti perintah atasan untuk potensi PHL.`;
+        return `${label}: upload bukti perintah atasan untuk PHL legacy.`;
       }
     }
 
@@ -2561,9 +2562,9 @@ export default function EmployeeAttendancePage() {
                       />
 
                       <SummaryCard
-                        title="Potensi PHL"
+                        title="PHL Tertaut"
                         value={String(phlCandidateCount)}
-                        description="Weekend/libur dengan scan"
+                        description="Approved melalui workflow PHL"
                         icon={<CalendarDays size={22} />}
                         tone="purple"
                       />
@@ -3591,6 +3592,14 @@ function RequestLabelBadge({
   row: CalendarDayRow;
   draft: RowDraft;
 }) {
+  if (row.log?.phl_work_request_id) {
+    return (
+      <span className="inline-flex rounded-full bg-[#f3e8ff] px-3 py-1 text-xs font-bold text-[#7b2cbf]">
+        PHL Approved
+      </span>
+    );
+  }
+
   if (isOffDayPHLOptOut(row, draft)) {
     return (
       <span className="inline-flex rounded-full bg-[#e8f2ff] px-3 py-1 text-xs font-bold text-[#0059b8]">
@@ -3628,6 +3637,17 @@ function ValidationInfo({
   const phl = isPotentialPHL(row, draft);
   const noRecord = !row.log;
   const meta = getDailyTypeMeta(draft.daily_type);
+
+  if (row.log?.phl_work_request_id) {
+    return (
+      <div className="space-y-1">
+        <p className="text-xs font-bold text-[#7b2cbf]">PHL sudah disetujui</p>
+        <p className="text-xs leading-5 text-[#6e6e73]">
+          Saldo berasal dari workflow PHL terpisah dan hanya ditautkan ke absensi ini.
+        </p>
+      </div>
+    );
+  }
 
   if (isOffDayPHLOptOut(row, draft)) {
     return (
@@ -4068,16 +4088,13 @@ function isPotentialPHL(row: CalendarDayRow, draft?: RowDraft) {
   if (meta?.isPHLClaim) return false;
   if (isOffDayPHLOptOut(row, draft)) return false;
 
-  const hasAttendance = Boolean(
-    row.log?.check_in ||
-    row.log?.check_out ||
-    row.log?.manual_check_in ||
-    row.log?.manual_check_out ||
-    draft?.manual_check_in ||
-    draft?.manual_check_out,
-  );
+  // V3.3: absensi tidak lagi menciptakan PHL otomatis dari weekend/libur.
+  // Hanya PHL yang sudah tertaut dari workflow PHL independen atau record legacy
+  // yang tetap tampil pada halaman absensi.
+  if (row.log?.phl_work_request_id) return true;
+  if (row.log?.is_phl_candidate === true) return true;
 
-  return hasAttendance && (row.is_weekend || Boolean(row.holiday_name));
+  return false;
 }
 
 function getSubmittedStatus(row: CalendarDayRow, draft: RowDraft) {
@@ -4098,6 +4115,8 @@ function getDisplayStatus(row: CalendarDayRow, draft: RowDraft) {
   const meta = getDailyTypeMeta(draft.daily_type);
 
   if (isOffDayPHLOptOut(row, draft)) return "off_day";
+
+  if (row.log?.phl_work_request_id) return "phl";
 
   if (isPotentialPHL(row, draft)) {
     if (row.log?.supervisor_approval_status === "approved") return "phl";

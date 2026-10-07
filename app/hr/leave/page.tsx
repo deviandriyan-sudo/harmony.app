@@ -2825,7 +2825,7 @@ function PHLBalanceTab({
 
       <DataTable
         emptyTitle="Belum ada saldo PHL"
-        emptyDescription="Saldo PHL akan muncul setelah PHL dari absensi disetujui."
+        emptyDescription="Saldo PHL akan muncul setelah pengajuan PHL kerja disetujui atasan."
         minWidth="1300px"
         headers={[
           'Karyawan',

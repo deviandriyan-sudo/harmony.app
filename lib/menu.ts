@@ -7,6 +7,7 @@ import {
   Settings,
   UserCheck,
   Users,
+  WalletCards,
 } from 'lucide-react'
 
 export const hrMenu = [
@@ -36,7 +37,14 @@ export const hrMenu = [
     title: 'Cuti & Izin',
     href: '/hr/leave',
     icon: CalendarDays,
-    subtitle: 'Cuti, izin, PHL & postpone',
+    subtitle: 'Cuti, izin & postpone',
+  },
+  {
+    section: 'HARMONY',
+    title: 'PHL',
+    href: '/hr/phl',
+    icon: WalletCards,
+    subtitle: 'Monitoring PHL & saldo',
   },
   {
     section: 'HARMONY',
@@ -74,7 +82,14 @@ export const employeeMenu = [
     title: 'Cuti & Izin',
     href: '/employee/leave',
     icon: CalendarDays,
-    subtitle: 'Cuti, izin, PHL & postpone',
+    subtitle: 'Cuti, izin & klaim saldo PHL',
+  },
+  {
+    section: 'HARMONY',
+    title: 'PHL',
+    href: '/employee/phl',
+    icon: WalletCards,
+    subtitle: 'Ajukan PHL kerja & saldo',
   },
   {
     section: 'HARMONY',
