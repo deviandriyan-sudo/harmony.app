@@ -1,4 +1,8 @@
 import { supabase } from '@/lib/supabase'
+import type {
+  HarmonyWorkflowNotificationResult,
+  HarmonyWorkflowPayload,
+} from '@/types/notificationWorkflow'
 
 export type NotifyPayload = {
   to: string | string[]
@@ -94,6 +98,87 @@ export async function sendHarmonyEmail(
     if (error?.name === 'AbortError') {
       throw new Error(
         'Pengiriman email melewati batas waktu 20 detik. Cek koneksi Resend dan konfigurasi domain.'
+      )
+    }
+
+    throw error
+  } finally {
+    window.clearTimeout(timeout)
+  }
+}
+
+
+export async function sendHarmonyWorkflowNotification(
+  payload: HarmonyWorkflowPayload,
+): Promise<HarmonyWorkflowNotificationResult> {
+  const { data: sessionData, error: sessionError } =
+    await supabase.auth.getSession()
+
+  if (sessionError) {
+    throw new Error(
+      sessionError.message ||
+        'Session HARMONY tidak dapat dibaca untuk mengirim notifikasi workflow.',
+    )
+  }
+
+  const token = sessionData.session?.access_token
+
+  if (!token) {
+    throw new Error(
+      'Session HARMONY tidak ditemukan. Silakan login ulang sebelum mengirim notifikasi.',
+    )
+  }
+
+  const controller = new AbortController()
+  const timeout = window.setTimeout(() => controller.abort(), 20000)
+
+  try {
+    const response = await fetch('/api/notifications/send-email', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      signal: controller.signal,
+      body: JSON.stringify({
+        mode: 'workflow',
+        workflow: payload.workflow,
+        entityId: payload.entityId || null,
+        data: payload.data || {},
+      }),
+    })
+
+    const result = await response.json().catch(() => null)
+
+    if (!response.ok) {
+      const details = [
+        result?.message,
+        result?.code ? `Code: ${result.code}` : '',
+      ]
+        .filter(Boolean)
+        .join(' · ')
+
+      throw new Error(
+        details ||
+          `Workflow notifikasi gagal diproses (HTTP ${response.status}).`,
+      )
+    }
+
+    return {
+      ok: result?.ok === true,
+      message:
+        result?.message ||
+        (result?.ok === true
+          ? 'Email notifikasi berhasil dikirim.'
+          : 'Email notifikasi belum terkirim lengkap.'),
+      sent: Number(result?.sent || 0),
+      failed: Number(result?.failed || 0),
+      details: Array.isArray(result?.details) ? result.details : [],
+    }
+  } catch (error: any) {
+    if (error?.name === 'AbortError') {
+      throw new Error(
+        'Pengiriman workflow email melewati batas waktu 20 detik. Cek koneksi Resend dan konfigurasi domain.',
       )
     }
 

@@ -26,7 +26,7 @@ import {
 import { Topbar } from '@/components/layout/Topbar'
 import { HarmonyAttachmentViewer } from '@/components/attachments/HarmonyAttachments'
 import { supabase } from '@/lib/supabase'
-import { sendHarmonyEmail } from '@/lib/notifications'
+import { sendHarmonyWorkflowNotification } from '@/lib/notifications'
 
 type AppUser = {
   id: string
@@ -484,34 +484,6 @@ export default function EmployeeApprovalDetailPage() {
     return true
   }
 
-  function getAppBaseUrl() {
-    if (typeof window === 'undefined') return ''
-    return window.location.origin
-  }
-
-  function isValidEmailAddress(value: string | null | undefined) {
-    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || '').trim())
-  }
-
-  async function getHrNotificationEmails() {
-    const { data, error } = await supabase
-      .from('app_users')
-      .select('email, role, is_active')
-
-    if (error) {
-      console.warn('HR email notification warning:', error)
-      return []
-    }
-
-    const emails = (data || [])
-      .filter((user) => user.is_active !== false)
-      .filter((user) => normalizeStatus(user.role).includes('hr'))
-      .map((user) => String(user.email || '').trim())
-      .filter(isValidEmailAddress)
-
-    return Array.from(new Set(emails))
-  }
-
   async function sendSupervisorApprovalNotification({
     action,
     scope,
@@ -525,56 +497,22 @@ export default function EmployeeApprovalDetailPage() {
     note?: string
     totalDays?: number
   }) {
-    const employeeEmail = String(employee?.email || '').trim()
-    const validEmployeeEmail = isValidEmailAddress(employeeEmail)
-    const hrEmails = action === 'approved' ? await getHrNotificationEmails() : []
-
-    if (!validEmployeeEmail && hrEmails.length === 0) {
-      return 'Email notifikasi belum terkirim karena email employee/HR belum tersedia.'
-    }
-
-    const baseUrl = getAppBaseUrl()
-    const periodText = `${formatDisplayDate(periodRange.start)} s.d. ${formatDisplayDate(periodRange.end)}`
-    const supervisorName = getSupervisorName()
-    const employeeName = employee?.full_name || '-'
-    const actionLabel = action === 'approved' ? 'disetujui' : 'ditolak'
-    const scopeLabel =
-      scope === 'period'
-        ? 'periode absensi'
-        : scope === 'selected'
-          ? `${totalDays || 0} tanggal absensi`
-          : `absensi tanggal ${date ? formatDisplayDate(date) : '-'}`
-
-    const recipients = validEmployeeEmail ? [employeeEmail] : hrEmails
-    const ccRecipients = validEmployeeEmail ? hrEmails.filter((email) => email !== employeeEmail) : []
-
-    await sendHarmonyEmail({
-      to: recipients,
-      cc: ccRecipients.length > 0 ? ccRecipients : undefined,
-      subject: `[HARMONY] Absensi ${employeeName} ${actionLabel} atasan`,
-      title: `Absensi ${actionLabel.charAt(0).toUpperCase()}${actionLabel.slice(1)} Atasan`,
-      message: [
-        `Halo,`,
-        ``,
-        `${scopeLabel} milik ${employeeName} untuk periode ${periodText} sudah ${actionLabel} oleh ${supervisorName}.`,
-        note ? `Catatan atasan: ${note}` : '',
-        action === 'approved'
-          ? `Status sekarang siap diproses HR pada menu Final Report.`
-          : `Silakan cek kembali data absensi dan lakukan revisi bila diperlukan.`,
-      ]
-        .filter(Boolean)
-        .join('\n'),
-      actionLabel: 'Buka HARMONY',
-      actionUrl:
-        action === 'approved' && hrEmails.length > 0
-          ? `${baseUrl}/hr/attendance/final-report`
-          : `${baseUrl}/employee/attendance`,
-      footer: 'Email ini dikirim otomatis oleh HARMONY setelah approval absensi diproses atasan.',
+    const result = await sendHarmonyWorkflowNotification({
+      workflow: 'supervisor_attendance_decision',
+      data: {
+        targetEmployeeId: employeeId,
+        periodMonth,
+        action,
+        scope,
+        date: date || null,
+        note: note || '',
+        totalDays: totalDays || 0,
+      },
     })
 
-    return validEmployeeEmail
-      ? 'Notifikasi email sudah dikirim ke employee.'
-      : 'Notifikasi email sudah dikirim ke HR, tetapi email employee belum tersedia.'
+    return result.ok
+      ? result.message
+      : `Email notifikasi belum terkirim lengkap: ${result.message}`
   }
 
   async function handleDailyApproval(log: AttendanceLog, action: DailyAction, note = '') {

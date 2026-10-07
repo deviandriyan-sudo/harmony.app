@@ -14,7 +14,7 @@ import {
 } from 'lucide-react'
 
 import { supabase } from '@/lib/supabase'
-import { sendHarmonyEmail } from '@/lib/notifications'
+import { sendHarmonyWorkflowNotification } from '@/lib/notifications'
 import { Topbar } from '@/components/layout/Topbar'
 
 type Employee = {
@@ -139,20 +139,6 @@ function statusClass(status?: string | null) {
   if (value === 'pending_hr') return 'border-blue-200 bg-blue-50 text-blue-700'
 
   return 'border-amber-200 bg-amber-50 text-amber-700'
-}
-
-function uniqueEmails(values: Array<string | null | undefined>) {
-  const emails = new Set<string>()
-
-  values.forEach((value) => {
-    const email = String(value || '').trim().toLowerCase()
-
-    if (email && email.includes('@')) {
-      emails.add(email)
-    }
-  })
-
-  return Array.from(emails)
 }
 
 export default function EmployeePostponeApprovalPage() {
@@ -286,48 +272,6 @@ export default function EmployeePostponeApprovalPage() {
     return 0
   }
 
-  function findRequesterEmployee(request: LeavePostponeRequest) {
-    const requestEmployeeNumber = normalize(request.employee_number)
-    const requestFullName = normalize(request.full_name)
-
-    return (
-      employees.find((employee) => {
-        return (
-          normalize(employee.id) === normalize(request.employee_id) ||
-          normalize(employee.employee_number) === requestEmployeeNumber ||
-          normalize(employee.nip) === requestEmployeeNumber ||
-          normalize(employee.machine_pin) === requestEmployeeNumber ||
-          normalize(employee.full_name) === requestFullName ||
-          normalize(employee.employee_name) === requestFullName ||
-          normalize(employee.name) === requestFullName
-        )
-      }) || null
-    )
-  }
-
-  async function getHrEmails() {
-    const { data, error } = await supabase
-      .from('app_users')
-      .select('email, role, is_active')
-
-    if (error) {
-      console.warn('HR email lookup warning:', error)
-      return []
-    }
-
-    return uniqueEmails(
-      ((data || []) as Array<{ email?: string | null; role?: string | null; is_active?: boolean | null }>)
-        .filter((user) => {
-          const role = normalize(user.role)
-          return (
-            user.is_active !== false &&
-            ['hr', 'admin', 'super_admin', 'human_resources'].includes(role)
-          )
-        })
-        .map((user) => user.email)
-    )
-  }
-
   async function notifyPostponeApprovalDecision({
     request,
     decision,
@@ -342,62 +286,20 @@ export default function EmployeePostponeApprovalPage() {
     nextStage: string
   }) {
     try {
-      const requester = findRequesterEmployee(request)
-      const requesterEmail = requester?.email || null
-      const requesterName = request.full_name || getEmployeeName(requester)
-      const actorName = getEmployeeName(currentEmployee)
-
-      if (!requesterEmail) {
-        return {
-          success: false,
-          message: 'Email karyawan pemohon belum tersedia pada master employee.',
-        }
-      }
-
-      const hrEmails = decision === 'approved' && nextStage === 'Menunggu HR'
-        ? await getHrEmails()
-        : []
-
-      const title = decision === 'approved'
-        ? 'Postpone Cuti Disetujui Atasan'
-        : 'Postpone Cuti Ditolak Atasan'
-
-      const subject = decision === 'approved'
-        ? `[HARMONY] Postpone Cuti Disetujui Atasan ${level}`
-        : `[HARMONY] Postpone Cuti Ditolak Atasan ${level}`
-
-      const message = [
-        `Halo ${requesterName || '-'},`,
-        '',
-        `Pengajuan postpone sisa cuti tahunan kamu telah ${decision === 'approved' ? 'disetujui' : 'ditolak'} oleh ${actorName}.`,
-        '',
-        'Detail Pengajuan:',
-        `- Jumlah hari diajukan: ${request.requested_days || 0} hari`,
-        `- Sisa cuti lama: ${request.remaining_days || 0} hari`,
-        `- Tanggal expired baru: ${formatDate(request.new_expired_at)}`,
-        `- Tahap berikutnya: ${nextStage}`,
-        `- Catatan atasan: ${note || '-'}`,
-        '',
-        decision === 'approved'
-          ? 'Silakan pantau status lanjutan melalui menu Cuti & Izin.'
-          : 'Silakan cek catatan penolakan melalui menu Cuti & Izin.',
-      ].join('\n')
-
-      await sendHarmonyEmail({
-        to: requesterEmail,
-        cc: hrEmails.length > 0 ? hrEmails : undefined,
-        subject,
-        title,
-        message,
-        actionLabel: 'Buka Cuti & Izin',
-        actionUrl: `${window.location.origin}/employee/leave`,
+      const result = await sendHarmonyWorkflowNotification({
+        workflow: 'supervisor_postpone_decision',
+        entityId: request.id,
+        data: {
+          decision,
+          note,
+          level,
+          nextStage,
+        },
       })
 
       return {
-        success: true,
-        message: hrEmails.length > 0
-          ? `Email terkirim ke employee dan HR.`
-          : `Email terkirim ke employee.`,
+        success: result.ok,
+        message: result.message,
       }
     } catch (error: any) {
       console.warn('Postpone approval notification warning:', error)

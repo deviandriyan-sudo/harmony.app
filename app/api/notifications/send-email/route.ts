@@ -7,10 +7,13 @@ import {
   isValidNotificationEmail,
   sendHarmonyServerEmail,
 } from '@/lib/notifications-server'
+import { sendCoreWorkflowNotification } from '@/lib/server/core-workflow-notifications'
+import type { HarmonyWorkflowKey } from '@/types/notificationWorkflow'
 
 export const runtime = 'nodejs'
 
 type SendEmailPayload = {
+  mode?: 'custom'
   to?: string | string[]
   cc?: string | string[]
   bcc?: string | string[]
@@ -19,6 +22,21 @@ type SendEmailPayload = {
   text?: string
   replyTo?: string
 }
+
+type WorkflowEmailPayload = {
+  mode: 'workflow'
+  workflow?: HarmonyWorkflowKey
+  entityId?: string | null
+  data?: Record<string, unknown>
+}
+
+const PRIVILEGED_EMAIL_ROLES = new Set([
+  'hr',
+  'admin',
+  'administrator',
+  'super_admin',
+  'human_resources',
+])
 
 function normalizeRole(value: unknown) {
   return String(value || '').trim().toLowerCase()
@@ -292,130 +310,126 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const auth =
-      await getAuthenticatedAppUser(request)
+    const auth = await getAuthenticatedAppUser(request)
 
     if (!auth.ok) {
-      return buildError(
-        auth.message,
-        auth.status
-      )
+      return buildError(auth.message, auth.status)
     }
 
-    const payload =
-      (await request
-        .json()
-        .catch(() => null)) as
-        | SendEmailPayload
-        | null
+    const payload = (await request.json().catch(() => null)) as
+      | SendEmailPayload
+      | WorkflowEmailPayload
+      | null
 
     if (!payload) {
+      return buildError('Payload email tidak valid.')
+    }
+
+    if (payload.mode === 'workflow') {
+      if (!payload.workflow) {
+        return buildError('Workflow notifikasi wajib diisi.')
+      }
+
+      try {
+        const result = await sendCoreWorkflowNotification({
+          admin: auth.admin,
+          appUser: auth.appUser,
+          authEmail: normalizeEmail(auth.authUser.email),
+          workflow: payload.workflow,
+          entityId: payload.entityId || null,
+          data: payload.data || {},
+        })
+
+        return NextResponse.json({
+          ok: result.ok,
+          message: result.message,
+          sent: result.sent,
+          failed: result.failed,
+          details: result.details || [],
+        })
+      } catch (workflowError: any) {
+        return buildError(
+          workflowError?.message || 'Workflow notifikasi HARMONY gagal diproses.',
+          Number(workflowError?.status || 500),
+          { code: 'HARMONY_WORKFLOW_NOTIFICATION_ERROR' },
+        )
+      }
+    }
+
+    const role = normalizeRole(auth.appUser.role)
+    if (!PRIVILEGED_EMAIL_ROLES.has(role)) {
       return buildError(
-        'Payload email tidak valid.'
+        'Pengiriman email custom hanya dapat dilakukan oleh HR/Admin. Workflow employee harus memakai template server HARMONY.',
+        403,
+        { code: 'CUSTOM_EMAIL_FORBIDDEN' },
       )
     }
 
     const to = normalizeRecipients(payload.to)
     const cc = normalizeRecipients(payload.cc)
     const bcc = normalizeRecipients(payload.bcc)
-    const allRecipients = Array.from(
-      new Set([...to, ...cc, ...bcc])
-    )
+    const allRecipients = Array.from(new Set([...to, ...cc, ...bcc]))
 
     if (to.length === 0) {
-      return buildError(
-        'Penerima email wajib diisi.'
-      )
+      return buildError('Penerima email wajib diisi.')
     }
 
     if (allRecipients.length > 50) {
-      return buildError(
-        'Jumlah penerima maksimal 50 alamat per pengiriman.'
-      )
+      return buildError('Jumlah penerima maksimal 50 alamat per pengiriman.')
     }
 
-    const invalidFormat =
-      allRecipients.filter(
-        (email) =>
-          !isValidNotificationEmail(email)
-      )
+    const invalidFormat = allRecipients.filter(
+      (email) => !isValidNotificationEmail(email),
+    )
 
     if (invalidFormat.length > 0) {
-      return buildError(
-        `Format email tidak valid: ${invalidFormat.join(', ')}`
-      )
+      return buildError(`Format email tidak valid: ${invalidFormat.join(', ')}`)
     }
 
-    const recipientCheck =
-      await validateRecipientsAreHarmonyUsers(
-        auth.admin,
-        allRecipients
-      )
+    const recipientCheck = await validateRecipientsAreHarmonyUsers(
+      auth.admin,
+      allRecipients,
+    )
 
     if (!recipientCheck.ok) {
       return buildError(
-        recipientCheck.message ||
-          'Penerima email tidak lolos validasi HARMONY.',
+        recipientCheck.message || 'Penerima email tidak lolos validasi HARMONY.',
         400,
-        {
-          invalid_recipients:
-            recipientCheck.invalid,
-        }
+        { invalid_recipients: recipientCheck.invalid },
       )
     }
 
-    const result =
-      await sendHarmonyServerEmail({
-        to,
-        cc,
-        bcc,
-        subject: String(
-          payload.subject || ''
-        ).trim(),
-        html: String(
-          payload.html || ''
-        ),
-        text: String(
-          payload.text || ''
-        ),
-        replyTo: String(
-          payload.replyTo || ''
-        ).trim(),
-      })
+    const result = await sendHarmonyServerEmail({
+      to,
+      cc,
+      bcc,
+      subject: String(payload.subject || '').trim(),
+      html: String(payload.html || ''),
+      text: String(payload.text || ''),
+      replyTo: String(payload.replyTo || '').trim(),
+    })
 
     if (!result.ok) {
-      return buildError(
-        result.message,
-        502,
-        {
-          code:
-            'EMAIL_PROVIDER_ERROR',
-          hint:
-            'Buka HR → Pengaturan → Diagnostik Email untuk mengecek environment dan domain Resend.',
-          detail: result.detail || null,
-        }
-      )
+      return buildError(result.message, 502, {
+        code: 'EMAIL_PROVIDER_ERROR',
+        hint: 'Buka HR → Pengaturan → Diagnostik Email untuk mengecek environment dan domain Resend.',
+        detail: result.detail || null,
+      })
     }
 
     return NextResponse.json({
       ok: true,
-      message:
-        'Email notifikasi berhasil dikirim.',
-      provider_id:
-        result.providerId || null,
+      message: 'Email notifikasi berhasil dikirim.',
+      provider_id: result.providerId || null,
       sent_to: to,
       cc,
       bcc,
     })
   } catch (error: any) {
     return buildError(
-      error?.message ||
-        'Terjadi kesalahan pada pusat notifikasi HARMONY.',
+      error?.message || 'Terjadi kesalahan pada pusat notifikasi HARMONY.',
       500,
-      {
-        code:
-          'HARMONY_NOTIFICATION_ERROR',
-      }
+      { code: 'HARMONY_NOTIFICATION_ERROR' },
     )
   }
 }

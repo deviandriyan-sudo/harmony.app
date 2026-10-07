@@ -170,6 +170,10 @@ function summarize(results: Array<{ target: string; result: HarmonyServerEmailRe
   }
 }
 
+function missingRecipient(message: string): HarmonyServerEmailResult {
+  return { ok: false, message }
+}
+
 export async function notifyRemedClaimSubmitted(
   admin: SupabaseClient,
   claimId: string,
@@ -205,6 +209,83 @@ export async function notifyRemedClaimSubmitted(
   })
 
   return summarize([{ target: hrEmails.join(', '), result }])
+}
+
+export async function notifyRemedClaimCancelled(
+  admin: SupabaseClient,
+  claimId: string,
+  actorEmail: string,
+  reason: string,
+  priorStatus?: string | null,
+): Promise<WorkflowNotificationResult> {
+  const claim = await getClaim(admin, claimId)
+  if (!claim) return { ok: false, sent: 0, failed: 0, message: 'Data claim tidak ditemukan untuk notifikasi pembatalan.' }
+
+  const actorName = await resolveActorName(admin, actorEmail)
+  const employeeName = clean(claim.employee?.full_name) || actorName || 'Karyawan'
+  const hrEmails = await getRemedRoleEmails(admin, 'hr')
+  const normalizedPriorStatus = clean(priorStatus).toLowerCase()
+  const financeWasInvolved = [
+    'pending_finance',
+    'waiting_payment',
+    'approved_finance',
+    'paid',
+  ].includes(normalizedPriorStatus)
+  const results: Array<{ target: string; result: HarmonyServerEmailResult }> = []
+
+  const baseMessage = [
+    `${employeeName} telah membatalkan klaim Re-Med.`,
+    '',
+    `Nomor klaim: ${clean(claim.claim_number) || '-'}`,
+    `Jenis klaim: ${clean(claim.claim_type?.name) || '-'}`,
+    `Nominal diajukan: ${rupiah(claim.submitted_amount)}`,
+    `Dibatalkan oleh: ${actorName}`,
+    `Alasan pembatalan: ${clean(reason) || '-'}`,
+    'Status berikutnya: Dibatalkan. Klaim tidak lagi diproses.',
+  ]
+
+  if (hrEmails.length) {
+    results.push({
+      target: hrEmails.join(', '),
+      result: await sendTemplate({
+        to: hrEmails,
+        subject: `[HARMONY Re-Med] Klaim Dibatalkan Employee - ${clean(claim.claim_number) || claim.id}`,
+        title: 'Klaim Re-Med Dibatalkan Employee',
+        message: ['Yth. Tim HR Re-Med,', '', ...baseMessage].join('\n'),
+        actionLabel: 'Buka Klaim Re-Med HR',
+        path: '/remed/hr/claims',
+      }),
+    })
+  } else {
+    results.push({
+      target: 'HR',
+      result: missingRecipient('Email HR Re-Med wajib tetapi tidak ditemukan.'),
+    })
+  }
+
+  if (financeWasInvolved) {
+    const financeEmails = await getRemedRoleEmails(admin, 'finance')
+    if (financeEmails.length) {
+      results.push({
+        target: financeEmails.join(', '),
+        result: await sendTemplate({
+          to: financeEmails,
+          subject: `[HARMONY Re-Med] Klaim Dibatalkan Employee - ${clean(claim.claim_number) || claim.id}`,
+          title: 'Klaim Re-Med Dibatalkan Employee',
+          message: ['Yth. Tim Finance Re-Med,', '', ...baseMessage].join('\n'),
+          actionLabel: 'Buka Klaim Re-Med Finance',
+          path: '/remed/finance/claims',
+        }),
+      })
+    } else {
+      results.push({
+        target: 'Finance',
+        result: missingRecipient('Email Finance Re-Med wajib tetapi tidak ditemukan.'),
+      })
+    }
+  }
+
+  return summarize(results)
 }
 
 export async function notifyRemedHrDecision(
@@ -245,6 +326,11 @@ export async function notifyRemedHrDecision(
       path: '/remed/employee/claims',
     })
     results.push({ target: employeeEmail, result: employeeResult })
+  } else {
+    results.push({
+      target: 'Employee',
+      result: missingRecipient('Email employee wajib tetapi tidak ditemukan.'),
+    })
   }
 
   if (approved) {
@@ -270,6 +356,11 @@ export async function notifyRemedHrDecision(
         path: '/remed/finance/claims',
       })
       results.push({ target: financeEmails.join(', '), result: financeResult })
+    } else {
+      results.push({
+        target: 'Finance',
+        result: missingRecipient('Email Finance Re-Med wajib tetapi tidak ditemukan.'),
+      })
     }
   }
 

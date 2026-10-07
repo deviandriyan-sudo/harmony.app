@@ -18,7 +18,7 @@ import {
 
 import { supabase } from '@/lib/supabase'
 import { Topbar } from '@/components/layout/Topbar'
-import { sendHarmonyEmail } from '@/lib/notifications'
+import { sendHarmonyWorkflowNotification } from '@/lib/notifications'
 
 type AppUser = {
   id: string
@@ -223,151 +223,24 @@ type NotificationResult = {
   message: string
 }
 
-function uniqueEmailList(values: Array<string | null | undefined>) {
-  return Array.from(
-    new Set(
-      values
-        .map((value) => String(value || '').trim().toLowerCase())
-        .filter((value) => value.includes('@'))
-    )
-  )
-}
-
-function getHarmonyBaseUrl() {
-  if (typeof window !== 'undefined') {
-    return window.location.origin
-  }
-
-  return process.env.NEXT_PUBLIC_SITE_URL || ''
-}
-
-function employeeMatchesReference(employee: Employee, reference: string) {
-  const value = normalize(reference)
-
-  if (!value) return false
-
-  return [
-    employee.id,
-    employee.full_name,
-    employee.employee_name,
-    employee.name,
-    employee.employee_number,
-    employee.nip,
-    employee.machine_pin,
-    employee.email,
-  ].some((item) => normalize(item) === value)
-}
-
-async function getHrNotificationEmails() {
-  const { data, error } = await supabase
-    .from('app_users')
-    .select('email, role, is_active')
-    .eq('is_active', true)
-    .ilike('role', '%hr%')
-
-  if (error) {
-    console.warn('HR email lookup warning:', error)
-    return []
-  }
-
-  return uniqueEmailList((data || []).map((item: any) => item.email))
-}
-
-async function getPostponeNotificationRecipients(employee: Employee) {
-  const supervisorReferences = [employee.supervisor_1, employee.supervisor_2]
-    .map((item) => normalize(item))
-    .filter(Boolean)
-
-  let supervisorEmails: string[] = []
-
-  if (supervisorReferences.length > 0) {
-    const { data, error } = await supabase
-      .from('employees')
-      .select('id, full_name, name, employee_name, employee_number, nip, machine_pin, email, is_active')
-      .eq('is_active', true)
-
-    if (error) {
-      console.warn('Supervisor email lookup warning:', error)
-    } else {
-      supervisorEmails = uniqueEmailList(
-        ((data || []) as Employee[])
-          .filter((item) => {
-            return supervisorReferences.some((reference) =>
-              employeeMatchesReference(item, reference)
-            )
-          })
-          .map((item) => item.email)
-      )
-    }
-  }
-
-  const hrEmails = await getHrNotificationEmails()
-
-  return {
-    to: supervisorEmails.length > 0 ? supervisorEmails : hrEmails,
-    cc: supervisorEmails.length > 0 ? hrEmails : [],
-    supervisorCount: supervisorEmails.length,
-    hrCount: hrEmails.length,
-  }
-}
-
 async function notifyPostponeRequestSubmitted({
-  employee,
-  selectedCycle,
-  requestedDays,
-  oldCycleEnd,
-  deadline,
-  expiredAt,
-  reason,
+  requestId,
+  sourceCycleId,
 }: {
-  employee: Employee
-  selectedCycle: AnnualLeaveCycle
-  requestedDays: number
-  oldCycleEnd: string
-  deadline: string
-  expiredAt: string
-  reason: string
+  requestId?: string | null
+  sourceCycleId: string
 }): Promise<NotificationResult> {
-  const recipients = await getPostponeNotificationRecipients(employee)
-  const toEmails = uniqueEmailList(recipients.to)
-  const ccEmails = uniqueEmailList(recipients.cc)
-
-  if (toEmails.length === 0 && ccEmails.length === 0) {
-    return {
-      success: false,
-      count: 0,
-      message: 'Email atasan atau HR belum ditemukan.',
-    }
-  }
-
   try {
-    await sendHarmonyEmail({
-      to: toEmails.length > 0 ? toEmails : ccEmails,
-      cc: toEmails.length > 0 ? ccEmails : [],
-      subject: `[HARMONY] Pengajuan Postpone Cuti - ${getName(employee)}`,
-      title: 'Pengajuan Postpone Cuti Baru',
-      message: [
-        `Karyawan ${getName(employee)} mengajukan postpone sisa cuti tahunan.`,
-        '',
-        `NIP / Employee Number: ${getEmployeeNumber(employee) || '-'}`,
-        `Departemen: ${getDepartment(employee) || selectedCycle.department || '-'}`,
-        `Jumlah hari diajukan: ${requestedDays} hari`,
-        `Cycle berakhir: ${formatDate(oldCycleEnd)}`,
-        `Batas pengajuan: ${formatDate(deadline)}`,
-        `Berlaku sampai: ${formatDate(expiredAt)}`,
-        '',
-        `Alasan: ${reason || '-'}`,
-        '',
-        'Silakan buka HARMONY untuk melakukan pengecekan dan approval.',
-      ].join('\n'),
-      actionLabel: 'Buka HARMONY',
-      actionUrl: `${getHarmonyBaseUrl()}/login`,
+    const result = await sendHarmonyWorkflowNotification({
+      workflow: 'postpone_request_submitted',
+      entityId: requestId || null,
+      data: { sourceCycleId },
     })
 
     return {
-      success: true,
-      count: uniqueEmailList([...toEmails, ...ccEmails]).length,
-      message: 'Email notifikasi berhasil dikirim.',
+      success: result.ok,
+      count: result.sent,
+      message: result.message,
     }
   } catch (error: any) {
     return {
@@ -377,7 +250,6 @@ async function notifyPostponeRequestSubmitted({
     }
   }
 }
-
 
 export default function EmployeeLeavePostponePage() {
   const [loading, setLoading] = useState(true)
@@ -609,13 +481,8 @@ export default function EmployeeLeavePostponePage() {
       const serverResult = result?.result || {}
 
       const notificationResult = await notifyPostponeRequestSubmitted({
-        employee,
-        selectedCycle,
-        requestedDays,
-        oldCycleEnd: serverResult.old_cycle_end || computed.oldCycleEnd,
-        deadline: serverResult.postpone_deadline || computed.deadline,
-        expiredAt: serverResult.expired_at || computed.expiredAt,
-        reason: reason.trim(),
+        requestId: serverResult.request_id || serverResult.id || null,
+        sourceCycleId: selectedCycle.id,
       })
 
       setReason('')
@@ -683,9 +550,23 @@ export default function EmployeeLeavePostponePage() {
         throw new Error(result.message || 'Postpone belum berhasil dibatalkan.')
       }
 
+      let notificationText = ''
+      try {
+        const notification = await sendHarmonyWorkflowNotification({
+          workflow: 'postpone_request_cancelled',
+          entityId: item.id,
+          data: { note: note.trim() },
+        })
+        notificationText = notification.ok
+          ? ` ${notification.message}`
+          : ` Namun email pembatalan belum terkirim lengkap: ${notification.message}`
+      } catch (notificationError: any) {
+        notificationText = ` Namun email pembatalan gagal diproses: ${notificationError?.message || 'terjadi kendala notifikasi'}.`
+      }
+
       setMessage({
         type: 'success',
-        text: result.message || 'Pengajuan postpone berhasil dibatalkan sebelum approval atasan.',
+        text: `${result.message || 'Pengajuan postpone berhasil dibatalkan sebelum approval atasan.'}${notificationText}`,
       })
       await fetchData()
     } catch (error: any) {

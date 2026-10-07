@@ -79,9 +79,11 @@ export default function Page() {
     setModalError('')
 
     try {
+      let result: { notification?: { ok?: boolean; message?: string } | null }
+
       if (mode === 'balance') {
         const targetAvailable = parseMoneyInput(remainingInput)
-        await remedFetch('/api/remed/hr/entitlements', {
+        result = await remedFetch('/api/remed/hr/entitlements', {
           method: 'PUT',
           body: JSON.stringify({
             action: 'adjust_balance',
@@ -93,7 +95,7 @@ export default function Page() {
         })
       } else {
         const plafondTotal = parseMoneyInput(plafondInput)
-        await remedFetch('/api/remed/hr/entitlements', {
+        result = await remedFetch('/api/remed/hr/entitlements', {
           method: 'PUT',
           body: JSON.stringify({
             action: 'set_plafond',
@@ -107,6 +109,9 @@ export default function Page() {
 
       await load()
       setSelected(null)
+      if (result.notification?.ok === false) {
+        window.alert(`Data plafond berhasil disimpan, tetapi email notifikasi belum terkirim lengkap: ${result.notification.message || 'cek konfigurasi notifikasi.'}`)
+      }
     } catch (error: any) {
       setModalError(error?.message || 'Gagal memperbarui plafond.')
     } finally {

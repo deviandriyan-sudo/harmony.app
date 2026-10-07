@@ -25,10 +25,33 @@ export default function EmployeeClaimsPage() {
   useEffect(() => { void load() }, [])
 
   async function cancel(claim: RemedClaim) {
+    const reason = window.prompt(
+      `Alasan pembatalan ${claim.claim_number}:`,
+      'Dibatalkan oleh employee sebelum review HR.',
+    )
+    if (reason === null) return
+    if (reason.trim().length < 3) {
+      window.alert('Alasan pembatalan minimal 3 karakter.')
+      return
+    }
     if (!window.confirm(`Batalkan ${claim.claim_number}?`)) return
+
     try {
-      await remedFetch(`/api/remed/claims/${claim.id}/cancel`, { method: 'POST', body: JSON.stringify({ reason: 'Dibatalkan oleh employee.' }) })
+      const result = await remedFetch<{ notification?: { ok?: boolean; message?: string } }>(
+        `/api/remed/claims/${claim.id}/cancel`,
+        {
+          method: 'POST',
+          body: JSON.stringify({ reason: reason.trim() }),
+        },
+      )
+
+      const notification = result?.notification
       await load()
+      if (notification?.ok === false) {
+        setMessage(
+          `Klaim berhasil dibatalkan, tetapi email pembatalan belum terkirim lengkap: ${notification.message || 'cek konfigurasi notifikasi.'}`,
+        )
+      }
     } catch (error: any) {
       window.alert(error?.message || 'Gagal membatalkan klaim.')
     }

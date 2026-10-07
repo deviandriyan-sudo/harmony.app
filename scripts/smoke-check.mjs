@@ -47,6 +47,8 @@ const requiredFiles = [
   'lib/harmony-client.ts',
   'lib/version.ts',
   'lib/server/workflow-notifications.ts',
+  'lib/server/core-workflow-notifications.ts',
+  'types/notificationWorkflow.ts',
 ]
 
 for (const file of requiredFiles) {
@@ -90,9 +92,19 @@ assert(sourceText.includes('notifyRemedHrDecision'), 'Notifikasi keputusan HR Re
 assert(sourceText.includes('notifyRemedFinanceDecision'), 'Notifikasi keputusan Finance Re-Med belum terpasang.')
 assert(sourceText.includes('notifyRemedPaymentCompleted'), 'Notifikasi pembayaran Re-Med belum terpasang.')
 assert(sourceText.includes('notifyRemedEntitlementChanged'), 'Notifikasi perubahan plafond Re-Med belum terpasang.')
+assert(sourceText.includes('notifyRemedClaimCancelled'), 'Notifikasi pembatalan Re-Med belum terpasang.')
+assert(sourceText.includes('CUSTOM_EMAIL_FORBIDDEN'), 'Hardening endpoint email custom belum terpasang.')
+assert(sourceText.includes('leave_request_cancelled'), 'Notifikasi pembatalan Cuti/Izin/PHL belum terpasang.')
+assert(sourceText.includes('postpone_request_cancelled'), 'Notifikasi pembatalan Postpone belum terpasang.')
+
+const employeeSourceText = walk(path.join(root, 'app', 'employee'))
+  .filter((file) => /\.(ts|tsx)$/.test(file))
+  .map((file) => fs.readFileSync(file, 'utf8'))
+  .join('\n')
+assert(!employeeSourceText.includes('sendHarmonyEmail('), 'Employee/supervisor masih dapat memanggil email custom; wajib memakai workflow template server.')
 
 const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'))
-assert(pkg.version === '3.1.2', `package.json version harus 3.1.2, saat ini ${pkg.version}`)
+assert(pkg.version === '3.2.0', `package.json version harus 3.2.0, saat ini ${pkg.version}`)
 assert(Boolean(pkg.scripts?.['test:smoke']), 'Script test:smoke belum tersedia.')
 
 if (warnings.length) {

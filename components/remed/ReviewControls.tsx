@@ -5,6 +5,22 @@ import { Check, Loader2, Upload, X } from 'lucide-react'
 import { remedFetch } from '@/lib/remed-client'
 import type { RemedClaim } from '@/types/remed'
 
+type NotificationResult = {
+  ok?: boolean
+  message?: string
+}
+
+type ActionResponse = {
+  success?: boolean
+  notification?: NotificationResult | null
+}
+
+function warnNotification(result: ActionResponse | null | undefined, actionLabel: string) {
+  if (result?.notification?.ok === false) {
+    window.alert(`${actionLabel} berhasil, tetapi email notifikasi belum terkirim lengkap: ${result.notification.message || 'cek konfigurasi notifikasi.'}`)
+  }
+}
+
 export function HrReviewControls({ claim, onDone }: { claim: RemedClaim; onDone: () => void }) {
   const [loading, setLoading] = useState(false)
 
@@ -15,10 +31,11 @@ export function HrReviewControls({ claim, onDone }: { claim: RemedClaim; onDone:
     if (decision === 'reject' && note === null) return
     setLoading(true)
     try {
-      await remedFetch(`/api/remed/hr/claims/${claim.id}/review`, {
+      const result = await remedFetch<ActionResponse>(`/api/remed/hr/claims/${claim.id}/review`, {
         method: 'POST',
         body: JSON.stringify({ decision, approved_amount: decision === 'approve' ? Number(amountText) : null, note: note || '' }),
       })
+      warnNotification(result, `Keputusan HR ${decision === 'approve' ? 'approve' : 'reject'}`)
       onDone()
     } catch (error: any) {
       window.alert(error?.message || 'Gagal memproses klaim.')
@@ -47,7 +64,8 @@ export function FinanceReviewControls({ claim, onDone }: { claim: RemedClaim; on
     if (decision === 'reject' && note === null) return
     setLoading(true)
     try {
-      await remedFetch(`/api/remed/finance/claims/${claim.id}/review`, { method: 'POST', body: JSON.stringify({ decision, note: note || '' }) })
+      const result = await remedFetch<ActionResponse>(`/api/remed/finance/claims/${claim.id}/review`, { method: 'POST', body: JSON.stringify({ decision, note: note || '' }) })
+      warnNotification(result, `Keputusan Finance ${decision === 'approve' ? 'approve' : 'reject'}`)
       onDone()
     } catch (error: any) {
       window.alert(error?.message || 'Gagal memproses klaim.')
@@ -83,7 +101,8 @@ export function PaymentControls({ claim, onDone }: { claim: RemedClaim; onDone: 
       formData.append('payment_date', date)
       formData.append('payment_reference', reference)
       formData.append('payment_proof', file)
-      await remedFetch(`/api/remed/finance/claims/${claim.id}/payment`, { method: 'POST', body: formData })
+      const result = await remedFetch<ActionResponse>(`/api/remed/finance/claims/${claim.id}/payment`, { method: 'POST', body: formData })
+      warnNotification(result, 'Pembayaran')
       onDone()
     } catch (error: any) {
       window.alert(error?.message || 'Gagal memproses pembayaran.')

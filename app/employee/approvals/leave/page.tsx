@@ -18,7 +18,7 @@ import {
 
 import { HarmonyAttachmentViewer } from '@/components/attachments/HarmonyAttachments'
 import { supabase } from '@/lib/supabase'
-import { sendHarmonyEmail } from '@/lib/notifications'
+import { sendHarmonyWorkflowNotification } from '@/lib/notifications'
 import {
   getApprovalStageLabel,
   getApprovalStageTone,
@@ -352,117 +352,36 @@ function resolveHandoverDisplay(
 }
 
 
-async function getActiveHrEmails() {
-  const { data, error } = await supabase
-    .from('app_users')
-    .select('email,role,is_active')
-    .eq('is_active', true)
-
-  if (error) {
-    console.warn('HR email lookup warning:', error)
-    return [] as string[]
-  }
-
-  return Array.from(
-    new Set(
-      (data || [])
-        .filter((row: any) => normalize(row.role).includes('hr'))
-        .map((row: any) => normalize(row.email))
-        .filter((email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)),
-    ),
-  )
-}
-
 async function sendSupervisorLeaveDecisionNotification({
   request,
-  employee,
-  supervisor,
   decision,
   note,
 }: {
   request: LeaveRequest
-  employee: Employee | null
-  supervisor: Employee
   decision: 'approved' | 'rejected'
   note: string
 }) {
-  const employeeEmail = normalize(employee?.email)
-  const employeeName = getRequestEmployeeName(request, employee || undefined)
-  const supervisorName = getEmployeeName(supervisor)
-  const requestLabel = getRequestTypeLabel(request.request_type, request.leave_type)
-  const approved = decision === 'approved'
-  const periodText = request.start_date && request.end_date
-    ? `${formatDate(request.start_date)} s.d. ${formatDate(request.end_date)}`
-    : request.start_date
-      ? formatDate(request.start_date)
-      : '-'
+  try {
+    const result = await sendHarmonyWorkflowNotification({
+      workflow: 'supervisor_leave_decision',
+      entityId: request.id,
+      data: {
+        sourceTable: request.source_table || 'leave_requests',
+        requestTypeLabel: getRequestTypeLabel(request.request_type, request.leave_type),
+        decision,
+        note,
+      },
+    })
 
-  const results: Array<{ ok: boolean; target: string; message: string }> = []
-
-  if (employeeEmail && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(employeeEmail)) {
-    try {
-      await sendHarmonyEmail({
-        to: employeeEmail,
-        subject: `[HARMONY] ${requestLabel} ${approved ? 'Disetujui' : 'Ditolak'} Atasan`,
-        title: `${requestLabel} ${approved ? 'Disetujui' : 'Ditolak'} Atasan`,
-        message: [
-          `Yth. ${employeeName},`,
-          '',
-          `Pengajuan ${requestLabel} Anda telah ${approved ? 'disetujui' : 'ditolak'} oleh atasan.`,
-          '',
-          `Periode: ${periodText}`,
-          `Jumlah hari: ${request.total_days || 0} hari`,
-          `Diproses oleh: ${supervisorName}`,
-          `Catatan/alasan atasan: ${note || '-'}`,
-          `Status berikutnya: ${approved ? 'Menunggu review HR.' : 'Ditolak atasan. Silakan periksa catatan dan ajukan ulang bila diperlukan.'}`,
-        ].join('\n'),
-        actionLabel: 'Buka Cuti & Izin',
-        actionUrl: `${window.location.origin}/employee/leave`,
-      })
-      results.push({ ok: true, target: employeeEmail, message: 'Email employee terkirim.' })
-    } catch (error: any) {
-      results.push({ ok: false, target: employeeEmail, message: error?.message || 'Email employee gagal.' })
+    return {
+      success: result.ok,
+      message: result.message,
     }
-  }
-
-  if (approved) {
-    const hrEmails = await getActiveHrEmails()
-    if (hrEmails.length > 0) {
-      try {
-        await sendHarmonyEmail({
-          to: hrEmails,
-          subject: `[HARMONY] ${requestLabel} Menunggu Review HR - ${employeeName}`,
-          title: `${requestLabel} Menunggu Review HR`,
-          message: [
-            'Yth. Tim HR HARMONY,',
-            '',
-            `${requestLabel} milik ${employeeName} telah disetujui oleh atasan dan menunggu review HR.`,
-            '',
-            `Periode: ${periodText}`,
-            `Jumlah hari: ${request.total_days || 0} hari`,
-            `Atasan/actor: ${supervisorName}`,
-            `Catatan atasan: ${note || '-'}`,
-            'Status berikutnya: Menunggu review HR.',
-          ].join('\n'),
-          actionLabel: 'Buka Approval HR',
-          actionUrl: `${window.location.origin}/hr/leave`,
-        })
-        results.push({ ok: true, target: hrEmails.join(', '), message: 'Email HR terkirim.' })
-      } catch (error: any) {
-        results.push({ ok: false, target: hrEmails.join(', '), message: error?.message || 'Email HR gagal.' })
-      }
+  } catch (error: any) {
+    return {
+      success: false,
+      message: error?.message || 'Email notifikasi gagal dikirim.',
     }
-  }
-
-  const failed = results.filter((item) => !item.ok)
-  return {
-    success: results.length > 0 && failed.length === 0,
-    message:
-      results.length === 0
-        ? 'Email employee/HR tidak tersedia.'
-        : failed.length === 0
-          ? 'Email notifikasi berhasil dikirim.'
-          : `${failed.length} email notifikasi gagal dikirim.`,
   }
 }
 
@@ -744,13 +663,8 @@ export default function EmployeeLeaveApprovalPage() {
 
       if (approvalResult.error) throw approvalResult.error
 
-      const targetEmployee = request.employee_id
-        ? employeeById.get(request.employee_id) || null
-        : null
       const notification = await sendSupervisorLeaveDecisionNotification({
         request,
-        employee: targetEmployee,
-        supervisor: currentEmployee,
         decision: 'approved',
         note: note || 'Disetujui oleh atasan.',
       })
@@ -818,13 +732,8 @@ export default function EmployeeLeaveApprovalPage() {
 
       if (rejectResult.error) throw rejectResult.error
 
-      const targetEmployee = request.employee_id
-        ? employeeById.get(request.employee_id) || null
-        : null
       const notification = await sendSupervisorLeaveDecisionNotification({
         request,
-        employee: targetEmployee,
-        supervisor: currentEmployee,
         decision: 'rejected',
         note,
       })

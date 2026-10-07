@@ -41,7 +41,7 @@ import {
   isFinalApproved,
   isWorkflowPending,
 } from '@/lib/leave-workflow-status'
-import { sendHarmonyEmail } from '@/lib/notifications'
+import { sendHarmonyWorkflowNotification } from '@/lib/notifications'
 import {
   getActiveHarmonyTypesForScope,
   getHarmonyRequestTypeMeta,
@@ -205,118 +205,29 @@ type LeaveNotificationResult = {
   message: string
 }
 
-function uniqueLeaveEmailList(values: Array<string | null | undefined>) {
-  return Array.from(
-    new Set(
-      values
-        .map((value) => String(value || '').trim().toLowerCase())
-        .filter((value) => value.includes('@'))
-    )
-  )
-}
-
-function getLeaveHarmonyBaseUrl() {
-  if (typeof window !== 'undefined') {
-    return window.location.origin
-  }
-
-  return process.env.NEXT_PUBLIC_SITE_URL || ''
-}
-
-async function getHrLeaveNotificationEmails() {
-  const { data, error } = await supabase
-    .from('app_users')
-    .select('email, role, is_active')
-    .eq('is_active', true)
-    .ilike('role', '%hr%')
-
-  if (error) {
-    console.warn('HR leave email lookup warning:', error)
-    return []
-  }
-
-  return uniqueLeaveEmailList((data || []).map((item: any) => item.email))
-}
-
 async function notifyLeaveRequestSubmitted({
-  requester,
-  supervisorOne,
-  supervisorTwo,
   requestId,
   requestTypeLabel,
-  startDate,
-  endDate,
-  totalDays,
-  reason,
-  jobPending,
-  handoverTo,
-  handoverNote,
+  sourceTable,
 }: {
-  requester: Employee
-  supervisorOne: Employee | null
-  supervisorTwo: Employee | null
-  requestId?: string | null
+  requestId: string
   requestTypeLabel: string
-  startDate: string
-  endDate: string
-  totalDays: number
-  reason: string
-  jobPending: string
-  handoverTo: string
-  handoverNote?: string | null
+  sourceTable: 'leave_requests' | 'phl_records'
 }): Promise<LeaveNotificationResult> {
-  const supervisorEmails = uniqueLeaveEmailList([
-    supervisorOne?.email,
-    supervisorTwo?.email,
-  ])
-
-  const hrEmails = await getHrLeaveNotificationEmails()
-
-  const toEmails = supervisorEmails.length > 0 ? supervisorEmails : hrEmails
-  const ccEmails = supervisorEmails.length > 0 ? hrEmails : []
-
-  if (toEmails.length === 0 && ccEmails.length === 0) {
-    return {
-      success: false,
-      count: 0,
-      message: 'Email atasan atau HR belum ditemukan.',
-    }
-  }
-
   try {
-    await sendHarmonyEmail({
-      to: toEmails.length > 0 ? toEmails : ccEmails,
-      cc: toEmails.length > 0 ? ccEmails : [],
-      subject: `[HARMONY] Pengajuan ${requestTypeLabel} - ${requester.full_name || requester.email || 'Employee'}`,
-      title: `Pengajuan ${requestTypeLabel} Baru`,
-      message: [
-        `Karyawan ${requester.full_name || requester.email || '-'} mengajukan ${requestTypeLabel}.`,
-        '',
-        `NIP / Employee Number: ${requester.employee_number || requester.machine_pin || '-'}`,
-        `Departemen: ${requester.department || '-'}`,
-        `Jabatan: ${requester.position || '-'}`,
-        `Periode: ${formatDisplayDate(startDate)} s.d. ${formatDisplayDate(endDate)}`,
-        `Total hari kerja: ${totalDays} hari`,
-        '',
-        `Alasan: ${reason || '-'}`,
-        '',
-        `Job pending: ${jobPending || '-'}`,
-        `Dialihkan kepada: ${handoverTo || '-'}`,
-        `Catatan serah terima: ${handoverNote || '-'}`,
-        requestId ? `ID Pengajuan: ${requestId}` : '',
-        '',
-        'Silakan buka HARMONY untuk melakukan pengecekan dan approval.',
-      ]
-        .filter(Boolean)
-        .join('\n'),
-      actionLabel: 'Buka Approval HARMONY',
-      actionUrl: `${getLeaveHarmonyBaseUrl()}/employee/approvals/leave`,
+    const result = await sendHarmonyWorkflowNotification({
+      workflow: 'leave_request_submitted',
+      entityId: requestId,
+      data: {
+        requestTypeLabel,
+        sourceTable,
+      },
     })
 
     return {
-      success: true,
-      count: uniqueLeaveEmailList([...toEmails, ...ccEmails]).length,
-      message: 'Email notifikasi berhasil dikirim.',
+      success: result.ok,
+      count: result.sent,
+      message: result.message,
     }
   } catch (error: any) {
     return {
@@ -326,7 +237,6 @@ async function notifyLeaveRequestSubmitted({
     }
   }
 }
-
 
 export default function EmployeeLeavePage() {
   const [appUser, setAppUser] = useState<AppUser | null>(null)
@@ -1036,20 +946,9 @@ export default function EmployeeLeavePage() {
     }
 
     const notificationResult = await notifyLeaveRequestSubmitted({
-      requester: employee,
-      supervisorOne,
-      supervisorTwo,
-
       requestId: insertedRequestId,
       requestTypeLabel: selectedRequestMeta.label,
-      startDate: form.start_date,
-      endDate: form.end_date,
-      totalDays: calculatedDays,
-
-      reason: form.reason.trim(),
-      jobPending: form.job_pending.trim(),
-      handoverTo: selectedHandoverEmployee?.full_name || form.handover_to.trim(),
-      handoverNote: form.handover_note.trim() || null,
+      sourceTable: form.request_type === 'phl_claim' ? 'phl_records' : 'leave_requests',
     })
 
     setSuccessMessage(
@@ -1118,7 +1017,30 @@ export default function EmployeeLeavePage() {
         throw new Error(result.message || 'Pengajuan belum berhasil dibatalkan.')
       }
 
-      setSuccessMessage(result.message || 'Pengajuan berhasil dibatalkan sebelum approval atasan.')
+      let cancellationNotification = ''
+      try {
+        const notification = await sendHarmonyWorkflowNotification({
+          workflow: 'leave_request_cancelled',
+          entityId: request.id,
+          data: {
+            sourceTable: isPHL ? 'phl_records' : 'leave_requests',
+            requestTypeLabel:
+              request.leave_type ||
+              (isPHL ? 'Klaim PHL' : request.request_type) ||
+              'Cuti/Izin',
+            note: note.trim(),
+          },
+        })
+        cancellationNotification = notification.ok
+          ? ` ${notification.message}`
+          : ` Namun email pembatalan belum terkirim lengkap: ${notification.message}`
+      } catch (notificationError: any) {
+        cancellationNotification = ` Namun email pembatalan gagal diproses: ${notificationError?.message || 'terjadi kendala notifikasi'}.`
+      }
+
+      setSuccessMessage(
+        `${result.message || 'Pengajuan berhasil dibatalkan sebelum approval atasan.'}${cancellationNotification}`,
+      )
 
       await Promise.all([
         fetchAnnualLeaveSummary(employee.id),

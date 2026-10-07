@@ -125,8 +125,11 @@ export default function NewRemedClaimPage() {
 
         setUploadLabel('Menyimpan pengajuan...')
         formData.append('staged_receipts', JSON.stringify(tickets.map(({ path, fileName, mimeType, fileSize }) => ({ path, fileName, mimeType, fileSize }))))
-        const result = await remedFetch<{ claimId: string; claimNumber: string }>('/api/remed/claims', { method: 'POST', body: formData })
-        window.alert(`Klaim ${result.claimNumber} berhasil diajukan.`)
+        const result = await remedFetch<{ claimId: string; claimNumber: string; notification?: { ok?: boolean; message?: string } | null }>('/api/remed/claims', { method: 'POST', body: formData })
+        const notificationWarning = result.notification?.ok === false
+          ? `\n\nCatatan: klaim tersimpan, tetapi email notifikasi belum terkirim lengkap: ${result.notification.message || 'cek konfigurasi notifikasi.'}`
+          : ''
+        window.alert(`Klaim ${result.claimNumber} berhasil diajukan.${notificationWarning}`)
         router.push('/remed/employee/claims')
       } catch (uploadError) {
         await remedFetch('/api/remed/uploads/receipts', {
