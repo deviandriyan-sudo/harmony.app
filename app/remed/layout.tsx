@@ -95,7 +95,7 @@ export default function RemedLayout({ children }: { children: React.ReactNode })
   return (
     <div className="harmony-shell min-h-screen overflow-x-hidden">
       <div className="flex min-h-screen w-full overflow-x-hidden">
-        <div className="hidden print:hidden lg:block">
+        <div className="hidden print:hidden lg:sticky lg:top-0 lg:block lg:h-screen lg:self-start">
           <AppSidebar
             menu={menu}
             title="HARMONY"

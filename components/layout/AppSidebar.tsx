@@ -87,7 +87,7 @@ export function AppSidebar({
   }
 
   return (
-    <aside className="harmony-sidebar-shell sticky top-0 flex h-screen w-[272px] max-w-[86vw] shrink-0 self-start flex-col px-3 py-3 sm:px-3.5 sm:py-3.5">
+    <aside className="harmony-sidebar-shell flex h-screen w-[272px] max-w-[86vw] shrink-0 flex-col px-3 py-3 sm:px-3.5 sm:py-3.5">
       <div className="harmony-sidebar-panel flex h-full flex-col overflow-hidden rounded-[30px]">
         <div className="harmony-sidebar-header border-b px-4 py-4">
           <div className="flex items-start gap-3">

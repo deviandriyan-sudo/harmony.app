@@ -825,7 +825,7 @@ body {
 }
 
 .harmony-action-soft {
-  background: rgba(255,255,255,.58) !important;
+  background: rgba(255,255,255,.72) !important;
   color: #30343a !important;
 }
 
@@ -903,7 +903,6 @@ body {
 .harmony-sidebar-shell {
   border-right: 0 !important;
   background: transparent !important;
-  align-self: flex-start;
 }
 
 .harmony-sidebar-panel {
@@ -1037,7 +1036,7 @@ body {
 .harmony-mobile-glass,
 .harmony-mobile-brand {
   border: 1px solid rgba(255,255,255,.76) !important;
-  background: rgba(255,255,255,.58) !important;
+  background: rgba(255,255,255,.72) !important;
   box-shadow: inset 0 1px 0 rgba(255,255,255,.94), 0 8px 22px rgba(58,72,96,.07) !important;
   backdrop-filter: blur(22px) saturate(170%);
   -webkit-backdrop-filter: blur(22px) saturate(170%);
@@ -1176,7 +1175,7 @@ body {
 
 .harmony-button-native-secondary {
   border-color: rgba(255,255,255,.64) !important;
-  background: rgba(229,235,243,.58) !important;
+  background: rgba(233,238,245,.74) !important;
   box-shadow: inset 0 1px 0 rgba(255,255,255,.80) !important;
   backdrop-filter: blur(18px) saturate(155%);
   -webkit-backdrop-filter: blur(18px) saturate(155%);
@@ -1373,47 +1372,67 @@ body {
 }
 
 .harmony-action-soft {
-  background: linear-gradient(145deg, rgba(255,255,255,.84), rgba(243,247,252,.70)) !important;
-  color: #263244 !important;
-  border: 1px solid rgba(104,119,145,.16) !important;
+  background: linear-gradient(145deg, rgba(255,255,255,.78), rgba(242,246,251,.68)) !important;
+  color: #2c3440 !important;
+  border: 1px solid rgba(255,255,255,.88) !important;
   box-shadow:
-    inset 0 1px 0 rgba(255,255,255,.92),
+    inset 0 1px 0 rgba(255,255,255,.96),
+    0 0 0 1px rgba(44,55,74,.035),
     0 8px 18px rgba(58,72,96,.06) !important;
 }
 
 .harmony-action-soft:hover {
-  background: linear-gradient(145deg, rgba(255,255,255,.96), rgba(248,250,253,.82)) !important;
-  color: #172334 !important;
-  border-color: rgba(79,102,137,.20) !important;
+  background: rgba(255,255,255,.92) !important;
+  color: #1f2937 !important;
+  border-color: rgba(255,255,255,.98) !important;
 }
 
-.harmony-workspace .harmony-button-secondary,
-.harmony-workspace .harmony-button-native-outline,
-.harmony-workspace .harmony-button-native-secondary {
-  color: #243145 !important;
+.harmony-action-info {
+  background: linear-gradient(145deg, rgba(229,240,255,.92), rgba(214,231,255,.82)) !important;
+  color: #245ea9 !important;
+  border: 1px solid rgba(169,199,242,.78) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.72) !important;
 }
 
-.harmony-workspace .harmony-button-secondary:hover,
-.harmony-workspace .harmony-button-native-outline:hover,
-.harmony-workspace .harmony-button-native-secondary:hover {
-  color: #152033 !important;
+.harmony-action-danger {
+  background: linear-gradient(145deg, rgba(255,237,237,.92), rgba(255,227,227,.85)) !important;
+  color: #bf2f2f !important;
+  border: 1px solid rgba(245,198,198,.82) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.7) !important;
 }
 
-.harmony-workspace .harmony-hero-v25 .harmony-action-soft,
-.harmony-workspace .harmony-glass-dark .harmony-action-soft,
-.harmony-workspace .harmony-card[data-tone='dark'] .harmony-action-soft {
-  background: rgba(255,255,255,.18) !important;
-  color: rgba(255,255,255,.92) !important;
-  border: 1px solid rgba(255,255,255,.14) !important;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,.10) !important;
+.harmony-workspace :where(
+  button.harmony-button-primary,
+  button.harmony-button-secondary,
+  button.harmony-button-blue,
+  button.harmony-action-primary,
+  button.harmony-action-soft,
+  button.harmony-action-info,
+  button.harmony-action-danger,
+  button.harmony-button-native,
+  button.harmony-button-native-outline,
+  button.harmony-button-native-secondary
+):disabled {
+  opacity: 1 !important;
+  transform: none !important;
+  box-shadow: none !important;
+  filter: saturate(.9);
 }
 
-.harmony-workspace .harmony-hero-v25 .harmony-action-soft:hover,
-.harmony-workspace .harmony-glass-dark .harmony-action-soft:hover,
-.harmony-workspace .harmony-card[data-tone='dark'] .harmony-action-soft:hover {
-  background: rgba(255,255,255,.24) !important;
-  color: #ffffff !important;
-  border-color: rgba(255,255,255,.20) !important;
+.harmony-workspace button.harmony-action-soft:disabled,
+.harmony-workspace button.harmony-button-secondary:disabled,
+.harmony-workspace button.harmony-button-native-outline:disabled,
+.harmony-workspace button.harmony-button-native-secondary:disabled {
+  background: rgba(244,246,249,.92) !important;
+  color: #7a8594 !important;
+  border-color: rgba(215,222,232,.95) !important;
+}
+
+.harmony-workspace button.harmony-action-primary:disabled,
+.harmony-workspace button.harmony-button-primary:disabled,
+.harmony-workspace button.harmony-button-blue:disabled,
+.harmony-workspace button.harmony-button-native:disabled {
+  color: rgba(255,255,255,.88) !important;
 }
 
 

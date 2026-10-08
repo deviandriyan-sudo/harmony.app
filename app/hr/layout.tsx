@@ -117,7 +117,7 @@ export default function HRLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="harmony-shell min-h-screen overflow-x-hidden">
       <div className="flex min-h-screen w-full overflow-x-hidden">
-        <div className="hidden lg:block">
+        <div className="hidden lg:sticky lg:top-0 lg:block lg:h-screen lg:self-start">
           <AppSidebar menu={hasRemedAccess ? [...hrMenu, hrRemedEntry] : hrMenu} title="HARMONY" subtitle="Integrated HR Platform" userName={userName} userRole="HR Administrator" logoSrc="/logo.png" />
         </div>
 
