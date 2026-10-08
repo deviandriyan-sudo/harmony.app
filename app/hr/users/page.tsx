@@ -457,6 +457,7 @@ Perubahan akan disinkronkan ke Supabase Auth, app_users, Employee Master, dan Re
         body: JSON.stringify({
           user_id: emailChangeForm.user_id,
           employee_id: emailChangeForm.employee_id || null,
+          old_email: emailChangeForm.old_email || null,
           new_email: nextEmail,
         }),
       })
@@ -665,7 +666,7 @@ Perubahan akan disinkronkan ke Supabase Auth, app_users, Employee Master, dan Re
           />
         )}
 
-        {errorMessage && (
+        {errorMessage && !showEmailModal && !showResetModal && (
           <AlertBox
             type="error"
             message={`Error: ${errorMessage}`}
@@ -748,6 +749,7 @@ Perubahan akan disinkronkan ke Supabase Auth, app_users, Employee Master, dan Re
           <ResetPasswordModal
             resetForm={resetForm}
             saving={saving}
+            errorMessage={errorMessage}
             onClose={() => setShowResetModal(false)}
             onSubmit={handleResetPassword}
             onChange={(value) =>
@@ -1302,7 +1304,7 @@ function EmailChangeModal({
   onChange: (value: string) => void
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-5 backdrop-blur-sm">
+    <div className="harmony-modal-surface fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-5 backdrop-blur-sm">
       <div className="w-full max-w-xl overflow-hidden rounded-[32px] border border-white/20 bg-white/95 shadow-[0_30px_90px_rgba(0,0,0,0.22)] backdrop-blur-2xl">
         <div className="flex items-start justify-between gap-4 border-b border-black/5 bg-white/70 p-6">
           <div>
@@ -1370,18 +1372,20 @@ function EmailChangeModal({
 function ResetPasswordModal({
   resetForm,
   saving,
+  errorMessage,
   onClose,
   onSubmit,
   onChange,
 }: {
   resetForm: ResetPasswordForm
   saving: boolean
+  errorMessage: string
   onClose: () => void
   onSubmit: (event: React.FormEvent<HTMLFormElement>) => void
   onChange: (value: string) => void
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-5 backdrop-blur-sm">
+    <div className="harmony-modal-surface fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-5 backdrop-blur-sm">
       <div className="w-full max-w-xl overflow-hidden rounded-[32px] border border-white/20 bg-white/95 shadow-[0_30px_90px_rgba(0,0,0,0.22)] backdrop-blur-2xl">
         <div className="flex items-start justify-between gap-4 border-b border-black/5 bg-white/70 p-6">
           <div>
@@ -1423,6 +1427,12 @@ function ResetPasswordModal({
             value={resetForm.new_password}
             onChange={onChange}
           />
+
+          {errorMessage ? (
+            <div role="alert" className="rounded-[20px] border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+              {errorMessage}
+            </div>
+          ) : null}
 
           <FormFooter
             saving={saving}
@@ -1712,7 +1722,11 @@ function AlertBox({
         : 'border-red-200 bg-red-50 text-red-600'
 
   return (
-    <div className={`rounded-2xl border p-4 text-sm ${className}`}>
+    <div
+      role={type === 'error' ? 'alert' : undefined}
+      data-harmony-feedback={type === 'error' ? 'error' : undefined}
+      className={`rounded-2xl border p-4 text-sm ${className}`}
+    >
       {message}
     </div>
   )

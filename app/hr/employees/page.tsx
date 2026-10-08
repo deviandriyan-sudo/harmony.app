@@ -791,7 +791,7 @@ export default function HREmployeesPage() {
     return token
   }
 
-  async function syncEmployeeLoginEmail(employeeId: string, newEmail: string) {
+  async function syncEmployeeLoginEmail(employeeId: string, newEmail: string, oldEmail?: string | null) {
     const token = await getSessionAccessToken()
     const response = await fetch('/api/hr/users/change-email', {
       method: 'POST',
@@ -801,6 +801,7 @@ export default function HREmployeesPage() {
       },
       body: JSON.stringify({
         employee_id: employeeId,
+        old_email: oldEmail || null,
         new_email: newEmail,
       }),
     })
@@ -812,6 +813,7 @@ export default function HREmployeesPage() {
 
     return result as {
       account_found?: boolean
+      unchanged?: boolean
       message?: string
       notification?: {
         old_email?: { success?: boolean }
@@ -1698,11 +1700,13 @@ export default function HREmployeesPage() {
       const previousEmail = String(currentEmployee?.email || '').trim().toLowerCase()
       const nextEmail = String(form.email || '').trim().toLowerCase()
 
-      if (editingEmployeeId && previousEmail !== nextEmail) {
-        const syncResult = await syncEmployeeLoginEmail(editingEmployeeId, nextEmail)
+      // Selalu reconcile login account saat employee existing mempunyai email.
+      // Ini menangani kasus Employee Master sudah memakai email baru tetapi Auth/app_users masih email lama.
+      if (editingEmployeeId && nextEmail) {
+        const syncResult = await syncEmployeeLoginEmail(editingEmployeeId, nextEmail, previousEmail || null)
         accountEmailSynced = syncResult.account_found === true
         emailNotificationWarning = Boolean(
-          accountEmailSynced &&
+          accountEmailSynced && !syncResult.unchanged &&
           (syncResult.notification?.old_email?.success === false ||
             syncResult.notification?.new_email?.success === false),
         )
@@ -2154,7 +2158,7 @@ function MasterOptionsModal({
   const totalSelected = selectedOptionIds.length
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4 backdrop-blur-sm">
+    <div className="harmony-modal-surface fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4 backdrop-blur-sm">
       <div className="flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-[34px] bg-white shadow-[0_30px_90px_rgba(0,0,0,0.24)]">
         <div className="flex min-w-0 items-start justify-between gap-4 border-b border-black/5 p-6">
           <div className="min-w-0">
@@ -2456,7 +2460,7 @@ function EmployeeCompactCard({ employee, assignmentCount, onDetail, onEdit, onTo
 
 function EmployeeDetailModal({ employee, assignments, employees, onClose, onEdit }: { employee: Employee; assignments: EmployeeAssignment[]; employees: Employee[]; onClose: () => void; onEdit: () => void }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4 backdrop-blur-sm">
+    <div className="harmony-modal-surface fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4 backdrop-blur-sm">
       <div className="flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-[34px] bg-white shadow-[0_30px_90px_rgba(0,0,0,0.24)]">
         <div className="flex min-w-0 items-start justify-between gap-4 border-b border-black/5 p-6">
           <div className="flex min-w-0 items-center gap-4">
@@ -2637,7 +2641,7 @@ function EmployeeFormModal({
   onDeleteAssignment: (assignment: EmployeeAssignment) => void
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4 backdrop-blur-sm">
+    <div className="harmony-modal-surface fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4 backdrop-blur-sm">
       <div className="flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-[34px] bg-white shadow-[0_30px_90px_rgba(0,0,0,0.24)]">
         <div className="flex min-w-0 items-start justify-between gap-4 border-b border-black/5 p-6">
           <div className="min-w-0">
@@ -3973,7 +3977,7 @@ function StatusBadge({ active }: { active: boolean }) {
 
 function AlertBox({ type, message }: { type: 'success' | 'error'; message: string }) {
   const className = type === 'success' ? 'border-green-200 bg-green-50 text-green-700' : 'border-red-200 bg-red-50 text-red-600'
-  return <div className={`rounded-2xl border p-4 text-sm ${className}`}>{message}</div>
+  return <div role={type === 'error' ? 'alert' : undefined} data-harmony-feedback={type === 'error' ? 'error' : undefined} className={`rounded-2xl border p-4 text-sm ${className}`}>{message}</div>
 }
 
 

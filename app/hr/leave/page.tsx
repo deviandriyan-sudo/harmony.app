@@ -1826,7 +1826,7 @@ export default function HRLeavePage() {
         )}
 
         {errorMessage && (
-          <div className="rounded-2xl border border-orange-200 bg-orange-50 p-4 text-sm leading-6 text-orange-700">
+          <div role="alert" data-harmony-feedback="error" className="rounded-2xl border border-orange-200 bg-orange-50 p-4 text-sm leading-6 text-orange-700">
             <div className="mb-1 flex items-center gap-2 font-bold">
               <AlertTriangle size={18} />
               Perhatian
@@ -3545,7 +3545,7 @@ function DeleteConfirmModal({
   onConfirm: () => void
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-5 backdrop-blur-sm">
+    <div className="harmony-modal-surface fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-5 backdrop-blur-sm">
       <div className="w-full max-w-lg overflow-hidden rounded-[32px] bg-white shadow-[0_30px_90px_rgba(0,0,0,0.24)]">
         <div className="relative overflow-hidden bg-[#1d1d1f] p-6 text-white">
           <div className="pointer-events-none absolute -right-12 -top-14 h-40 w-40 rounded-full bg-red-500/30 blur-3xl" />
@@ -4374,7 +4374,7 @@ function ModalShell({
   onClose: () => void
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-5 backdrop-blur-sm">
+    <div className="harmony-modal-surface fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-5 backdrop-blur-sm">
       <div className="flex max-h-[92vh] w-full max-w-4xl flex-col overflow-hidden rounded-[32px] bg-white shadow-[0_30px_90px_rgba(0,0,0,0.24)]">
         <div className="flex items-start justify-between gap-4 border-b border-black/5 p-6">
           <div>

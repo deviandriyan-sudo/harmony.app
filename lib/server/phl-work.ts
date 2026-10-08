@@ -121,16 +121,31 @@ async function supervisorEmailsForEmployee(
   admin: SupabaseClient,
   employeeId: string,
 ) {
-  const { data: employee, error } = await admin
-    .from('employees')
-    .select('supervisor_1,supervisor_2')
-    .eq('id', employeeId)
-    .maybeSingle()
+  const [{ data: employee, error }, assignmentsResult] = await Promise.all([
+    admin
+      .from('employees')
+      .select('supervisor_1,supervisor_2')
+      .eq('id', employeeId)
+      .maybeSingle(),
+    admin
+      .from('employee_assignments')
+      .select('supervisor_1,supervisor_2,start_date,end_date,is_primary,is_active')
+      .eq('employee_id', employeeId)
+      .eq('is_active', true),
+  ])
 
   if (error || !employee) return [] as string[]
 
-  const refs = unique([employee.supervisor_1, employee.supervisor_2])
-  if (refs.length === 0) return []
+  const refs = new Set(unique([employee.supervisor_1, employee.supervisor_2]))
+  const today = todayWita()
+  if (!assignmentsResult.error) {
+    for (const assignment of assignmentsResult.data || []) {
+      if (!assignmentIsEffective(assignment, today)) continue
+      for (const ref of unique([assignment.supervisor_1, assignment.supervisor_2])) refs.add(ref)
+    }
+  }
+
+  if (refs.size === 0) return []
 
   const { data: candidates } = await admin
     .from('employees')
@@ -147,7 +162,7 @@ async function supervisorEmailsForEmployee(
           candidate.full_name,
           candidate.email,
         ])
-        return refs.some((ref) => candidateKeys.includes(ref))
+        return [...refs].some((ref) => candidateKeys.includes(ref))
       })
       .map((candidate: any) => candidate.email)
       .filter(isEmail),

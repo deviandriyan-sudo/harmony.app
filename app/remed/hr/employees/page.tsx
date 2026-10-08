@@ -179,7 +179,7 @@ export default function Page() {
       </div>
 
       {selected ? (
-        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-[#0b1220]/28 p-4 backdrop-blur-[18px]" onMouseDown={(event) => {
+        <div className="harmony-modal-surface fixed inset-0 z-[120] flex items-center justify-center bg-[#0b1220]/28 p-4 backdrop-blur-[18px]" onMouseDown={(event) => {
           if (event.target === event.currentTarget) closeModal()
         }}>
           <div className="w-full max-w-2xl overflow-hidden rounded-[32px] border border-white/70 bg-white/62 shadow-[0_32px_100px_rgba(20,36,62,0.28)] backdrop-blur-[42px] backdrop-saturate-[185%]">

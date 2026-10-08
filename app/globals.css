@@ -1871,3 +1871,23 @@ body {
     border-radius: 22px !important;
   }
 }
+
+/* =========================================================
+   MODAL-AWARE ERROR FEEDBACK
+   Page-level errors stay visible above any active modal instead of
+   being hidden behind its backdrop. Modal-local errors remain inline.
+========================================================= */
+body:has(.harmony-modal-surface) [data-harmony-feedback='error'] {
+  position: fixed !important;
+  z-index: 10000 !important;
+  top: max(18px, env(safe-area-inset-top)) !important;
+  left: 50% !important;
+  width: min(calc(100vw - 32px), 760px) !important;
+  max-height: 32vh !important;
+  overflow: auto !important;
+  transform: translateX(-50%) !important;
+  margin: 0 !important;
+  box-shadow: 0 24px 70px rgba(15, 23, 42, .24) !important;
+  backdrop-filter: blur(24px) saturate(165%);
+  -webkit-backdrop-filter: blur(24px) saturate(165%);
+}

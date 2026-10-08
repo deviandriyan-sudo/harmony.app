@@ -69,6 +69,7 @@ function durationBetween(start: unknown, end: unknown) {
   const endMinutes = timeToMinutes(end)
   if (startMinutes === null || endMinutes === null) return 0
   const difference = endMinutes - startMinutes
+  if (difference === 0) return 0
   return difference > 0 ? difference : difference + 24 * 60
 }
 
@@ -103,6 +104,113 @@ function dateDiffDays(from: string, to: string) {
 function isWeekendDate(date: string) {
   const day = new Date(`${date}T00:00:00Z`).getUTCDay()
   return day === 0 || day === 6
+}
+
+function canonicalDate(value: unknown) {
+  const raw = clean(value).slice(0, 10)
+  if (!raw) return ''
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw
+
+  const slash = raw.match(/^(\d{2})\/(\d{2})\/(\d{4})$/)
+  if (slash) return `${slash[3]}-${slash[2]}-${slash[1]}`
+
+  const dash = raw.match(/^(\d{2})-(\d{2})-(\d{4})$/)
+  if (dash) return `${dash[3]}-${dash[2]}-${dash[1]}`
+
+  return ''
+}
+
+async function findAttendanceForDate(admin: any, employeeId: string, machinePin: string | null | undefined, workDate: string) {
+  const select = 'id,employee_id,machine_pin,attendance_date,check_in,check_out,manual_check_in,manual_check_out,requested_check_in,requested_check_out,work_duration_minutes,updated_at,deleted_at'
+  const rows: any[] = []
+
+  const byEmployee = await admin
+    .from('attendance_logs')
+    .select(select)
+    .eq('employee_id', employeeId)
+    .is('deleted_at', null)
+    .order('updated_at', { ascending: false })
+    .limit(500)
+  if (byEmployee.error) throw byEmployee.error
+  rows.push(...(byEmployee.data || []))
+
+  if (!rows.some((row: any) => canonicalDate(row.attendance_date) === workDate) && clean(machinePin)) {
+    const byMachine = await admin
+      .from('attendance_logs')
+      .select(select)
+      .eq('machine_pin', clean(machinePin))
+      .is('deleted_at', null)
+      .order('updated_at', { ascending: false })
+      .limit(500)
+    if (byMachine.error) throw byMachine.error
+    rows.push(...(byMachine.data || []))
+  }
+
+  return rows.find((row: any) => canonicalDate(row.attendance_date) === workDate) || null
+}
+
+async function findApprovedCreditForDate(admin: any, employeeId: string, machinePin: string | null | undefined, workDate: string) {
+  const select = 'id,employee_id,machine_pin,phl_date,status,source,created_at'
+  const rows: any[] = []
+  const byEmployee = await admin
+    .from('phl_records')
+    .select(select)
+    .eq('employee_id', employeeId)
+    .eq('source', 'attendance_phl_approved')
+    .eq('status', 'approved')
+    .order('created_at', { ascending: false })
+    .limit(500)
+  if (byEmployee.error) throw byEmployee.error
+  rows.push(...(byEmployee.data || []))
+
+  if (!rows.some((row: any) => canonicalDate(row.phl_date) === workDate) && clean(machinePin)) {
+    const byMachine = await admin
+      .from('phl_records')
+      .select(select)
+      .eq('machine_pin', clean(machinePin))
+      .eq('source', 'attendance_phl_approved')
+      .eq('status', 'approved')
+      .order('created_at', { ascending: false })
+      .limit(500)
+    if (byMachine.error) throw byMachine.error
+    rows.push(...(byMachine.data || []))
+  }
+
+  return rows.find((row: any) => canonicalDate(row.phl_date) === workDate) || null
+}
+
+async function hasConfiguredSupervisor(admin: any, employee: any) {
+  if (clean(employee?.supervisor_1) || clean(employee?.supervisor_2)) return true
+
+  const { data, error } = await admin
+    .from('employee_assignments')
+    .select('supervisor_1,supervisor_2,start_date,end_date,is_primary,is_active')
+    .eq('employee_id', employee.id)
+    .eq('is_active', true)
+    .limit(100)
+  if (error) throw error
+
+  const today = todayWita()
+  return (data || []).some((row: any) => {
+    if (row.is_primary === true) return false
+    const start = clean(row.start_date).slice(0, 10)
+    const end = clean(row.end_date).slice(0, 10)
+    if (start && start > today) return false
+    if (end && end < today) return false
+    return Boolean(clean(row.supervisor_1) || clean(row.supervisor_2))
+  })
+}
+
+async function findHolidayForDate(admin: any, workDate: string) {
+  const { data, error } = await admin
+    .from('holidays')
+    .select('holiday_date,holiday_name,holiday_type,is_active')
+    .eq('is_active', true)
+    .limit(500)
+
+  if (error) throw error
+  return (data || []).find((row: any) => canonicalDate(row.holiday_date) === workDate) || null
 }
 
 async function withAttachments(admin: any, rows: any[]) {
@@ -210,6 +318,13 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    if (!(await hasConfiguredSupervisor(context.admin, context.employee))) {
+      return NextResponse.json(
+        { success: false, error: 'Atasan belum dikonfigurasi pada Employee Master atau penugasan aktif. Hubungi HR sebelum mengajukan saldo PHL.' },
+        { status: 409 },
+      )
+    }
+
     const body = await request.formData()
     const requestKey = clean(body.get('request_key'))
     const workDate = clean(body.get('work_date'))
@@ -276,16 +391,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const { data: existingCredit, error: existingCreditError } = await context.admin
-      .from('phl_records')
-      .select('id')
-      .eq('employee_id', context.employee.id)
-      .eq('phl_date', workDate)
-      .eq('source', 'attendance_phl_approved')
-      .eq('status', 'approved')
-      .limit(1)
-      .maybeSingle()
-    if (existingCreditError) throw existingCreditError
+    const existingCredit = await findApprovedCreditForDate(context.admin, context.employee.id, context.employee.machine_pin, workDate)
     if (existingCredit) {
       return NextResponse.json(
         { success: false, error: 'Saldo PHL untuk tanggal tersebut sudah pernah terbentuk.' },
@@ -293,17 +399,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const { data: attendance, error: attendanceError } = await context.admin
-      .from('attendance_logs')
-      .select('id,employee_id,machine_pin,attendance_date,check_in,check_out,manual_check_in,manual_check_out,requested_check_in,requested_check_out,work_duration_minutes,deleted_at')
-      .eq('employee_id', context.employee.id)
-      .eq('attendance_date', workDate)
-      .is('deleted_at', null)
-      .order('updated_at', { ascending: false })
-      .limit(1)
-      .maybeSingle()
-
-    if (attendanceError) throw attendanceError
+    const attendance = await findAttendanceForDate(context.admin, context.employee.id, context.employee.machine_pin, workDate)
     if (!attendance) {
       return NextResponse.json(
         { success: false, error: 'Data absensi pada tanggal tersebut belum tercatat. PHL baru dapat diajukan setelah absensi tersedia.' },
@@ -319,15 +415,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const { data: holiday, error: holidayError } = await context.admin
-      .from('holidays')
-      .select('holiday_name,holiday_type')
-      .eq('holiday_date', workDate)
-      .eq('is_active', true)
-      .limit(1)
-      .maybeSingle()
-    if (holidayError) throw holidayError
-
+    const holiday = await findHolidayForDate(context.admin, workDate)
     const dayType = holiday ? 'holiday' : isWeekendDate(workDate) ? 'weekend' : 'weekday'
 
     for (let index = 0; index < files.length; index += 1) {

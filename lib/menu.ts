@@ -86,10 +86,10 @@ export const employeeMenu = [
   },
   {
     section: 'HARMONY',
-    title: 'PHL',
+    title: 'Saldo PHL',
     href: '/employee/phl',
     icon: WalletCards,
-    subtitle: 'Ajukan PHL kerja & saldo',
+    subtitle: 'Ajukan saldo dari pekerjaan PHL',
   },
   {
     section: 'HARMONY',

@@ -15,11 +15,47 @@ import {
 
 export const runtime = 'nodejs'
 
-async function findAuthUserByEmail(admin: any, email: string) {
-  if (!email) return null
-  const list = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 })
-  if (list.error) throw list.error
-  return list.data.users.find((item: any) => normalizeEmail(item.email) === email) || null
+type AnyRow = Record<string, any>
+type AuthUser = Record<string, any>
+
+function clean(value: unknown) {
+  return String(value || '').trim()
+}
+
+function unique(values: unknown[]) {
+  return Array.from(new Set(values.map((value) => normalizeEmail(value)).filter(Boolean)))
+}
+
+async function listAuthUsers(admin: any) {
+  const users: AuthUser[] = []
+  const perPage = 200
+
+  for (let page = 1; page <= 25; page += 1) {
+    const result = await admin.auth.admin.listUsers({ page, perPage })
+    if (result.error) throw result.error
+    const batch = result.data?.users || []
+    users.push(...batch)
+    if (batch.length < perPage) break
+  }
+
+  return users
+}
+
+function metadataMatchesEmployee(user: AuthUser | null, employee: AnyRow | null, employeeId: string | null) {
+  if (!user) return false
+  const metadata = user.user_metadata || {}
+  const metadataEmployeeId = clean(metadata.employee_id)
+  const metadataEmployeeNumber = clean(metadata.employee_number).toLowerCase()
+  const employeeNumber = clean(employee?.employee_number).toLowerCase()
+
+  if (employeeId && metadataEmployeeId && metadataEmployeeId === employeeId) return true
+  if (employeeNumber && metadataEmployeeNumber && metadataEmployeeNumber === employeeNumber) return true
+  return false
+}
+
+function archiveEmailFor(id: string) {
+  const suffix = clean(id).replace(/[^a-zA-Z0-9]/g, '').slice(0, 12) || 'user'
+  return `harmony-archived-${Date.now()}-${suffix}@archive.invalid`
 }
 
 async function sendEmailChangeNotice({
@@ -89,182 +125,315 @@ async function sendEmailChangeNotice({
   }
 }
 
+function pickAppUser(rows: AnyRow[], userId: string, oldEmail: string) {
+  if (userId) {
+    const exact = rows.find((row) => clean(row.id) === userId)
+    if (exact) return exact
+  }
+  if (oldEmail) {
+    const byEmail = rows.find((row) => normalizeEmail(row.email) === oldEmail)
+    if (byEmail) return byEmail
+  }
+  return rows.find((row) => row.is_active !== false) || rows[0] || null
+}
+
 export async function POST(request: NextRequest) {
+  let stage = 'init'
+
   try {
+    stage = 'authorize_hr'
     const { admin, actor, authUserId: actorAuthUserId } = await requireHRApi(request)
     const body = await request.json().catch(() => null)
 
-    const userIdInput = String(body?.user_id || '').trim()
-    const employeeIdInput = String(body?.employee_id || '').trim()
+    const userIdInput = clean(body?.user_id)
+    const employeeIdInput = clean(body?.employee_id)
+    const oldEmailInput = normalizeEmail(body?.old_email)
     const newEmail = normalizeEmail(body?.new_email)
 
     if (!isValidEmail(newEmail)) {
-      return NextResponse.json({ message: 'Email baru wajib diisi dengan format yang valid.' }, { status: 400 })
+      return NextResponse.json(
+        { message: 'Email baru wajib diisi dengan format yang valid.', stage: 'validate_email' },
+        { status: 400 },
+      )
     }
 
-    let appUser: any = null
+    stage = 'resolve_app_user'
+    const appUserMap = new Map<string, AnyRow>()
+
+    const collectAppUsers = async (query: any) => {
+      const result = await query
+      if (result.error) throw result.error
+      for (const row of result.data || []) appUserMap.set(clean(row.id), row)
+    }
 
     if (userIdInput) {
-      const result = await admin
-        .from('app_users')
-        .select('id,email,role,employee_id,is_active')
-        .eq('id', userIdInput)
-        .maybeSingle()
-      if (result.error) throw result.error
-      appUser = result.data
+      await collectAppUsers(
+        admin.from('app_users')
+          .select('id,email,role,employee_id,is_active,created_at,updated_at')
+          .eq('id', userIdInput)
+          .limit(5),
+      )
     }
 
-    if (!appUser && employeeIdInput) {
-      const result = await admin
-        .from('app_users')
-        .select('id,email,role,employee_id,is_active')
-        .eq('employee_id', employeeIdInput)
-        .maybeSingle()
-      if (result.error) throw result.error
-      appUser = result.data
+    if (employeeIdInput) {
+      await collectAppUsers(
+        admin.from('app_users')
+          .select('id,email,role,employee_id,is_active,created_at,updated_at')
+          .eq('employee_id', employeeIdInput)
+          .limit(50),
+      )
     }
 
-    // Employee Master tetap boleh mengubah email master ketika employee belum mempunyai akun login.
+    if (oldEmailInput) {
+      await collectAppUsers(
+        admin.from('app_users')
+          .select('id,email,role,employee_id,is_active,created_at,updated_at')
+          .ilike('email', oldEmailInput)
+          .limit(50),
+      )
+    }
+
+    let appUser = pickAppUser([...appUserMap.values()], userIdInput, oldEmailInput)
+
     if (!appUser && employeeIdInput) {
       return NextResponse.json({
         success: true,
         account_found: false,
-        message: 'Employee belum mempunyai akun HARMONY; tidak ada email login yang perlu disinkronkan.',
+        unchanged: true,
+        message: 'Employee belum mempunyai akun login HARMONY; hanya Employee Master yang perlu disimpan.',
       })
     }
 
     if (!appUser) {
-      return NextResponse.json({ message: 'Akun HARMONY target tidak ditemukan.' }, { status: 404 })
+      return NextResponse.json({ message: 'Akun HARMONY target tidak ditemukan.', stage }, { status: 404 })
     }
 
-    const appUserId = String(appUser.id)
-    const employeeId = String(appUser.employee_id || employeeIdInput || '').trim() || null
+    let appUserId = clean(appUser.id)
+    const employeeId = clean(appUser.employee_id || employeeIdInput) || null
 
-    let employee: any = null
+    stage = 'resolve_employee'
+    let employee: AnyRow | null = null
     if (employeeId) {
       const result = await admin
         .from('employees')
         .select('id,employee_number,full_name,email')
         .eq('id', employeeId)
-        .maybeSingle()
+        .limit(2)
       if (result.error) throw result.error
-      employee = result.data
+      employee = result.data?.[0] || null
     }
 
-    const oldEmail = normalizeEmail(appUser.email || employee?.email)
-    if (!oldEmail || !isValidEmail(oldEmail)) {
-      return NextResponse.json({ message: 'Email login lama akun tidak valid. Sinkronisasi akun diperlukan.' }, { status: 409 })
+    stage = 'resolve_auth_user'
+    const authUsers = await listAuthUsers(admin)
+    const authById = authUsers.find((item) => clean(item.id) === appUserId) || null
+    const appUserEmail = normalizeEmail(appUser.email)
+    const authByAppEmail = appUserEmail
+      ? authUsers.find((item) => normalizeEmail(item.email) === appUserEmail) || null
+      : null
+    const oldEmailCandidates = unique([appUser.email, oldEmailInput, employee?.email])
+    const authByOldEmail = authUsers.find((item) => oldEmailCandidates.includes(normalizeEmail(item.email))) || null
+    const metadataCandidates = authUsers.filter((item) => metadataMatchesEmployee(item, employee, employeeId))
+    const authByNewEmail = authUsers.find((item) => normalizeEmail(item.email) === newEmail) || null
+
+    let authUser: AuthUser | null = null
+
+    // app_users adalah mapping akun HARMONY yang paling kuat. Prioritaskan ID/email row
+    // ini sebelum Employee Master karena master email dapat sudah berubah sementara Auth masih lama.
+    if (authById) authUser = authById
+    if (!authUser && authByAppEmail) authUser = authByAppEmail
+    if (!authUser && oldEmailInput && oldEmailInput !== newEmail) {
+      authUser = authUsers.find((item) => normalizeEmail(item.email) === oldEmailInput) || null
+    }
+    if (!authUser && authByOldEmail) authUser = authByOldEmail
+    if (!authUser && metadataCandidates.length === 1) authUser = metadataCandidates[0]
+    if (!authUser && authByNewEmail && metadataMatchesEmployee(authByNewEmail, employee, employeeId)) {
+      authUser = authByNewEmail
     }
 
-    if (oldEmail === newEmail) {
+    if (!authUser && metadataCandidates.length > 1) {
       return NextResponse.json({
-        success: true,
-        account_found: true,
-        unchanged: true,
-        message: 'Email login tidak berubah.',
-        user: appUser,
-      })
-    }
-
-    // Resolve Auth user secara toleran terhadap akun legacy yang app_users.id-nya tidak sama dengan auth.users.id.
-    const authByIdResult = await admin.auth.admin.getUserById(appUserId)
-    const authById = !authByIdResult.error ? authByIdResult.data?.user || null : null
-    const authByEmail = await findAuthUserByEmail(admin, oldEmail)
-
-    let authUser = authById
-    if (authByEmail && (!authById || normalizeEmail(authById.email) !== oldEmail)) {
-      authUser = authByEmail
+        message: 'Ditemukan lebih dari satu Supabase Auth user yang mengarah ke karyawan yang sama. Rekonsiliasi dihentikan agar akun yang salah tidak diubah.',
+        stage,
+      }, { status: 409 })
     }
 
     if (!authUser) {
       return NextResponse.json({
-        message: 'Supabase Auth user target tidak ditemukan berdasarkan UUID maupun email login lama.',
+        message: `Supabase Auth user target tidak ditemukan. Kandidat email: ${oldEmailCandidates.join(', ') || '-'}.`,
+        stage,
       }, { status: 404 })
     }
 
-    const authUserId = String(authUser.id)
+    const authUserId = clean(authUser.id)
+    const oldEmail = normalizeEmail(authUser.email || oldEmailInput || appUser.email || employee?.email)
 
-    const appConflict = await admin
+    if (!isValidEmail(oldEmail)) {
+      return NextResponse.json({
+        message: 'Email login lama akun tidak dapat diidentifikasi dengan aman.',
+        stage: 'resolve_old_email',
+      }, { status: 409 })
+    }
+
+    // Bila ada app_users yang ID-nya sama dengan auth.users, prioritaskan row tersebut sebagai canonical.
+    const canonicalAppRow = [...appUserMap.values()].find((row) => clean(row.id) === authUserId)
+    if (canonicalAppRow) {
+      appUser = canonicalAppRow
+      appUserId = clean(canonicalAppRow.id)
+    }
+
+    stage = 'check_app_user_conflict'
+    const appEmailResult = await admin
       .from('app_users')
-      .select('id,email')
+      .select('id,email,employee_id,is_active')
       .ilike('email', newEmail)
-      .neq('id', appUserId)
-      .maybeSingle()
-    if (appConflict.error) throw appConflict.error
-    if (appConflict.data) {
-      return NextResponse.json({ message: 'Email baru sudah digunakan akun HARMONY lain.' }, { status: 409 })
+      .limit(50)
+    if (appEmailResult.error) throw appEmailResult.error
+
+    const foreignAppConflict = (appEmailResult.data || []).find((row: AnyRow) => {
+      if (clean(row.id) === appUserId) return false
+      if (employeeId && clean(row.employee_id) === employeeId) return false
+      return true
+    })
+    if (foreignAppConflict) {
+      return NextResponse.json({
+        message: 'Email baru sudah digunakan akun HARMONY milik karyawan lain.',
+        stage,
+      }, { status: 409 })
     }
 
-    const authConflict = await findAuthUserByEmail(admin, newEmail)
-    if (authConflict && String(authConflict.id) !== authUserId) {
-      return NextResponse.json({ message: 'Email baru sudah digunakan Supabase Auth user lain.' }, { status: 409 })
-    }
-
+    stage = 'check_employee_conflict'
     if (employeeId) {
-      const employeeConflict = await admin
+      const employeeConflictResult = await admin
         .from('employees')
-        .select('id,email')
+        .select('id,email,full_name')
         .ilike('email', newEmail)
-        .neq('id', employeeId)
-        .maybeSingle()
-      if (employeeConflict.error) throw employeeConflict.error
-      if (employeeConflict.data) {
-        return NextResponse.json({ message: 'Email baru sudah digunakan data karyawan lain.' }, { status: 409 })
+        .limit(50)
+      if (employeeConflictResult.error) throw employeeConflictResult.error
+      const foreignEmployee = (employeeConflictResult.data || []).find((row: AnyRow) => clean(row.id) !== employeeId)
+      if (foreignEmployee) {
+        return NextResponse.json({
+          message: `Email baru sudah digunakan karyawan lain${foreignEmployee.full_name ? ` (${foreignEmployee.full_name})` : ''}.`,
+          stage,
+        }, { status: 409 })
       }
     }
 
-    const remedConflict = await admin
-      .from('remed_user_access')
-      .select('id,auth_user_id,employee_id,email')
-      .ilike('email', newEmail)
-      .maybeSingle()
-    if (remedConflict.error) throw remedConflict.error
-    if (
-      remedConflict.data &&
-      String(remedConflict.data.auth_user_id || '') !== authUserId &&
-      (!employeeId || String(remedConflict.data.employee_id || '') !== employeeId)
-    ) {
-      return NextResponse.json({ message: 'Email baru sudah digunakan akses Re-Med lain.' }, { status: 409 })
+    stage = 'check_auth_conflict'
+    if (authByNewEmail && clean(authByNewEmail.id) !== authUserId) {
+      const duplicateAuthId = clean(authByNewEmail.id)
+      const [duplicateAppResult, duplicateRemedResult] = await Promise.all([
+        admin.from('app_users').select('id,email,employee_id,is_active').eq('id', duplicateAuthId).limit(20),
+        admin.from('remed_user_access').select('id,auth_user_id,employee_id,email,is_active').eq('auth_user_id', duplicateAuthId).limit(20),
+      ])
+      if (duplicateAppResult.error) throw duplicateAppResult.error
+      if (duplicateRemedResult.error) throw duplicateRemedResult.error
+
+      const linkedEmployeeIds = [
+        clean(authByNewEmail.user_metadata?.employee_id),
+        ...(duplicateAppResult.data || []).map((row: AnyRow) => clean(row.employee_id)),
+        ...(duplicateRemedResult.data || []).map((row: AnyRow) => clean(row.employee_id)),
+      ].filter(Boolean)
+
+      const sameEmployee = Boolean(employeeId) && linkedEmployeeIds.length > 0 && linkedEmployeeIds.every((id) => id === employeeId)
+
+      if (!sameEmployee) {
+        return NextResponse.json({
+          message: 'Email baru sudah digunakan Supabase Auth user lain. Sistem tidak mengubah akun tersebut untuk mencegah salah kepemilikan.',
+          stage,
+        }, { status: 409 })
+      }
+
+      // Duplicate Auth yang terbukti terhubung ke employee yang sama diarsipkan.
+      const archivedEmail = archiveEmailFor(duplicateAuthId)
+      const archiveAuth = await admin.auth.admin.updateUserById(duplicateAuthId, {
+        email: archivedEmail,
+        email_confirm: true,
+        user_metadata: {
+          ...(authByNewEmail.user_metadata || {}),
+          archived_by_harmony: true,
+          archived_reason: 'duplicate_email_same_employee',
+          archived_at: new Date().toISOString(),
+        },
+      })
+      if (archiveAuth.error) throw archiveAuth.error
+
+      for (const row of duplicateAppResult.data || []) {
+        if (clean(row.id) === appUserId) continue
+        const update = await admin
+          .from('app_users')
+          .update({ email: archiveEmailFor(clean(row.id)), is_active: false, updated_at: new Date().toISOString() })
+          .eq('id', row.id)
+        if (update.error) throw update.error
+      }
     }
 
-    const remedRowsByAuthId = await admin
-      .from('remed_user_access')
-      .select('id,auth_user_id,employee_id,email,role,is_active')
-      .eq('auth_user_id', authUserId)
-    if (remedRowsByAuthId.error) throw remedRowsByAuthId.error
+    stage = 'archive_same_employee_duplicate_app_rows'
+    const sameEmployeeRows = employeeId
+      ? [...appUserMap.values()].filter((row) => clean(row.employee_id) === employeeId)
+      : [appUser]
+    for (const row of sameEmployeeRows) {
+      if (clean(row.id) === appUserId) continue
+      const update = await admin
+        .from('app_users')
+        .update({ email: archiveEmailFor(clean(row.id)), is_active: false, updated_at: new Date().toISOString() })
+        .eq('id', row.id)
+      if (update.error) throw update.error
+    }
 
-    const remedRowsByLegacyAppId = authUserId !== appUserId
-      ? await admin
-          .from('remed_user_access')
-          .select('id,auth_user_id,employee_id,email,role,is_active')
-          .eq('auth_user_id', appUserId)
-      : { data: [], error: null }
-    if (remedRowsByLegacyAppId.error) throw remedRowsByLegacyAppId.error
+    stage = 'load_remed_links'
+    const remedCollections: AnyRow[][] = []
+    const remedQueries = [
+      admin.from('remed_user_access').select('id,auth_user_id,employee_id,email,role,is_active').eq('auth_user_id', authUserId),
+      authUserId !== appUserId
+        ? admin.from('remed_user_access').select('id,auth_user_id,employee_id,email,role,is_active').eq('auth_user_id', appUserId)
+        : null,
+      employeeId
+        ? admin.from('remed_user_access').select('id,auth_user_id,employee_id,email,role,is_active').eq('employee_id', employeeId)
+        : null,
+      admin.from('remed_user_access').select('id,auth_user_id,employee_id,email,role,is_active').ilike('email', oldEmail),
+      admin.from('remed_user_access').select('id,auth_user_id,employee_id,email,role,is_active').ilike('email', newEmail),
+    ].filter(Boolean) as any[]
 
-    const remedRowsByEmployee = employeeId
-      ? await admin
-          .from('remed_user_access')
-          .select('id,auth_user_id,employee_id,email,role,is_active')
-          .eq('employee_id', employeeId)
-      : { data: [], error: null }
-    if (remedRowsByEmployee.error) throw remedRowsByEmployee.error
-
-    const remedRowsByEmail = await admin
-      .from('remed_user_access')
-      .select('id,auth_user_id,employee_id,email,role,is_active')
-      .ilike('email', oldEmail)
-    if (remedRowsByEmail.error) throw remedRowsByEmail.error
+    for (const query of remedQueries) {
+      const result = await query
+      if (result.error) throw result.error
+      remedCollections.push(result.data || [])
+    }
 
     const remedRows = Array.from(
-      new Map(
-        [
-          ...(remedRowsByAuthId.data || []),
-          ...(remedRowsByLegacyAppId.data || []),
-          ...(remedRowsByEmployee.data || []),
-          ...(remedRowsByEmail.data || []),
-        ].map((row: any) => [row.id, row]),
-      ).values(),
-    ) as any[]
+      new Map(remedCollections.flat().map((row: AnyRow) => [clean(row.id), row])).values(),
+    ) as AnyRow[]
+
+    const foreignRemed = remedRows.find((row) => {
+      const rowEmployeeId = clean(row.employee_id)
+      return normalizeEmail(row.email) === newEmail && rowEmployeeId && (!employeeId || rowEmployeeId !== employeeId)
+    })
+    if (foreignRemed) {
+      return NextResponse.json({
+        message: 'Email baru masih terhubung ke akses Re-Med milik karyawan lain.',
+        stage: 'check_remed_conflict',
+      }, { status: 409 })
+    }
+
+    const authAlreadyNew = normalizeEmail(authUser.email) === newEmail
+    const appAlreadyNew = normalizeEmail(appUser.email) === newEmail
+    const employeeAlreadyNew = !employeeId || normalizeEmail(employee?.email) === newEmail
+    const remedAlreadyNew = remedRows.every((row) => {
+      const belongsToTarget = employeeId
+        ? clean(row.employee_id) === employeeId || clean(row.auth_user_id) === authUserId || clean(row.auth_user_id) === appUserId
+        : clean(row.auth_user_id) === authUserId || clean(row.auth_user_id) === appUserId
+      return !belongsToTarget || (normalizeEmail(row.email) === newEmail && clean(row.auth_user_id) === authUserId)
+    })
+
+    if (authAlreadyNew && appAlreadyNew && employeeAlreadyNew && remedAlreadyNew) {
+      return NextResponse.json({
+        success: true,
+        account_found: true,
+        unchanged: true,
+        message: 'Email login dan seluruh data terkait sudah sinkron.',
+        user: { ...appUser, email: newEmail },
+      })
+    }
 
     const now = new Date().toISOString()
     let authChanged = false
@@ -273,67 +442,73 @@ export async function POST(request: NextRequest) {
     const remedChanged: string[] = []
 
     try {
-      const authUpdate = await admin.auth.admin.updateUserById(authUserId, {
-        email: newEmail,
-        email_confirm: true,
-        user_metadata: {
-          ...(authUser.user_metadata || {}),
-          employee_id: employeeId,
-          employee_number: employee?.employee_number || authUser.user_metadata?.employee_number || null,
-          full_name: employee?.full_name || authUser.user_metadata?.full_name || null,
-          source: 'harmony_email_change_v3_4_1',
-        },
-      })
-      if (authUpdate.error) throw authUpdate.error
-      authChanged = true
+      stage = 'update_supabase_auth'
+      if (!authAlreadyNew) {
+        const authUpdate = await admin.auth.admin.updateUserById(authUserId, {
+          email: newEmail,
+          email_confirm: true,
+          user_metadata: {
+            ...(authUser.user_metadata || {}),
+            employee_id: employeeId,
+            employee_number: employee?.employee_number || authUser.user_metadata?.employee_number || null,
+            full_name: employee?.full_name || authUser.user_metadata?.full_name || null,
+            source: 'harmony_email_change_v3_4_4',
+          },
+        })
+        if (authUpdate.error) throw authUpdate.error
+        authChanged = true
+      }
 
-      const appUpdate = await admin
-        .from('app_users')
-        .update({ email: newEmail, updated_at: now })
-        .eq('id', appUserId)
-      if (appUpdate.error) throw appUpdate.error
-      appChanged = true
+      stage = 'update_app_users'
+      if (!appAlreadyNew) {
+        const appUpdate = await admin.from('app_users').update({ email: newEmail, updated_at: now }).eq('id', appUserId)
+        if (appUpdate.error) throw appUpdate.error
+        appChanged = true
+      }
 
-      if (employeeId) {
-        const employeeUpdate = await admin
-          .from('employees')
-          .update({ email: newEmail, updated_at: now })
-          .eq('id', employeeId)
+      stage = 'update_employee_master'
+      if (employeeId && !employeeAlreadyNew) {
+        const employeeUpdate = await admin.from('employees').update({ email: newEmail, updated_at: now }).eq('id', employeeId)
         if (employeeUpdate.error) throw employeeUpdate.error
         employeeChanged = true
       }
 
+      stage = 'update_remed_access'
       for (const row of remedRows) {
+        const rowEmployeeId = clean(row.employee_id)
+        const belongsToTarget = employeeId
+          ? rowEmployeeId === employeeId || clean(row.auth_user_id) === authUserId || clean(row.auth_user_id) === appUserId || normalizeEmail(row.email) === oldEmail
+          : clean(row.auth_user_id) === authUserId || clean(row.auth_user_id) === appUserId || normalizeEmail(row.email) === oldEmail
+        if (!belongsToTarget) continue
+        if (normalizeEmail(row.email) === newEmail && clean(row.auth_user_id) === authUserId) continue
+
         const remedUpdate = await admin
           .from('remed_user_access')
           .update({ email: newEmail, auth_user_id: authUserId, updated_at: now })
           .eq('id', row.id)
         if (remedUpdate.error) throw remedUpdate.error
-        remedChanged.push(row.id)
+        remedChanged.push(clean(row.id))
       }
     } catch (syncError) {
-      // Best-effort rollback agar perubahan email tidak berhenti setengah jalan.
-      for (const row of remedRows.filter((item) => remedChanged.includes(item.id))) {
+      // Best-effort rollback untuk target utama. Arsip duplicate yang telah dibuktikan stale tidak diaktifkan kembali.
+      for (const row of remedRows.filter((item) => remedChanged.includes(clean(item.id)))) {
         try {
-          await admin
-            .from('remed_user_access')
+          await admin.from('remed_user_access')
             .update({ email: row.email, auth_user_id: row.auth_user_id, updated_at: new Date().toISOString() })
             .eq('id', row.id)
         } catch {}
       }
       if (employeeChanged && employeeId) {
         try {
-          await admin
-            .from('employees')
+          await admin.from('employees')
             .update({ email: employee?.email || oldEmail, updated_at: new Date().toISOString() })
             .eq('id', employeeId)
         } catch {}
       }
       if (appChanged) {
         try {
-          await admin
-            .from('app_users')
-            .update({ email: oldEmail, updated_at: new Date().toISOString() })
+          await admin.from('app_users')
+            .update({ email: appUser.email || oldEmail, updated_at: new Date().toISOString() })
             .eq('id', appUserId)
         } catch {}
       }
@@ -345,6 +520,7 @@ export async function POST(request: NextRequest) {
       throw syncError
     }
 
+    stage = 'write_audit'
     let auditWarning = ''
     try {
       const audit = await admin.from('hr_setting_action_logs').insert({
@@ -362,7 +538,7 @@ export async function POST(request: NextRequest) {
           new_email: newEmail,
           synced_app_users: true,
           synced_employee: Boolean(employeeId),
-          synced_remed_access_count: remedRows.length,
+          synced_remed_access_count: remedChanged.length,
         },
       })
       if (audit.error) auditWarning = audit.error.message
@@ -370,6 +546,7 @@ export async function POST(request: NextRequest) {
       auditWarning = error?.message || 'Audit log tidak dapat ditulis.'
     }
 
+    stage = 'send_notifications'
     const fullName = employee?.full_name || newEmail
     const [oldNotice, newNotice] = await Promise.all([
       oldEmail && oldEmail !== newEmail
@@ -381,11 +558,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       account_found: true,
-      message: 'Email login berhasil diubah dan disinkronkan ke Supabase Auth, HARMONY, Employee Master, dan Re-Med.',
-      user: {
-        ...appUser,
-        email: newEmail,
-      },
+      unchanged: false,
+      message: 'Email login berhasil direkonsiliasi dan disinkronkan ke Supabase Auth, HARMONY, Employee Master, dan Re-Med.',
+      user: { ...appUser, email: newEmail },
       reconciled_legacy_uuid: appUserId !== authUserId,
       audit_warning: auditWarning || null,
       notification: {
@@ -396,6 +571,10 @@ export async function POST(request: NextRequest) {
     })
   } catch (error) {
     const result = apiError(error, 'Gagal mengubah email login akun.')
-    return NextResponse.json({ message: result.message, error: result.error }, { status: result.status })
+    return NextResponse.json({
+      message: `${result.message} [tahap: ${stage}]`,
+      error: result.error,
+      stage,
+    }, { status: result.status })
   }
 }

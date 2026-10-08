@@ -886,7 +886,7 @@ function AlertBox({
       : 'border-red-200 bg-red-50 text-red-600'
 
   return (
-    <div className={`rounded-2xl border p-4 text-sm ${className}`}>
+    <div role={type === 'error' ? 'alert' : undefined} data-harmony-feedback={type === 'error' ? 'error' : undefined} className={`rounded-2xl border p-4 text-sm ${className}`}>
       {message}
     </div>
   )

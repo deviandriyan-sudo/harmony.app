@@ -1119,7 +1119,7 @@ export default function EmployeeLeavePage() {
           </AlertBox>
         )}
 
-        {errorMessage && (
+        {errorMessage && !formOpen && (
           <AlertBox tone="orange" title="Perhatian" icon={<AlertTriangle size={18} />}>
             {errorMessage}
           </AlertBox>
@@ -1355,7 +1355,7 @@ function LeaveRequestModal({
   onClose: () => void
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-3 backdrop-blur-sm sm:p-5">
+    <div className="harmony-modal-surface fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-3 backdrop-blur-sm sm:p-5">
       <div className="flex max-h-[94vh] w-full max-w-4xl flex-col overflow-hidden rounded-[32px] bg-white shadow-[0_30px_90px_rgba(0,0,0,0.24)]">
         <div className="flex items-start justify-between gap-4 border-b border-black/5 p-5 sm:p-6">
           <div>
@@ -1576,7 +1576,7 @@ function LeaveRequestModal({
 
           <div className="border-t border-black/5 bg-white p-5 sm:p-6">
             {errorMessage ? (
-              <div className="mb-4 flex items-start gap-3 rounded-[18px] border border-red-200 bg-red-50 px-4 py-3 text-sm leading-5 text-red-700">
+              <div role="alert" className="mb-4 flex items-start gap-3 rounded-[18px] border border-red-200 bg-red-50 px-4 py-3 text-sm leading-5 text-red-700">
                 <AlertTriangle size={17} className="mt-0.5 shrink-0" />
                 <span>{errorMessage}</span>
               </div>

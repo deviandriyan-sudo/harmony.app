@@ -20,6 +20,14 @@ function walk(dir, files = []) {
   return files
 }
 
+
+function routeShape(route) {
+  return route
+    .replace(/\[\[\.\.\.[^\]]+\]\]/g, '[...*]')
+    .replace(/\[\.\.\.[^\]]+\]/g, '[...*]')
+    .replace(/\[[^\]]+\]/g, '[*]')
+}
+
 function normalizeRoute(file) {
   let rel = path.relative(appDir, path.dirname(file)).replaceAll(path.sep, '/')
   rel = rel
@@ -77,6 +85,18 @@ for (const file of routeFiles) {
   else map.set(route, file)
 }
 
+for (const [label, map] of [['page', pageRoutes], ['API', apiRoutes]]) {
+  const shapes = new Map()
+  for (const [route, file] of map) {
+    const shape = routeShape(route)
+    if (shapes.has(shape) && shapes.get(shape) !== route) {
+      failures.push(`Dynamic ${label} route collision: ${shapes.get(shape)} <-> ${route}`)
+    } else {
+      shapes.set(shape, route)
+    }
+  }
+}
+
 const forbiddenPaths = [
   '/hr/workforce',
   '/hr/attendance/security',
@@ -126,9 +146,19 @@ assert(sourceText.includes('/api/hr/users/change-email'), 'Sinkronisasi perubaha
 assert(employeeLeaveSource.includes('countCalendarDays(form.start_date, form.end_date)'), 'Klaim PHL masih memakai hitungan hari kerja/weekend exclusion.')
 const emailRouteSource = fs.readFileSync(path.join(root, 'app/api/hr/users/change-email/route.ts'), 'utf8')
 assert(emailRouteSource.includes('legacy_uuid_mismatch'), 'Email login legacy UUID reconciliation belum terpasang.')
+assert(emailRouteSource.includes('authByAppEmail'), 'Rekonsiliasi email belum memprioritaskan mapping app_users lama.')
+const phlClaimApiSource = fs.readFileSync(path.join(root, 'app/api/employee/phl-claims/route.ts'), 'utf8')
+assert(phlClaimApiSource.includes('PHL_ACTIVE_CLAIM_EXISTS'), 'Preflight duplicate Klaim PHL belum terpasang.')
+assert(phlClaimApiSource.includes('PHL_LEGACY_UNIQUE_INDEX'), 'Handling legacy unique index Klaim PHL belum terpasang.')
+const phlWorkApiSource = fs.readFileSync(path.join(root, 'app/api/phl/work-requests/route.ts'), 'utf8')
+assert(phlWorkApiSource.includes('canonicalDate'), 'Normalisasi tanggal Pengajuan Saldo PHL belum terpasang.')
+assert(phlWorkApiSource.includes('hasConfiguredSupervisor'), 'Validasi atasan Pengajuan Saldo PHL belum terpasang.')
+const dashboardSource = fs.readFileSync(path.join(root, 'app/employee/dashboard/page.tsx'), 'utf8')
+assert(dashboardSource.includes('Ajukan Saldo PHL') && dashboardSource.includes('/employee/phl'), 'Dashboard belum menyediakan jalur Pengajuan Saldo PHL terpisah.')
+assert(sourceText.includes('harmony-modal-surface'), 'Modal feedback surface belum terpasang.')
 
 const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'))
-assert(pkg.version === '3.4.1', `package.json version harus 3.4.1, saat ini ${pkg.version}`)
+assert(pkg.version === '3.4.4', `package.json version harus 3.4.4, saat ini ${pkg.version}`)
 assert(Boolean(pkg.scripts?.['test:smoke']), 'Script test:smoke belum tersedia.')
 
 if (warnings.length) {

@@ -922,7 +922,7 @@ export default function EmployeeApprovalDetailPage() {
         )}
 
         {errorMessage && (
-          <div className="rounded-2xl border border-orange-200 bg-orange-50 p-4 text-sm leading-6 text-orange-700">
+          <div role="alert" data-harmony-feedback="error" className="rounded-2xl border border-orange-200 bg-orange-50 p-4 text-sm leading-6 text-orange-700">
             <div className="mb-1 flex items-center gap-2 font-bold">
               <AlertTriangle size={18} />
               Perhatian
@@ -1614,7 +1614,7 @@ function AttendanceDetailModal({
   const displayStatus = getStatusFromLog(log)
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-5 backdrop-blur-sm">
+    <div className="harmony-modal-surface fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-5 backdrop-blur-sm">
       <div className="flex max-h-[92vh] w-full max-w-4xl flex-col overflow-hidden rounded-[32px] bg-white shadow-[0_30px_90px_rgba(0,0,0,0.24)]">
         <div className="flex items-start justify-between gap-4 border-b border-black/5 p-6">
           <div>
@@ -1695,7 +1695,7 @@ function RejectModal({
   onSubmit: () => void
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-5 backdrop-blur-sm">
+    <div className="harmony-modal-surface fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-5 backdrop-blur-sm">
       <div className="flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-[32px] bg-white shadow-[0_30px_90px_rgba(0,0,0,0.24)]">
         <div className="flex items-start justify-between gap-4 border-b border-black/5 p-6">
           <div>

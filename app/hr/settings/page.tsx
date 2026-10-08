@@ -1239,7 +1239,7 @@ function ConfirmActionModal({
   onConfirm: () => void
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-5 backdrop-blur-sm">
+    <div className="harmony-modal-surface fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-5 backdrop-blur-sm">
       <div className="w-full max-w-lg overflow-hidden rounded-[32px] bg-white shadow-[0_30px_90px_rgba(0,0,0,0.24)]">
         <div className="relative overflow-hidden bg-[#1d1d1f] p-6 text-white">
           <div className="pointer-events-none absolute -right-12 -top-14 h-40 w-40 rounded-full bg-red-500/30 blur-3xl" />
@@ -1355,7 +1355,7 @@ function AlertBox({ type, title, message }: { type: 'success' | 'error'; title: 
   const icon = type === 'success' ? <CheckCircle2 size={18} /> : <AlertTriangle size={18} />
 
   return (
-    <div className={`rounded-2xl border p-4 text-sm leading-6 ${className}`}>
+    <div role={type === 'error' ? 'alert' : undefined} data-harmony-feedback={type === 'error' ? 'error' : undefined} className={`rounded-2xl border p-4 text-sm leading-6 ${className}`}>
       <div className="mb-1 flex items-center gap-2 font-bold">
         {icon}
         {title}

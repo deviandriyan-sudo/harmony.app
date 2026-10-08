@@ -116,7 +116,7 @@ export default function EmployeeLayout({ children }: { children: React.ReactNode
         </div>
 
         {mobileSidebarOpen && (
-          <div className="fixed inset-0 z-50 lg:hidden">
+          <div className="harmony-modal-surface fixed inset-0 z-50 lg:hidden">
             <button type="button" aria-label="Tutup menu" onClick={() => setMobileSidebarOpen(false)} className="absolute inset-0 bg-black/35 backdrop-blur-sm" />
             <div className="absolute left-0 top-0 h-full max-w-[86vw]">
               <AppSidebar

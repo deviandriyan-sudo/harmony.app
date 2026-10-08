@@ -334,7 +334,8 @@ export default function EmployeeDashboardPage() {
               <h1 className="mt-5 text-3xl font-semibold tracking-[-0.04em] sm:text-4xl">Selamat datang, {employee?.full_name || appUser?.email || 'Employee'}.</h1>
               <p className="mt-3 max-w-2xl text-sm leading-7 text-white/60">Saldo cuti dan PHL pada dashboard ini membaca lifecycle summary yang sama dengan HR agar tidak terjadi perbedaan angka.</p>
               <div className="mt-6 flex flex-wrap gap-3">
-                <Link href="/employee/leave" className="inline-flex min-h-11 items-center gap-2 rounded-2xl bg-white px-4 text-sm font-bold text-[#1d1d1f]"><CalendarDays size={17} />Ajukan Cuti / PHL</Link>
+                <Link href="/employee/leave" className="inline-flex min-h-11 items-center gap-2 rounded-2xl bg-white px-4 text-sm font-bold text-[#1d1d1f]"><CalendarDays size={17} />Cuti / Izin / Klaim PHL</Link>
+                <Link href="/employee/phl" className="inline-flex min-h-11 items-center gap-2 rounded-2xl border border-white/15 bg-white/12 px-4 text-sm font-bold text-white"><WalletCards size={17} />Ajukan Saldo PHL</Link>
                 <Link href="/employee/attendance" className="inline-flex min-h-11 items-center gap-2 rounded-2xl border border-white/10 bg-white/10 px-4 text-sm font-bold text-white"><Fingerprint size={17} />Absensi</Link>
               </div>
             </div>
