@@ -182,11 +182,11 @@ export async function notifyPHLWorkSubmitted(
     return { ok: false, message: 'Email atasan belum ditemukan.' }
   }
 
-  const title = 'Pengajuan PHL Kerja Baru'
+  const title = 'Pengajuan Saldo PHL Baru'
   const message = [
     'Yth. Atasan HARMONY,',
     '',
-    `${clean(requestRow.full_name) || 'Karyawan'} mengajukan PHL kerja.`,
+    `${clean(requestRow.full_name) || 'Karyawan'} mengajukan saldo PHL.`,
     `Tanggal: ${formatDate(requestRow.work_date)}`,
     `Jam tugas: ${clean(requestRow.work_start_time).slice(0, 5)} - ${clean(requestRow.work_end_time).slice(0, 5)}`,
     `Durasi tercatat: ${formatMinutes(Number(requestRow.recorded_work_minutes || 0))}`,
@@ -198,7 +198,7 @@ export async function notifyPHLWorkSubmitted(
   const actionUrl = appUrl('/employee/approvals/phl')
   const result = await sendHarmonyServerEmail({
     to: emails,
-    subject: `[HARMONY] Pengajuan PHL - ${clean(requestRow.full_name) || 'Karyawan'}`,
+    subject: `[HARMONY] Pengajuan Saldo PHL - ${clean(requestRow.full_name) || 'Karyawan'}`,
     html: buildServerHarmonyEmailHtml({
       title,
       message,
@@ -221,12 +221,12 @@ export async function notifyPHLWorkDecision(requestRow: any) {
   if (!isEmail(email)) return { ok: false, message: 'Email employee belum tersedia.' }
 
   const approved = normalize(requestRow.status) === 'approved'
-  const title = approved ? 'PHL Kerja Disetujui' : 'PHL Kerja Ditolak'
+  const title = approved ? 'Pengajuan Saldo PHL Disetujui' : 'Pengajuan Saldo PHL Ditolak'
   const statusText = approved ? 'disetujui' : 'ditolak'
   const message = [
     `Yth. ${clean(requestRow.full_name) || 'Karyawan'},`,
     '',
-    `Pengajuan PHL kerja tanggal ${formatDate(requestRow.work_date)} telah ${statusText} oleh ${clean(requestRow.supervisor_name) || 'atasan'}.`,
+    `Pengajuan saldo PHL tanggal ${formatDate(requestRow.work_date)} telah ${statusText} oleh ${clean(requestRow.supervisor_name) || 'atasan'}.`,
     `Penugasan: ${clean(requestRow.work_purpose)}`,
     `Catatan atasan: ${clean(requestRow.supervisor_note) || '-'}`,
     approved ? 'Saldo bertambah 1 PHL dan berlaku 90 hari sejak tanggal pelaksanaan.' : 'Saldo PHL tidak berubah.',

@@ -26,6 +26,8 @@ export type PHLWorkRequest = {
   recorded_work_minutes: number | null
   attendance_log_id: string | null
   attendance_verified: boolean
+  origin?: 'employee_request' | 'legacy_attendance' | string
+  legacy_attendance_status?: string | null
   work_day_type: 'weekday' | 'weekend' | 'holiday' | string
   holiday_name: string | null
   work_purpose: string

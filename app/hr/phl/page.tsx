@@ -85,7 +85,7 @@ export default function HRPHLPage() {
           <div className="relative flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
             <div>
               <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-4 py-2 text-xs font-semibold text-white/75"><ShieldCheck size={15} />PHL Monitoring</div>
-              <h1 className="mt-5 text-3xl font-semibold tracking-[-0.04em] md:text-5xl">PHL terpisah dari cutoff absensi.</h1>
+              <h1 className="mt-5 text-3xl font-semibold tracking-[-0.04em] md:text-5xl">Monitoring Pengajuan Saldo PHL</h1>
               <p className="mt-4 max-w-2xl text-sm leading-7 text-white/65">HR memonitor dan melakukan adjustment bila diperlukan. Approval saldo dilakukan langsung oleh atasan.</p>
             </div>
             <div className="grid grid-cols-4 gap-3 xl:min-w-[560px]">
@@ -141,6 +141,7 @@ export default function HRPHLPage() {
                     <tr key={item.id} className="align-top">
                       <td className="px-4 py-4">
                         <p className="font-bold text-[#1d1d1f]">{item.full_name || '-'}</p>
+                        {item.origin === 'legacy_attendance' && <span className="mt-1 inline-flex rounded-full bg-amber-50 px-2 py-1 text-[10px] font-bold text-amber-700">Migrasi Absensi Lama</span>}
                         <p className="mt-1 text-xs text-[#86868b]">{item.employee_number || '-'} · {item.department || '-'}</p>
                       </td>
                       <td className="px-4 py-4">

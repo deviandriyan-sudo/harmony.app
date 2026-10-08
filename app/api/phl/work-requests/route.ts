@@ -111,7 +111,7 @@ async function withAttachments(admin: any, rows: any[]) {
   const ids = rows.map((row) => row.id)
   const { data: attachments, error } = await admin
     .from('phl_work_request_attachments')
-    .select('id,request_id,slot_no,file_name,mime_type,file_size,storage_bucket,storage_path')
+    .select('id,request_id,slot_no,file_name,mime_type,file_size,storage_bucket,storage_path,legacy_file_url')
     .in('request_id', ids)
     .order('slot_no', { ascending: true })
 
@@ -120,11 +120,13 @@ async function withAttachments(admin: any, rows: any[]) {
   const grouped = new Map<string, any[]>()
 
   for (const attachment of attachments || []) {
-    let signedUrl: string | null = null
-    const { data } = await admin.storage
-      .from(attachment.storage_bucket || BUCKET)
-      .createSignedUrl(attachment.storage_path, 60 * 30)
-    signedUrl = data?.signedUrl || null
+    let signedUrl: string | null = attachment.legacy_file_url || null
+    if (attachment.storage_path) {
+      const { data } = await admin.storage
+        .from(attachment.storage_bucket || BUCKET)
+        .createSignedUrl(attachment.storage_path, 60 * 30)
+      signedUrl = data?.signedUrl || signedUrl
+    }
 
     const list = grouped.get(attachment.request_id) || []
     list.push({
