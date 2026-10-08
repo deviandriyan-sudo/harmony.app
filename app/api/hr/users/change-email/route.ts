@@ -319,46 +319,109 @@ export async function POST(request: NextRequest) {
     }
 
     stage = 'check_auth_conflict'
+    let archivedDuplicateAuth: { id: string; reason: string } | null = null
+
     if (authByNewEmail && clean(authByNewEmail.id) !== authUserId) {
       const duplicateAuthId = clean(authByNewEmail.id)
-      const [duplicateAppResult, duplicateRemedResult] = await Promise.all([
-        admin.from('app_users').select('id,email,employee_id,is_active').eq('id', duplicateAuthId).limit(20),
-        admin.from('remed_user_access').select('id,auth_user_id,employee_id,email,is_active').eq('auth_user_id', duplicateAuthId).limit(20),
-      ])
-      if (duplicateAppResult.error) throw duplicateAppResult.error
-      if (duplicateRemedResult.error) throw duplicateRemedResult.error
 
-      const linkedEmployeeIds = [
-        clean(authByNewEmail.user_metadata?.employee_id),
-        ...(duplicateAppResult.data || []).map((row: AnyRow) => clean(row.employee_id)),
-        ...(duplicateRemedResult.data || []).map((row: AnyRow) => clean(row.employee_id)),
-      ].filter(Boolean)
-
-      const sameEmployee = Boolean(employeeId) && linkedEmployeeIds.length > 0 && linkedEmployeeIds.every((id) => id === employeeId)
-
-      if (!sameEmployee) {
+      // Jangan pernah mengarsipkan session HR yang sedang melakukan perubahan, kecuali memang
+      // session tersebut adalah akun target yang sama (yang berarti authUserId seharusnya sama).
+      if (duplicateAuthId === actorAuthUserId) {
         return NextResponse.json({
-          message: 'Email baru sudah digunakan Supabase Auth user lain. Sistem tidak mengubah akun tersebut untuk mencegah salah kepemilikan.',
+          message: 'Email baru sedang dipakai oleh akun HR yang aktif. Gunakan email lain atau selesaikan perubahan dari akun target terlebih dahulu.',
           stage,
         }, { status: 409 })
       }
 
-      // Duplicate Auth yang terbukti terhubung ke employee yang sama diarsipkan.
+      const [duplicateAppByIdResult, duplicateAppByEmailResult, duplicateRemedByIdResult, duplicateRemedByEmailResult] = await Promise.all([
+        admin.from('app_users').select('id,email,employee_id,is_active').eq('id', duplicateAuthId).limit(20),
+        admin.from('app_users').select('id,email,employee_id,is_active').ilike('email', newEmail).limit(50),
+        admin.from('remed_user_access').select('id,auth_user_id,employee_id,email,is_active').eq('auth_user_id', duplicateAuthId).limit(20),
+        admin.from('remed_user_access').select('id,auth_user_id,employee_id,email,is_active').ilike('email', newEmail).limit(50),
+      ])
+
+      for (const result of [duplicateAppByIdResult, duplicateAppByEmailResult, duplicateRemedByIdResult, duplicateRemedByEmailResult]) {
+        if (result.error) throw result.error
+      }
+
+      const duplicateAppRows = Array.from(new Map([
+        ...(duplicateAppByIdResult.data || []),
+        ...(duplicateAppByEmailResult.data || []),
+      ].map((row: AnyRow) => [clean(row.id), row])).values()) as AnyRow[]
+
+      const duplicateRemedRows = Array.from(new Map([
+        ...(duplicateRemedByIdResult.data || []),
+        ...(duplicateRemedByEmailResult.data || []),
+      ].map((row: AnyRow) => [clean(row.id), row])).values()) as AnyRow[]
+
+      const metadataEmployeeId = clean(authByNewEmail.user_metadata?.employee_id)
+      const metadataEmployeeNumber = clean(authByNewEmail.user_metadata?.employee_number).toLowerCase()
+      const targetEmployeeNumber = clean(employee?.employee_number).toLowerCase()
+
+      const linkedEmployeeIds = [
+        metadataEmployeeId,
+        ...duplicateAppRows.map((row) => clean(row.employee_id)),
+        ...duplicateRemedRows.map((row) => clean(row.employee_id)),
+      ].filter(Boolean)
+
+      const hasForeignEmployeeLink = Boolean(employeeId)
+        ? linkedEmployeeIds.some((id) => id !== employeeId)
+        : linkedEmployeeIds.length > 0
+
+      const metadataMatchesTargetNumber = Boolean(
+        targetEmployeeNumber && metadataEmployeeNumber && metadataEmployeeNumber === targetEmployeeNumber,
+      )
+
+      const sameEmployee = Boolean(employeeId) && (
+        (linkedEmployeeIds.length > 0 && linkedEmployeeIds.every((id) => id === employeeId)) ||
+        metadataMatchesTargetNumber
+      )
+
+      // Auth-only orphan dapat terbentuk dari setup/percobaan lama: email ada di auth.users,
+      // tetapi tidak memiliki app_users, Re-Med, atau metadata ownership. Jika Employee Master
+      // yang sedang diedit adalah satu-satunya pemilik email tersebut, orphan aman diarsipkan.
+      const hasOwnershipMarker = linkedEmployeeIds.length > 0 || Boolean(metadataEmployeeNumber)
+      const orphanAuthForTarget = Boolean(employeeId) && !hasOwnershipMarker && !hasForeignEmployeeLink &&
+        duplicateAppRows.every((row) => !clean(row.employee_id) || clean(row.employee_id) === employeeId) &&
+        duplicateRemedRows.every((row) => !clean(row.employee_id) || clean(row.employee_id) === employeeId)
+
+      if (!sameEmployee && !orphanAuthForTarget) {
+        return NextResponse.json({
+          message: 'Email baru sudah digunakan Supabase Auth user lain yang masih memiliki identitas/mapping berbeda. Sistem tidak mengambil alih akun tersebut.',
+          stage,
+          conflict: {
+            auth_user_id: duplicateAuthId,
+            has_employee_link: linkedEmployeeIds.length > 0,
+            has_metadata_employee_number: Boolean(metadataEmployeeNumber),
+          },
+        }, { status: 409 })
+      }
+
+      // Pertahankan Auth canonical yang lama agar password user tidak berubah. Auth duplikat yang
+      // terbukti milik employee yang sama atau benar-benar orphan dipindah ke alamat arsip dahulu.
       const archivedEmail = archiveEmailFor(duplicateAuthId)
+      const archiveReason = sameEmployee ? 'duplicate_email_same_employee' : 'orphan_email_duplicate_for_target_employee'
       const archiveAuth = await admin.auth.admin.updateUserById(duplicateAuthId, {
         email: archivedEmail,
         email_confirm: true,
         user_metadata: {
           ...(authByNewEmail.user_metadata || {}),
           archived_by_harmony: true,
-          archived_reason: 'duplicate_email_same_employee',
+          archived_reason: archiveReason,
+          archived_for_employee_id: employeeId,
+          archived_for_email: newEmail,
           archived_at: new Date().toISOString(),
         },
       })
       if (archiveAuth.error) throw archiveAuth.error
+      archivedDuplicateAuth = { id: duplicateAuthId, reason: archiveReason }
 
-      for (const row of duplicateAppResult.data || []) {
+      // Nonaktifkan hanya app_users duplicate yang jelas milik target/legacy orphan. Foreign rows
+      // sudah diblokir oleh check_app_user_conflict di atas.
+      for (const row of duplicateAppRows) {
         if (clean(row.id) === appUserId) continue
+        const rowEmployeeId = clean(row.employee_id)
+        if (rowEmployeeId && employeeId && rowEmployeeId !== employeeId) continue
         const update = await admin
           .from('app_users')
           .update({ email: archiveEmailFor(clean(row.id)), is_active: false, updated_at: new Date().toISOString() })
@@ -539,6 +602,8 @@ export async function POST(request: NextRequest) {
           synced_app_users: true,
           synced_employee: Boolean(employeeId),
           synced_remed_access_count: remedChanged.length,
+          archived_duplicate_auth_id: archivedDuplicateAuth?.id || null,
+          archived_duplicate_auth_reason: archivedDuplicateAuth?.reason || null,
         },
       })
       if (audit.error) auditWarning = audit.error.message
@@ -562,6 +627,7 @@ export async function POST(request: NextRequest) {
       message: 'Email login berhasil direkonsiliasi dan disinkronkan ke Supabase Auth, HARMONY, Employee Master, dan Re-Med.',
       user: { ...appUser, email: newEmail },
       reconciled_legacy_uuid: appUserId !== authUserId,
+      reconciled_duplicate_auth: archivedDuplicateAuth,
       audit_warning: auditWarning || null,
       notification: {
         old_email: oldNotice,

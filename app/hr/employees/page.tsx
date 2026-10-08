@@ -1929,7 +1929,7 @@ export default function HREmployeesPage() {
         )}
 
         {successMessage && <AlertBox type="success" message={successMessage} />}
-        {errorMessage && <AlertBox type="error" message={`Error: ${errorMessage}`} />}
+        {errorMessage && !editModalOpen && <AlertBox type="error" message={`Error: ${errorMessage}`} />}
 
         <div className="harmony-card harmony-slide-up overflow-hidden">
           <div className="flex flex-col gap-4 border-b border-black/5 p-5 xl:flex-row xl:items-center xl:justify-between">

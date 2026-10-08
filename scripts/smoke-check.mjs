@@ -147,6 +147,8 @@ assert(employeeLeaveSource.includes('countCalendarDays(form.start_date, form.end
 const emailRouteSource = fs.readFileSync(path.join(root, 'app/api/hr/users/change-email/route.ts'), 'utf8')
 assert(emailRouteSource.includes('legacy_uuid_mismatch'), 'Email login legacy UUID reconciliation belum terpasang.')
 assert(emailRouteSource.includes('authByAppEmail'), 'Rekonsiliasi email belum memprioritaskan mapping app_users lama.')
+assert(emailRouteSource.includes('orphanAuthForTarget'), 'Rekonsiliasi email belum menangani Supabase Auth orphan/duplicate yang aman.')
+assert(emailRouteSource.includes('orphan_email_duplicate_for_target_employee'), 'Audit reason untuk orphan Auth duplicate belum terpasang.')
 const phlClaimApiSource = fs.readFileSync(path.join(root, 'app/api/employee/phl-claims/route.ts'), 'utf8')
 assert(phlClaimApiSource.includes('PHL_ACTIVE_CLAIM_EXISTS'), 'Preflight duplicate Klaim PHL belum terpasang.')
 assert(phlClaimApiSource.includes('PHL_LEGACY_UNIQUE_INDEX'), 'Handling legacy unique index Klaim PHL belum terpasang.')
@@ -158,7 +160,7 @@ assert(dashboardSource.includes('Ajukan Saldo PHL') && dashboardSource.includes(
 assert(sourceText.includes('harmony-modal-surface'), 'Modal feedback surface belum terpasang.')
 
 const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'))
-assert(pkg.version === '3.4.4', `package.json version harus 3.4.4, saat ini ${pkg.version}`)
+assert(pkg.version === '3.4.5', `package.json version harus 3.4.5, saat ini ${pkg.version}`)
 assert(Boolean(pkg.scripts?.['test:smoke']), 'Script test:smoke belum tersedia.')
 
 if (warnings.length) {
