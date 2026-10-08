@@ -118,7 +118,7 @@ const employeeSourceText = walk(path.join(root, 'app', 'employee'))
 assert(!employeeSourceText.includes('sendHarmonyEmail('), 'Employee/supervisor masih dapat memanggil email custom; wajib memakai workflow template server.')
 
 const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'))
-assert(pkg.version === '3.3.5', `package.json version harus 3.3.5, saat ini ${pkg.version}`)
+assert(pkg.version === '3.3.6', `package.json version harus 3.3.6, saat ini ${pkg.version}`)
 assert(Boolean(pkg.scripts?.['test:smoke']), 'Script test:smoke belum tersedia.')
 
 if (warnings.length) {

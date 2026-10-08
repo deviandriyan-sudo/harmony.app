@@ -95,7 +95,7 @@ export default function RemedLayout({ children }: { children: React.ReactNode })
   return (
     <div className="harmony-shell min-h-screen overflow-x-hidden">
       <div className="flex min-h-screen w-full overflow-x-hidden">
-        <div className="hidden print:hidden lg:sticky lg:top-0 lg:block lg:h-screen lg:self-start">
+        <div className="fixed inset-y-0 left-0 z-30 hidden h-screen w-[272px] print:hidden lg:block">
           <AppSidebar
             menu={menu}
             title="HARMONY"
@@ -126,7 +126,7 @@ export default function RemedLayout({ children }: { children: React.ReactNode })
           </div>
         )}
 
-        <main className="min-w-0 flex-1 overflow-x-hidden">
+        <main className="min-w-0 flex-1 overflow-x-hidden lg:ml-[272px]">
           <div className="harmony-mobile-topbar sticky top-0 z-40 border-b px-4 py-3 print:hidden lg:hidden">
             <div className="flex items-center justify-between gap-3">
               <button type="button" onClick={() => setMobileSidebarOpen(true)} className="harmony-mobile-glass flex h-11 w-11 items-center justify-center rounded-2xl text-[#1d1d1f]" aria-label="Buka menu">

@@ -117,7 +117,7 @@ export default function HRLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="harmony-shell min-h-screen overflow-x-hidden">
       <div className="flex min-h-screen w-full overflow-x-hidden">
-        <div className="hidden lg:sticky lg:top-0 lg:block lg:h-screen lg:self-start">
+        <div className="fixed inset-y-0 left-0 z-30 hidden h-screen w-[272px] lg:block">
           <AppSidebar menu={hasRemedAccess ? [...hrMenu, hrRemedEntry] : hrMenu} title="HARMONY" subtitle="Integrated HR Platform" userName={userName} userRole="HR Administrator" logoSrc="/logo.png" />
         </div>
 
@@ -131,7 +131,7 @@ export default function HRLayout({ children }: { children: React.ReactNode }) {
           </div>
         )}
 
-        <main className="min-w-0 flex-1 overflow-x-hidden">
+        <main className="min-w-0 flex-1 overflow-x-hidden lg:ml-[272px]">
           <div className="harmony-mobile-topbar sticky top-0 z-40 border-b px-4 py-3 lg:hidden">
             <div className="flex items-center justify-between gap-3">
               <button type="button" onClick={() => setMobileSidebarOpen(true)} className="harmony-mobile-glass flex h-11 w-11 items-center justify-center rounded-2xl text-[#1d1d1f]" aria-label="Buka menu"><Menu size={22} /></button>
