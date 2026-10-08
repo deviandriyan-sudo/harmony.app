@@ -763,6 +763,7 @@ Perubahan akan disinkronkan ke Supabase Auth, app_users, Employee Master, dan Re
           <EmailChangeModal
             form={emailChangeForm}
             saving={saving}
+            errorMessage={errorMessage}
             onClose={() => {
               if (saving) return
               setShowEmailModal(false)
@@ -1288,12 +1289,14 @@ function BulkCreateUserForm({
 function EmailChangeModal({
   form,
   saving,
+  errorMessage,
   onClose,
   onSubmit,
   onChange,
 }: {
   form: EmailChangeForm
   saving: boolean
+  errorMessage: string
   onClose: () => void
   onSubmit: (event: React.FormEvent<HTMLFormElement>) => void
   onChange: (value: string) => void
@@ -1345,6 +1348,12 @@ function EmailChangeModal({
           <div className="rounded-[20px] border border-blue-100 bg-blue-50 px-4 py-3 text-xs leading-5 text-blue-700">
             Sistem akan memperbarui Supabase Auth, app_users, Employee Master, dan akses Re-Med yang terhubung. Password tidak berubah.
           </div>
+
+          {errorMessage ? (
+            <div className="rounded-[20px] border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+              {errorMessage}
+            </div>
+          ) : null}
 
           <FormFooter
             saving={saving}

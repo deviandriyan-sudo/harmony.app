@@ -301,8 +301,14 @@ export default function EmployeeLeavePage() {
   const calculatedDays = useMemo(() => {
     if (!form.start_date || !form.end_date) return 0
 
+    // Klaim PHL menggunakan saldo per tanggal klaim, termasuk Sabtu/Minggu/hari libur.
+    // Pengajuan cuti/izin lain tetap hanya menghitung hari kerja.
+    if (form.request_type === 'phl_claim') {
+      return countCalendarDays(form.start_date, form.end_date)
+    }
+
     return countWorkingDays(form.start_date, form.end_date, holidays)
-  }, [form.start_date, form.end_date, holidays])
+  }, [form.request_type, form.start_date, form.end_date, holidays])
 
   const selectedRequestMeta = getRequestMeta(form.request_type)
 
@@ -568,10 +574,23 @@ export default function EmployeeLeavePage() {
 
   function updateForm<K extends keyof FormState>(key: K, value: FormState[K]) {
     if (errorMessage) setErrorMessage('')
-    setForm((prev) => ({
-      ...prev,
-      [key]: value,
-    }))
+    setForm((prev) => {
+      const next = {
+        ...prev,
+        [key]: value,
+      }
+
+      // Klaim PHL selalu 1 tanggal per pengajuan. Hindari rentang tanggal yang membingungkan user.
+      if (key === 'request_type' && String(value) === 'phl_claim' && prev.start_date) {
+        next.end_date = prev.start_date
+      }
+
+      if (key === 'start_date' && prev.request_type === 'phl_claim') {
+        next.end_date = String(value)
+      }
+
+      return next
+    })
   }
 
   function resetForm() {
@@ -748,7 +767,7 @@ export default function EmployeeLeavePage() {
     }
 
     if (calculatedDays <= 0) {
-      setErrorMessage('Jumlah hari pengajuan harus lebih dari 0 hari kerja.')
+      setErrorMessage(form.request_type === 'phl_claim' ? 'Tanggal klaim PHL belum valid.' : 'Jumlah hari pengajuan harus lebih dari 0 hari kerja.')
       setSubmitting(false)
       return
     }
@@ -1345,7 +1364,9 @@ function LeaveRequestModal({
             </h2>
 
             <p className="mt-1 text-sm leading-6 text-[#6e6e73]">
-              Isi data pengajuan. Sabtu, Minggu, dan hari libur aktif tidak dihitung sebagai jatah cuti.
+              {form.request_type === 'phl_claim'
+                ? 'Klaim PHL menggunakan 1 saldo untuk 1 tanggal yang dipilih, termasuk Sabtu, Minggu, atau hari libur.'
+                : 'Isi data pengajuan. Sabtu, Minggu, dan hari libur aktif tidak dihitung sebagai jatah cuti.'}
             </p>
           </div>
 
@@ -1430,7 +1451,8 @@ function LeaveRequestModal({
                   type="date"
                   value={form.end_date}
                   onChange={(event) => onUpdate('end_date', event.target.value)}
-                  className="harmony-input"
+                  disabled={form.request_type === 'phl_claim'}
+                  className="harmony-input disabled:cursor-not-allowed disabled:bg-[#f2f3f5] disabled:text-[#6e6e73]"
                 />
               </label>
             </div>
@@ -1439,7 +1461,7 @@ function LeaveRequestModal({
               <InfoTile
                 label="Jumlah Hari"
                 value={`${calculatedDays} hari`}
-                description="Exclude weekend/libur"
+                description={form.request_type === 'phl_claim' ? '1 tanggal per klaim PHL' : 'Exclude weekend/libur'}
                 tone="blue"
               />
 
@@ -2065,6 +2087,16 @@ function getRequestMeta(type: RequestType) {
     ...meta,
     category: meta.request_category,
   }
+}
+
+function countCalendarDays(start: string, end: string) {
+  if (!start || !end || end < start) return 0
+
+  const startDate = new Date(`${start}T00:00:00`)
+  const endDate = new Date(`${end}T00:00:00`)
+  const diff = endDate.getTime() - startDate.getTime()
+
+  return Math.floor(diff / 86_400_000) + 1
 }
 
 function countWorkingDays(start: string, end: string, holidays: Holiday[]) {

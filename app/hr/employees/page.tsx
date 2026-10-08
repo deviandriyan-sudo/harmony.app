@@ -2019,6 +2019,7 @@ export default function HREmployeesPage() {
           <EmployeeFormModal
             form={form}
             saving={saving}
+            errorMessage={errorMessage}
             savingAssignment={savingAssignment}
             deletingAssignmentId={deletingAssignmentId}
             editingEmployeeId={editingEmployeeId}
@@ -2548,6 +2549,7 @@ function EmployeeDetailModal({ employee, assignments, employees, onClose, onEdit
 function EmployeeFormModal({
   form,
   saving,
+  errorMessage,
   savingAssignment,
   deletingAssignmentId,
   editingEmployeeId,
@@ -2587,6 +2589,7 @@ function EmployeeFormModal({
 }: {
   form: EmployeeForm
   saving: boolean
+  errorMessage: string
   savingAssignment: boolean
   deletingAssignmentId: string | null
   editingEmployeeId: string | null
@@ -2652,6 +2655,12 @@ function EmployeeFormModal({
 
         <form onSubmit={onSubmit} className="flex min-h-0 flex-1 flex-col">
           <div className="space-y-6 overflow-y-auto p-6">
+            {errorMessage ? (
+              <div className="rounded-[20px] border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+                {errorMessage}
+              </div>
+            ) : null}
+
             <FormSection title="Identitas Karyawan" description="Data utama untuk pencarian, user account, dan mapping employee." icon={<Users size={18} />}>
               <InputField label="Employee Number" value={form.employee_number} onChange={(value) => onUpdate('employee_number', value)} placeholder="Contoh: EMP001" required />
               <InputField label="Machine PIN" value={form.machine_pin} onChange={(value) => onUpdate('machine_pin', value)} placeholder="PIN dari mesin fingerprint" required />

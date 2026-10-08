@@ -123,9 +123,12 @@ const employeeLeaveSource = fs.readFileSync(path.join(root, 'app/employee/leave/
 assert(employeeLeaveSource.includes('/api/employee/phl-claims'), 'Klaim PHL employee belum memakai API server-side.')
 assert(!employeeLeaveSource.includes('harmony_employee_submit_phl_claim_v1'), 'Klaim PHL employee masih memanggil submit RPC langsung dari client.')
 assert(sourceText.includes('/api/hr/users/change-email'), 'Sinkronisasi perubahan email akun belum terpasang.')
+assert(employeeLeaveSource.includes('countCalendarDays(form.start_date, form.end_date)'), 'Klaim PHL masih memakai hitungan hari kerja/weekend exclusion.')
+const emailRouteSource = fs.readFileSync(path.join(root, 'app/api/hr/users/change-email/route.ts'), 'utf8')
+assert(emailRouteSource.includes('legacy_uuid_mismatch'), 'Email login legacy UUID reconciliation belum terpasang.')
 
 const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'))
-assert(pkg.version === '3.4.0', `package.json version harus 3.4.0, saat ini ${pkg.version}`)
+assert(pkg.version === '3.4.1', `package.json version harus 3.4.1, saat ini ${pkg.version}`)
 assert(Boolean(pkg.scripts?.['test:smoke']), 'Script test:smoke belum tersedia.')
 
 if (warnings.length) {
