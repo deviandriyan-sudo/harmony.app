@@ -252,7 +252,7 @@ export default function LoginPage() {
                   <button type="button" onClick={handleForgotPassword} className="text-sm font-semibold text-[#0876db] transition hover:text-[#005eb8]">Lupa password?</button>
                 </div>
 
-                <button disabled={loading || googleLoading} className="harmony-reference-primary flex min-h-[54px] w-full items-center justify-center gap-3 rounded-full px-5 text-[15px] font-bold text-white transition disabled:opacity-60">
+                <button type="submit" disabled={loading || googleLoading} className="harmony-reference-primary flex min-h-[54px] w-full items-center justify-center gap-3 rounded-full px-5 text-[15px] font-bold text-white transition disabled:opacity-60">
                   {loading ? <Loader2 size={18} className="animate-spin" /> : <ArrowRight size={20} />}
                   {loading ? 'Memproses...' : 'Masuk'}
                 </button>
@@ -264,7 +264,7 @@ export default function LoginPage() {
                 <div className="h-px flex-1 bg-[#c9d4e3]/70" />
               </div>
 
-              <button onClick={handleGoogleLogin} disabled={loading || googleLoading} className="harmony-reference-google flex min-h-[54px] w-full items-center justify-center gap-3 rounded-full border px-5 text-[15px] font-semibold text-[#101828] transition disabled:opacity-60">
+              <button type="button" onClick={handleGoogleLogin} disabled={loading || googleLoading} className="harmony-reference-google flex min-h-[54px] w-full items-center justify-center gap-3 rounded-full border px-5 text-[15px] font-semibold text-[#101828] transition disabled:opacity-60">
                 {googleLoading ? <Loader2 size={18} className="animate-spin" /> : <GoogleIcon />}
                 {googleLoading ? 'Menghubungkan Google...' : 'Masuk dengan Google'}
               </button>

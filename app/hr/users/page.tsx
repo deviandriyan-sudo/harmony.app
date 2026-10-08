@@ -58,6 +58,13 @@ type ResetPasswordForm = {
   new_password: string
 }
 
+type EmailChangeForm = {
+  user_id: string
+  employee_id: string
+  old_email: string
+  new_email: string
+}
+
 type InputMode = 'manual' | 'checklist' | 'bulk'
 
 const initialUserForm: UserForm = {
@@ -71,6 +78,13 @@ const initialResetForm: ResetPasswordForm = {
   user_id: '',
   email: '',
   new_password: '',
+}
+
+const initialEmailChangeForm: EmailChangeForm = {
+  user_id: '',
+  employee_id: '',
+  old_email: '',
+  new_email: '',
 }
 
 async function getHRApiHeaders(includeJson = true): Promise<Record<string, string>> {
@@ -97,9 +111,11 @@ export default function HRUsersPage() {
   const [inputMode, setInputMode] = useState<InputMode>('manual')
   const [showForm, setShowForm] = useState(false)
   const [showResetModal, setShowResetModal] = useState(false)
+  const [showEmailModal, setShowEmailModal] = useState(false)
 
   const [form, setForm] = useState<UserForm>(initialUserForm)
   const [resetForm, setResetForm] = useState<ResetPasswordForm>(initialResetForm)
+  const [emailChangeForm, setEmailChangeForm] = useState<EmailChangeForm>(initialEmailChangeForm)
 
   const [selectedEmployeeIds, setSelectedEmployeeIds] = useState<string[]>([])
   const [bulkPassword, setBulkPassword] = useState('')
@@ -397,6 +413,79 @@ export default function HRUsersPage() {
     return `Created: ${createdCount} · Skipped: ${skippedCount} · Failed: ${failedCount}`
   }
 
+  function openEmailChange(user: AppUser) {
+    setEmailChangeForm({
+      user_id: user.id,
+      employee_id: user.employee_id || '',
+      old_email: user.email,
+      new_email: user.email,
+    })
+    setShowEmailModal(true)
+    setSuccessMessage('')
+    setErrorMessage('')
+  }
+
+  async function handleEmailChange(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+
+    const nextEmail = emailChangeForm.new_email.trim().toLowerCase()
+    if (!nextEmail || !nextEmail.includes('@')) {
+      setErrorMessage('Email baru wajib diisi dengan format yang valid.')
+      return
+    }
+
+    if (nextEmail === emailChangeForm.old_email.trim().toLowerCase()) {
+      setErrorMessage('Email baru masih sama dengan email login saat ini.')
+      return
+    }
+
+    const confirmed = window.confirm(
+      `Ubah email login dari ${emailChangeForm.old_email} menjadi ${nextEmail}?
+
+Perubahan akan disinkronkan ke Supabase Auth, app_users, Employee Master, dan Re-Med.`,
+    )
+    if (!confirmed) return
+
+    setSaving(true)
+    setErrorMessage('')
+    setSuccessMessage('')
+
+    try {
+      const response = await fetch('/api/hr/users/change-email', {
+        method: 'POST',
+        headers: await getHRApiHeaders(),
+        body: JSON.stringify({
+          user_id: emailChangeForm.user_id,
+          employee_id: emailChangeForm.employee_id || null,
+          new_email: nextEmail,
+        }),
+      })
+      const result = await response.json().catch(() => null)
+
+      if (!response.ok || result?.success === false) {
+        throw new Error(result?.message || 'Email login gagal diubah.')
+      }
+
+      const notificationWarning = [
+        result?.notification?.old_email?.success === false ? 'email lama' : '',
+        result?.notification?.new_email?.success === false ? 'email baru' : '',
+      ].filter(Boolean)
+
+      setSuccessMessage(
+        notificationWarning.length > 0
+          ? `${result.message} Notifikasi belum terkirim ke ${notificationWarning.join(' dan ')}.`
+          : result.message || 'Email login berhasil diubah dan disinkronkan.',
+      )
+      setShowEmailModal(false)
+      setEmailChangeForm(initialEmailChangeForm)
+      await fetchData()
+    } catch (error: any) {
+      setErrorMessage(error?.message || 'Email login gagal diubah.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
   function openResetPassword(user: AppUser) {
     setResetForm({
       user_id: user.id,
@@ -670,6 +759,25 @@ export default function HRUsersPage() {
           />
         )}
 
+        {showEmailModal && (
+          <EmailChangeModal
+            form={emailChangeForm}
+            saving={saving}
+            onClose={() => {
+              if (saving) return
+              setShowEmailModal(false)
+              setEmailChangeForm(initialEmailChangeForm)
+            }}
+            onSubmit={handleEmailChange}
+            onChange={(value) =>
+              setEmailChangeForm((prev) => ({
+                ...prev,
+                new_email: value,
+              }))
+            }
+          />
+        )}
+
         <div className="harmony-card harmony-slide-up overflow-hidden">
           <div className="flex flex-col gap-4 border-b border-black/5 bg-white/55 p-5 xl:flex-row xl:items-center xl:justify-between">
             <div>
@@ -819,6 +927,15 @@ export default function HRUsersPage() {
 
                       <td className="px-5 py-3.5">
                         <div className="flex items-center justify-center gap-2">
+                          <button
+                            type="button"
+                            title="Ubah email login"
+                            onClick={() => openEmailChange(user)}
+                            className="flex h-9 w-9 items-center justify-center rounded-2xl border border-black/5 bg-white text-emerald-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-emerald-50 hover:shadow-md"
+                          >
+                            <Mail size={15} />
+                          </button>
+
                           <button
                             type="button"
                             title="Reset password"
@@ -1164,6 +1281,79 @@ function BulkCreateUserForm({
           onCancel={onClose}
         />
       </form>
+    </div>
+  )
+}
+
+function EmailChangeModal({
+  form,
+  saving,
+  onClose,
+  onSubmit,
+  onChange,
+}: {
+  form: EmailChangeForm
+  saving: boolean
+  onClose: () => void
+  onSubmit: (event: React.FormEvent<HTMLFormElement>) => void
+  onChange: (value: string) => void
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-5 backdrop-blur-sm">
+      <div className="w-full max-w-xl overflow-hidden rounded-[32px] border border-white/20 bg-white/95 shadow-[0_30px_90px_rgba(0,0,0,0.22)] backdrop-blur-2xl">
+        <div className="flex items-start justify-between gap-4 border-b border-black/5 bg-white/70 p-6">
+          <div>
+            <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700">
+              <Mail size={14} />
+              Account Identity
+            </div>
+            <h2 className="text-xl font-semibold text-[#1d1d1f]">Ubah Email Login</h2>
+            <p className="mt-1 text-sm leading-6 text-[#6e6e73]">
+              Email baru menjadi username login dan disinkronkan ke seluruh modul HARMONY.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={saving}
+            className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#f5f5f7] text-[#1d1d1f] transition hover:bg-white disabled:opacity-50"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        <form onSubmit={onSubmit} className="space-y-5 p-6">
+          <div className="rounded-[22px] border border-black/5 bg-[#f5f5f7]/80 p-4">
+            <p className="text-xs font-bold uppercase tracking-wide text-[#6e6e73]">Email Login Saat Ini</p>
+            <p className="mt-2 font-semibold text-[#1d1d1f]">{form.old_email}</p>
+          </div>
+
+          <label className="block">
+            <span className="harmony-label">Email Login Baru</span>
+            <input
+              type="email"
+              required
+              value={form.new_email}
+              onChange={(event) => onChange(event.target.value)}
+              className="harmony-input"
+              placeholder="nama@polteksimasberau.ac.id"
+              autoComplete="off"
+            />
+          </label>
+
+          <div className="rounded-[20px] border border-blue-100 bg-blue-50 px-4 py-3 text-xs leading-5 text-blue-700">
+            Sistem akan memperbarui Supabase Auth, app_users, Employee Master, dan akses Re-Med yang terhubung. Password tidak berubah.
+          </div>
+
+          <FormFooter
+            saving={saving}
+            submitLabel="Simpan Email Baru"
+            loadingLabel="Menyinkronkan..."
+            onCancel={onClose}
+          />
+        </form>
+      </div>
     </div>
   )
 }

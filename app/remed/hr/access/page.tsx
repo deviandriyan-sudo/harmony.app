@@ -1,7 +1,7 @@
 'use client'
 
 import { FormEvent, useEffect, useState } from 'react'
-import { ShieldCheck } from 'lucide-react'
+import { Mail, Pencil, Save, ShieldCheck, X } from 'lucide-react'
 import { RemedPageHeader } from '@/components/remed/RemedPageHeader'
 import { remedFetch } from '@/lib/remed-client'
 
@@ -17,10 +17,71 @@ type AccessRow = {
 export default function Page() {
   const [rows, setRows] = useState<AccessRow[]>([])
   const [message, setMessage] = useState('')
+  const [editingId, setEditingId] = useState('')
+  const [editingEmail, setEditingEmail] = useState('')
+  const [savingEmail, setSavingEmail] = useState(false)
 
   const load = () => remedFetch<{ access: AccessRow[] }>('/api/remed/hr/access').then((payload) => setRows(payload.access || []))
 
   useEffect(() => { void load() }, [])
+
+  function startEditEmail(row: AccessRow) {
+    setEditingId(row.id)
+    setEditingEmail(row.email)
+    setMessage('')
+  }
+
+  function cancelEditEmail() {
+    if (savingEmail) return
+    setEditingId('')
+    setEditingEmail('')
+  }
+
+  async function saveEmail(row: AccessRow) {
+    const nextEmail = editingEmail.trim().toLowerCase()
+    if (!nextEmail || !nextEmail.includes('@')) {
+      setMessage('Email baru tidak valid.')
+      return
+    }
+    if (nextEmail === row.email.trim().toLowerCase()) {
+      cancelEditEmail()
+      return
+    }
+
+    setSavingEmail(true)
+    setMessage('')
+    try {
+      const result = await remedFetch<{
+        success: boolean
+        message: string
+        notification?: {
+          old_email?: { success?: boolean }
+          new_email?: { success?: boolean }
+        }
+      }>('/api/remed/hr/access', {
+        method: 'PATCH',
+        body: JSON.stringify({
+          access_id: row.id,
+          new_email: nextEmail,
+        }),
+      })
+
+      const notificationWarning =
+        result.notification?.old_email?.success === false ||
+        result.notification?.new_email?.success === false
+
+      setMessage(
+        `${result.message || 'Email berhasil diperbarui.'}${notificationWarning ? ' Perubahan berhasil, tetapi sebagian email notifikasi belum terkirim.' : ''}`,
+      )
+      setEditingId('')
+      setEditingEmail('')
+      await load()
+    } catch (error: any) {
+      setMessage(error?.message || 'Gagal mengubah email akses.')
+    } finally {
+      setSavingEmail(false)
+    }
+  }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -70,13 +131,59 @@ export default function Page() {
         <div className="space-y-2 p-5 sm:p-6">
           {rows.map((row) => (
             <div key={row.id} className="flex flex-col gap-3 rounded-[18px] border border-black/[0.055] bg-[#f8f9fb] px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <p className="font-bold text-[#17181b]">{row.email}</p>
-                <p className="mt-1 text-xs text-[#747982]">{row.role} · {row.auth_user_id ? 'Auth linked' : 'Auth belum dibuat'}</p>
+              <div className="min-w-0 flex-1">
+                {editingId === row.id ? (
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                    <div className="relative min-w-0 flex-1">
+                      <Mail size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#7a8190]" />
+                      <input
+                        type="email"
+                        value={editingEmail}
+                        onChange={(event) => setEditingEmail(event.target.value)}
+                        className="harmony-input min-h-10 pl-9"
+                        autoFocus
+                      />
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => void saveEmail(row)}
+                        disabled={savingEmail}
+                        className="harmony-button-primary min-h-10 px-3 text-xs disabled:opacity-60"
+                      >
+                        <Save size={14} /> Simpan
+                      </button>
+                      <button
+                        type="button"
+                        onClick={cancelEditEmail}
+                        disabled={savingEmail}
+                        className="harmony-button-secondary min-h-10 px-3 text-xs disabled:opacity-60"
+                      >
+                        <X size={14} /> Batal
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <p className="truncate font-bold text-[#17181b]">{row.email}</p>
+                    <p className="mt-1 text-xs text-[#747982]">{row.role} · {row.auth_user_id ? 'Auth linked' : 'Auth belum dibuat'}</p>
+                  </>
+                )}
               </div>
-              <span className={`inline-flex w-fit rounded-full px-3 py-1 text-xs font-bold ${row.is_active ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>
-                {row.is_active ? 'Aktif' : 'Nonaktif'}
-              </span>
+              <div className="flex items-center gap-2">
+                {editingId !== row.id ? (
+                  <button
+                    type="button"
+                    onClick={() => startEditEmail(row)}
+                    className="inline-flex min-h-9 items-center gap-1.5 rounded-[14px] border border-black/[0.06] bg-white px-3 text-xs font-bold text-[#315f8f] shadow-sm transition hover:bg-blue-50"
+                  >
+                    <Pencil size={13} /> Email
+                  </button>
+                ) : null}
+                <span className={`inline-flex w-fit rounded-full px-3 py-1 text-xs font-bold ${row.is_active ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>
+                  {row.is_active ? 'Aktif' : 'Nonaktif'}
+                </span>
+              </div>
             </div>
           ))}
         </div>

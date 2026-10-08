@@ -791,6 +791,35 @@ export default function HREmployeesPage() {
     return token
   }
 
+  async function syncEmployeeLoginEmail(employeeId: string, newEmail: string) {
+    const token = await getSessionAccessToken()
+    const response = await fetch('/api/hr/users/change-email', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        employee_id: employeeId,
+        new_email: newEmail,
+      }),
+    })
+    const result = await response.json().catch(() => null)
+
+    if (!response.ok || result?.success === false) {
+      throw new Error(result?.message || 'Email login akun gagal disinkronkan.')
+    }
+
+    return result as {
+      account_found?: boolean
+      message?: string
+      notification?: {
+        old_email?: { success?: boolean }
+        new_email?: { success?: boolean }
+      }
+    }
+  }
+
   async function fetchEmployeePostponeDetail(employeeId: string) {
     setLoadingPostpone(true)
 
@@ -1661,6 +1690,24 @@ export default function HREmployeesPage() {
       await ensureMasterOption('department', form.department)
       await ensureMasterOption('position', form.position)
 
+      let accountEmailSynced = false
+      let emailNotificationWarning = false
+      const currentEmployee = editingEmployeeId
+        ? employees.find((item) => item.id === editingEmployeeId) || null
+        : null
+      const previousEmail = String(currentEmployee?.email || '').trim().toLowerCase()
+      const nextEmail = String(form.email || '').trim().toLowerCase()
+
+      if (editingEmployeeId && previousEmail !== nextEmail) {
+        const syncResult = await syncEmployeeLoginEmail(editingEmployeeId, nextEmail)
+        accountEmailSynced = syncResult.account_found === true
+        emailNotificationWarning = Boolean(
+          accountEmailSynced &&
+          (syncResult.notification?.old_email?.success === false ||
+            syncResult.notification?.new_email?.success === false),
+        )
+      }
+
       const now = new Date().toISOString()
       const payload = {
         employee_number: form.employee_number.trim(),
@@ -1689,7 +1736,11 @@ export default function HREmployeesPage() {
       if (editingEmployeeId) {
         const { error } = await supabase.from('employees').update(payload).eq('id', editingEmployeeId)
         if (error) throw error
-        setSuccessMessage('Data karyawan berhasil diperbarui.')
+        setSuccessMessage(
+          accountEmailSynced
+            ? `Data karyawan dan email login HARMONY berhasil diperbarui.${emailNotificationWarning ? ' Perubahan akun berhasil, tetapi sebagian email notifikasi belum terkirim.' : ''}`
+            : 'Data karyawan berhasil diperbarui.',
+        )
       } else {
         const { error } = await supabase.from('employees').insert({ ...payload, created_at: now })
         if (error) throw error

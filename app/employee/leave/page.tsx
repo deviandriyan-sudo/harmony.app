@@ -567,6 +567,7 @@ export default function EmployeeLeavePage() {
   }
 
   function updateForm<K extends keyof FormState>(key: K, value: FormState[K]) {
+    if (errorMessage) setErrorMessage('')
     setForm((prev) => ({
       ...prev,
       [key]: value,
@@ -641,19 +642,59 @@ export default function EmployeeLeavePage() {
     await supabase.storage.from('leave-attachments').remove([storagePath])
   }
 
+  async function phlClaimApi(
+    method: 'POST' | 'DELETE',
+    payload: Record<string, unknown>,
+  ) {
+    const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
+    const token = sessionData.session?.access_token
+
+    if (sessionError || !token) {
+      throw new Error('Session login tidak valid. Silakan login ulang.')
+    }
+
+    const response = await fetch('/api/employee/phl-claims', {
+      method,
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    })
+
+    const result = await response.json().catch(() => null)
+
+    if (!response.ok || result?.success === false) {
+      throw new Error(result?.message || 'Proses klaim PHL belum berhasil.')
+    }
+
+    return result || {}
+  }
+
   async function rollbackCreatedRequest(requestId: string, requestType: string, note: string) {
     if (!requestId) return { success: true, message: 'Tidak ada request yang perlu di-rollback.' }
 
     const isPHL = normalizeText(requestType) === 'phl_claim'
-    const { data, error } = isPHL
-      ? await supabase.rpc('harmony_employee_cancel_phl_claim_v1', {
-          p_claim_record_id: requestId,
-          p_note: note,
+
+    if (isPHL) {
+      try {
+        const result = await phlClaimApi('DELETE', {
+          claim_record_id: requestId,
+          note,
         })
-      : await supabase.rpc('harmony_employee_cancel_leave_request_v1', {
-          p_request_id: requestId,
-          p_note: note,
-        })
+        return {
+          success: result.success !== false,
+          message: String(result.message || ''),
+        }
+      } catch (error: any) {
+        return { success: false, message: error?.message || 'Rollback klaim PHL gagal.' }
+      }
+    }
+
+    const { data, error } = await supabase.rpc('harmony_employee_cancel_leave_request_v1', {
+      p_request_id: requestId,
+      p_note: note,
+    })
 
     if (error) return { success: false, message: error.message }
 
@@ -662,6 +703,7 @@ export default function EmployeeLeavePage() {
       success: result.success !== false,
       message: result.message || '',
     }
+
   }
 
   async function checkLockedPeriod() {
@@ -792,52 +834,39 @@ export default function EmployeeLeavePage() {
     let insertedRequestId = ''
 
     if (form.request_type === 'phl_claim') {
-      const { data: claimData, error: claimError } = await supabase.rpc(
-        'harmony_employee_submit_phl_claim_v1',
-        {
-          p_request_key: crypto.randomUUID(),
-          p_claim_date: form.start_date,
-          p_days: calculatedDays,
-          p_reason: form.reason.trim(),
-          p_proof_file_url: uploaded.url || null,
-          p_proof_file_name: uploaded.name || null,
-          p_proof_file_size: uploaded.size || null,
-          p_proof_file_type: uploaded.type || null,
-          p_job_pending_summary: form.job_pending.trim(),
-          p_job_pending_detail: form.job_pending.trim(),
-          p_handover_to_employee_id: selectedHandoverEmployee?.id || null,
-          p_handover_to_employee_number: selectedHandoverEmployee?.employee_number || null,
-          p_handover_to_full_name:
+      try {
+        const claimResult = await phlClaimApi('POST', {
+          request_key: crypto.randomUUID(),
+          claim_date: form.start_date,
+          days: calculatedDays,
+          reason: form.reason.trim(),
+          proof_file_url: uploaded.url || null,
+          proof_file_name: uploaded.name || null,
+          proof_file_size: uploaded.size || null,
+          proof_file_type: uploaded.type || null,
+          job_pending: form.job_pending.trim(),
+          job_pending_detail: form.job_pending.trim(),
+          handover_to_employee_id: selectedHandoverEmployee?.id || null,
+          handover_to_employee_number: selectedHandoverEmployee?.employee_number || null,
+          handover_to_full_name:
             selectedHandoverEmployee?.full_name || form.handover_to.trim(),
-          p_handover_to_department: selectedHandoverEmployee?.department || null,
-          p_handover_to_position: selectedHandoverEmployee?.position || null,
-          p_handover_note: form.handover_note.trim() || null,
-          p_emergency_contact:
+          handover_to_department: selectedHandoverEmployee?.department || null,
+          handover_to_position: selectedHandoverEmployee?.position || null,
+          handover_note: form.handover_note.trim() || null,
+          emergency_contact:
             employee.emergency_contact_phone || employee.phone || null,
-        },
-      )
+        })
 
-      if (claimError) {
+        insertedRequestId = String(claimResult.claim_record_id || '')
+        if (!insertedRequestId) {
+          throw new Error('Klaim PHL tersimpan tanpa ID request. Hubungi HR sebelum submit ulang.')
+        }
+      } catch (claimError: any) {
         await cleanupUploadedProof(uploaded.storagePath)
-        setErrorMessage(claimError.message)
+        setErrorMessage(claimError?.message || 'Klaim PHL belum berhasil disimpan.')
         setSubmitting(false)
         return
       }
-
-      const claimResult = (claimData || {}) as {
-        success?: boolean
-        claim_record_id?: string
-        message?: string
-      }
-
-      if (!claimResult.success) {
-        await cleanupUploadedProof(uploaded.storagePath)
-        setErrorMessage(claimResult.message || 'Klaim PHL belum berhasil disimpan.')
-        setSubmitting(false)
-        return
-      }
-
-      insertedRequestId = String(claimResult.claim_record_id || '')
     } else {
       const payload = {
         employee_id: employee.id,
@@ -1000,19 +1029,22 @@ export default function EmployeeLeavePage() {
 
     try {
       const isPHL = request.source_table === 'phl_records' || normalizeText(request.request_type) === 'phl_claim'
-      const { data, error } = isPHL
-        ? await supabase.rpc('harmony_employee_cancel_phl_claim_v1', {
-            p_claim_record_id: request.id,
-            p_note: note.trim(),
-          })
-        : await supabase.rpc('harmony_employee_cancel_leave_request_v1', {
-            p_request_id: request.id,
-            p_note: note.trim(),
-          })
+      let result: { success?: boolean; message?: string }
 
-      if (error) throw error
+      if (isPHL) {
+        result = await phlClaimApi('DELETE', {
+          claim_record_id: request.id,
+          note: note.trim(),
+        })
+      } else {
+        const { data, error } = await supabase.rpc('harmony_employee_cancel_leave_request_v1', {
+          p_request_id: request.id,
+          p_note: note.trim(),
+        })
+        if (error) throw error
+        result = (data || {}) as { success?: boolean; message?: string }
+      }
 
-      const result = (data || {}) as { success?: boolean; message?: string }
       if (result.success === false) {
         throw new Error(result.message || 'Pengajuan belum berhasil dibatalkan.')
       }
@@ -1253,6 +1285,7 @@ export default function EmployeeLeavePage() {
             phlRemaining={phlRemaining}
             handoverEmployeeOptions={handoverEmployeeOptions}
             selectedHandoverEmployee={selectedHandoverEmployee}
+            errorMessage={errorMessage}
             onUpdate={updateForm}
             onSubmit={handleSubmit}
             onClose={closeForm}
@@ -1278,6 +1311,7 @@ function LeaveRequestModal({
   phlRemaining,
   handoverEmployeeOptions,
   selectedHandoverEmployee,
+  errorMessage,
   onUpdate,
   onSubmit,
   onClose,
@@ -1296,6 +1330,7 @@ function LeaveRequestModal({
   phlRemaining: number
   handoverEmployeeOptions: Employee[]
   selectedHandoverEmployee: Employee | null
+  errorMessage: string
   onUpdate: <K extends keyof FormState>(key: K, value: FormState[K]) => void
   onSubmit: (event: FormEvent<HTMLFormElement>) => void
   onClose: () => void
@@ -1517,19 +1552,28 @@ function LeaveRequestModal({
             />
           </div>
 
-          <div className="flex flex-col gap-3 border-t border-black/5 bg-white p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
-            <p className="text-xs leading-5 text-[#6e6e73]">
-              Pengajuan akan dikirim ke atasan/HR dan tersinkron ke riwayat setelah berhasil submit.
-            </p>
+          <div className="border-t border-black/5 bg-white p-5 sm:p-6">
+            {errorMessage ? (
+              <div className="mb-4 flex items-start gap-3 rounded-[18px] border border-red-200 bg-red-50 px-4 py-3 text-sm leading-5 text-red-700">
+                <AlertTriangle size={17} className="mt-0.5 shrink-0" />
+                <span>{errorMessage}</span>
+              </div>
+            ) : null}
 
-            <button
-              type="submit"
-              disabled={submitting || loading}
-              className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-[#1d1d1f] px-5 text-sm font-bold text-white transition hover:bg-black disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {submitting ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
-              {submitting ? 'Mengirim...' : `Ajukan ${selectedRequestMeta.label}`}
-            </button>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-xs leading-5 text-[#6e6e73]">
+                Pengajuan akan dikirim ke atasan/HR dan tersinkron ke riwayat setelah berhasil submit.
+              </p>
+
+              <button
+                type="submit"
+                disabled={submitting || loading}
+                className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-[#1d1d1f] px-5 text-sm font-bold text-white transition hover:bg-black disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {submitting ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
+                {submitting ? 'Mengirim...' : `Ajukan ${selectedRequestMeta.label}`}
+              </button>
+            </div>
           </div>
         </form>
       </div>
