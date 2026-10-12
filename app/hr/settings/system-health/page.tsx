@@ -9,6 +9,9 @@ import {
   RefreshCcw,
   ServerCog,
   ShieldCheck,
+  Power,
+  Wrench,
+  MailX,
   XCircle,
 } from 'lucide-react'
 
@@ -20,6 +23,17 @@ type HealthCheck = {
   label: string
   status: 'ok' | 'warning' | 'error'
   detail: string
+}
+
+
+type SystemControlPayload = {
+  systemEnabled: boolean
+  emailEnabled: boolean
+  maintenanceMessage: string
+  updatedAt: string | null
+  updatedByEmail: string | null
+  configured: boolean
+  message?: string
 }
 
 type HealthPayload = {
@@ -35,10 +49,53 @@ export default function SystemHealthPage() {
   const [payload, setPayload] = useState<HealthPayload | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [systemControl, setSystemControl] = useState<SystemControlPayload | null>(null)
+  const [systemUpdating, setSystemUpdating] = useState(false)
+  const [systemMessage, setSystemMessage] = useState('')
 
   useEffect(() => {
     loadHealth()
+    loadSystemControl()
   }, [])
+
+  async function loadSystemControl() {
+    try {
+      const response = await fetch('/api/system/status', { cache: 'no-store' })
+      if (!response.ok) return
+      setSystemControl(await response.json())
+    } catch {
+      // Health page remains usable if the control endpoint is unavailable.
+    }
+  }
+
+  async function toggleSystem() {
+    if (!systemControl || systemUpdating) return
+
+    const nextEnabled = !systemControl.systemEnabled
+    const confirmed = window.confirm(
+      nextEnabled
+        ? 'Aktifkan HARMONY? Employee/Finance dapat menggunakan aplikasi kembali dan pengiriman email akan aktif.'
+        : 'Mulai maintenance? Employee/Finance akan diblokir dan seluruh email HARMONY dihentikan sampai sistem diaktifkan kembali.',
+    )
+    if (!confirmed) return
+
+    setSystemUpdating(true)
+    setSystemMessage('')
+    setError('')
+    try {
+      const payload = await harmonyFetch<SystemControlPayload>('/api/system/status', {
+        method: 'PATCH',
+        body: JSON.stringify({ systemEnabled: nextEnabled }),
+      })
+      setSystemControl(payload)
+      setSystemMessage(payload.message || 'Status HARMONY berhasil diperbarui.')
+      await loadHealth()
+    } catch (value: any) {
+      setError(value?.message || 'Status HARMONY gagal diperbarui.')
+    } finally {
+      setSystemUpdating(false)
+    }
+  }
 
   async function loadHealth() {
     setLoading(true)
@@ -70,6 +127,46 @@ export default function SystemHealthPage() {
       />
 
       <section className="space-y-5 overflow-x-hidden p-4 sm:p-6">
+        <div className={`rounded-[30px] border p-5 shadow-sm sm:p-6 ${systemControl?.systemEnabled === false ? 'border-amber-200 bg-amber-50/75' : 'border-emerald-100 bg-emerald-50/55'}`}>
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex items-start gap-4">
+              <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-[18px] ${systemControl?.systemEnabled === false ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                {systemControl?.systemEnabled === false ? <Wrench size={23} /> : <Power size={23} />}
+              </div>
+              <div>
+                <p className="text-lg font-bold text-[#1d1d1f]">
+                  {systemControl?.systemEnabled === false ? 'Maintenance Mode Aktif' : 'HARMONY Online'}
+                </p>
+                <p className="mt-1 max-w-2xl text-sm leading-6 text-[#6e6e73]">
+                  Satu switch mengontrol akses Employee/Finance dan pengiriman email. HR Administrator tetap dapat masuk saat maintenance untuk menyelesaikan update.
+                </p>
+                <div className="mt-3 flex flex-wrap gap-2 text-xs font-bold">
+                  <span className={`rounded-full px-3 py-1.5 ${systemControl?.systemEnabled === false ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                    User Access: {systemControl?.systemEnabled === false ? 'OFF' : 'ON'}
+                  </span>
+                  <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 ${systemControl?.emailEnabled === false ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'}`}>
+                    <MailX size={13} /> Email: {systemControl?.emailEnabled === false ? 'OFF' : 'ON'}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={toggleSystem}
+              disabled={!systemControl?.configured || systemUpdating}
+              className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-[18px] px-5 text-sm font-bold transition disabled:cursor-not-allowed disabled:opacity-50 ${systemControl?.systemEnabled === false ? 'bg-emerald-600 text-white hover:bg-emerald-700' : 'bg-[#17181b] text-white hover:bg-black'}`}
+            >
+              {systemUpdating ? <RefreshCcw size={16} className="animate-spin" /> : systemControl?.systemEnabled === false ? <Power size={16} /> : <Wrench size={16} />}
+              {systemUpdating ? 'Memproses...' : systemControl?.systemEnabled === false ? 'Aktifkan HARMONY' : 'Mulai Maintenance'}
+            </button>
+          </div>
+          {!systemControl?.configured && (
+            <p className="mt-4 text-sm font-semibold text-amber-800">System Control belum aktif. Jalankan SQL HARMONY V3.5.0 terlebih dahulu.</p>
+          )}
+          {systemMessage && <p className="mt-4 text-sm font-semibold text-emerald-700">{systemMessage}</p>}
+        </div>
+
         <div className="harmony-card rounded-[30px] p-5 sm:p-6">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex items-start gap-4">

@@ -9,6 +9,7 @@ import {
 } from '@/lib/notifications-server'
 import { sendCoreWorkflowNotification } from '@/lib/server/core-workflow-notifications'
 import type { HarmonyWorkflowKey } from '@/types/notificationWorkflow'
+import { getHarmonySystemControl } from '@/lib/server/system-control'
 
 export const runtime = 'nodejs'
 
@@ -270,8 +271,10 @@ export async function GET(request: Request) {
     getNotificationEnvironmentStatus()
   const domain =
     await getResendDomainDiagnostic()
+  const systemControl = await getHarmonySystemControl(auth.admin)
 
   const sendTestReady =
+    systemControl.emailEnabled &&
     environment.resendApiKeyConfigured &&
     environment.fromConfigured
 
@@ -304,6 +307,11 @@ export async function GET(request: Request) {
       app_url: environment.appUrl,
     },
     domain,
+    system_control: {
+      system_enabled: systemControl.systemEnabled,
+      email_enabled: systemControl.emailEnabled,
+      configured: systemControl.configured,
+    },
     checked_at: new Date().toISOString(),
   })
 }

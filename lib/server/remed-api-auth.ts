@@ -2,6 +2,7 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import type { NextRequest } from 'next/server'
 import type { RemedRole } from '@/types/remed'
 import { normalizeRemedRole } from '@/lib/remed'
+import { assertHarmonySystemAvailable } from '@/lib/server/system-control'
 
 export type RemedAccess = {
   id: string
@@ -100,6 +101,8 @@ export async function requireRemedApi(
   }
 
   access.role = role
+
+  await assertHarmonySystemAvailable(admin, role)
 
   if (allowedRoles?.length && !allowedRoles.includes(role)) {
     throw Object.assign(new Error('Akun ini tidak memiliki akses untuk proses tersebut.'), { status: 403 })

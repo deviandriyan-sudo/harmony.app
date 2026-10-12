@@ -40,6 +40,8 @@ export default function LoginPage() {
   const [googleLoading, setGoogleLoading] = useState(false)
   const [message, setMessage] = useState('')
   const [messageType, setMessageType] = useState<'error' | 'info'>('error')
+  const [systemEnabled, setSystemEnabled] = useState(true)
+  const [maintenanceMessage, setMaintenanceMessage] = useState('')
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
@@ -54,9 +56,23 @@ export default function LoginPage() {
       setMessageType('info')
     }
 
+    loadSystemStatus()
     checkExistingSession()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+
+  async function loadSystemStatus() {
+    try {
+      const response = await fetch('/api/system/status', { cache: 'no-store' })
+      if (!response.ok) return
+      const payload = await response.json()
+      setSystemEnabled(payload?.systemEnabled !== false)
+      setMaintenanceMessage(String(payload?.maintenanceMessage || ''))
+    } catch {
+      setSystemEnabled(true)
+    }
+  }
 
   async function checkExistingSession() {
     setCheckingSession(true)
@@ -150,6 +166,12 @@ export default function LoginPage() {
   }
 
   async function handleForgotPassword() {
+    if (!systemEnabled) {
+      setMessage('Reset password sementara dinonaktifkan selama maintenance HARMONY.')
+      setMessageType('error')
+      return
+    }
+
     if (!email.trim()) {
       setMessage('Masukkan email terlebih dahulu.')
       setMessageType('error')
@@ -229,6 +251,12 @@ export default function LoginPage() {
                 </div>
                 <h2 className="mt-5 text-[34px] font-semibold tracking-[-0.035em] text-[#101828] sm:text-[40px]">Masuk ke HARMONY</h2>
               </div>
+
+              {!systemEnabled && (
+                <div className="mb-5 rounded-[22px] border border-amber-200/80 bg-amber-50/85 px-4 py-3 text-sm leading-6 text-amber-800">
+                  <strong>Maintenance aktif.</strong> {maintenanceMessage || 'Akses Employee dan Finance dihentikan sementara. HR Administrator tetap dapat masuk untuk menyelesaikan pembaruan.'}
+                </div>
+              )}
 
               {message && (
                 <div className={`mb-5 rounded-[22px] border px-4 py-3 text-sm ${messageType === 'info' ? 'border-blue-100/80 bg-blue-50/75 text-blue-700' : 'border-red-100/80 bg-red-50/75 text-red-700'}`}>

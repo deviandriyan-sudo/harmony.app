@@ -706,7 +706,7 @@ export default function HRSettingsPage() {
             <div>
               <p className="text-sm font-bold text-[#1d1d1f]">System Health HARMONY</p>
               <p className="mt-1 max-w-3xl text-sm leading-6 text-[#6e6e73]">
-                Cek kompatibilitas schema database, tabel/RPC kritis, storage Re-Med, dan environment production.
+                Aktifkan/nonaktifkan HARMONY saat maintenance sekaligus kontrol email, lalu cek schema, RPC, storage, dan environment production.
               </p>
             </div>
           </div>

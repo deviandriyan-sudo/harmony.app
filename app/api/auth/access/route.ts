@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 
 import { supabaseAdmin } from '@/lib/supabase-admin'
+import { getHarmonySystemControl, isHarmonyHrRole } from '@/lib/server/system-control'
 
 export const dynamic = 'force-dynamic'
 
@@ -74,6 +75,14 @@ export async function GET(request: NextRequest) {
         if (!employeeByEmail.error && employeeByEmail.data) employee = employeeByEmail.data
       }
 
+      const control = await getHarmonySystemControl(supabaseAdmin)
+      if (!control.systemEnabled && !isHarmonyHrRole(role)) {
+        return NextResponse.json(
+          { message: control.maintenanceMessage, code: 'HARMONY_MAINTENANCE' },
+          { status: 503 },
+        )
+      }
+
       return NextResponse.json({
         kind: 'harmony',
         appUser: {
@@ -107,6 +116,14 @@ export async function GET(request: NextRequest) {
     }
 
     if (financeAccess && financeAccess.is_active !== false && normalize(financeAccess.role) === 'finance') {
+      const control = await getHarmonySystemControl(supabaseAdmin)
+      if (!control.systemEnabled) {
+        return NextResponse.json(
+          { message: control.maintenanceMessage, code: 'HARMONY_MAINTENANCE' },
+          { status: 503 },
+        )
+      }
+
       return NextResponse.json({
         kind: 'finance',
         appUser: null,

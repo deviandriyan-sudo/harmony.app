@@ -1,3 +1,6 @@
+import { getHarmonySystemControl } from '@/lib/server/system-control'
+import { supabaseAdmin } from '@/lib/supabase-admin'
+
 export type HarmonyServerEmailPayload = {
   to: string | string[]
   cc?: string | string[]
@@ -292,6 +295,15 @@ export async function getResendDomainDiagnostic(): Promise<ResendDomainDiagnosti
 export async function sendHarmonyServerEmail(
   payload: HarmonyServerEmailPayload
 ): Promise<HarmonyServerEmailResult> {
+  const control = await getHarmonySystemControl(supabaseAdmin)
+  if (!control.emailEnabled) {
+    return {
+      ok: false,
+      message: 'Pengiriman email HARMONY sedang dinonaktifkan karena sistem berada dalam maintenance mode.',
+      detail: { code: 'EMAIL_DISABLED_MAINTENANCE' },
+    }
+  }
+
   const environment =
     getNotificationEnvironmentStatus()
 

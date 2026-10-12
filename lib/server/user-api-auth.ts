@@ -1,5 +1,6 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import type { NextRequest } from 'next/server'
+import { assertHarmonySystemAvailable } from '@/lib/server/system-control'
 
 export type HarmonyAppUser = {
   id: string
@@ -122,6 +123,8 @@ export async function requireHarmonyApi(
       { status: 403 },
     )
   }
+
+  await assertHarmonySystemAvailable(admin, appUser.role)
 
   let employee: HarmonyEmployeeIdentity | null = null
 

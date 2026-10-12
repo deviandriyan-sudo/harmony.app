@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { HARMONY_APP_VERSION, HARMONY_REQUIRED_SCHEMA_VERSION } from '@/lib/version'
 import { apiError, requireHRApi } from '@/lib/server/hr-api-auth'
 import { REMED_BUCKET, REMED_SIGNATURE_BUCKET } from '@/lib/remed'
+import { getHarmonySystemControl } from '@/lib/server/system-control'
 
 export const dynamic = 'force-dynamic'
 
@@ -140,6 +141,16 @@ export async function GET(request: NextRequest) {
       detail: process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY
         ? 'Server environment Supabase tersedia.'
         : 'Environment Supabase server belum lengkap.',
+    })
+
+    const systemControl = await getHarmonySystemControl(admin)
+    checks.push({
+      key: 'system_control',
+      label: 'Maintenance & Email Master Switch',
+      status: systemControl.configured ? 'ok' : 'warning',
+      detail: systemControl.configured
+        ? `System Control tersedia. Akses user ${systemControl.systemEnabled ? 'ON' : 'OFF'} dan email ${systemControl.emailEnabled ? 'ON' : 'OFF'}.`
+        : 'System Control belum tersedia. Jalankan migration HARMONY V3.5.0.',
     })
 
     checks.push({

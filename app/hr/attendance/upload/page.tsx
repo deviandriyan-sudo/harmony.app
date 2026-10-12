@@ -111,6 +111,13 @@ type AttendanceLogPayload = {
   updated_at: string
 }
 
+type AttendanceInsertResult = {
+  errorMessage: string
+  insertedCount: number
+  completedCount: number
+  skippedExistingCount: number
+}
+
 const fallbackSchedule: WorkSchedule = {
   id: 'fallback',
   schedule_name: 'Jam Kerja Reguler Poltek',
@@ -227,8 +234,16 @@ export default function HRAttendanceUploadPage() {
         return
       }
 
+      const period = deriveUploadPeriod(result.rows)
+      if (period.error) {
+        setErrorMessage(period.error)
+        setUploadPeriod('')
+        return
+      }
+
       const matchedRows = buildMatchedPreviewRows(result.rows)
 
+      setUploadPeriod(period.label)
       setParsedTotalRows(result.rows.length)
       setMatchedPreviewCount(matchedRows.length)
       setSkippedPreviewCount(result.rows.length - matchedRows.length)
@@ -310,8 +325,16 @@ export default function HRAttendanceUploadPage() {
       return
     }
 
+    const period = deriveUploadPeriod(result.rows)
+    if (period.error) {
+      setErrorMessage(period.error)
+      setUploadPeriod('')
+      return
+    }
+
     const matchedRows = buildMatchedPreviewRows(result.rows)
 
+    setUploadPeriod(period.label)
     setParsedTotalRows(result.rows.length)
     setMatchedPreviewCount(matchedRows.length)
     setSkippedPreviewCount(result.rows.length - matchedRows.length)
@@ -637,6 +660,75 @@ export default function HRAttendanceUploadPage() {
     return `${hour}:${minute}`
   }
 
+  function getPeriodMonthForAttendanceDate(value: string) {
+    const match = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})$/)
+    if (!match) return ''
+
+    const year = Number(match[1])
+    const month = Number(match[2])
+    const day = Number(match[3])
+
+    if (day >= 11) {
+      return `${year}-${String(month).padStart(2, '0')}`
+    }
+
+    const previous = new Date(year, month - 2, 1)
+    return `${previous.getFullYear()}-${String(previous.getMonth() + 1).padStart(2, '0')}`
+  }
+
+  function getCutoffRangeForUpload(periodMonth: string) {
+    const [yearText, monthText] = periodMonth.split('-')
+    const year = Number(yearText)
+    const month = Number(monthText)
+    const start = new Date(year, month - 1, 11)
+    const end = new Date(year, month, 10)
+
+    return {
+      start: formatDateToISO(start),
+      end: formatDateToISO(end),
+    }
+  }
+
+  function formatPeriodDate(value: string) {
+    const date = new Date(`${value}T00:00:00`)
+    return new Intl.DateTimeFormat('id-ID', {
+      day: '2-digit',
+      month: 'long',
+      year: 'numeric',
+      timeZone: 'Asia/Makassar',
+    }).format(date)
+  }
+
+  function deriveUploadPeriod(rows: ParsedRow[]) {
+    const periodMonths = Array.from(
+      new Set(
+        rows
+          .map((row) => getPeriodMonthForAttendanceDate(row.attendance_date))
+          .filter(Boolean),
+      ),
+    )
+
+    if (periodMonths.length === 0) {
+      return { periodMonth: '', label: '', error: 'Periode absensi tidak dapat ditentukan dari file.' }
+    }
+
+    if (periodMonths.length > 1) {
+      return {
+        periodMonth: '',
+        label: '',
+        error: `File memuat lebih dari satu periode cutoff (${periodMonths.join(', ')}). Pisahkan file per periode 11–10 agar histori upload tetap konsisten.`,
+      }
+    }
+
+    const periodMonth = periodMonths[0]
+    const range = getCutoffRangeForUpload(periodMonth)
+    return {
+      periodMonth,
+      label: `Periode Absensi ${formatPeriodDate(range.start)} - ${formatPeriodDate(range.end)}`,
+      error: '',
+    }
+  }
+
   function getTimeInMinutes(value: string | null) {
     if (!value) return null
 
@@ -867,9 +959,37 @@ export default function HRAttendanceUploadPage() {
 
   function mergeFingerprintPayloadWithExisting(
     incoming: AttendanceLogPayload,
-    existing: any
+    existing: any,
   ) {
-    if (!existing) return incoming
+    if (!existing) {
+      return {
+        payload: incoming as Record<string, unknown>,
+        changed: true,
+        inserted: true,
+        completed: false,
+      }
+    }
+
+    const existingCheckIn = String(existing.check_in || '').trim() || null
+    const existingCheckOut = String(existing.check_out || '').trim() || null
+    const incomingCheckIn = String(incoming.check_in || '').trim() || null
+    const incomingCheckOut = String(incoming.check_out || '').trim() || null
+
+    const filledFields: string[] = []
+    const mergedCheckIn = existingCheckIn || incomingCheckIn
+    const mergedCheckOut = existingCheckOut || incomingCheckOut
+
+    if (!existingCheckIn && incomingCheckIn) filledFields.push('check_in')
+    if (!existingCheckOut && incomingCheckOut) filledFields.push('check_out')
+
+    if (filledFields.length === 0) {
+      return {
+        payload: null,
+        changed: false,
+        inserted: false,
+        completed: false,
+      }
+    }
 
     const protectedFields = [
       'manual_check_in',
@@ -931,8 +1051,57 @@ export default function HRAttendanceUploadPage() {
       'deleted_by',
     ] as const
 
+    const decision = getAttendanceDecision(mergedCheckIn, mergedCheckOut)
+    const existingStatus = String(existing.status || '').trim().toLowerCase()
+    const canRefreshStatus = !existingStatus || existingStatus === 'incomplete'
+    const oldRaw = existing.raw_data && typeof existing.raw_data === 'object' && !Array.isArray(existing.raw_data)
+      ? existing.raw_data
+      : {}
+    const oldHistory = Array.isArray((oldRaw as any).incremental_uploads)
+      ? (oldRaw as any).incremental_uploads
+      : []
+
     const merged: Record<string, unknown> = {
       ...incoming,
+      employee_id: existing.employee_id || incoming.employee_id,
+      employee_number: existing.employee_number || incoming.employee_number,
+      machine_pin: existing.machine_pin || incoming.machine_pin,
+      full_name: existing.full_name || incoming.full_name,
+      department: existing.department || incoming.department,
+      position: existing.position || incoming.position,
+      attendance_date: existing.attendance_date || incoming.attendance_date,
+      check_in: mergedCheckIn,
+      check_out: mergedCheckOut,
+      upload_id: existing.upload_id || incoming.upload_id,
+      total_punches: Math.max(
+        Number(existing.total_punches || 0),
+        Number(incoming.total_punches || 0),
+        Number(Boolean(mergedCheckIn)) + Number(Boolean(mergedCheckOut)),
+      ),
+      status: canRefreshStatus ? decision.status : existing.status,
+      source: existing.source || incoming.source,
+      notes: canRefreshStatus ? decision.note : (existing.notes || incoming.notes),
+      detected_schedule_name: existing.detected_schedule_name || incoming.detected_schedule_name,
+      detected_schedule_group: existing.detected_schedule_group || incoming.detected_schedule_group,
+      work_duration_minutes: canRefreshStatus
+        ? decision.work_duration_minutes
+        : (existing.work_duration_minutes ?? incoming.work_duration_minutes),
+      is_double_shift: existing.is_double_shift ?? incoming.is_double_shift,
+      is_night_shift: existing.is_night_shift ?? incoming.is_night_shift,
+      is_matched: existing.is_matched ?? incoming.is_matched,
+      raw_data: {
+        ...(oldRaw as Record<string, unknown>),
+        incremental_uploads: [
+          ...oldHistory,
+          {
+            upload_id: incoming.upload_id,
+            filled_fields: filledFields,
+            imported_at: new Date().toISOString(),
+            source_rows: (incoming.raw_data as any)?.rows || [],
+          },
+        ],
+      },
+      updated_at: new Date().toISOString(),
     }
 
     protectedFields.forEach((field) => {
@@ -941,15 +1110,19 @@ export default function HRAttendanceUploadPage() {
       }
     })
 
-    if (hasEmployeeProtectedAttendanceData(existing)) {
-      merged.source = 'upload_merged_manual'
+    return {
+      payload: merged,
+      changed: true,
+      inserted: false,
+      completed: true,
     }
-
-    return merged
   }
 
-  async function insertAttendanceLogs(logs: AttendanceLogPayload[]) {
+  async function insertAttendanceLogs(logs: AttendanceLogPayload[]): Promise<AttendanceInsertResult> {
     const batchSize = 500
+    let insertedCount = 0
+    let completedCount = 0
+    let skippedExistingCount = 0
 
     for (let i = 0; i < logs.length; i += batchSize) {
       const batch = logs.slice(i, i + batchSize)
@@ -967,37 +1140,64 @@ export default function HRAttendanceUploadPage() {
         .lte('attendance_date', maxDate)
 
       if (existingError) {
-        return existingError.message
+        return {
+          errorMessage: existingError.message,
+          insertedCount,
+          completedCount,
+          skippedExistingCount,
+        }
       }
 
       const existingMap = new Map<string, any>()
 
       ;(existingRows || []).forEach((row) => {
         existingMap.set(
-          `${String(row.machine_pin || '').trim()}|${row.attendance_date}`,
-          row
+          `${String(row.machine_pin || '').trim()}|${String(row.attendance_date || '').trim()}`,
+          row,
         )
       })
 
-      const mergedBatch = batch.map((incoming) => {
+      const writeBatch: Record<string, unknown>[] = []
+
+      batch.forEach((incoming) => {
         const key = `${incoming.machine_pin}|${incoming.attendance_date}`
         const existing = existingMap.get(key)
+        const merge = mergeFingerprintPayloadWithExisting(incoming, existing)
 
-        return mergeFingerprintPayloadWithExisting(incoming, existing)
+        if (!merge.changed || !merge.payload) {
+          skippedExistingCount += 1
+          return
+        }
+
+        if (merge.inserted) insertedCount += 1
+        if (merge.completed) completedCount += 1
+        writeBatch.push(merge.payload)
       })
+
+      if (writeBatch.length === 0) continue
 
       const { error } = await supabase
         .from('attendance_logs')
-        .upsert(mergedBatch, {
+        .upsert(writeBatch, {
           onConflict: 'machine_pin,attendance_date',
         })
 
       if (error) {
-        return error.message
+        return {
+          errorMessage: error.message,
+          insertedCount,
+          completedCount,
+          skippedExistingCount,
+        }
       }
     }
 
-    return ''
+    return {
+      errorMessage: '',
+      insertedCount,
+      completedCount,
+      skippedExistingCount,
+    }
   }
 
   async function syncApprovedRequestsAfterUpload(logs: AttendanceLogPayload[]) {
@@ -1099,6 +1299,14 @@ export default function HRAttendanceUploadPage() {
       return
     }
 
+    const derivedPeriod = deriveUploadPeriod(parseResult.rows)
+    if (derivedPeriod.error) {
+      setErrorMessage(derivedPeriod.error)
+      setUploading(false)
+      return
+    }
+    setUploadPeriod(derivedPeriod.label)
+
     const logsPreview = buildAttendanceLogs('preview', parseResult.rows)
 
     if (logsPreview.length === 0) {
@@ -1143,7 +1351,7 @@ export default function HRAttendanceUploadPage() {
         uploaded_by: 'HR',
         status: 'uploaded',
         total_rows: parseResult.rows.length,
-        upload_period: uploadPeriod || selectedFile.name,
+        upload_period: derivedPeriod.label,
         notes:
           notes ||
           `Diproses menggunakan jam kerja reguler ${workSchedule.expected_check_in} - ${workSchedule.expected_check_out}. ${skippedRows} data dilewati karena NIP tidak sesuai dengan machine_pin data master karyawan.`,
@@ -1159,19 +1367,19 @@ export default function HRAttendanceUploadPage() {
     }
 
     const logs = buildAttendanceLogs(uploadRecord.id, parseResult.rows)
-    const logError = await insertAttendanceLogs(logs)
+    const insertResult = await insertAttendanceLogs(logs)
 
-    if (logError) {
+    if (insertResult.errorMessage) {
       await supabase
         .from('attendance_uploads')
         .update({
           status: 'failed',
-          notes: `${notes || ''} | Error proses data: ${logError}`,
+          notes: `${notes || ''} | Error proses data: ${insertResult.errorMessage}`,
           updated_at: new Date().toISOString(),
         })
         .eq('id', uploadRecord.id)
 
-      setErrorMessage(logError)
+      setErrorMessage(insertResult.errorMessage)
       setUploading(false)
       await fetchData()
       return
@@ -1224,7 +1432,7 @@ export default function HRAttendanceUploadPage() {
       .eq('id', uploadRecord.id)
 
     setSuccessMessage(
-      `Berkas berhasil diproses. ${logs.length} data fingerprint dibuat/diperbarui dengan safe merge. Data manual employee dan dokumen bukti pada tanggal yang sama dipertahankan. ${skippedRows} data dilewati. Sinkron cuti/izin/PHL approved berhasil dijalankan untuk ${syncResult.successCount} karyawan.`
+      `Berkas berhasil diproses untuk ${derivedPeriod.label}. ${insertResult.insertedCount} tanggal baru ditambahkan, ${insertResult.completedCount} record lama hanya dilengkapi pada field fingerprint yang kosong, dan ${insertResult.skippedExistingCount} record existing dilewati tanpa perubahan. ${skippedRows} baris tidak cocok machine PIN. Sinkron request approved: ${syncResult.successCount} karyawan.`
     )
 
     setSelectedFile(null)
@@ -1435,8 +1643,7 @@ Data fingerprint dari upload ini akan dilepas. Data manual employee, alasan, app
               </h2>
 
               <p className="mt-1 max-w-3xl text-sm leading-6 text-[#6e6e73]">
-                Proses import dibuat dalam modal supaya halaman utama tetap ringkas.
-                Sistem akan membaca NIP sebagai machine_pin dan hanya memproses data yang sesuai dengan master karyawan aktif.
+                Sistem membaca periode cutoff 11–10 secara otomatis dari tanggal di file. Upload berikutnya pada periode yang sama hanya menambahkan tanggal/scan yang masih kosong tanpa menimpa fingerprint yang sudah tersimpan.
               </p>
             </div>
 
@@ -1493,8 +1700,7 @@ Data fingerprint dari upload ini akan dilepas. Data manual employee, alasan, app
                   </h2>
 
                   <p className="mt-1 max-w-3xl text-sm leading-6 text-[#6e6e73]">
-                    Pilih berkas XLS, XLSX, atau CSV, cek pratinjau, konfirmasi jam kerja,
-                    lalu proses data ke attendance_logs.
+                    Pilih berkas XLS, XLSX, atau CSV. Periode dibaca otomatis; data existing dipertahankan dan hanya bagian fingerprint yang masih kosong yang akan dilengkapi.
                   </p>
                 </div>
 
@@ -1573,9 +1779,9 @@ Data fingerprint dari upload ini akan dilepas. Data manual employee, alasan, app
 
                       <input
                         value={uploadPeriod}
-                        onChange={(event) => setUploadPeriod(event.target.value)}
-                        placeholder="Contoh: Absensi Mei 2026 / Absensi Minggu 1 Mei 2026"
-                        className="harmony-input pl-11"
+                        readOnly
+                        placeholder="Periode akan dibaca otomatis setelah file dipilih"
+                        className="harmony-input cursor-default pl-11 text-[#4b5563]"
                       />
                     </div>
                   </label>
@@ -2086,15 +2292,15 @@ function ProcessingLogic() {
 
         <ProcessItem
           number="04"
-          title="Status Otomatis"
-          description="Sistem menentukan present, late, atau incomplete berdasarkan jam kerja reguler."
+          title="Incremental Merge"
+          description="Record lama tidak ditimpa. Sistem hanya membuat tanggal baru atau mengisi check-in/check-out yang masih kosong."
           icon={<Database size={18} />}
         />
 
         <ProcessItem
           number="05"
-          title="Sync Cuti/PHL"
-          description="Pengajuan approved otomatis ditarik ke attendance_logs setelah upload."
+          title="Sync Request"
+          description="Cuti/izin/PHL approved tetap disinkronkan setelah penambahan data fingerprint selesai."
           icon={<CalendarDays size={18} />}
         />
       </div>
@@ -2103,9 +2309,9 @@ function ProcessingLogic() {
         <div className="rounded-[24px] border border-green-200 bg-green-50 p-4 text-sm leading-6 text-green-700">
           <div className="mb-2 flex items-center gap-2 font-bold">
             <CheckCircle2 size={18} />
-            Data otomatis difilter
+            Aman untuk upload bertahap
           </div>
-          Data dengan NIP yang tidak tersedia pada master karyawan tidak akan masuk ke attendance_logs.
+          Upload file periode yang sama dapat diulang. Fingerprint lama tetap dipertahankan dan hanya tanggal/jam yang belum ada yang dilengkapi.
         </div>
 
         <div className="rounded-[24px] border border-orange-200 bg-orange-50 p-4 text-sm leading-6 text-orange-700">

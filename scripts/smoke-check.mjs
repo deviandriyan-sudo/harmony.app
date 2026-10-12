@@ -64,6 +64,9 @@ const requiredFiles = [
   'app/api/phl/work-requests/[id]/review/route.ts',
   'app/api/employee/phl-claims/route.ts',
   'app/api/hr/users/change-email/route.ts',
+  'app/api/system/status/route.ts',
+  'components/system/SystemMaintenanceGate.tsx',
+  'lib/server/system-control.ts',
   'lib/phl-work.ts',
   'lib/server/phl-work.ts',
 ]
@@ -159,8 +162,17 @@ const dashboardSource = fs.readFileSync(path.join(root, 'app/employee/dashboard/
 assert(dashboardSource.includes('Ajukan Saldo PHL') && dashboardSource.includes('/employee/phl'), 'Dashboard belum menyediakan jalur Pengajuan Saldo PHL terpisah.')
 assert(sourceText.includes('harmony-modal-surface'), 'Modal feedback surface belum terpasang.')
 
+
+const systemControlSource = fs.readFileSync(path.join(root, 'lib/server/system-control.ts'), 'utf8')
+assert(systemControlSource.includes('harmony_system_controls'), 'System maintenance control belum terpasang.')
+assert(sourceText.includes('EMAIL_DISABLED_MAINTENANCE'), 'Email gate maintenance belum terpasang.')
+const uploadSource = fs.readFileSync(path.join(root, 'app/hr/attendance/upload/page.tsx'), 'utf8')
+assert(uploadSource.includes('deriveUploadPeriod'), 'Auto-detection periode upload absensi belum terpasang.')
+assert(uploadSource.includes('skippedExistingCount'), 'Incremental attendance merge belum terpasang.')
+assert(uploadSource.includes('Periode akan dibaca otomatis setelah file dipilih'), 'Field periode upload belum otomatis/read-only.')
+
 const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'))
-assert(pkg.version === '3.4.5', `package.json version harus 3.4.5, saat ini ${pkg.version}`)
+assert(pkg.version === '3.5.0', `package.json version harus 3.5.0, saat ini ${pkg.version}`)
 assert(Boolean(pkg.scripts?.['test:smoke']), 'Script test:smoke belum tersedia.')
 
 if (warnings.length) {

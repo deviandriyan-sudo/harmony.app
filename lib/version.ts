@@ -1,2 +1,2 @@
-export const HARMONY_APP_VERSION = '3.4.5'
+export const HARMONY_APP_VERSION = '3.5.0'
 export const HARMONY_REQUIRED_SCHEMA_VERSION = '3.0.0'
