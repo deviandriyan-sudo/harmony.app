@@ -118,6 +118,85 @@ type AttendanceInsertResult = {
   skippedExistingCount: number
 }
 
+const PERIOD_MONTH_CODES = [
+  'JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN',
+  'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC',
+] as const
+
+const PERIOD_MONTH_ALIASES: Record<string, number> = {
+  JAN: 0, JANUARY: 0, JANUARI: 0,
+  FEB: 1, FEBRUARY: 1, FEBRUARI: 1,
+  MAR: 2, MARCH: 2, MARET: 2,
+  APR: 3, APRIL: 3,
+  MAY: 4, MEI: 4,
+  JUN: 5, JUNE: 5, JUNI: 5,
+  JUL: 6, JULY: 6, JULI: 6,
+  AUG: 7, AUGUST: 7, AGU: 7, AGUSTUS: 7,
+  SEP: 8, SEPT: 8, SEPTEMBER: 8,
+  OCT: 9, OCTOBER: 9, OKT: 9, OKTOBER: 9,
+  NOV: 10, NOVEMBER: 10,
+  DEC: 11, DECEMBER: 11, DES: 11, DESEMBER: 11,
+}
+
+function normalizePeriodYear(value?: string | null) {
+  if (!value) return null
+  const numeric = Number(value)
+  if (!Number.isFinite(numeric)) return null
+  if (value.length === 2) return 2000 + numeric
+  if (value.length === 4) return numeric
+  return null
+}
+
+function formatAttendancePeriodName(startIso: string, endIso: string) {
+  const startMatch = String(startIso || '').match(/^(\d{4})-(\d{2})-(\d{2})$/)
+  const endMatch = String(endIso || '').match(/^(\d{4})-(\d{2})-(\d{2})$/)
+  if (!startMatch || !endMatch) return ''
+
+  const startYear = Number(startMatch[1])
+  const startMonth = Number(startMatch[2]) - 1
+  const startDay = Number(startMatch[3])
+  const endMonth = Number(endMatch[2]) - 1
+  const endDay = Number(endMatch[3])
+
+  if (
+    startMonth < 0 || startMonth > 11 ||
+    endMonth < 0 || endMonth > 11 ||
+    !Number.isFinite(startYear)
+  ) return ''
+
+  return `PY-P-${String(startDay).padStart(2, '0')} ${PERIOD_MONTH_CODES[startMonth]} - ${String(endDay).padStart(2, '0')} ${PERIOD_MONTH_CODES[endMonth]} - ${startYear}`
+}
+
+function normalizeUploadPeriodDisplay(item: Pick<AttendanceUpload, 'upload_period' | 'file_name'>) {
+  const candidates = [item.upload_period, item.file_name].filter(Boolean) as string[]
+
+  for (const candidate of candidates) {
+    const upper = candidate.toUpperCase().replace(/\./g, ' ')
+    const match = upper.match(
+      /11\s+([A-Z]+)(?:\s+(\d{2,4}))?\s*[-–—]\s*10\s+([A-Z]+)(?:\s+(\d{2,4}))?/,
+    )
+
+    if (!match) continue
+
+    const startMonth = PERIOD_MONTH_ALIASES[match[1]]
+    const endMonth = PERIOD_MONTH_ALIASES[match[3]]
+    if (startMonth === undefined || endMonth === undefined) continue
+
+    let startYear = normalizePeriodYear(match[2])
+    const endYear = normalizePeriodYear(match[4])
+
+    if (!startYear && endYear) {
+      startYear = startMonth > endMonth ? endYear - 1 : endYear
+    }
+
+    if (!startYear) continue
+
+    return `PY-P-11 ${PERIOD_MONTH_CODES[startMonth]} - 10 ${PERIOD_MONTH_CODES[endMonth]} - ${startYear}`
+  }
+
+  return item.upload_period || item.file_name || '-'
+}
+
 const fallbackSchedule: WorkSchedule = {
   id: 'fallback',
   schedule_name: 'Jam Kerja Reguler Poltek',
@@ -689,16 +768,6 @@ export default function HRAttendanceUploadPage() {
     }
   }
 
-  function formatPeriodDate(value: string) {
-    const date = new Date(`${value}T00:00:00`)
-    return new Intl.DateTimeFormat('id-ID', {
-      day: '2-digit',
-      month: 'long',
-      year: 'numeric',
-      timeZone: 'Asia/Makassar',
-    }).format(date)
-  }
-
   function deriveUploadPeriod(rows: ParsedRow[]) {
     const periodMonths = Array.from(
       new Set(
@@ -724,7 +793,7 @@ export default function HRAttendanceUploadPage() {
     const range = getCutoffRangeForUpload(periodMonth)
     return {
       periodMonth,
-      label: `Periode Absensi ${formatPeriodDate(range.start)} - ${formatPeriodDate(range.end)}`,
+      label: formatAttendancePeriodName(range.start, range.end),
       error: '',
     }
   }
@@ -2116,7 +2185,7 @@ function UploadHistory({
                     </td>
 
                     <td className="break-words px-4 py-3.5 align-top text-[#1d1d1f]">
-                      {item.upload_period || item.file_name || '-'}
+                      {normalizeUploadPeriodDisplay(item)}
                     </td>
 
                     <td className="break-words px-4 py-3.5 align-top text-[#1d1d1f]">
@@ -2193,7 +2262,7 @@ function UploadHistoryCard({
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
         <MobileInfoBox
           title="Periode"
-          value={item.upload_period || item.file_name || '-'}
+          value={normalizeUploadPeriodDisplay(item)}
         />
         <MobileInfoBox
           title="Tanggal Upload"
