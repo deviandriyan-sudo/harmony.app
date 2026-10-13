@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { canonicalizeLeaveBalanceSummaries } from '@/lib/leave-balance-canonical'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -53,15 +54,23 @@ export async function GET(request: NextRequest) {
     const allCycles = Array.isArray(context.cycles) ? context.cycles : []
     const flexibleCycles = allCycles.filter(isFlexibleTechnicalCycle)
     const visibleCycles = allCycles.filter((item) => !isFlexibleTechnicalCycle(item))
+    const canonicalSummaries = canonicalizeLeaveBalanceSummaries(
+      Array.isArray(context.summaries) ? context.summaries : [],
+      allCycles,
+      context.reference_date || null,
+    )
 
     return NextResponse.json(
       {
         success: true,
-        summaries: context.summaries || [],
+        summaries: canonicalSummaries,
         cycles: visibleCycles,
         flexible_cycles: flexibleCycles,
         adjustments: context.adjustments || [],
         reference_date: context.reference_date || null,
+        balance_integrity_warning: canonicalSummaries.some((item: any) => item.balance_integrity_status && item.balance_integrity_status !== 'ok')
+          ? 'Ada summary saldo yang berbeda dari cycle aktif; nilai canonical cycle digunakan.'
+          : null,
       },
       { headers: { 'Cache-Control': 'no-store, max-age=0' } },
     )
@@ -93,6 +102,7 @@ export async function POST(request: NextRequest) {
       )
 
       if (error) throw error
+
       return NextResponse.json({ success: true, result: data })
     }
 

@@ -22,6 +22,7 @@ import { TodayTeamAvailability } from '@/components/employee/TodayTeamAvailabili
 import { Topbar } from '@/components/layout/Topbar'
 import { getCurrentPeriodMonthWita, getCutoffRange } from '@/lib/attendance-reporting'
 import { supabase } from '@/lib/supabase'
+import { harmonyFetch } from '@/lib/harmony-client'
 import { getApprovalStageLabel, isWorkflowPending } from '@/lib/leave-workflow-status'
 
 type AppUser = {
@@ -52,6 +53,8 @@ type BalanceSummary = {
   postpone_expired_days: number | null
   next_postpone_expiry: string | null
   next_phl_expiry: string | null
+  balance_integrity_status?: 'ok' | 'reconciled_from_cycle' | 'summary_only'
+  balance_integrity_difference_days?: number | null
 }
 
 type AttendanceRow = {
@@ -150,19 +153,24 @@ export default function EmployeeDashboardPage() {
       if (!employeeData) throw new Error('Akun belum terhubung ke data employee. Hubungi HR.')
       setEmployee(employeeData)
 
+      const balancePayload = await harmonyFetch<{
+        balance_summary?: BalanceSummary | null
+        balance_integrity_warning?: string | null
+      }>('/api/employee/leave/postpone')
+
+      if (balancePayload.balance_integrity_warning) {
+        console.warn('Leave balance integrity warning:', balancePayload.balance_integrity_warning)
+      }
+
+      setBalance(balancePayload.balance_summary || null)
+
       const [
-        balanceResponse,
         attendanceResponse,
         leaveResponse,
         phlResponse,
         pendingLeaveResponse,
         pendingPHLResponse,
       ] = await Promise.all([
-        supabase
-          .from('harmony_leave_balance_summary')
-          .select('employee_id,annual_total_available_days,phl_total_available_days,postpone_active_days,postpone_expired_days,next_postpone_expiry,next_phl_expiry')
-          .eq('employee_id', employeeData.id)
-          .maybeSingle<BalanceSummary>(),
         supabase
           .from('attendance_logs')
           .select('attendance_date,check_in,check_out,manual_check_in,manual_check_out,status')
@@ -196,9 +204,6 @@ export default function EmployeeDashboardPage() {
           .eq('employee_id', employeeData.id)
           .eq('source', 'employee_phl_claim'),
       ])
-
-      if (!balanceResponse.error) setBalance(balanceResponse.data || null)
-      else setBalance(null)
 
       if (attendanceResponse.error) throw attendanceResponse.error
       setAttendance((attendanceResponse.data || []) as AttendanceRow[])
@@ -311,7 +316,7 @@ export default function EmployeeDashboardPage() {
   }
 
   const recordedAttendance = attendance.filter((row) => Boolean(row.check_in || row.check_out || row.manual_check_in || row.manual_check_out)).length
-  const annualBalance = Number(balance?.annual_total_available_days ?? employee?.annual_leave_balance ?? 0)
+  const annualBalance = balance ? Number(balance.annual_total_available_days ?? 0) : null
   const phlBalance = Number(balance?.phl_total_available_days ?? employee?.phl_balance ?? 0)
 
   return (
@@ -351,7 +356,13 @@ export default function EmployeeDashboardPage() {
         </section>
 
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <Metric title="Saldo Cuti" value={`${annualBalance}`} description="Cuti matang + postpone aktif" icon={<WalletCards size={20} />} tone="blue" />
+          <Metric
+            title="Saldo Cuti"
+            value={annualBalance === null ? '—' : `${annualBalance}`}
+            description={balance ? 'Cuti matang + postpone aktif' : 'Lifecycle belum berhasil direkonsiliasi'}
+            icon={<WalletCards size={20} />}
+            tone="blue"
+          />
           <Metric title="Saldo PHL" value={`${phlBalance}`} description="PHL aktif yang dapat diklaim" icon={<Plane size={20} />} tone="purple" />
           <Metric title="Kehadiran Tercatat" value={`${recordedAttendance}`} description="Periode cut-off berjalan" icon={<CheckCircle2 size={20} />} tone="green" />
           <Metric title="Pending Request" value={`${pendingRequestCount}`} description="Cuti/izin/PHL belum final" icon={<Clock3 size={20} />} tone="orange" />

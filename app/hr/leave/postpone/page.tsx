@@ -969,27 +969,6 @@ export default function HRLeavePostponePage() {
 
     try {
       const {
-        error:
-          lifecycleError,
-      } =
-        await supabase.rpc(
-          'harmony_reconcile_leave_lifecycle',
-          {
-            p_employee_id:
-              null,
-          },
-        )
-
-      if (
-        lifecycleError
-      ) {
-        console.warn(
-          'Postpone lifecycle reconcile warning:',
-          lifecycleError.message,
-        )
-      }
-
-      const {
         data,
         error,
       } =

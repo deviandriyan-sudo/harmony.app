@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { canonicalizeLeaveBalanceSummary } from '@/lib/leave-balance-canonical'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -34,16 +35,41 @@ export async function GET(request: NextRequest) {
   try {
     const { supabase } = await clientFor(request)
 
-    const { data, error } = await supabase.rpc(
+    // Production source of truth already exposes the current employee lifecycle
+    // through this RPC. Do not depend on optional lifecycle repair RPCs; they
+    // are not present on every deployed HARMONY schema.
+    const contextResponse = await supabase.rpc(
       'harmony_get_my_leave_postpone_context',
     )
+    if (contextResponse.error) throw contextResponse.error
 
-    if (error) throw error
-
-    const context = (data || {}) as Record<string, any>
-    const visibleCycles = (Array.isArray(context.cycles) ? context.cycles : []).filter(
+    const context = (contextResponse.data || {}) as Record<string, any>
+    const allCycles = Array.isArray(context.cycles) ? context.cycles : []
+    const visibleCycles = allCycles.filter(
       (cycle: any) => !String(cycle?.notes || '').includes('[HR_FLEX_POSTPONE]')
     )
+
+    const employeeId = String(context?.employee?.id || '').trim()
+    let balanceSummary: Record<string, any> | null = null
+
+    if (employeeId) {
+      const summaryResponse = await supabase
+        .from('harmony_leave_balance_summary')
+        .select('*')
+        .eq('employee_id', employeeId)
+        .maybeSingle()
+
+      if (summaryResponse.error) throw summaryResponse.error
+      if (summaryResponse.data) {
+        balanceSummary = canonicalizeLeaveBalanceSummary(
+          summaryResponse.data as Record<string, any>,
+          allCycles,
+          context.reference_date || null,
+        )
+      }
+    }
+
+    const integrityStatus = String(balanceSummary?.balance_integrity_status || '')
 
     return NextResponse.json(
       {
@@ -51,7 +77,12 @@ export async function GET(request: NextRequest) {
         employee: context.employee || null,
         cycles: visibleCycles,
         requests: context.requests || [],
+        balance_summary: balanceSummary,
         reference_date: context.reference_date || null,
+        balance_integrity_warning:
+          integrityStatus && integrityStatus !== 'ok'
+            ? 'Saldo summary berbeda dari cycle aktif; HARMONY menampilkan nilai canonical dari lifecycle cycle.'
+            : null,
       },
       { headers: { 'Cache-Control': 'no-store, max-age=0' } },
     )

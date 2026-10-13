@@ -133,6 +133,9 @@ assert(sourceText.includes('phl_work_request_id'), 'Link PHL independen ke atten
 assert(sourceText.includes('Pengajuan Saldo PHL'), 'Label Pengajuan Saldo PHL belum terpasang.')
 assert(!sourceText.includes('PHL tanpa menunggu cutoff.'), 'Judul PHL lama masih ditemukan.')
 assert(sourceText.includes('legacy_attendance'), 'Support migrasi PHL attendance legacy belum terpasang.')
+assert(sourceText.includes('canonicalizeLeaveBalanceSummary'), 'Canonical leave balance resolver belum terpasang.')
+assert(sourceText.includes('balance_integrity_status'), 'Leave balance integrity marker belum terpasang.')
+
 assert(!sourceText.includes('harmony_sync_phl_balance_from_attendance_v2'), 'Legacy sync saldo PHL dari approval attendance masih direferensikan.')
 assert(sourceText.includes('buildUploadHistoryDisplay'), 'Dedup riwayat upload per periode belum terpasang.')
 assert(sourceText.includes('normalizeUploadFileNameDisplay'), 'Normalisasi nama berkas upload belum terpasang.')
@@ -176,13 +179,14 @@ assert(uploadSource.includes('skippedExistingCount'), 'Incremental attendance me
 assert(uploadSource.includes('Periode akan dibaca otomatis setelah file dipilih'), 'Field periode upload belum otomatis/read-only.')
 
 const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'))
-assert(pkg.version === '3.5.4', `package.json version harus 3.5.4, saat ini ${pkg.version}`)
+assert(pkg.version === '3.5.6', `package.json version harus 3.5.6, saat ini ${pkg.version}`)
 assert(fs.existsSync(path.join(root, 'app/api/notifications/attendance-upload/route.ts')), 'Dispatch absensi belum disediakan.')
 assert(uploadSource.includes('processAttendanceUploadEmails'), 'Hook dispatch email upload belum tersedia.')
 assert(sourceText.includes('harmony_claim_attendance_emails_v1'), 'Atomic email claim belum tersedia.')
 assert(sourceText.includes('Idempotency-Key'), 'Resend idempotency belum digunakan.')
 assert(sourceText.includes('/api/hr/attendance/upload-file'), 'HR signed file route belum digunakan.')
 assert(Boolean(pkg.scripts?.['test:smoke']), 'Script test:smoke belum tersedia.')
+assert(!sourceText.includes('harmony_reconcile_leave_lifecycle'), 'RPC lifecycle obsolete/missing masih direferensikan oleh source.')
 
 if (warnings.length) {
   console.warn(`HARMONY smoke check WARNINGS (${warnings.length})`)

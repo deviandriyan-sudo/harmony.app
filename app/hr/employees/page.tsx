@@ -40,6 +40,7 @@ import {
   HarmonyPendingAttachmentPicker,
 } from '@/components/attachments/HarmonyAttachments'
 import { supabase } from '@/lib/supabase'
+import { harmonyFetch } from '@/lib/harmony-client'
 
 type Employee = {
   id: string
@@ -550,14 +551,33 @@ export default function HREmployeesPage() {
     setErrorMessage('')
 
     try {
-      const { data: employeeData, error: employeeError } = await supabase
-        .from('employees')
-        .select('*')
-        .order('full_name', { ascending: true })
+      const [employeeResponse, balancePayload] = await Promise.all([
+        supabase
+          .from('employees')
+          .select('*')
+          .order('full_name', { ascending: true }),
+        harmonyFetch<{ summaries?: LeaveBalanceSummary[] }>(
+          '/api/hr/leave/postpone-adjustments',
+        ),
+      ])
 
-      if (employeeError) throw employeeError
+      if (employeeResponse.error) throw employeeResponse.error
 
-      const employeesRows = (employeeData || []) as Employee[]
+      const balanceByEmployee = new Map(
+        (balancePayload.summaries || []).map((item) => [
+          item.employee_id,
+          Number(item.annual_total_available_days || 0),
+        ]),
+      )
+
+      const employeesRows = ((employeeResponse.data || []) as Employee[]).map(
+        (employee) => ({
+          ...employee,
+          annual_leave_balance: balanceByEmployee.has(employee.id)
+            ? Number(balanceByEmployee.get(employee.id) || 0)
+            : employee.annual_leave_balance,
+        }),
+      )
       setEmployees(employeesRows)
 
       const { data: logsData, error: logsError } = await supabase
@@ -1728,7 +1748,9 @@ export default function HREmployeesPage() {
         supervisor_2: form.supervisor_2.trim() || null,
         schedule_group: 'regular',
         auto_detect_schedule: true,
-        annual_leave_balance: form.annual_leave_balance,
+        // Existing annual leave is lifecycle-managed. Never overwrite the legacy
+        // employee balance from a generic profile edit; this can double-count
+        // active postpone/carry-forward days.
         is_active: form.is_active,
         personal_phone: form.personal_phone.trim() || null,
         address: form.address.trim() || null,
@@ -1746,7 +1768,11 @@ export default function HREmployeesPage() {
             : 'Data karyawan berhasil diperbarui.',
         )
       } else {
-        const { error } = await supabase.from('employees').insert({ ...payload, created_at: now })
+        const { error } = await supabase.from('employees').insert({
+          ...payload,
+          annual_leave_balance: form.annual_leave_balance,
+          created_at: now,
+        })
         if (error) throw error
         setSuccessMessage('Data karyawan berhasil ditambahkan.')
       }
@@ -2716,8 +2742,12 @@ function EmployeeFormModal({
               <TextareaField label="Alamat Domisili" value={form.address} onChange={(value) => onUpdate('address', value)} placeholder="Alamat domisili karyawan" />
             </FormSection>
 
-            <FormSection title="Saldo & Status Data" description="Saldo cuti tahunan dapat dikoreksi pada data utama. Saldo PHL dikelola melalui ledger bertanggal di bagian berikutnya." icon={<WalletCards size={18} />}>
-              <InputField label="Saldo Cuti Tahunan" type="number" value={String(form.annual_leave_balance)} onChange={(value) => onUpdate('annual_leave_balance', Number(value))} />
+            <FormSection title="Saldo & Status Data" description="Saldo cuti dan postpone dikelola melalui lifecycle agar tidak terjadi double count. Saldo PHL dikelola melalui ledger bertanggal." icon={<WalletCards size={18} />}>
+              <ReadOnlyBalanceField
+                label="Saldo Cuti Aktif"
+                value={`${Number(leaveBalanceSummary?.annual_total_available_days ?? form.annual_leave_balance ?? 0)} hari`}
+                description="Tidak diedit dari profil karyawan. Gunakan Administrasi Cuti/Postpone atau Hutang Cuti agar histori dan lifecycle tetap konsisten."
+              />
               <ReadOnlyBalanceField
                 label="Saldo PHL Aktif"
                 value={

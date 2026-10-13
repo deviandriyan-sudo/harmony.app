@@ -29,6 +29,7 @@ import {
   HarmonyPendingAttachmentPicker,
 } from '@/components/attachments/HarmonyAttachments'
 import { supabase } from '@/lib/supabase'
+import { harmonyFetch } from '@/lib/harmony-client'
 import {
   HARMONY_ATTACHMENT_REQUIRED_FILES,
   registerHarmonySubmissionAttachments,
@@ -443,32 +444,22 @@ export default function EmployeeLeavePage() {
     setSupervisorTwo(foundTwo)
   }
 
-  async function fetchAnnualLeaveSummary(employeeId: string) {
-    const { error: reconcileError } = await supabase.rpc(
-      'harmony_reconcile_leave_lifecycle',
-      { p_employee_id: employeeId }
-    )
+  async function fetchAnnualLeaveSummary(_employeeId: string) {
+    try {
+      const payload = await harmonyFetch<{
+        balance_summary?: AnnualLeaveSummary | null
+        balance_integrity_warning?: string | null
+      }>('/api/employee/leave/postpone')
 
-    if (reconcileError) {
-      console.warn(
-        'Leave lifecycle reconcile warning:',
-        reconcileError.message
-      )
-    }
+      if (payload.balance_integrity_warning) {
+        console.warn('Leave balance integrity warning:', payload.balance_integrity_warning)
+      }
 
-    const { data, error } = await supabase
-      .from('harmony_leave_balance_summary')
-      .select('*')
-      .eq('employee_id', employeeId)
-      .maybeSingle<AnnualLeaveSummary>()
-
-    if (error) {
-      console.warn('Leave lifecycle summary warning:', error.message)
+      setAnnualLeave(payload.balance_summary || null)
+    } catch (error: any) {
+      console.warn('Leave lifecycle summary warning:', error?.message || error)
       setAnnualLeave(null)
-      return
     }
-
-    setAnnualLeave(data || null)
   }
 
   async function fetchPHLBalance(employeeId: string) {

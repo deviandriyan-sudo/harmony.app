@@ -24,6 +24,7 @@ import {
 import { Topbar } from '@/components/layout/Topbar'
 import { HarmonyAttachmentViewer } from '@/components/attachments/HarmonyAttachments'
 import { supabase } from '@/lib/supabase'
+import { harmonyFetch } from '@/lib/harmony-client'
 import {
   canHRProcessApproval,
   getHRApprovalLabel,
@@ -987,15 +988,6 @@ export default function HRLeavePage() {
       }
     )
 
-    const { error: lifecycleError } = await supabase.rpc(
-      'harmony_reconcile_leave_lifecycle',
-      { p_employee_id: null }
-    )
-
-    if (lifecycleError) {
-      console.warn('Leave lifecycle reconcile warning:', lifecycleError.message)
-    }
-
     await Promise.all([
       fetchEmployeeDirectory(),
       fetchLeaveRequests(),
@@ -1042,20 +1034,24 @@ export default function HRLeavePage() {
   }
 
   async function fetchLeaveBalanceLifecycle() {
-    const { data, error } = await supabase
-      .from('harmony_leave_balance_summary')
-      .select('*')
-      .order('full_name', { ascending: true })
+    try {
+      const payload = await harmonyFetch<{
+        summaries?: LeaveBalanceLifecycleSummary[]
+        balance_integrity_warning?: string | null
+      }>('/api/hr/leave/postpone-adjustments')
 
-    if (error) {
-      console.warn('Leave lifecycle summary warning:', error.message)
+      if (payload.balance_integrity_warning) {
+        console.warn('Leave balance integrity warning:', payload.balance_integrity_warning)
+      }
+
+      const rows = [...(payload.summaries || [])].sort((a, b) =>
+        String(a.full_name || '').localeCompare(String(b.full_name || ''), 'id'),
+      )
+      setLeaveBalanceLifecycle(rows)
+    } catch (error: any) {
+      console.warn('Leave lifecycle summary warning:', error?.message || error)
       setLeaveBalanceLifecycle([])
-      return
     }
-
-    setLeaveBalanceLifecycle(
-      (data || []) as LeaveBalanceLifecycleSummary[]
-    )
   }
 
   async function fetchPHLRecords() {
