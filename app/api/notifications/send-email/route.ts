@@ -5,6 +5,7 @@ import {
   getNotificationEnvironmentStatus,
   getResendDomainDiagnostic,
   isValidNotificationEmail,
+  deliverHarmonyServerEmail,
   sendHarmonyServerEmail,
 } from '@/lib/notifications-server'
 import { sendCoreWorkflowNotification } from '@/lib/server/core-workflow-notifications'
@@ -22,6 +23,7 @@ type SendEmailPayload = {
   html?: string
   text?: string
   replyTo?: string
+  delivery?: 'queue' | 'direct'
 }
 
 type WorkflowEmailPayload = {
@@ -407,7 +409,7 @@ export async function POST(request: Request) {
       )
     }
 
-    const result = await sendHarmonyServerEmail({
+    const emailPayload = {
       to,
       cc,
       bcc,
@@ -415,7 +417,11 @@ export async function POST(request: Request) {
       html: String(payload.html || ''),
       text: String(payload.text || ''),
       replyTo: String(payload.replyTo || '').trim(),
-    })
+    }
+
+    const result = payload.delivery === 'direct'
+      ? await deliverHarmonyServerEmail(emailPayload)
+      : await sendHarmonyServerEmail(emailPayload)
 
     if (!result.ok) {
       return buildError(result.message, 502, {
@@ -427,8 +433,10 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       ok: true,
-      message: 'Email notifikasi berhasil dikirim.',
+      message: result.message || (result.queued ? 'Email masuk antrean.' : 'Email notifikasi berhasil dikirim.'),
       provider_id: result.providerId || null,
+      queued: result.queued === true,
+      queue_id: result.queueId || null,
       sent_to: to,
       cc,
       bcc,

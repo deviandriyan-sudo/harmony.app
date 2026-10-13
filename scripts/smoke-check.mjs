@@ -69,6 +69,8 @@ const requiredFiles = [
   'lib/server/system-control.ts',
   'lib/phl-work.ts',
   'lib/server/phl-work.ts',
+  'lib/server/job-queue.ts',
+  'app/api/notifications/queue/route.ts',
 ]
 
 for (const file of requiredFiles) {
@@ -184,10 +186,14 @@ assert(uploadSource.includes('skippedExistingCount'), 'Incremental attendance me
 assert(uploadSource.includes('Periode akan dibaca otomatis setelah file dipilih'), 'Field periode upload belum otomatis/read-only.')
 
 const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'))
-assert(pkg.version === '3.5.7', `package.json version harus 3.5.7, saat ini ${pkg.version}`)
+assert(pkg.version === '3.6.0', `package.json version harus 3.6.0, saat ini ${pkg.version}`)
 assert(fs.existsSync(path.join(root, 'app/api/notifications/attendance-upload/route.ts')), 'Dispatch absensi belum disediakan.')
 assert(uploadSource.includes('processAttendanceUploadEmails'), 'Hook dispatch email upload belum tersedia.')
 assert(sourceText.includes('harmony_claim_attendance_emails_v1'), 'Atomic email claim belum tersedia.')
+assert(sourceText.includes('harmony_claim_jobs_v1'), 'Background notification queue claim belum tersedia.')
+assert(sourceText.includes('scheduleHarmonyJobQueueDrain'), 'Background queue drain belum direferensikan.')
+assert(sourceText.includes('processHarmonyJobQueue'), 'Cron fallback background queue belum direferensikan.')
+assert(sourceText.includes('deliverHarmonyServerEmail'), 'Direct provider sender untuk queue worker belum tersedia.')
 assert(sourceText.includes('Idempotency-Key'), 'Resend idempotency belum digunakan.')
 assert(sourceText.includes('/api/hr/attendance/upload-file'), 'HR signed file route belum digunakan.')
 assert(Boolean(pkg.scripts?.['test:smoke']), 'Script test:smoke belum tersedia.')

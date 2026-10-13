@@ -109,6 +109,7 @@ function failureResult(message: string): HarmonyServerEmailResult {
 function summarize(deliveries: Delivery[]): HarmonyWorkflowNotificationResult {
   const sent = deliveries.filter((item) => item.result.ok).length
   const failed = deliveries.length - sent
+  const queued = deliveries.filter((item) => item.result.ok && item.result.queued).length
 
   return {
     ok: deliveries.length > 0 && failed === 0,
@@ -117,9 +118,11 @@ function summarize(deliveries: Delivery[]): HarmonyWorkflowNotificationResult {
     message:
       deliveries.length === 0
         ? 'Tidak ada penerima email yang tersedia.'
-        : failed === 0
-          ? `${sent} email notifikasi berhasil dikirim.`
-          : `${sent} email terkirim, ${failed} gagal.`,
+        : failed === 0 && queued === sent
+          ? `${queued} email notifikasi masuk antrean background.`
+          : failed === 0
+            ? `${sent} email notifikasi berhasil diproses.`
+            : `${sent} email diproses, ${failed} gagal.`,
     details: deliveries.map((item) => ({
       target: item.target,
       ok: item.result.ok,

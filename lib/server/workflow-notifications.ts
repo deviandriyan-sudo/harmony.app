@@ -152,6 +152,7 @@ async function sendTemplate({
 function summarize(results: Array<{ target: string; result: HarmonyServerEmailResult }>): WorkflowNotificationResult {
   const sent = results.filter((item) => item.result.ok).length
   const failed = results.length - sent
+  const queued = results.filter((item) => item.result.ok && item.result.queued).length
   return {
     ok: failed === 0 && sent > 0,
     sent,
@@ -159,9 +160,11 @@ function summarize(results: Array<{ target: string; result: HarmonyServerEmailRe
     message:
       results.length === 0
         ? 'Tidak ada penerima email yang tersedia.'
-        : failed === 0
-          ? `${sent} email notifikasi berhasil dikirim.`
-          : `${sent} email terkirim, ${failed} gagal.`,
+        : failed === 0 && queued === sent
+          ? `${queued} email notifikasi masuk antrean background.`
+          : failed === 0
+            ? `${sent} email notifikasi berhasil diproses.`
+            : `${sent} email diproses, ${failed} gagal.`,
     details: results.map((item) => ({
       target: item.target,
       ok: item.result.ok,

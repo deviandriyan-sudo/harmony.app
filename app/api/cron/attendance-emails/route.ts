@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { timingSafeEqual } from 'node:crypto'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { processAttendanceEmailOutbox } from '@/lib/server/attendance-email-outbox'
+import { processHarmonyJobQueue } from '@/lib/server/job-queue'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -20,26 +21,45 @@ export async function GET(request: NextRequest) {
   if (!authorized(request)) {
     return NextResponse.json({ ok: false, message: 'Unauthorized' }, { status: 401 })
   }
+
+  const started = Date.now()
+  const general = { completed: 0, failed: 0, remaining: 0, paused: false, batches: 0, error: '' }
+  const attendance = { sent: 0, failed: 0, remaining: 0, paused: false, batches: 0, error: '' }
+
   try {
-    const started = Date.now()
-    let sent = 0
-    let failed = 0
-    let remaining = 0
-    let paused = false
-    let batches = 0
-    while (batches < 10 && Date.now() - started < 42_000) {
-      const batch = await processAttendanceEmailOutbox(supabaseAdmin)
-      sent += batch.sent
-      failed += batch.failed
-      remaining = batch.remaining
-      paused = batch.paused
-      batches++
-      if (paused || !batch.claimed || !remaining) break
+    while (general.batches < 6 && Date.now() - started < 24_000) {
+      const batch = await processHarmonyJobQueue(supabaseAdmin, { limit: 8 })
+      general.completed += batch.completed
+      general.failed += batch.failed
+      general.remaining = batch.remaining
+      general.paused = batch.paused
+      general.batches++
+      if (batch.paused || !batch.claimed || !batch.remaining) break
     }
-    return NextResponse.json({ ok: failed === 0, sent, failed, remaining, paused, batches },
-      { headers: { 'Cache-Control': 'no-store' } })
-  } catch (error) {
-    console.error('HARMONY attendance cron processing failed', error)
-    return NextResponse.json({ ok: false, message: 'Proses email gagal. Periksa server logs.' }, { status: 500 })
+  } catch (error: any) {
+    general.error = error?.message || 'Queue umum gagal diproses.'
+    console.error('HARMONY general notification queue cron failed:', error)
   }
+
+  try {
+    while (attendance.batches < 8 && Date.now() - started < 44_000) {
+      const batch = await processAttendanceEmailOutbox(supabaseAdmin)
+      attendance.sent += batch.sent
+      attendance.failed += batch.failed
+      attendance.remaining = batch.remaining
+      attendance.paused = batch.paused
+      attendance.batches++
+      if (batch.paused || !batch.claimed || !batch.remaining) break
+    }
+  } catch (error: any) {
+    attendance.error = error?.message || 'Queue upload absensi gagal diproses.'
+    console.error('HARMONY attendance queue cron failed:', error)
+  }
+
+  const ok = !general.error && !attendance.error && general.failed === 0 && attendance.failed === 0
+  return NextResponse.json(
+    { ok, general, attendance },
+    { status: ok ? 200 : 207, headers: { 'Cache-Control': 'no-store' } },
+  )
 }
+

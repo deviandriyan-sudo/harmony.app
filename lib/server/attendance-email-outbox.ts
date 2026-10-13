@@ -3,7 +3,7 @@ import {
   buildServerHarmonyEmailHtml,
   buildServerHarmonyEmailText,
   getNotificationEnvironmentStatus,
-  sendHarmonyServerEmail,
+  deliverHarmonyServerEmail,
 } from '@/lib/notifications-server'
 import { getHarmonySystemControl } from '@/lib/server/system-control'
 
@@ -48,7 +48,7 @@ export async function processAttendanceEmailOutbox(admin: SupabaseClient) {
     const path = `${env.appUrl}/employee/attendance`
     let result: { ok: boolean; providerId?: string | null; message: string }
     try {
-      result = await sendHarmonyServerEmail({
+      result = await deliverHarmonyServerEmail({
         to: job.recipient_email,
         subject,
         html: buildServerHarmonyEmailHtml({ title, message, actionLabel: 'Periksa Absensi', actionUrl: path }),

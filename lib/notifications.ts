@@ -15,6 +15,7 @@ export type NotifyPayload = {
   actionUrl?: string
   footer?: string
   replyTo?: string
+  delivery?: 'queue' | 'direct'
 }
 
 type SendHarmonyEmailResult = {
@@ -66,6 +67,7 @@ export async function sendHarmonyEmail(
         html: buildHarmonyEmailHtml(payload),
         text: buildHarmonyEmailText(payload),
         replyTo: payload.replyTo,
+        delivery: payload.delivery || 'queue',
       }),
     })
 

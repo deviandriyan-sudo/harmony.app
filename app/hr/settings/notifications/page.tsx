@@ -78,6 +78,8 @@ export default function HRNotificationDiagnosticsPage() {
     useState('')
   const [message, setMessage] =
     useState<MessageState | null>(null)
+  const [notificationQueue, setNotificationQueue] = useState<Record<string, number> | null>(null)
+  const [notificationQueueProcessing, setNotificationQueueProcessing] = useState(false)
   const [attendanceQueue, setAttendanceQueue] = useState<Record<string, number> | null>(null)
   const [queueProcessing, setQueueProcessing] = useState(false)
 
@@ -165,6 +167,53 @@ export default function HRNotificationDiagnosticsPage() {
       })
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function fetchNotificationQueue() {
+    const { data } = await supabase.auth.getSession()
+    const token = data.session?.access_token
+    if (!token) return
+    try {
+      const response = await fetch('/api/notifications/queue', {
+        headers: { Authorization: `Bearer ${token}` }, cache: 'no-store',
+      })
+      const result = await response.json().catch(() => null)
+      if (response.ok && result?.counts) setNotificationQueue(result.counts)
+      else setNotificationQueue(null)
+    } catch {
+      setNotificationQueue(null)
+    }
+  }
+
+  async function processNotificationQueue(retryFailed = false) {
+    if (retryFailed && !window.confirm('Ulangi semua notifikasi umum yang gagal permanen?')) return
+    setNotificationQueueProcessing(true)
+    try {
+      const { data } = await supabase.auth.getSession()
+      const token = data.session?.access_token
+      if (!token) throw new Error('Sesi HR tidak tersedia.')
+      let totalCompleted = 0
+      let lastMessage = ''
+      for (let attempt = 0; attempt < 6; attempt++) {
+        const response = await fetch('/api/notifications/queue', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+          cache: 'no-store',
+          body: JSON.stringify({ retry_failed: retryFailed && attempt === 0 }),
+        })
+        const result = await response.json().catch(() => null)
+        if (!response.ok) throw new Error(result?.message || 'Queue notifikasi gagal diproses.')
+        totalCompleted += Number(result?.completed || 0)
+        lastMessage = result?.message || ''
+        if (result?.paused || !result?.claimed || !result?.remaining) break
+      }
+      setMessage({ type: 'info', text: `${totalCompleted} notifikasi background selesai. ${lastMessage}` })
+    } catch (error: any) {
+      setMessage({ type: 'error', text: error?.message || 'Queue notifikasi gagal diproses.' })
+    } finally {
+      await fetchNotificationQueue()
+      setNotificationQueueProcessing(false)
     }
   }
 
@@ -271,7 +320,7 @@ export default function HRNotificationDiagnosticsPage() {
     }
 
     setDiagnostic(result)
-    await fetchAttendanceEmailQueue()
+    await Promise.all([fetchNotificationQueue(), fetchAttendanceEmailQueue()])
   }
 
   async function handleRefresh() {
@@ -342,6 +391,7 @@ export default function HRNotificationDiagnosticsPage() {
             'https://harmony-app-ten.vercel.app',
           footer:
             'Email test ini dikirim dari menu Diagnostik Email HARMONY.',
+          delivery: 'direct',
         })
 
       setMessage({
@@ -567,6 +617,35 @@ export default function HRNotificationDiagnosticsPage() {
                 }
                 ok={Boolean(environment?.app_url)}
               />
+            </section>
+
+            <section className="rounded-[24px] border border-black/5 bg-white/75 p-4 shadow-sm backdrop-blur-xl sm:p-5">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h2 className="text-sm font-bold text-[#1d1d1f]">Background Notification Queue</h2>
+                  <p className="mt-1 text-xs text-[#6e6e73]">Notifikasi transaksi masuk database queue lebih dulu agar submit/approve tidak menunggu Resend. Worker memproses otomatis setelah response dan cron menjadi fallback.</p>
+                </div>
+                <button type="button" onClick={() => processNotificationQueue(false)}
+                  disabled={notificationQueueProcessing || !notificationQueue}
+                  className="inline-flex min-h-10 items-center gap-2 rounded-2xl bg-[#17181b] px-4 text-xs font-bold text-white disabled:opacity-50">
+                  {notificationQueueProcessing ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />}
+                  Proses Queue
+                </button>
+              </div>
+              {notificationQueue ? (
+                <>
+                  <div className="mt-4 grid grid-cols-2 gap-2 text-sm sm:grid-cols-4">
+                    {([['pending','Menunggu'],['processing','Diproses'],['completed','Selesai'],['failed','Gagal Permanen']] as const).map(([key,label]) => (
+                      <div key={key} className="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3">
+                        <p className="text-xs text-slate-500">{label}</p>
+                        <p className="mt-1 text-xl font-bold tabular-nums">{notificationQueue[key] || 0}</p>
+                      </div>
+                    ))}
+                  </div>
+                  {Boolean(notificationQueue.failed) && <button type="button" onClick={() => processNotificationQueue(true)}
+                    disabled={notificationQueueProcessing} className="mt-3 text-xs font-semibold text-red-700 underline disabled:opacity-50">Coba Lagi yang Gagal</button>}
+                </>
+              ) : <p className="mt-3 text-xs text-amber-700">Queue umum belum tersedia. Jalankan migration HARMONY V3.6.0.</p>}
             </section>
 
             <section className="rounded-[24px] border border-black/5 bg-white/75 p-4 shadow-sm backdrop-blur-xl sm:p-5">

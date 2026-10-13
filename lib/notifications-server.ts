@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto'
+import { enqueueHarmonyEmailJob, scheduleHarmonyJobQueueDrain } from '@/lib/server/job-queue'
 import { getHarmonySystemControl } from '@/lib/server/system-control'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 
@@ -37,6 +38,8 @@ export type HarmonyServerEmailResult = {
   ok: boolean
   message: string
   providerId?: string | null
+  queued?: boolean
+  queueId?: string | null
   detail?: unknown
 }
 
@@ -294,7 +297,7 @@ export async function getResendDomainDiagnostic(): Promise<ResendDomainDiagnosti
   }
 }
 
-export async function sendHarmonyServerEmail(
+export async function deliverHarmonyServerEmail(
   payload: HarmonyServerEmailPayload
 ): Promise<HarmonyServerEmailResult> {
   const control = await getHarmonySystemControl(supabaseAdmin)
@@ -477,6 +480,83 @@ export async function sendHarmonyServerEmail(
   }
   return { ok: false, message: lastError }
 
+}
+
+
+export async function sendHarmonyServerEmail(
+  payload: HarmonyServerEmailPayload
+): Promise<HarmonyServerEmailResult> {
+  const environment = getNotificationEnvironmentStatus()
+  const resendApiKey = String(process.env.RESEND_API_KEY || '').trim()
+
+  if (!resendApiKey) {
+    return { ok: false, message: 'RESEND_API_KEY belum diatur di environment variable.' }
+  }
+
+  if (!environment.fromConfigured) {
+    return { ok: false, message: 'NOTIFICATION_FROM_EMAIL belum diatur atau format sender belum valid.' }
+  }
+
+  const to = normalizeRecipients(payload.to)
+  const cc = normalizeRecipients(payload.cc)
+  const bcc = normalizeRecipients(payload.bcc)
+  const allRecipients = [...to, ...cc, ...bcc]
+
+  if (to.length === 0) return { ok: false, message: 'Penerima email wajib diisi.' }
+  if (allRecipients.length > 50) {
+    return { ok: false, message: 'Jumlah penerima email maksimal 50 alamat per pengiriman.' }
+  }
+
+  const invalidRecipients = allRecipients.filter((email) => !isValidNotificationEmail(email))
+  if (invalidRecipients.length > 0) {
+    return { ok: false, message: `Format email tidak valid: ${invalidRecipients.join(', ')}` }
+  }
+
+  const subject = String(payload.subject || '').trim()
+  const html = String(payload.html || '').trim()
+  const text = String(payload.text || '').trim()
+  const replyTo = String(payload.replyTo || environment.replyTo || '').trim()
+
+  if (!subject) return { ok: false, message: 'Subject email wajib diisi.' }
+  if (!html && !text) return { ok: false, message: 'Isi email wajib tersedia minimal html atau text.' }
+
+  const idempotencyKey = payload.idempotencyKey || `harmony-${randomUUID()}`
+  const queued = await enqueueHarmonyEmailJob(supabaseAdmin, {
+    to,
+    cc,
+    bcc,
+    subject,
+    html: html || undefined,
+    text: text || undefined,
+    replyTo: replyTo && isValidNotificationEmail(replyTo) ? replyTo : undefined,
+    idempotencyKey,
+  })
+
+  if (!queued.ok) {
+    // Safe rollout fallback: while SQL is not installed yet, keep notifications working.
+    console.warn('HARMONY notification queue unavailable; using direct delivery:', queued.error?.message)
+    const direct = await deliverHarmonyServerEmail({ ...payload, idempotencyKey })
+    return {
+      ...direct,
+      detail: {
+        queue_fallback: true,
+        queue_error: queued.error?.message || 'Queue belum tersedia.',
+        provider: direct.detail || null,
+      },
+    }
+  }
+
+  scheduleHarmonyJobQueueDrain()
+  return {
+    ok: true,
+    message: queued.duplicate
+      ? 'Email sudah ada di antrean HARMONY.'
+      : 'Email masuk antrean HARMONY dan akan dikirim di background.',
+    providerId: null,
+    queued: true,
+    queueId: queued.id,
+    detail: { queued: true, duplicate: queued.duplicate, status: queued.status },
+  }
 }
 
 function escapeHtml(value: string) {
