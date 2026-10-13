@@ -137,7 +137,7 @@ export default function EmployeePHLPage() {
     <>
       <Topbar
         title="Pengajuan Saldo PHL"
-        description="Ajukan saldo PHL berdasarkan penugasan, evidence, dan minimal 4 jam kerja tercatat."
+        description="Ajukan saldo PHL lintas periode selama masih berlaku 90 hari, dengan evidence dan minimal 4 jam kerja tercatat."
       />
 
       <section className="space-y-6 p-4 sm:p-6">
@@ -184,7 +184,7 @@ export default function EmployeePHLPage() {
               </div>
               <div>
                 <h2 className="text-lg font-semibold text-[#1d1d1f]">Ajukan PHL</h2>
-                <p className="mt-1 text-sm leading-6 text-[#6e6e73]">Weekday, weekend, maupun hari libur diperbolehkan selama absensi pada tanggal tersebut minimal 4 jam.</p>
+                <p className="mt-1 text-sm leading-6 text-[#6e6e73]">Weekday, weekend, maupun hari libur diperbolehkan. Pengajuan periode lama tetap bisa dilakukan selama belum melewati 90 hari dan histori absensi tanggal tersebut tercatat minimal 4 jam.</p>
               </div>
             </div>
 

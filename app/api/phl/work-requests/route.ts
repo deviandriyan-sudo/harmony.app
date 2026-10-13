@@ -75,13 +75,18 @@ function durationBetween(start: unknown, end: unknown) {
 
 function attendanceDuration(row: any) {
   const direct = Number(row?.work_duration_minutes || 0)
-  if (Number.isFinite(direct) && direct > 0) return direct
+  const directMinutes = Number.isFinite(direct) && direct > 0 ? direct : 0
 
+  // Historical rows can retain the original fingerprint duration even after an
+  // employee correction/manual attendance was saved. Prefer the effective
+  // corrected times, but keep the recorded duration as a safe fallback.
   const start =
-    row?.check_in || row?.manual_check_in || row?.requested_check_in || null
+    row?.manual_check_in || row?.requested_check_in || row?.check_in || null
   const end =
-    row?.check_out || row?.manual_check_out || row?.requested_check_out || null
-  return durationBetween(start, end)
+    row?.manual_check_out || row?.requested_check_out || row?.check_out || null
+  const effectiveMinutes = durationBetween(start, end)
+
+  return Math.max(directMinutes, effectiveMinutes)
 }
 
 function todayWita() {
@@ -121,63 +126,202 @@ function canonicalDate(value: unknown) {
   return ''
 }
 
-async function findAttendanceForDate(admin: any, employeeId: string, machinePin: string | null | undefined, workDate: string) {
-  const select = 'id,employee_id,machine_pin,attendance_date,check_in,check_out,manual_check_in,manual_check_out,requested_check_in,requested_check_out,work_duration_minutes,updated_at,deleted_at'
-  const rows: any[] = []
-
-  const byEmployee = await admin
-    .from('attendance_logs')
-    .select(select)
-    .eq('employee_id', employeeId)
-    .is('deleted_at', null)
-    .order('updated_at', { ascending: false })
-    .limit(500)
-  if (byEmployee.error) throw byEmployee.error
-  rows.push(...(byEmployee.data || []))
-
-  if (!rows.some((row: any) => canonicalDate(row.attendance_date) === workDate) && clean(machinePin)) {
-    const byMachine = await admin
-      .from('attendance_logs')
-      .select(select)
-      .eq('machine_pin', clean(machinePin))
-      .is('deleted_at', null)
-      .order('updated_at', { ascending: false })
-      .limit(500)
-    if (byMachine.error) throw byMachine.error
-    rows.push(...(byMachine.data || []))
-  }
-
-  return rows.find((row: any) => canonicalDate(row.attendance_date) === workDate) || null
+function normalizedIdentity(value: unknown) {
+  return clean(value).toLowerCase()
 }
 
-async function findApprovedCreditForDate(admin: any, employeeId: string, machinePin: string | null | undefined, workDate: string) {
-  const select = 'id,employee_id,machine_pin,phl_date,status,source,created_at'
-  const rows: any[] = []
-  const byEmployee = await admin
-    .from('phl_records')
-    .select(select)
-    .eq('employee_id', employeeId)
-    .eq('source', 'attendance_phl_approved')
-    .eq('status', 'approved')
-    .order('created_at', { ascending: false })
-    .limit(500)
-  if (byEmployee.error) throw byEmployee.error
-  rows.push(...(byEmployee.data || []))
+function normalizedNumericIdentity(value: unknown) {
+  const raw = clean(value)
+  if (!/^\d+$/.test(raw)) return raw.toLowerCase()
+  return raw.replace(/^0+(?=\d)/, '')
+}
 
-  if (!rows.some((row: any) => canonicalDate(row.phl_date) === workDate) && clean(machinePin)) {
-    const byMachine = await admin
+function sameIdentity(left: unknown, right: unknown) {
+  const a = normalizedIdentity(left)
+  const b = normalizedIdentity(right)
+  if (!a || !b) return false
+  if (a === b) return true
+  return normalizedNumericIdentity(a) === normalizedNumericIdentity(b)
+}
+
+function historicalDateVariants(workDate: string) {
+  const match = workDate.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+  if (!match) return [workDate]
+  return [workDate, `${match[3]}/${match[2]}/${match[1]}`, `${match[3]}-${match[2]}-${match[1]}`]
+}
+
+function identityScore(row: any, employee: any) {
+  let score = 0
+  if (sameIdentity(row?.employee_id, employee?.id)) score += 100
+  if (sameIdentity(row?.employee_number, employee?.employee_number)) score += 60
+  if (sameIdentity(row?.machine_pin, employee?.machine_pin)) score += 50
+
+  const rowName = normalizedIdentity(row?.full_name)
+  const employeeName = normalizedIdentity(employee?.full_name)
+  const rowDepartment = normalizedIdentity(row?.department)
+  const employeeDepartment = normalizedIdentity(employee?.department)
+  if (rowName && employeeName && rowName === employeeName) score += 10
+  if (rowDepartment && employeeDepartment && rowDepartment === employeeDepartment) score += 5
+
+  return score
+}
+
+function bestIdentityMatch(rows: any[], employee: any, workDate: string) {
+  return rows
+    .filter((row) => canonicalDate(row?.attendance_date ?? row?.phl_date ?? row?.work_date) === workDate)
+    .map((row) => ({ row, score: identityScore(row, employee) }))
+    .filter(({ score }) => score >= 15)
+    .sort((a, b) => b.score - a.score)[0]?.row || null
+}
+
+async function findAttendanceForDate(admin: any, employee: any, workDate: string) {
+  const select = 'id,employee_id,employee_number,machine_pin,full_name,department,attendance_date,check_in,check_out,manual_check_in,manual_check_out,requested_check_in,requested_check_out,work_duration_minutes,updated_at,deleted_at'
+  const collected: any[] = []
+  const seen = new Set<string>()
+
+  const addRows = (rows: any[] | null | undefined) => {
+    for (const row of rows || []) {
+      const key = clean(row?.id) || `${clean(row?.employee_id)}|${clean(row?.machine_pin)}|${clean(row?.attendance_date)}`
+      if (seen.has(key)) continue
+      seen.add(key)
+      collected.push(row)
+    }
+  }
+
+  const identityQueries: Array<[string, string]> = [
+    ['employee_id', clean(employee?.id)],
+    ['employee_number', clean(employee?.employee_number)],
+    ['machine_pin', clean(employee?.machine_pin)],
+  ].filter(([, value]) => Boolean(value)) as Array<[string, string]>
+
+  for (const [column, value] of identityQueries) {
+    const result = await admin
+      .from('attendance_logs')
+      .select(select)
+      .eq(column, value)
+      .is('deleted_at', null)
+      .order('updated_at', { ascending: false })
+      .limit(1000)
+
+    if (result.error) throw result.error
+    addRows(result.data)
+
+    const matched = bestIdentityMatch(collected, employee, workDate)
+    if (matched) return matched
+  }
+
+  // Final recovery path for legacy rows whose employee_id / employee_number / PIN
+  // mapping changed after the attendance was imported. Query the exact historical
+  // date in the common legacy formats, then match against all stable identities.
+  for (const dateValue of historicalDateVariants(workDate)) {
+    const result = await admin
+      .from('attendance_logs')
+      .select(select)
+      .eq('attendance_date', dateValue)
+      .is('deleted_at', null)
+      .limit(500)
+
+    // A DATE-typed production column can reject DD/MM/YYYY; that variant is only
+    // a compatibility probe, so skip that single query and continue safely.
+    if (result.error) continue
+    addRows(result.data)
+
+    const matched = bestIdentityMatch(collected, employee, workDate)
+    if (matched) return matched
+  }
+
+  return null
+}
+
+async function findApprovedCreditForDate(admin: any, employee: any, workDate: string) {
+  const select = 'id,employee_id,employee_number,machine_pin,full_name,department,phl_date,status,source,created_at'
+  const collected: any[] = []
+  const seen = new Set<string>()
+
+  const addRows = (rows: any[] | null | undefined) => {
+    for (const row of rows || []) {
+      const key = clean(row?.id) || `${clean(row?.employee_id)}|${clean(row?.machine_pin)}|${clean(row?.phl_date)}`
+      if (seen.has(key)) continue
+      seen.add(key)
+      collected.push(row)
+    }
+  }
+
+  const identityQueries: Array<[string, string]> = [
+    ['employee_id', clean(employee?.id)],
+    ['employee_number', clean(employee?.employee_number)],
+    ['machine_pin', clean(employee?.machine_pin)],
+  ].filter(([, value]) => Boolean(value)) as Array<[string, string]>
+
+  for (const [column, value] of identityQueries) {
+    const result = await admin
       .from('phl_records')
       .select(select)
-      .eq('machine_pin', clean(machinePin))
+      .eq(column, value)
       .eq('source', 'attendance_phl_approved')
       .eq('status', 'approved')
       .order('created_at', { ascending: false })
-      .limit(500)
-    if (byMachine.error) throw byMachine.error
-    rows.push(...(byMachine.data || []))
+      .limit(1000)
+
+    if (result.error) throw result.error
+    addRows(result.data)
+
+    const matched = collected
+      .filter((row) => canonicalDate(row?.phl_date) === workDate)
+      .map((row) => ({ row, score: identityScore(row, employee) }))
+      .filter(({ score }) => score >= 15)
+      .sort((a, b) => b.score - a.score)[0]?.row
+    if (matched) return matched
   }
 
-  return rows.find((row: any) => canonicalDate(row.phl_date) === workDate) || null
+  for (const dateValue of historicalDateVariants(workDate)) {
+    const result = await admin
+      .from('phl_records')
+      .select(select)
+      .eq('phl_date', dateValue)
+      .eq('source', 'attendance_phl_approved')
+      .eq('status', 'approved')
+      .limit(500)
+
+    if (result.error) continue
+    addRows(result.data)
+
+    const matched = collected
+      .filter((row) => canonicalDate(row?.phl_date) === workDate)
+      .map((row) => ({ row, score: identityScore(row, employee) }))
+      .filter(({ score }) => score >= 15)
+      .sort((a, b) => b.score - a.score)[0]?.row
+    if (matched) return matched
+  }
+
+  return null
+}
+
+async function findActiveWorkRequestForDate(admin: any, employee: any, workDate: string) {
+  const identityQueries: Array<[string, string]> = [
+    ['employee_id', clean(employee?.id)],
+    ['employee_number', clean(employee?.employee_number)],
+    ['machine_pin', clean(employee?.machine_pin)],
+  ].filter(([, value]) => Boolean(value)) as Array<[string, string]>
+
+  for (const [column, value] of identityQueries) {
+    const { data, error } = await admin
+      .from('phl_work_requests')
+      .select('id,status,employee_id,employee_number,machine_pin,work_date')
+      .eq(column, value)
+      .eq('work_date', workDate)
+      .in('status', ['pending_supervisor', 'approved'])
+      .limit(10)
+
+    if (error) throw error
+    const matched = (data || [])
+      .map((row: any) => ({ row, score: identityScore(row, employee) }))
+      .filter(({ score }: any) => score >= 15)
+      .sort((a: any, b: any) => b.score - a.score)[0]?.row
+    if (matched) return matched
+  }
+
+  return null
 }
 
 async function hasConfiguredSupervisor(admin: any, employee: any) {
@@ -375,15 +519,7 @@ export async function POST(request: NextRequest) {
       if (validation) return NextResponse.json({ success: false, error: validation }, { status: 400 })
     }
 
-    const { data: duplicate, error: duplicateError } = await context.admin
-      .from('phl_work_requests')
-      .select('id,status')
-      .eq('employee_id', context.employee.id)
-      .eq('work_date', workDate)
-      .in('status', ['pending_supervisor', 'approved'])
-      .limit(1)
-      .maybeSingle()
-    if (duplicateError) throw duplicateError
+    const duplicate = await findActiveWorkRequestForDate(context.admin, context.employee, workDate)
     if (duplicate) {
       return NextResponse.json(
         { success: false, error: 'Sudah ada pengajuan PHL aktif pada tanggal tersebut.' },
@@ -391,7 +527,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const existingCredit = await findApprovedCreditForDate(context.admin, context.employee.id, context.employee.machine_pin, workDate)
+    const existingCredit = await findApprovedCreditForDate(context.admin, context.employee, workDate)
     if (existingCredit) {
       return NextResponse.json(
         { success: false, error: 'Saldo PHL untuk tanggal tersebut sudah pernah terbentuk.' },
@@ -399,10 +535,10 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const attendance = await findAttendanceForDate(context.admin, context.employee.id, context.employee.machine_pin, workDate)
+    const attendance = await findAttendanceForDate(context.admin, context.employee, workDate)
     if (!attendance) {
       return NextResponse.json(
-        { success: false, error: 'Data absensi pada tanggal tersebut belum tercatat. PHL baru dapat diajukan setelah absensi tersedia.' },
+        { success: false, error: 'Histori absensi pada tanggal tersebut belum ditemukan berdasarkan Employee ID, NPK, atau PIN. Pengajuan PHL lintas periode tetap diperbolehkan selama masih dalam 90 hari, tetapi data absensi periode lama harus sudah tersedia.' },
         { status: 400 },
       )
     }

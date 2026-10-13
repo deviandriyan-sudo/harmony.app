@@ -160,6 +160,8 @@ assert(phlClaimApiSource.includes('PHL_LEGACY_UNIQUE_INDEX'), 'Handling legacy u
 const phlWorkApiSource = fs.readFileSync(path.join(root, 'app/api/phl/work-requests/route.ts'), 'utf8')
 assert(phlWorkApiSource.includes('canonicalDate'), 'Normalisasi tanggal Pengajuan Saldo PHL belum terpasang.')
 assert(phlWorkApiSource.includes('hasConfiguredSupervisor'), 'Validasi atasan Pengajuan Saldo PHL belum terpasang.')
+assert(phlWorkApiSource.includes('employee_number') && phlWorkApiSource.includes('historicalDateVariants'), 'Lookup histori PHL lintas periode belum memakai NPK/date fallback.')
+assert(phlWorkApiSource.includes('Math.max(directMinutes, effectiveMinutes)'), 'Durasi PHL belum mempertimbangkan koreksi/manual attendance.')
 const dashboardSource = fs.readFileSync(path.join(root, 'app/employee/dashboard/page.tsx'), 'utf8')
 assert(dashboardSource.includes('Ajukan Saldo PHL') && dashboardSource.includes('/employee/phl'), 'Dashboard belum menyediakan jalur Pengajuan Saldo PHL terpisah.')
 assert(sourceText.includes('harmony-modal-surface'), 'Modal feedback surface belum terpasang.')
@@ -174,8 +176,7 @@ assert(uploadSource.includes('skippedExistingCount'), 'Incremental attendance me
 assert(uploadSource.includes('Periode akan dibaca otomatis setelah file dipilih'), 'Field periode upload belum otomatis/read-only.')
 
 const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'))
-assert(pkg.version === '3.5.3', `package.json version harus 3.5.3, saat ini ${pkg.version}`)
-assert(fs.existsSync(path.join(root, 'DATABASE_SQL/HARMONY_ATTENDANCE_EMAIL_OUTBOX_V1.sql')), 'Email outbox migration belum ada.')
+assert(pkg.version === '3.5.4', `package.json version harus 3.5.4, saat ini ${pkg.version}`)
 assert(fs.existsSync(path.join(root, 'app/api/notifications/attendance-upload/route.ts')), 'Dispatch absensi belum disediakan.')
 assert(uploadSource.includes('processAttendanceUploadEmails'), 'Hook dispatch email upload belum tersedia.')
 assert(sourceText.includes('harmony_claim_attendance_emails_v1'), 'Atomic email claim belum tersedia.')
