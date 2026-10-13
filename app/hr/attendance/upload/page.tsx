@@ -167,13 +167,19 @@ function formatAttendancePeriodName(startIso: string, endIso: string) {
   return `PY-P-${String(startDay).padStart(2, '0')} ${PERIOD_MONTH_CODES[startMonth]} - ${String(endDay).padStart(2, '0')} ${PERIOD_MONTH_CODES[endMonth]} - ${startYear}`
 }
 
-function normalizeUploadPeriodDisplay(item: Pick<AttendanceUpload, 'upload_period' | 'file_name'>) {
+function getUploadPeriodInfo(item: Pick<AttendanceUpload, 'upload_period' | 'file_name' | 'created_at'>) {
   const candidates = [item.upload_period, item.file_name].filter(Boolean) as string[]
 
   for (const candidate of candidates) {
-    const upper = candidate.toUpperCase().replace(/\./g, ' ')
+    const upper = candidate
+      .toUpperCase()
+      .replace(/[._]/g, ' ')
+      .replace(/[–—]/g, '-')
+      .replace(/\s+/g, ' ')
+      .trim()
+
     const match = upper.match(
-      /11\s+([A-Z]+)(?:\s+(\d{2,4}))?\s*[-–—]\s*10\s+([A-Z]+)(?:\s+(\d{2,4}))?/,
+      /11\s+([A-Z]+)(?:\s+(\d{2,4}))?\s*-\s*10\s+([A-Z]+)(?:\s+(?:-\s*)?(\d{2,4}))?/,
     )
 
     if (!match) continue
@@ -183,18 +189,97 @@ function normalizeUploadPeriodDisplay(item: Pick<AttendanceUpload, 'upload_perio
     if (startMonth === undefined || endMonth === undefined) continue
 
     let startYear = normalizePeriodYear(match[2])
-    const endYear = normalizePeriodYear(match[4])
+    let endYear = normalizePeriodYear(match[4])
 
     if (!startYear && endYear) {
       startYear = startMonth > endMonth ? endYear - 1 : endYear
     }
 
-    if (!startYear) continue
+    if (startYear && !endYear) {
+      endYear = startMonth > endMonth ? startYear + 1 : startYear
+    }
 
-    return `PY-P-11 ${PERIOD_MONTH_CODES[startMonth]} - 10 ${PERIOD_MONTH_CODES[endMonth]} - ${startYear}`
+    if (!startYear && !endYear) {
+      const uploadedAt = item.created_at ? new Date(item.created_at) : null
+      const uploadedYear = uploadedAt && !Number.isNaN(uploadedAt.getTime())
+        ? uploadedAt.getFullYear()
+        : null
+
+      if (uploadedYear) {
+        endYear = uploadedYear
+        startYear = startMonth > endMonth ? uploadedYear - 1 : uploadedYear
+      }
+    }
+
+    if (!startYear || !endYear) continue
+
+    const startIso = `${startYear}-${String(startMonth + 1).padStart(2, '0')}-11`
+    const endIso = `${endYear}-${String(endMonth + 1).padStart(2, '0')}-10`
+    const label = `PY-P-11 ${PERIOD_MONTH_CODES[startMonth]} - 10 ${PERIOD_MONTH_CODES[endMonth]} - ${startYear}`
+
+    return {
+      key: `${startIso}_${endIso}`,
+      label,
+      startIso,
+      endIso,
+      sortValue: Date.UTC(startYear, startMonth, 11),
+    }
   }
 
-  return item.upload_period || item.file_name || '-'
+  return null
+}
+
+function normalizeUploadPeriodDisplay(item: Pick<AttendanceUpload, 'upload_period' | 'file_name' | 'created_at'>) {
+  return getUploadPeriodInfo(item)?.label || item.upload_period || item.file_name || '-'
+}
+
+function normalizeUploadFileNameDisplay(item: Pick<AttendanceUpload, 'upload_period' | 'file_name' | 'created_at' | 'file_type'>) {
+  const period = getUploadPeriodInfo(item)
+  const rawName = String(item.file_name || '').trim()
+  const extensionMatch = rawName.match(/(\.xlsx?|\.csv)$/i)
+  const extension = extensionMatch?.[1]?.toLowerCase()
+    || (String(item.file_type || '').toLowerCase().includes('xlsx') ? '.xlsx' : '')
+    || (String(item.file_type || '').toLowerCase().includes('xls') ? '.xls' : '')
+
+  if (period) return `${period.label}${extension}`
+
+  return rawName.replace(/^\s*\d+\)\s*/, '') || '-'
+}
+
+function buildUploadHistoryDisplay(uploads: AttendanceUpload[]) {
+  const latestByPeriod = new Map<string, AttendanceUpload>()
+
+  for (const item of uploads) {
+    const period = getUploadPeriodInfo(item)
+    const key = period?.key || `raw:${item.id}`
+    const current = latestByPeriod.get(key)
+
+    if (!current) {
+      latestByPeriod.set(key, item)
+      continue
+    }
+
+    const currentTime = current.created_at ? new Date(current.created_at).getTime() : 0
+    const itemTime = item.created_at ? new Date(item.created_at).getTime() : 0
+
+    if (itemTime >= currentTime) latestByPeriod.set(key, item)
+  }
+
+  return Array.from(latestByPeriod.values()).sort((a, b) => {
+    const periodA = getUploadPeriodInfo(a)
+    const periodB = getUploadPeriodInfo(b)
+
+    if (periodA && periodB && periodA.sortValue !== periodB.sortValue) {
+      return periodB.sortValue - periodA.sortValue
+    }
+
+    if (periodA && !periodB) return -1
+    if (!periodA && periodB) return 1
+
+    const timeA = a.created_at ? new Date(a.created_at).getTime() : 0
+    const timeB = b.created_at ? new Date(b.created_at).getTime() : 0
+    return timeB - timeA
+  })
 }
 
 const fallbackSchedule: WorkSchedule = {
@@ -2084,6 +2169,8 @@ function UploadHistory({
   fetchData: () => void
   handleDeleteUpload: (upload: AttendanceUpload) => void
 }) {
+  const displayUploads = useMemo(() => buildUploadHistoryDisplay(uploads), [uploads])
+
   return (
     <div className="harmony-card harmony-slide-up overflow-hidden">
       <div className="flex flex-col gap-4 border-b border-black/5 bg-white/55 p-5 lg:flex-row lg:items-center lg:justify-between">
@@ -2118,7 +2205,7 @@ function UploadHistory({
         </div>
       )}
 
-      {!loading && uploads.length === 0 && (
+      {!loading && displayUploads.length === 0 && (
         <div className="p-8 text-center">
           <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-3xl bg-[#f5f5f7] text-[#007aff]">
             <Upload size={24} />
@@ -2134,10 +2221,10 @@ function UploadHistory({
         </div>
       )}
 
-      {!loading && uploads.length > 0 && (
+      {!loading && displayUploads.length > 0 && (
         <>
           <div className="grid gap-3 p-4 lg:hidden">
-            {uploads.map((item) => (
+            {displayUploads.map((item) => (
               <UploadHistoryCard
                 key={item.id}
                 item={item}
@@ -2162,7 +2249,7 @@ function UploadHistory({
               </thead>
 
               <tbody>
-                {uploads.map((item) => (
+                {displayUploads.map((item) => (
                   <tr
                     key={item.id}
                     className="border-b border-black/5 transition hover:bg-white/55"
@@ -2175,7 +2262,7 @@ function UploadHistory({
 
                         <div className="min-w-0">
                           <div className="break-words font-semibold leading-5 text-[#1d1d1f]">
-                            {item.file_name || '-'}
+                            {normalizeUploadFileNameDisplay(item)}
                           </div>
                           <div className="mt-1 line-clamp-2 break-words text-xs leading-5 text-[#6e6e73]">
                             {item.notes || 'Tidak ada catatan'}
@@ -2240,7 +2327,7 @@ function UploadHistoryCard({
 
         <div className="min-w-0 flex-1">
           <p className="break-words font-semibold leading-5 text-[#1d1d1f]">
-            {item.file_name || '-'}
+            {normalizeUploadFileNameDisplay(item)}
           </p>
 
           <p className="mt-1 break-words text-xs leading-5 text-[#6e6e73]">

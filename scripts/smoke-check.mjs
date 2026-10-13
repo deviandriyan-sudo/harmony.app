@@ -134,6 +134,8 @@ assert(sourceText.includes('Pengajuan Saldo PHL'), 'Label Pengajuan Saldo PHL be
 assert(!sourceText.includes('PHL tanpa menunggu cutoff.'), 'Judul PHL lama masih ditemukan.')
 assert(sourceText.includes('legacy_attendance'), 'Support migrasi PHL attendance legacy belum terpasang.')
 assert(!sourceText.includes('harmony_sync_phl_balance_from_attendance_v2'), 'Legacy sync saldo PHL dari approval attendance masih direferensikan.')
+assert(sourceText.includes('buildUploadHistoryDisplay'), 'Dedup riwayat upload per periode belum terpasang.')
+assert(sourceText.includes('normalizeUploadFileNameDisplay'), 'Normalisasi nama berkas upload belum terpasang.')
 assert(!sourceText.includes("'harmony_reconcile_attendance_period_v1'"), 'Recovery attendance legacy masih dapat memanggil Auto-PHL.')
 
 const employeeSourceText = walk(path.join(root, 'app', 'employee'))
@@ -172,7 +174,7 @@ assert(uploadSource.includes('skippedExistingCount'), 'Incremental attendance me
 assert(uploadSource.includes('Periode akan dibaca otomatis setelah file dipilih'), 'Field periode upload belum otomatis/read-only.')
 
 const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'))
-assert(pkg.version === '3.5.1', `package.json version harus 3.5.1, saat ini ${pkg.version}`)
+assert(pkg.version === '3.5.2', `package.json version harus 3.5.2, saat ini ${pkg.version}`)
 assert(Boolean(pkg.scripts?.['test:smoke']), 'Script test:smoke belum tersedia.')
 
 if (warnings.length) {
