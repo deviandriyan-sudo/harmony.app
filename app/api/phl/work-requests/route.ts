@@ -536,20 +536,15 @@ export async function POST(request: NextRequest) {
     }
 
     const attendance = await findAttendanceForDate(context.admin, context.employee, workDate)
-    if (!attendance) {
-      return NextResponse.json(
-        { success: false, error: 'Histori absensi pada tanggal tersebut belum ditemukan berdasarkan Employee ID, NPK, atau PIN. Pengajuan PHL lintas periode tetap diperbolehkan selama masih dalam 90 hari, tetapi data absensi periode lama harus sudah tersedia.' },
-        { status: 400 },
-      )
-    }
+    const attendanceMinutes = attendance ? attendanceDuration(attendance) : 0
+    const attendanceVerified = Boolean(attendance && attendanceMinutes >= MIN_WORK_MINUTES)
 
-    const recordedMinutes = attendanceDuration(attendance)
-    if (recordedMinutes < MIN_WORK_MINUTES) {
-      return NextResponse.json(
-        { success: false, error: `Durasi kerja yang tercatat baru ${recordedMinutes} menit. PHL membutuhkan minimal 240 menit (4 jam).` },
-        { status: 400 },
-      )
-    }
+    // Independent PHL is evidence-first. Historical attendance may legitimately
+    // have no punch row (weekend/holiday/off-site work). The employee may still
+    // submit the request as long as the declared assignment is >= 4 hours and
+    // evidence is attached. Supervisor approval becomes the verification point;
+    // at approval time the request is synchronized back into attendance.
+    const recordedMinutes = attendanceVerified ? attendanceMinutes : requestedMinutes
 
     const holiday = await findHolidayForDate(context.admin, workDate)
     const dayType = holiday ? 'holiday' : isWeekendDate(workDate) ? 'weekend' : 'weekday'
@@ -580,8 +575,8 @@ export async function POST(request: NextRequest) {
         work_end_time: endTime,
         requested_work_minutes: requestedMinutes,
         recorded_work_minutes: recordedMinutes,
-        attendance_log_id: attendance.id,
-        attendance_verified: true,
+        attendance_log_id: attendance?.id || null,
+        attendance_verified: attendanceVerified,
         work_day_type: dayType,
         holiday_name: holiday?.holiday_name || null,
         work_purpose: workPurpose,
@@ -625,6 +620,12 @@ export async function POST(request: NextRequest) {
       success: true,
       request: requestWithAttachments,
       notification,
+      attendance: {
+        found: Boolean(attendance),
+        verified: attendanceVerified,
+        recorded_minutes: attendanceMinutes,
+        sync_on_approval: !attendanceVerified,
+      },
     })
   } catch (error) {
     const normalized = harmonyApiError(error, 'Pengajuan PHL gagal disimpan.')

@@ -499,7 +499,7 @@ export default function EmployeeApprovalsPage() {
 
           <ApprovalModuleCard
             title="Approval PHL Kerja"
-            description="Review penugasan PHL berdasarkan Surat Tugas, jam kerja, dan absensi minimal 4 jam. Approve langsung menambah +1 saldo PHL."
+            description="Review penugasan PHL berdasarkan Surat Tugas dan durasi form minimal 4 jam. Approve menambah +1 saldo PHL dan menyinkronkan absensi bila belum tercatat."
             href="/employee/approvals/phl"
             icon={<WalletCards size={25} />}
             tone="purple"

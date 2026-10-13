@@ -153,8 +153,8 @@ export default function HRPHLPage() {
                         <p className="mt-1 text-xs text-[#86868b]">{item.work_start_time.slice(0, 5)}–{item.work_end_time.slice(0, 5)}</p>
                       </td>
                       <td className="px-4 py-4">
-                        <p className="font-bold text-[#1d1d1f]">{formatPHLMinutes(item.recorded_work_minutes)}</p>
-                        <p className="mt-1 text-xs text-[#86868b]">Absensi tercatat</p>
+                        <p className="font-bold text-[#1d1d1f]">{item.attendance_verified ? formatPHLMinutes(item.recorded_work_minutes) : formatPHLMinutes(item.requested_work_minutes)}</p>
+                        <p className="mt-1 text-xs text-[#86868b]">{item.attendance_verified ? 'Absensi tercatat' : 'Jam form · sinkron saat approve'}</p>
                       </td>
                       <td className="px-4 py-4">
                         <div className="flex max-w-[220px] flex-col gap-1.5">

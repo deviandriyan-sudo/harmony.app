@@ -113,7 +113,7 @@ export default function PHLApprovalPage() {
             <div>
               <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-4 py-2 text-xs font-semibold text-white/75"><ShieldCheck size={15} />Supervisor PHL</div>
               <h1 className="mt-5 text-3xl font-semibold tracking-[-0.04em] md:text-5xl">Review Pengajuan Saldo PHL</h1>
-              <p className="mt-4 max-w-2xl text-sm leading-7 text-white/65">Pastikan Surat Tugas, tujuan penugasan, jam kerja, dan absensi minimal 4 jam sudah sesuai.</p>
+              <p className="mt-4 max-w-2xl text-sm leading-7 text-white/65">Pastikan Surat Tugas, tujuan penugasan, dan durasi minimal 4 jam sudah sesuai. Jika absensi belum tercatat, approval akan menyinkronkan jam form ke absensi secara otomatis.</p>
             </div>
             <div className="grid grid-cols-3 gap-3 xl:min-w-[420px]">
               <Metric label="Pending" value={counts.pending} />
@@ -178,7 +178,7 @@ export default function PHLApprovalPage() {
 
                 <div className="mt-4 grid grid-cols-2 gap-3">
                   <Info label="Durasi Form" value={formatPHLMinutes(item.requested_work_minutes)} icon={<Clock3 size={15} />} />
-                  <Info label="Durasi Absensi" value={formatPHLMinutes(item.recorded_work_minutes)} icon={<CheckCircle2 size={15} />} />
+                  <Info label={item.attendance_verified ? "Durasi Absensi" : "Sinkron Absensi"} value={item.attendance_verified ? formatPHLMinutes(item.recorded_work_minutes) : "Dibuat saat approve"} icon={<CheckCircle2 size={15} />} />
                 </div>
 
                 <div className="mt-4 flex flex-wrap gap-2">

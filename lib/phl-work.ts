@@ -111,6 +111,12 @@ export async function submitPHLWorkRequest(input: {
     success: boolean
     request: PHLWorkRequest
     notification?: { ok: boolean; message: string }
+    attendance?: {
+      found: boolean
+      verified: boolean
+      recorded_minutes: number
+      sync_on_approval: boolean
+    }
   }
 }
 

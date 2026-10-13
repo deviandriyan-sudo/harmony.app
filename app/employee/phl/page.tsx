@@ -107,11 +107,14 @@ export default function EmployeePHLPage() {
         files: form.files,
       })
       setForm(initialForm)
+      const attendanceNote = result.attendance?.sync_on_approval
+        ? ' Absensi tanggal tersebut belum memiliki minimal 4 jam tercatat; setelah atasan approve, jam pada form ini akan disinkronkan otomatis ke absensi.'
+        : ''
       setMessage({
         type: 'success',
         text: result.notification?.ok === false
-          ? `Pengajuan tersimpan dan menunggu atasan. Namun email notifikasi belum terkirim: ${result.notification.message}`
-          : 'Pengajuan PHL tersimpan dan langsung dikirim ke atasan.',
+          ? `Pengajuan tersimpan dan menunggu atasan.${attendanceNote} Namun email notifikasi belum terkirim: ${result.notification.message}`
+          : `Pengajuan PHL tersimpan dan langsung dikirim ke atasan.${attendanceNote}`,
       })
       await load()
     } catch (error: any) {
@@ -137,7 +140,7 @@ export default function EmployeePHLPage() {
     <>
       <Topbar
         title="Pengajuan Saldo PHL"
-        description="Ajukan saldo PHL lintas periode selama masih berlaku 90 hari, dengan evidence dan minimal 4 jam kerja tercatat."
+        description="Ajukan saldo PHL lintas periode selama masih berlaku 90 hari. Minimal 4 jam berdasarkan form penugasan dan evidence; absensi akan disinkronkan otomatis setelah approval atasan."
       />
 
       <section className="space-y-6 p-4 sm:p-6">
@@ -184,7 +187,7 @@ export default function EmployeePHLPage() {
               </div>
               <div>
                 <h2 className="text-lg font-semibold text-[#1d1d1f]">Ajukan PHL</h2>
-                <p className="mt-1 text-sm leading-6 text-[#6e6e73]">Weekday, weekend, maupun hari libur diperbolehkan. Pengajuan periode lama tetap bisa dilakukan selama belum melewati 90 hari dan histori absensi tanggal tersebut tercatat minimal 4 jam.</p>
+                <p className="mt-1 text-sm leading-6 text-[#6e6e73]">Weekday, weekend, maupun hari libur diperbolehkan. Pengajuan periode lama tetap bisa dilakukan selama belum melewati 90 hari. Jika absensi lama belum memiliki clock-in/out, jam pada form + Surat Tugas akan diverifikasi atasan dan otomatis disinkronkan ke absensi setelah approval.</p>
               </div>
             </div>
 
@@ -306,7 +309,7 @@ export default function EmployeePHLPage() {
 
                     <div className="mt-4 grid gap-3 sm:grid-cols-3">
                       <Info label="Durasi Form" value={formatPHLMinutes(item.requested_work_minutes)} icon={<Clock3 size={15} />} />
-                      <Info label="Durasi Absensi" value={formatPHLMinutes(item.recorded_work_minutes)} icon={<CheckCircle2 size={15} />} />
+                      <Info label={item.attendance_verified ? "Durasi Absensi" : "Verifikasi Absensi"} value={item.attendance_verified ? formatPHLMinutes(item.recorded_work_minutes) : "Menunggu approval"} icon={<CheckCircle2 size={15} />} />
                       <Info label="Saldo" value={item.status === 'approved' ? '+1 PHL' : 'Belum berubah'} icon={<WalletCards size={15} />} />
                     </div>
 
