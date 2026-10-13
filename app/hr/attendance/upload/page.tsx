@@ -333,7 +333,6 @@ export default function HRAttendanceUploadPage() {
 
   async function fetchData() {
     setLoading(true)
-    setErrorMessage('')
 
     const { data: uploadData, error: uploadError } = await supabase
       .from('attendance_uploads')
@@ -1418,6 +1417,39 @@ export default function HRAttendanceUploadPage() {
     }
   }
 
+  async function processAttendanceUploadEmails() {
+    const { data: sessionData } = await supabase.auth.getSession()
+    const token = sessionData.session?.access_token
+    if (!token) return 'Sesi HR tidak ditemukan; notifikasi tetap masuk antrean dan akan diproses ulang otomatis.'
+
+    let totalSent = 0
+    let totalFailed = 0
+    let remaining = 0
+    for (let batch = 0; batch < 6; batch++) {
+      try {
+        const response = await fetch('/api/notifications/attendance-upload', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` },
+          cache: 'no-store',
+        })
+        const result = await response.json().catch(() => null)
+        if (!response.ok) {
+          return `Email masih antre: ${result?.message || 'Antrean tidak dapat diproses.'}`
+        }
+        if (result?.paused) {
+          return `Email antrean ditunda: ${result.message}`
+        }
+        totalSent += Number(result?.sent || 0)
+        totalFailed += Number(result?.failed || 0)
+        remaining = Number(result?.remaining || 0)
+        if (!result?.claimed || remaining === 0) break
+      } catch {
+        return 'Notifikasi tersimpan di antrean; koneksi ke pengirim email terputus. Cron harian akan memproses antrean tersisa.'
+      }
+    }
+    return `Email absensi: ${totalSent} diterima Resend, ${totalFailed} gagal sementara, ${remaining} dalam antrean.`
+  }
+
   async function handleUpload() {
     setUploading(true)
     setErrorMessage('')
@@ -1488,17 +1520,13 @@ export default function HRAttendanceUploadPage() {
       return
     }
 
-    const { data: publicUrlData } = supabase.storage
-      .from('attendance-uploads')
-      .getPublicUrl(filePath)
-
     const skippedRows = parseResult.rows.length - logsPreview.length
 
     const { data: uploadRecord, error: insertError } = await supabase
       .from('attendance_uploads')
       .insert({
         file_name: selectedFile.name,
-        file_url: publicUrlData.publicUrl,
+        file_url: null, // Raw fingerprint files are private; download via HR-signed URL.
         file_path: filePath,
         file_size: selectedFile.size,
         file_type: fileExt || selectedFile.type || 'unknown',
@@ -1515,6 +1543,8 @@ export default function HRAttendanceUploadPage() {
       .single()
 
     if (insertError || !uploadRecord) {
+      // Roll back orphaned storage file when metadata cannot be created.
+      await supabase.storage.from('attendance-uploads').remove([filePath])
       setErrorMessage(insertError?.message || 'Gagal menyimpan metadata unggahan.')
       setUploading(false)
       return
@@ -1573,7 +1603,7 @@ export default function HRAttendanceUploadPage() {
       return
     }
 
-    await supabase
+    const { error: finalizeError } = await supabase
       .from('attendance_uploads')
       .update({
         status: 'processed',
@@ -1585,8 +1615,19 @@ export default function HRAttendanceUploadPage() {
       })
       .eq('id', uploadRecord.id)
 
+    if (finalizeError) {
+      setErrorMessage(`Data absensi sudah masuk, tetapi status final belum tersimpan: ${finalizeError.message}. Notifikasi email belum dibuat. Hubungi HR administrator.`)
+      setUploading(false)
+      await fetchData()
+      return
+    }
+
+    // The database trigger queues each employee once per attendance period.
+    // The immediate dispatch is best-effort; Vercel Cron retries pending jobs.
+    const emailStatus = await processAttendanceUploadEmails()
+
     setSuccessMessage(
-      `Berkas berhasil diproses untuk ${derivedPeriod.label}. ${insertResult.insertedCount} tanggal baru ditambahkan, ${insertResult.completedCount} record lama hanya dilengkapi pada field fingerprint yang kosong, dan ${insertResult.skippedExistingCount} record existing dilewati tanpa perubahan. ${skippedRows} baris tidak cocok machine PIN. Sinkron request approved: ${syncResult.successCount} karyawan.`
+      `Berkas berhasil diproses untuk ${derivedPeriod.label}. ${insertResult.insertedCount} tanggal baru ditambahkan, ${insertResult.completedCount} record lama hanya dilengkapi pada field fingerprint yang kosong, dan ${insertResult.skippedExistingCount} record existing dilewati tanpa perubahan. ${skippedRows} baris tidak cocok machine PIN. Sinkron request approved: ${syncResult.successCount} karyawan. ${emailStatus}`
     )
 
     setSelectedFile(null)
@@ -2377,18 +2418,34 @@ function UploadActions({
   deletingId: string | null
   handleDeleteUpload: (upload: AttendanceUpload) => void
 }) {
+  async function openPrivateUpload() {
+    const preview = window.open('', '_blank')
+    try {
+      const { data } = await supabase.auth.getSession()
+      const token = data.session?.access_token
+      if (!token) throw new Error('Session HR tidak tersedia.')
+      const response = await fetch(`/api/hr/attendance/upload-file?id=${encodeURIComponent(item.id)}`, {
+        headers: { Authorization: `Bearer ${token}` }, cache: 'no-store',
+      })
+      const result = await response.json().catch(() => null)
+      if (!response.ok || !result?.url) throw new Error(result?.message || 'File tidak dapat dibuka.')
+      if (preview && !preview.closed) preview.location.href = result.url
+      else window.location.href = result.url
+    } catch (error: any) {
+      preview?.close()
+      window.alert(error?.message || 'Gagal membuka file absensi.')
+    }
+  }
+
   return (
     <div className="flex justify-center gap-2">
-      {item.file_url ? (
-        <a
-          href={item.file_url}
-          target="_blank"
-          rel="noreferrer"
+      {item.file_path ? (
+        <button type="button" onClick={openPrivateUpload}
           className="inline-flex h-9 w-9 items-center justify-center rounded-2xl border border-black/5 bg-white text-[#007aff] shadow-sm transition hover:-translate-y-0.5 hover:bg-[#f5f5f7] hover:shadow-md"
-          title="Unduh / pratinjau berkas"
+          title="Unduh / pratinjau berkas (akses HR sementara)"
         >
           <Download size={15} />
-        </a>
+        </button>
       ) : null}
 
       <button

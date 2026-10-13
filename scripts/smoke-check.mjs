@@ -174,7 +174,13 @@ assert(uploadSource.includes('skippedExistingCount'), 'Incremental attendance me
 assert(uploadSource.includes('Periode akan dibaca otomatis setelah file dipilih'), 'Field periode upload belum otomatis/read-only.')
 
 const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'))
-assert(pkg.version === '3.5.2', `package.json version harus 3.5.2, saat ini ${pkg.version}`)
+assert(pkg.version === '3.5.3', `package.json version harus 3.5.3, saat ini ${pkg.version}`)
+assert(fs.existsSync(path.join(root, 'DATABASE_SQL/HARMONY_ATTENDANCE_EMAIL_OUTBOX_V1.sql')), 'Email outbox migration belum ada.')
+assert(fs.existsSync(path.join(root, 'app/api/notifications/attendance-upload/route.ts')), 'Dispatch absensi belum disediakan.')
+assert(uploadSource.includes('processAttendanceUploadEmails'), 'Hook dispatch email upload belum tersedia.')
+assert(sourceText.includes('harmony_claim_attendance_emails_v1'), 'Atomic email claim belum tersedia.')
+assert(sourceText.includes('Idempotency-Key'), 'Resend idempotency belum digunakan.')
+assert(sourceText.includes('/api/hr/attendance/upload-file'), 'HR signed file route belum digunakan.')
 assert(Boolean(pkg.scripts?.['test:smoke']), 'Script test:smoke belum tersedia.')
 
 if (warnings.length) {

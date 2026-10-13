@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import { getHarmonySystemControl } from '@/lib/server/system-control'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 
@@ -9,6 +10,7 @@ export type HarmonyServerEmailPayload = {
   html?: string
   text?: string
   replyTo?: string
+  idempotencyKey?: string
 }
 
 export type NotificationEnvironmentStatus = {
@@ -431,59 +433,50 @@ export async function sendHarmonyServerEmail(
     resendPayload.reply_to = replyTo
   }
 
-  const controller = new AbortController()
-  const timeout = setTimeout(
-    () => controller.abort(),
-    20000
-  )
+  // Same idempotency key and payload across retries prevent duplicate requests
+  // when the provider accepts a message but the network response is lost.
+  const idempotencyKey = payload.idempotencyKey || `harmony-${randomUUID()}`
+  let lastError = 'Pengiriman email gagal.'
 
-  try {
-    const response = await fetch(
-      'https://api.resend.com/emails',
-      {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 20000)
+    try {
+      const response = await fetch('https://api.resend.com/emails', {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${resendApiKey}`,
           'Content-Type': 'application/json',
+          'Idempotency-Key': idempotencyKey,
         },
         body: JSON.stringify(resendPayload),
         signal: controller.signal,
+      })
+      const result = await response.json().catch(() => null)
+      if (response.ok) {
+        return {
+          ok: true,
+          message: 'Email berhasil diterima oleh Resend.',
+          providerId: result?.id || null,
+          detail: result,
+        }
       }
-    )
-
-    const result = await response
-      .json()
-      .catch(() => null)
-
-    if (!response.ok) {
-      return {
-        ok: false,
-        message:
-          result?.message ||
-          `Email gagal dikirim melalui Resend (HTTP ${response.status}).`,
-        detail: result,
+      lastError = result?.message || `Email gagal dikirim melalui Resend (HTTP ${response.status}).`
+      if (![429, 500, 502, 503, 504].includes(response.status) || attempt === 2) {
+        return { ok: false, message: lastError, detail: result }
       }
+    } catch (error: any) {
+      lastError = error?.name === 'AbortError'
+        ? 'Pengiriman email melewati batas waktu 20 detik.'
+        : error?.message || 'Tidak dapat menghubungi Resend.'
+      if (attempt === 2) return { ok: false, message: lastError }
+    } finally {
+      clearTimeout(timeout)
     }
-
-    return {
-      ok: true,
-      message:
-        'Email berhasil dikirim melalui Resend.',
-      providerId: result?.id || null,
-      detail: result,
-    }
-  } catch (error: any) {
-    return {
-      ok: false,
-      message:
-        error?.name === 'AbortError'
-          ? 'Pengiriman email melewati batas waktu 20 detik.'
-          : error?.message ||
-            'Terjadi kesalahan saat menghubungi Resend.',
-    }
-  } finally {
-    clearTimeout(timeout)
+    await new Promise((resolve) => setTimeout(resolve, 800 * (attempt + 1)))
   }
+  return { ok: false, message: lastError }
+
 }
 
 function escapeHtml(value: string) {

@@ -78,6 +78,8 @@ export default function HRNotificationDiagnosticsPage() {
     useState('')
   const [message, setMessage] =
     useState<MessageState | null>(null)
+  const [attendanceQueue, setAttendanceQueue] = useState<Record<string, number> | null>(null)
+  const [queueProcessing, setQueueProcessing] = useState(false)
 
   const canAccess = useMemo(() => {
     const role = normalize(appUser?.role)
@@ -166,6 +168,72 @@ export default function HRNotificationDiagnosticsPage() {
     }
   }
 
+  async function fetchAttendanceEmailQueue() {
+    const { data } = await supabase.auth.getSession()
+    const token = data.session?.access_token
+    if (!token) return
+    try {
+      const response = await fetch('/api/notifications/attendance-upload', {
+        headers: { Authorization: `Bearer ${token}` }, cache: 'no-store',
+      })
+      const result = await response.json().catch(() => null)
+      if (response.ok && result?.counts) setAttendanceQueue(result.counts)
+      else setAttendanceQueue(null)
+    } catch {
+      setAttendanceQueue(null)
+    }
+  }
+
+  async function retryFailedAttendanceEmails() {
+    if (!window.confirm('Ulangi semua email yang berstatus Gagal Permanen? Pastikan konfigurasi Resend dan email karyawan sudah diperbaiki.')) return
+    setQueueProcessing(true)
+    try {
+      const { data } = await supabase.auth.getSession()
+      const token = data.session?.access_token
+      if (!token) throw new Error('Sesi HR tidak tersedia.')
+      const response = await fetch('/api/notifications/attendance-upload', {
+        method: 'POST', headers: {
+          Authorization: `Bearer ${token}`, 'Content-Type': 'application/json',
+        }, body: JSON.stringify({ retry_failed: true }),
+      })
+      const result = await response.json().catch(() => null)
+      if (!response.ok) throw new Error(result?.message || 'Gagal mengulang antrean.')
+      setMessage({ type: 'info', text: result.message || 'Antrean gagal telah diaktifkan kembali.' })
+    } catch (error: any) {
+      setMessage({ type: 'error', text: error?.message || 'Gagal memproses antrean.' })
+    } finally {
+      await fetchAttendanceEmailQueue()
+      setQueueProcessing(false)
+    }
+  }
+
+  async function processPendingAttendanceEmails() {
+    setQueueProcessing(true)
+    try {
+      const { data } = await supabase.auth.getSession()
+      const token = data.session?.access_token
+      if (!token) throw new Error('Sesi HR tidak tersedia.')
+      let totalSent = 0
+      let lastMessage = ''
+      for (let attempt = 0; attempt < 6; attempt++) {
+        const response = await fetch('/api/notifications/attendance-upload', {
+          method: 'POST', headers: { Authorization: `Bearer ${token}` }, cache: 'no-store',
+        })
+        const result = await response.json().catch(() => null)
+        if (!response.ok) throw new Error(result?.message || 'Antrean gagal diproses.')
+        lastMessage = result?.message || ''
+        totalSent += Number(result?.sent || 0)
+        if (result?.paused || !result?.claimed || !result?.remaining) break
+      }
+      setMessage({ type: 'info', text: `${totalSent} notifikasi berhasil diterima penyedia email. ${lastMessage}` })
+    } catch (error: any) {
+      setMessage({ type: 'error', text: error?.message || 'Proses antrean gagal.' })
+    } finally {
+      await fetchAttendanceEmailQueue()
+      setQueueProcessing(false)
+    }
+  }
+
   async function fetchDiagnostic() {
     setMessage(null)
 
@@ -203,6 +271,7 @@ export default function HRNotificationDiagnosticsPage() {
     }
 
     setDiagnostic(result)
+    await fetchAttendanceEmailQueue()
   }
 
   async function handleRefresh() {
@@ -498,6 +567,39 @@ export default function HRNotificationDiagnosticsPage() {
                 }
                 ok={Boolean(environment?.app_url)}
               />
+            </section>
+
+            <section className="rounded-[24px] border border-black/5 bg-white/75 p-4 shadow-sm backdrop-blur-xl sm:p-5">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h2 className="text-sm font-bold text-[#1d1d1f]">Notifikasi Upload Absensi</h2>
+                  <p className="mt-1 text-xs text-[#6e6e73]">Satu pemberitahuan per karyawan per periode. Pending otomatis dicoba ulang; Failed memerlukan pemeriksaan HR.</p>
+                </div>
+                <button type="button" onClick={processPendingAttendanceEmails}
+                  disabled={queueProcessing || !attendanceQueue}
+                  className="inline-flex min-h-10 items-center gap-2 rounded-2xl bg-[#007aff] px-4 text-xs font-bold text-white disabled:opacity-50">
+                  {queueProcessing ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />}
+                  Proses Antrean
+                </button>
+              </div>
+              {attendanceQueue && (
+                <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-slate-500">
+                  <span>Email karyawan valid: <strong>{attendanceQueue.eligible_employees || 0}</strong></span>
+                  <span>Email kosong/tidak valid: <strong className="text-amber-700">{attendanceQueue.missing_email || 0}</strong></span>
+                  {Boolean(attendanceQueue.failed) && <button type="button" onClick={retryFailedAttendanceEmails}
+                    disabled={queueProcessing} className="font-semibold text-red-700 underline disabled:opacity-50">Coba Lagi yang Gagal</button>}
+                </div>
+              )}
+              {attendanceQueue ? (
+                <div className="mt-4 grid grid-cols-2 gap-2 text-sm sm:grid-cols-4">
+                  {([['pending','Menunggu'],['sending','Diproses'],['sent','Diterima Resend'],['failed','Gagal Permanen']] as const).map(([key,label]) => (
+                    <div key={key} className="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3">
+                      <p className="text-xs text-slate-500">{label}</p>
+                      <p className="mt-1 text-xl font-bold tabular-nums">{attendanceQueue[key] || 0}</p>
+                    </div>
+                  ))}
+                </div>
+              ) : <p className="mt-3 text-xs text-amber-700">Status antrean belum tersedia. Pastikan SQL migration telah dijalankan.</p>}
             </section>
 
             <section className="grid gap-5 xl:grid-cols-[1.05fr_0.95fr]">
