@@ -30,25 +30,18 @@ export default function RemedEmployeeDashboard() {
   const used = Number(ent?.legacy_used || 0) + Number(ent?.current_used || 0)
 
   return (
-    <section className="mx-auto w-full max-w-[1540px] space-y-6 p-4 sm:p-6 lg:p-8">
-      <div className="harmony-hero-v25 p-6 sm:p-8" data-accent="remed">
-        <div className="relative flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
-          <div className="max-w-3xl">
-            <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-3.5 py-2 text-xs font-bold text-white/75 backdrop-blur-xl">
-              <HeartPulse size={15} className="text-emerald-300" /> Medical Reimbursement
-            </div>
-            <h1 className="mt-5 text-3xl font-semibold tracking-[-0.045em] sm:text-4xl">Re-Med Employee</h1>
-            <p className="mt-3 max-w-2xl text-sm leading-7 text-white/65">Ajukan reimbursement, pantau plafond, dan lihat status proses HR sampai pembayaran Finance dari satu modul HARMONY.</p>
-          </div>
-          <Link href="/remed/employee/claims/new" className="inline-flex min-h-11 items-center justify-center gap-2 rounded-[15px] bg-white px-5 text-sm font-bold text-[#174433] shadow-lg transition hover:-translate-y-0.5 hover:shadow-xl">
-            <Plus size={18} /> Ajukan Reimbursement
-          </Link>
+    <section className="mx-auto w-full max-w-[1540px] space-y-4 p-4 sm:p-5 lg:p-6">
+      <header className="flex flex-wrap items-center justify-between gap-3">
+        <div><h1 className="text-xl font-bold tracking-tight text-slate-900">Re-Med Karyawan</h1><p className="mt-1 text-xs text-slate-500">Ringkasan dan tindakan utama</p></div>
+        <div className="flex flex-wrap gap-2">
+          <Link href="/remed/employee/claims/new" className="harmony-button-secondary inline-flex min-h-10 items-center px-3 text-xs font-semibold">Ajukan Klaim</Link>
+          <Link href="/remed/employee/claims" className="harmony-button-secondary inline-flex min-h-10 items-center px-3 text-xs font-semibold">Klaim Saya</Link>
         </div>
-      </div>
+      </header>
 
       {error ? <div className="rounded-[22px] border border-red-100 bg-red-50 p-4 text-sm text-red-700">{error}</div> : null}
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
         <RemedStatCard label="Plafond" value={ent ? formatRupiah(ent.plafond_total) : '-'} helper={ent ? `Tahun ${ent.period_year}` : 'Belum diatur HR'} icon={WalletCards} />
         <RemedStatCard label="Terpakai" value={ent ? formatRupiah(used) : '-'} helper="Legacy + pembayaran Re-Med" icon={CircleDollarSign} />
         <RemedStatCard label="Pending" value={ent ? formatRupiah(ent.reserved_amount) : '-'} helper="Klaim yang sedang diproses" icon={Activity} />
@@ -61,11 +54,11 @@ export default function RemedEmployeeDashboard() {
         <div className="flex items-center justify-between gap-4 border-b border-black/[0.055] p-5 sm:p-6">
           <div>
             <h2 className="harmony-section-title">Klaim Terbaru</h2>
-            <p className="harmony-section-copy">Status reimbursement terakhir Anda.</p>
+            
           </div>
           <Link href="/remed/employee/claims" className="rounded-[14px] bg-emerald-50 px-4 py-2 text-sm font-bold text-emerald-700 transition hover:bg-emerald-100">Lihat Semua</Link>
         </div>
-        <div className="p-4 sm:p-5"><RemedClaimList claims={data?.recentClaims || []} /></div>
+        <div className="p-3 sm:p-4"><RemedClaimList claims={data?.recentClaims || []} /></div>
       </div>
     </section>
   )

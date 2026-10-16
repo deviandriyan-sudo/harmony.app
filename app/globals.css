@@ -1891,3 +1891,43 @@ body:has(.harmony-modal-surface) [data-harmony-feedback='error'] {
   backdrop-filter: blur(24px) saturate(165%);
   -webkit-backdrop-filter: blur(24px) saturate(165%);
 }
+
+/* HARMONY navigation refactor: fixed icon rail + overlay, no content reflow. */
+@media (min-width: 1024px) {
+  .harmony-desktop-sidebar { width: 88px !important; overflow: visible; }
+  .harmony-desktop-main { margin-left: 88px !important; }
+}
+.harmony-sidebar-shell {
+  width: 88px;
+  height: 100dvh;
+  box-sizing: border-box;
+  padding: 10px 5px;
+  overflow: visible;
+  transition: width 290ms ease;
+}
+.harmony-sidebar-shell:not(.harmony-sidebar-mobile):is(:hover, :focus-within, .harmony-sidebar-pinned),
+.harmony-sidebar-mobile { width: 264px; }
+.harmony-sidebar-shell:not(.harmony-sidebar-mobile):is(:hover, :focus-within, .harmony-sidebar-pinned) .harmony-sidebar-panel { box-shadow: 0 22px 65px rgba(40,55,85,.2) !important; }
+.harmony-side-detail {
+  opacity: 0;
+  visibility: hidden;
+  white-space: nowrap;
+  transition: opacity 160ms ease, visibility 160ms;
+}
+.harmony-sidebar-shell:not(.harmony-sidebar-mobile):is(:hover, :focus-within, .harmony-sidebar-pinned) .harmony-side-detail,
+.harmony-sidebar-mobile .harmony-side-detail {
+  opacity: 1;
+  visibility: visible;
+  transition-delay: 80ms;
+}
+.harmony-sidebar-shell .harmony-nav-item { flex-shrink: 0; }
+.harmony-sidebar-shell .harmony-sidebar-nav { scrollbar-width: thin; scrollbar-color: rgba(95,111,130,.22) transparent; }
+.harmony-sidebar-mobile { padding: 10px 5px; width: min(264px, 86vw); height: 100dvh; transition: none; }
+.harmony-module-subnav nav { scrollbar-width: thin; }
+@media (prefers-reduced-motion: reduce) {
+  .harmony-sidebar-shell, .harmony-side-detail { transition: none !important; }
+}
+@media print {
+  .harmony-desktop-sidebar, .harmony-module-subnav { display: none !important; }
+  .harmony-desktop-main { margin-left: 0 !important; }
+}

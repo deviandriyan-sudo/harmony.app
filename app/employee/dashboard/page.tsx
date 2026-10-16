@@ -20,6 +20,7 @@ import {
 
 import { TodayTeamAvailability } from '@/components/employee/TodayTeamAvailability'
 import { Topbar } from '@/components/layout/Topbar'
+import { CompactMetric } from '@/components/dashboard/CompactMetric'
 import { getCurrentPeriodMonthWita, getCutoffRange } from '@/lib/attendance-reporting'
 import { supabase } from '@/lib/supabase'
 import { harmonyFetch } from '@/lib/harmony-client'
@@ -321,83 +322,44 @@ export default function EmployeeDashboardPage() {
 
   return (
     <>
-      <Topbar title="Beranda Employee" description="Ringkasan saldo, absensi, pengajuan, dan informasi kehadiran tim dari source HARMONY yang sama." />
-
-      <section className="harmony-page-bg min-h-screen space-y-5 overflow-x-hidden p-4 sm:p-6">
-        {message && (
-          <div className="rounded-2xl border border-orange-200 bg-orange-50 p-4 text-sm font-semibold text-orange-700">
-            <div className="flex items-start gap-2"><AlertTriangle size={18} className="mt-0.5 shrink-0" /><span>{message}</span></div>
-          </div>
-        )}
-
-        <section className="harmony-glass-dark relative overflow-hidden rounded-[30px] p-6 text-white sm:p-7">
-          <div className="pointer-events-none absolute -right-20 -top-20 h-64 w-64 rounded-full bg-[#007aff]/30 blur-3xl" />
-          <div className="pointer-events-none absolute -bottom-24 left-8 h-60 w-60 rounded-full bg-[#af52de]/20 blur-3xl" />
-          <div className="relative grid gap-6 xl:grid-cols-[1.25fr_0.75fr] xl:items-end">
-            <div>
-              <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-3 py-1.5 text-[11px] font-bold text-white/75"><Sparkles size={13} />HARMONY · Employee Self Service</div>
-              <h1 className="mt-5 text-3xl font-semibold tracking-[-0.04em] sm:text-4xl">Selamat datang, {employee?.full_name || appUser?.email || 'Employee'}.</h1>
-              <p className="mt-3 max-w-2xl text-sm leading-7 text-white/60">Saldo cuti dan PHL pada dashboard ini membaca lifecycle summary yang sama dengan HR agar tidak terjadi perbedaan angka.</p>
-              <div className="mt-6 flex flex-wrap gap-3">
-                <Link href="/employee/leave" className="inline-flex min-h-11 items-center gap-2 rounded-2xl bg-white px-4 text-sm font-bold text-[#1d1d1f]"><CalendarDays size={17} />Cuti / Izin / Klaim PHL</Link>
-                <Link href="/employee/phl" className="inline-flex min-h-11 items-center gap-2 rounded-2xl border border-white/15 bg-white/12 px-4 text-sm font-bold text-white"><WalletCards size={17} />Ajukan Saldo PHL</Link>
-                <Link href="/employee/attendance" className="inline-flex min-h-11 items-center gap-2 rounded-2xl border border-white/10 bg-white/10 px-4 text-sm font-bold text-white"><Fingerprint size={17} />Absensi</Link>
-              </div>
-            </div>
-
-            <div className="rounded-[24px] border border-white/10 bg-white/10 p-4 backdrop-blur-xl">
-              <div className="flex items-center justify-between"><div><p className="text-xs font-bold text-white/45">PERIODE BERJALAN</p><p className="mt-1 text-sm font-semibold">{periodRange.label}</p></div><ShieldCheck size={20} className="text-[#9ff2b5]" /></div>
-              <div className="mt-4 grid grid-cols-2 gap-2 text-xs">
-                <MiniInfo label="NIP" value={employee?.employee_number || '-'} />
-                <MiniInfo label="Unit" value={employee?.department || '-'} />
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <Metric
-            title="Saldo Cuti"
-            value={annualBalance === null ? '—' : `${annualBalance}`}
-            description={balance ? 'Cuti matang + postpone aktif' : 'Lifecycle belum berhasil direkonsiliasi'}
-            icon={<WalletCards size={20} />}
-            tone="blue"
-          />
-          <Metric title="Saldo PHL" value={`${phlBalance}`} description="PHL aktif yang dapat diklaim" icon={<Plane size={20} />} tone="purple" />
-          <Metric title="Kehadiran Tercatat" value={`${recordedAttendance}`} description="Periode cut-off berjalan" icon={<CheckCircle2 size={20} />} tone="green" />
-          <Metric title="Pending Request" value={`${pendingRequestCount}`} description="Cuti/izin/PHL belum final" icon={<Clock3 size={20} />} tone="orange" />
+      <Topbar title="Beranda" />
+      <section className="harmony-page-bg mx-auto min-h-screen max-w-[1500px] space-y-4 p-4 sm:p-5 lg:p-6">
+        {message && <div role="alert" className="flex gap-2 rounded-xl border border-orange-200 bg-orange-50 p-3 text-xs text-orange-700"><AlertTriangle size={16}/>{message}</div>}
+        <div className="harmony-glass-dark flex flex-wrap items-center justify-between gap-3 rounded-[22px] px-4 py-4 text-white sm:px-5">
+          <div className="min-w-0"><p className="text-[11px] text-white/60">Selamat datang</p><h1 className="truncate text-lg font-bold sm:text-xl">{employee?.full_name || appUser?.email || 'Karyawan'}</h1><p className="mt-1 text-[11px] text-white/60">{employee?.employee_number || '—'} · {employee?.department || '—'} · {periodRange.label}</p></div>
+          <button type="button" onClick={fetchDashboardData} disabled={refreshing} title="Perbarui" aria-label="Perbarui dashboard" className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/20 bg-white/10 text-white"><RefreshCcw size={17} className={refreshing ? 'animate-spin' : ''} /></button>
         </div>
-
-        <div className="grid gap-5 xl:grid-cols-[1.05fr_0.95fr]">
-          <section className="harmony-card overflow-hidden">
-            <div className="flex items-center justify-between border-b border-black/5 p-5">
-              <div><h2 className="font-bold text-[#1d1d1f]">Riwayat Cuti, Izin & PHL</h2><p className="mt-1 text-xs text-[#6e6e73]">Riwayat pengajuan termasuk catatan hutang cuti milik employee.</p></div>
-              <Link href="/employee/leave" className="text-xs font-bold text-[#007aff]">Buka menu cuti</Link>
-            </div>
-            <div className="divide-y divide-black/5">
-              {loading ? <EmptyRow text="Memuat riwayat..." /> : requests.length === 0 ? <EmptyRow text="Belum ada riwayat cuti, izin, PHL, atau hutang cuti." /> : requests.map((item) => (
-                <div key={`${item.type}-${item.id}`} className="flex gap-3 p-4 sm:p-5">
-                  <RequestTypeIcon type={item.type} />
-                  <div className="min-w-0 flex-1"><div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between"><p className="text-sm font-bold text-[#1d1d1f]">{item.label}</p><Status status={item.status} /></div><p className="mt-1 text-xs text-[#6e6e73]">{item.date}</p><p className="mt-2 line-clamp-3 text-xs leading-5 text-[#6e6e73]">{item.reason}</p></div>
-                </div>
-              ))}
+        <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+          <CompactMetric label="Saldo Cuti" value={loading ? '…' : annualBalance === null ? '—' : `${annualBalance} hari`} icon={CalendarDays} href="/employee/leave" />
+          <CompactMetric label="Saldo PHL" value={loading ? '…' : `${phlBalance} hari`} icon={WalletCards} href="/employee/phl" accent="green" />
+          <CompactMetric label="Pengajuan Pending" value={loading ? '…' : pendingRequestCount} icon={Clock3} href="/employee/leave" accent="amber" />
+          <CompactMetric label="Hari Tercatat" value={loading ? '…' : recordedAttendance} icon={CheckCircle2} href="/employee/attendance" />
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Link href="/employee/leave" className="harmony-button-primary inline-flex min-h-10 items-center gap-2 px-4 text-xs"><CalendarDays size={15}/> Ajukan Cuti/Izin</Link>
+          <Link href="/employee/phl" className="harmony-button-secondary inline-flex min-h-10 items-center gap-2 px-4 text-xs"><WalletCards size={15}/> Ajukan Saldo PHL</Link>
+          <Link href="/employee/attendance" className="harmony-button-secondary inline-flex min-h-10 items-center gap-2 px-4 text-xs"><Fingerprint size={15}/> Absensi</Link>
+        </div>
+        <div className="grid gap-4 xl:grid-cols-[1.25fr_0.75fr]">
+          <section className="harmony-unified-surface overflow-hidden rounded-[22px]">
+            <div className="flex items-center justify-between gap-2 border-b border-slate-200/50 px-4 py-3"><h2 className="text-sm font-bold text-slate-900">Aktivitas Terbaru</h2><Link href="/employee/leave" className="text-xs font-semibold text-blue-700">Lihat pengajuan</Link></div>
+            <div className="divide-y divide-slate-200/40">
+              {loading ? <EmptyRow text="Memuat..."/> : requests.length === 0 ? <EmptyRow text="Belum ada aktivitas."/> : requests.slice(0, 5).map(item => <div key={`${item.type}-${item.id}`} className="flex min-h-[58px] items-center gap-3 px-4 py-2.5">
+                <div className="min-w-0 flex-1"><p className="truncate text-xs font-semibold text-slate-900">{item.label}</p><p className="mt-0.5 truncate text-[11px] text-slate-500">{item.date}</p></div><Status status={item.status}/>
+              </div>)}
             </div>
           </section>
-
-          <section className="harmony-card p-5">
-            <div className="flex items-center justify-between"><div><h2 className="font-bold text-[#1d1d1f]">Lifecycle Saldo</h2><p className="mt-1 text-xs text-[#6e6e73]">Informasi dari summary database.</p></div><button type="button" onClick={fetchDashboardData} disabled={refreshing} className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white shadow-sm disabled:opacity-50"><RefreshCcw size={16} className={refreshing ? 'animate-spin' : ''} /></button></div>
-            <div className="mt-4 space-y-3">
+          <section className="harmony-unified-surface overflow-hidden rounded-[22px]">
+            <h2 className="border-b border-slate-200/50 px-4 py-3 text-sm font-bold text-slate-900">Detail Saldo</h2>
+            <div className="space-y-1.5 p-3">
               <InfoRow label="Postpone aktif" value={`${Number(balance?.postpone_active_days || 0)} hari`} />
-              <InfoRow label="Postpone expired" value={`${Number(balance?.postpone_expired_days || 0)} hari`} />
-              <InfoRow label="Hutang cuti aktif" value={`${debtOutstandingDays} hari`} />
-              <InfoRow label="Target pelunasan hutang" value={formatDate(debtNextMaturity)} />
-              <InfoRow label="Expiry Postpone terdekat" value={formatDate(balance?.next_postpone_expiry)} />
-              <InfoRow label="Expiry PHL terdekat" value={formatDate(balance?.next_phl_expiry)} />
+              {debtOutstandingDays > 0 && <InfoRow label="Hutang cuti" value={`${debtOutstandingDays} hari`}/>}
+              {debtOutstandingDays > 0 && <InfoRow label="Target pelunasan" value={formatDate(debtNextMaturity)}/>}
+              <InfoRow label="Masa berlaku Postpone" value={formatDate(balance?.next_postpone_expiry)}/>
+              <InfoRow label="Masa berlaku PHL" value={formatDate(balance?.next_phl_expiry)}/>
             </div>
-            <Link href="/employee/settings" className="mt-4 inline-flex min-h-10 items-center gap-2 rounded-2xl bg-[#f5f5f7] px-4 text-xs font-bold text-[#1d1d1f]"><Settings size={15} />Pengaturan akun</Link>
           </section>
         </div>
-
         <TodayTeamAvailability />
       </section>
     </>

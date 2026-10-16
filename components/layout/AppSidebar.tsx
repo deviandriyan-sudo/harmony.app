@@ -3,193 +3,103 @@
 import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { Fragment, useState } from 'react'
-import { ChevronRight, Loader2, LogOut, ShieldCheck } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { Loader2, LogOut, Pin, PinOff } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import { isNavigationActive, type NavigationItem } from '@/lib/navigation'
 
-type SidebarMenuItem = {
-  title: string
-  href: string
-  icon: React.ElementType
-  subtitle?: string
-  section?: string
-}
-
-type AppSidebarProps = {
-  menu?: SidebarMenuItem[]
+type Props = {
+  menu: NavigationItem[]
   title?: string
-  subtitle?: string
   userName?: string
   userRole?: string
   logoSrc?: string
   onNavigate?: () => void
+  mobile?: boolean
 }
 
-export function AppSidebar({
-  menu = [],
-  title = 'HARMONY',
-  subtitle = 'Human Attendance & Leave System',
-  userName = 'HARMONY User',
-  userRole = 'Employee',
-  logoSrc = '/logo.png',
-  onNavigate,
-}: AppSidebarProps) {
+export function AppSidebar({ menu, title = 'HARMONY', userName = 'HARMONY User', userRole = 'Employee', logoSrc = '/logo.png', onNavigate, mobile = false }: Props) {
   const pathname = usePathname()
   const router = useRouter()
   const [loggingOut, setLoggingOut] = useState(false)
+  const [pinned, setPinned] = useState(false)
 
-  function normalizeRoute(value: string) {
-    if (!value) return '/'
-    return value.endsWith('/') && value.length > 1 ? value.slice(0, -1) : value
-  }
-
-  const normalizedPath = normalizeRoute(pathname)
-  const activeHref = (() => {
-    const exact = menu.find((item) => normalizeRoute(item.href) === normalizedPath)
-    if (exact) return normalizeRoute(exact.href)
-
-    const candidates = menu
-      .map((item) => normalizeRoute(item.href))
-      .filter((href) => href !== '/' && normalizedPath.startsWith(`${href}/`))
-      .sort((a, b) => b.length - a.length)
-
-    return candidates[0] || ''
-  })()
-
-  function isActive(href: string) {
-    return normalizeRoute(href) === activeHref
+  useEffect(() => {
+    if (mobile) return
+    try { const saved = localStorage.getItem('harmony-sidebar-pinned') === 'true'; queueMicrotask(() => setPinned(saved)) } catch { /* private browsing */ }
+  }, [mobile])
+  function togglePinned() {
+    const next = !pinned
+    setPinned(next)
+    try { localStorage.setItem('harmony-sidebar-pinned', String(next)) } catch { /* private browsing */ }
   }
 
   async function handleLogout() {
     if (loggingOut) return
     setLoggingOut(true)
-
     try {
       await supabase.auth.signOut()
-      if (typeof window !== 'undefined') {
-        localStorage.removeItem('harmony_user')
-        localStorage.removeItem('remed_user')
-        sessionStorage.clear()
-      }
+      localStorage.removeItem('harmony_user')
+      localStorage.removeItem('remed_user')
+      sessionStorage.clear()
       router.replace('/login')
       router.refresh()
     } catch (error) {
       console.error('Logout error:', error)
-      if (typeof window !== 'undefined') {
-        localStorage.removeItem('harmony_user')
-        localStorage.removeItem('remed_user')
-        sessionStorage.clear()
-        window.location.href = '/login'
-      }
-    } finally {
-      setLoggingOut(false)
-    }
+      localStorage.removeItem('harmony_user')
+      localStorage.removeItem('remed_user')
+      sessionStorage.clear()
+      window.location.href = '/login'
+    } finally { setLoggingOut(false) }
   }
 
-  return (
-    <aside className="harmony-sidebar-shell flex h-screen w-[272px] max-w-[86vw] shrink-0 flex-col px-3 py-3 sm:px-3.5 sm:py-3.5">
-      <div className="harmony-sidebar-panel flex h-full flex-col overflow-hidden rounded-[30px]">
-        <div className="harmony-sidebar-header border-b px-4 py-4">
-          <div className="flex items-start gap-3">
-            <div className="harmony-logo-glass flex h-[52px] w-[52px] shrink-0 items-center justify-center overflow-hidden rounded-[17px] border">
-              <Image src={logoSrc} alt="HARMONY Logo" width={42} height={42} className="h-10 w-10 object-contain" priority />
-            </div>
-            <div className="min-w-0 flex-1 pt-0.5">
-              <div className="flex items-center gap-2">
-                <h1 className="truncate text-[15px] font-bold tracking-[-0.02em] text-[#17181b]">{title}</h1>
-                <span className="text-[#3b82f6]">✣</span>
-              </div>
-              <p className="mt-1 line-clamp-2 text-[11px] leading-4 text-[#737780]">{subtitle}</p>
-            </div>
-          </div>
-
-          <div className="harmony-sidebar-user mt-4 rounded-[21px] border p-3">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[14px] bg-[#17181b] text-[12px] font-bold text-white shadow-[0_8px_20px_rgba(15,23,42,.14)]">{getInitials(userName)}</div>
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-[13px] font-bold text-[#17181b]">{userName}</p>
-                <p className="truncate text-[11px] text-[#737780]">{userRole}</p>
-              </div>
-            </div>
-            <div className="harmony-secure-pill mt-3 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-[10px] font-bold text-emerald-700">
-              <ShieldCheck size={12} />
-              Secure workspace
-            </div>
-          </div>
+  return <aside className={`harmony-sidebar-shell ${mobile ? 'harmony-sidebar-mobile' : ''} ${pinned && !mobile ? 'harmony-sidebar-pinned' : ''}`} aria-label="Navigasi HARMONY">
+    <div className="harmony-sidebar-panel flex h-full min-h-0 flex-col overflow-hidden rounded-[25px]">
+      <header className="harmony-sidebar-header flex h-[72px] shrink-0 items-center gap-2 border-b px-[13px]">
+        <div className="harmony-logo-glass flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-[15px] border">
+          <Image src={logoSrc} alt="Logo Politeknik" width={36} height={36} className="h-9 w-9 object-contain" priority />
         </div>
-
-        <div className="min-h-0 flex-1 overflow-y-auto px-2.5 py-3.5">
-          <nav className="space-y-1">
-            {menu.map((item, index) => {
-              const active = isActive(item.href)
-              const Icon = item.icon
-              const section = item.section || 'Navigation'
-              const previousSection = index > 0 ? (menu[index - 1].section || 'Navigation') : null
-              const showSection = index === 0 || section !== previousSection
-              const isRemed = section.toLowerCase().includes('re-med') || item.href.startsWith('/remed')
-
-              return (
-                <Fragment key={item.href}>
-                  {showSection && (
-                    <p className={`${index === 0 ? 'mb-2.5' : 'mb-2.5 mt-5'} px-2.5 text-[10px] font-bold uppercase tracking-[0.22em] ${isRemed ? 'text-emerald-700/75' : 'text-[#9599a1]'}`}>
-                      {section}
-                    </p>
-                  )}
-                  <Link
-                    href={item.href}
-                    onClick={onNavigate}
-                    className={[
-                      'harmony-nav-item group relative flex items-center gap-2.5 overflow-hidden rounded-[18px] px-2.5 py-2 transition-all duration-200',
-                      active ? 'harmony-nav-active text-white' : 'text-[#25272c]',
-                      isRemed ? 'harmony-nav-remed' : '',
-                    ].join(' ')}
-                  >
-                    {active ? <span className={`absolute inset-y-2 left-0 w-[3px] rounded-r-full ${isRemed ? 'bg-emerald-400' : 'bg-blue-400'}`} /> : null}
-                    <div className={[
-                      'harmony-nav-icon flex h-9 w-9 shrink-0 items-center justify-center rounded-[13px] transition',
-                      active
-                        ? 'bg-white/[0.10] text-white'
-                        : isRemed
-                          ? 'bg-emerald-50 text-emerald-700 group-hover:bg-emerald-100'
-                          : 'bg-[#eef1f5] text-[#4b5058] group-hover:bg-blue-50 group-hover:text-blue-600',
-                    ].join(' ')}>
-                      <Icon size={17} strokeWidth={2.15} />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className={['truncate text-[13px] font-bold', active ? 'text-white' : 'text-[#25272c]'].join(' ')}>{item.title}</p>
-                      {item.subtitle ? <p className={['truncate text-[10.5px]', active ? 'text-white/58' : 'text-[#8a8f98]'].join(' ')}>{item.subtitle}</p> : null}
-                    </div>
-                    <ChevronRight size={14} className={active ? 'text-white/55' : 'text-[#b1b5bc]'} />
-                  </Link>
-                </Fragment>
-              )
-            })}
-          </nav>
+        <div className="harmony-side-detail min-w-0 flex-1 overflow-hidden">
+          <p className="truncate text-[15px] font-bold tracking-tight text-slate-900">{title}</p>
+          <p className="truncate text-[10px] text-slate-500">Integrated HR Platform</p>
         </div>
+        {!mobile && <button type="button" onClick={togglePinned} className="harmony-side-detail rounded-lg p-1.5 text-slate-500 hover:bg-white focus-visible:outline-2 focus-visible:outline-blue-500" title={pinned ? 'Lepas pin sidebar' : 'Sematkan sidebar'} aria-label={pinned ? 'Lepas pin sidebar' : 'Sematkan sidebar'} aria-pressed={pinned}>
+          {pinned ? <PinOff size={16} /> : <Pin size={16} />}
+        </button>}
+      </header>
 
-        <div className="harmony-sidebar-footer border-t px-3.5 py-3.5">
-          <button
-            type="button"
-            onClick={handleLogout}
-            disabled={loggingOut}
-            className="harmony-logout flex w-full items-center justify-center gap-2 rounded-[17px] border px-4 py-2.5 text-[13px] font-semibold text-[#25272c] transition hover:border-red-100 hover:bg-red-50/80 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {loggingOut ? <><Loader2 size={15} className="animate-spin text-red-500" />Keluar...</> : <><LogOut size={15} className="text-red-500" />Keluar</>}
-          </button>
-          <p className="mt-3 text-center text-[10px] font-medium tracking-[0.08em] text-[#9aa0aa]">
-            Developed by <span className="font-bold text-[#6f7680]">Devan</span>
-          </p>
-        </div>
+      <div className="harmony-sidebar-nav min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-[9px] py-3">
+        <nav className="flex flex-col gap-1" aria-label="Menu utama">
+          {menu.map(item => {
+            const active = isNavigationActive(pathname, item)
+            const Icon = item.icon
+            return <Link key={item.href} href={item.href} title={item.title} onClick={onNavigate} aria-current={active ? 'page' : undefined}
+              className={`harmony-nav-item ${active ? 'harmony-nav-active' : ''} ${item.remed ? 'harmony-nav-remed' : ''} group flex h-[49px] items-center gap-[11px] rounded-[15px] px-[9px] text-slate-700 transition-colors duration-200 focus-visible:outline-2 focus-visible:outline-blue-500`}>
+              <span className={`harmony-nav-icon flex h-[39px] w-[39px] shrink-0 items-center justify-center rounded-xl ${active ? 'bg-white/10 text-white' : item.remed ? 'bg-emerald-50 text-emerald-700' : 'bg-white/65 text-slate-600 group-hover:text-blue-600'}`}><Icon size={19} strokeWidth={2} /></span>
+              <span className={`harmony-side-detail min-w-0 flex-1 truncate text-[13px] font-semibold ${active ? 'text-white' : 'text-slate-700'}`}>{item.title}</span>
+            </Link>
+          })}
+        </nav>
       </div>
-    </aside>
-  )
+
+      <footer className="harmony-sidebar-footer shrink-0 border-t px-[9px] py-3">
+        <div className="flex min-h-[48px] items-center gap-[11px] px-[9px]" title={`${userName} · ${userRole}`}>
+          <div className="flex h-[39px] w-[39px] shrink-0 items-center justify-center rounded-xl bg-slate-900 text-[11px] font-bold text-white">{getInitials(userName)}</div>
+          <div className="harmony-side-detail min-w-0 flex-1"><p className="truncate text-xs font-bold text-slate-900">{userName}</p><p className="truncate text-[11px] text-slate-500">{userRole}</p></div>
+        </div>
+        <button type="button" onClick={handleLogout} disabled={loggingOut} title="Keluar" aria-label="Keluar"
+          className="harmony-logout mt-2 flex h-11 w-full items-center gap-[11px] rounded-[14px] border px-[18px] text-red-600 transition-colors hover:bg-red-50 focus-visible:outline-2 focus-visible:outline-red-500 disabled:opacity-50">
+          {loggingOut ? <Loader2 size={19} className="shrink-0 animate-spin" /> : <LogOut size={19} className="shrink-0" />}
+          <span className="harmony-side-detail text-xs font-semibold">{loggingOut ? 'Keluar...' : 'Keluar'}</span>
+        </button>
+        <p className="harmony-side-detail mt-2 truncate text-center text-[10px] text-slate-400">Developed by <strong>Devan</strong></p>
+      </footer>
+    </div>
+  </aside>
 }
 
 export default AppSidebar
-
 function getInitials(name: string) {
   const words = name.trim().split(' ').filter(Boolean)
-  if (words.length === 0) return 'U'
-  if (words.length === 1) return words[0].slice(0, 2).toUpperCase()
-  return `${words[0][0]}${words[1][0]}`.toUpperCase()
+  return words.length > 1 ? `${words[0][0]}${words[1][0]}`.toUpperCase() : (words[0] || 'U').slice(0, 2).toUpperCase()
 }

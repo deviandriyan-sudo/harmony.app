@@ -1,15 +1,16 @@
 'use client'
 
 import Image from 'next/image'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import { Loader2, Menu, ShieldAlert, X } from 'lucide-react'
 
 import { AppSidebar } from '@/components/layout/AppSidebar'
-import { employeeMenu, hrMenu } from '@/lib/menu'
+import { navigationForRole } from '@/lib/navigation'
+import { ModuleSubnav } from '@/components/layout/ModuleSubnav'
 import { REMED_ROLE_LABELS } from '@/lib/remed'
+import { hasSupervisorAssignments } from '@/lib/supervisor-navigation'
 import { remedFetch } from '@/lib/remed-client'
-import { remedEmployeeMenu, remedFinanceMenu, remedHrMenu } from '@/lib/remed-menu'
 import type { RemedSession } from '@/types/remed'
 
 export default function RemedLayout({ children }: { children: React.ReactNode }) {
@@ -19,11 +20,17 @@ export default function RemedLayout({ children }: { children: React.ReactNode })
   const [loading, setLoading] = useState(true)
   const [message, setMessage] = useState('Memeriksa akses Re-Med...')
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
+  const [hasSubordinates, setHasSubordinates] = useState(false)
 
   useEffect(() => {
     loadSession()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  useEffect(() => {
+    if (session?.role !== 'employee' || !session.employeeId) return
+    void hasSupervisorAssignments(session.employeeId).then(setHasSubordinates)
+  }, [session])
 
   useEffect(() => {
     if (!session) return
@@ -61,11 +68,11 @@ export default function RemedLayout({ children }: { children: React.ReactNode })
     }
   }
 
-  const menu = useMemo(() => {
-    if (session?.role === 'hr') return [...hrMenu, ...remedHrMenu]
-    if (session?.role === 'finance') return remedFinanceMenu
-    return [...employeeMenu, ...remedEmployeeMenu]
-  }, [session?.role])
+  const menu = session?.role === 'hr'
+    ? navigationForRole('hr', { remed: true })
+    : session?.role === 'finance'
+      ? navigationForRole('finance')
+      : navigationForRole('employee', { remed: true, supervisor: hasSubordinates })
 
   if (loading) return <AccessLoading message={message} />
 
@@ -95,11 +102,11 @@ export default function RemedLayout({ children }: { children: React.ReactNode })
   return (
     <div className="harmony-shell min-h-screen overflow-x-hidden">
       <div className="flex min-h-screen w-full overflow-x-hidden">
-        <div className="fixed inset-y-0 left-0 z-30 hidden h-screen w-[272px] print:hidden lg:block">
+        <div className="fixed inset-y-0 left-0 z-30 hidden h-screen w-[88px] print:hidden lg:block harmony-desktop-sidebar">
           <AppSidebar
             menu={menu}
             title="HARMONY"
-            subtitle="Integrated HR Platform"
+           
             userName={session.userName}
             userRole={roleLabel}
             logoSrc="/logo.png"
@@ -113,10 +120,11 @@ export default function RemedLayout({ children }: { children: React.ReactNode })
               <AppSidebar
                 menu={menu}
                 title="HARMONY"
-                subtitle="Integrated HR Platform"
+               
                 userName={session.userName}
                 userRole={roleLabel}
                 logoSrc="/logo.png"
+                mobile
                 onNavigate={() => setMobileSidebarOpen(false)}
               />
               <button type="button" aria-label="Tutup menu" onClick={() => setMobileSidebarOpen(false)} className="absolute right-[-48px] top-4 flex h-10 w-10 items-center justify-center rounded-2xl bg-white text-[#1d1d1f] shadow-lg">
@@ -126,7 +134,7 @@ export default function RemedLayout({ children }: { children: React.ReactNode })
           </div>
         )}
 
-        <main className="min-w-0 flex-1 overflow-x-hidden lg:ml-[272px]">
+        <main className="min-w-0 flex-1 overflow-x-hidden lg:ml-[88px] harmony-desktop-main">
           <div className="harmony-mobile-topbar sticky top-0 z-40 border-b px-4 py-3 print:hidden lg:hidden">
             <div className="flex items-center justify-between gap-3">
               <button type="button" onClick={() => setMobileSidebarOpen(true)} className="harmony-mobile-glass flex h-11 w-11 items-center justify-center rounded-2xl text-[#1d1d1f]" aria-label="Buka menu">
@@ -143,7 +151,7 @@ export default function RemedLayout({ children }: { children: React.ReactNode })
               </div>
             </div>
           </div>
-          <div className="harmony-workspace w-full min-w-0">{children}</div>
+          <div className="harmony-workspace w-full min-w-0"><ModuleSubnav role={session.role} />{children}</div>
         </main>
       </div>
     </div>

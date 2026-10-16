@@ -186,7 +186,8 @@ assert(uploadSource.includes('skippedExistingCount'), 'Incremental attendance me
 assert(uploadSource.includes('Periode akan dibaca otomatis setelah file dipilih'), 'Field periode upload belum otomatis/read-only.')
 
 const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'))
-assert(pkg.version === '3.6.0', `package.json version harus 3.6.0, saat ini ${pkg.version}`)
+const versionSource = fs.readFileSync(path.join(root, 'lib/version.ts'), 'utf8')
+assert(versionSource.includes(`HARMONY_APP_VERSION = '${pkg.version}'`), `package.json dan lib/version.ts tidak sinkron: ${pkg.version}`)
 assert(fs.existsSync(path.join(root, 'app/api/notifications/attendance-upload/route.ts')), 'Dispatch absensi belum disediakan.')
 assert(uploadSource.includes('processAttendanceUploadEmails'), 'Hook dispatch email upload belum tersedia.')
 assert(sourceText.includes('harmony_claim_attendance_emails_v1'), 'Atomic email claim belum tersedia.')

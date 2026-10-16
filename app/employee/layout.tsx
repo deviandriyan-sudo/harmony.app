@@ -6,11 +6,13 @@ import { useRouter } from 'next/navigation'
 import { Loader2, Menu, ShieldAlert, X } from 'lucide-react'
 
 import { AppSidebar } from '@/components/layout/AppSidebar'
-import { employeeMenu, employeeRemedEntry } from '@/lib/menu'
+import { navigationForRole } from '@/lib/navigation'
+import { ModuleSubnav } from '@/components/layout/ModuleSubnav'
 import { harmonyFetch } from '@/lib/harmony-client'
 import { remedFetch } from '@/lib/remed-client'
 import type { RemedSession } from '@/types/remed'
 import { supabase } from '@/lib/supabase'
+import { hasSupervisorAssignments } from '@/lib/supervisor-navigation'
 
 type AppUser = {
   id: string
@@ -28,6 +30,7 @@ export default function EmployeeLayout({ children }: { children: React.ReactNode
   const [message, setMessage] = useState('Memeriksa akses akun...')
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
   const [hasRemedAccess, setHasRemedAccess] = useState(false)
+  const [hasSubordinates, setHasSubordinates] = useState(false)
 
   useEffect(() => {
     checkAccess()
@@ -74,6 +77,11 @@ export default function EmployeeLayout({ children }: { children: React.ReactNode
         setHasRemedAccess(false)
       }
 
+      // Same supervisor identifiers as the canonical Approval Tim page (homebase and assignments).
+      // Navigation is convenience only; the original page/API keep authorization checks.
+      if (payload.appUser.employee_id) {
+        void hasSupervisorAssignments(payload.appUser.employee_id).then(setHasSubordinates)
+      }
       setAllowed(true)
     } catch (error: any) {
       setMessage(error?.message || 'Akses Employee tidak dapat diverifikasi.')
@@ -104,11 +112,11 @@ export default function EmployeeLayout({ children }: { children: React.ReactNode
   return (
     <div className="harmony-shell min-h-screen overflow-x-hidden">
       <div className="flex min-h-screen w-full overflow-x-hidden">
-        <div className="fixed inset-y-0 left-0 z-30 hidden h-screen w-[272px] lg:block">
+        <div className="fixed inset-y-0 left-0 z-30 hidden h-screen w-[88px] lg:block harmony-desktop-sidebar">
           <AppSidebar
-            menu={hasRemedAccess ? [...employeeMenu, employeeRemedEntry] : employeeMenu}
+            menu={navigationForRole('employee', { remed: hasRemedAccess, supervisor: hasSubordinates })}
             title="HARMONY"
-            subtitle="Integrated HR Platform"
+           
             userName={userName}
             userRole="Employee"
             logoSrc="/logo.png"
@@ -120,12 +128,13 @@ export default function EmployeeLayout({ children }: { children: React.ReactNode
             <button type="button" aria-label="Tutup menu" onClick={() => setMobileSidebarOpen(false)} className="absolute inset-0 bg-black/35 backdrop-blur-sm" />
             <div className="absolute left-0 top-0 h-full max-w-[86vw]">
               <AppSidebar
-                menu={hasRemedAccess ? [...employeeMenu, employeeRemedEntry] : employeeMenu}
+                menu={navigationForRole('employee', { remed: hasRemedAccess, supervisor: hasSubordinates })}
                 title="HARMONY"
-                subtitle="Integrated HR Platform"
+               
                 userName={userName}
                 userRole="Employee"
                 logoSrc="/logo.png"
+                mobile
                 onNavigate={() => setMobileSidebarOpen(false)}
               />
               <button type="button" aria-label="Tutup menu" onClick={() => setMobileSidebarOpen(false)} className="absolute right-[-48px] top-4 flex h-10 w-10 items-center justify-center rounded-2xl bg-white text-[#1d1d1f] shadow-lg"><X size={20} /></button>
@@ -133,7 +142,7 @@ export default function EmployeeLayout({ children }: { children: React.ReactNode
           </div>
         )}
 
-        <main className="min-w-0 flex-1 overflow-x-hidden lg:ml-[272px]">
+        <main className="min-w-0 flex-1 overflow-x-hidden lg:ml-[88px] harmony-desktop-main">
           <div className="harmony-mobile-topbar sticky top-0 z-40 border-b px-4 py-3 lg:hidden">
             <div className="flex items-center justify-between gap-3">
               <button type="button" onClick={() => setMobileSidebarOpen(true)} className="harmony-mobile-glass flex h-11 w-11 items-center justify-center rounded-2xl text-[#1d1d1f]" aria-label="Buka menu"><Menu size={22} /></button>
@@ -148,7 +157,7 @@ export default function EmployeeLayout({ children }: { children: React.ReactNode
               </div>
             </div>
           </div>
-          <div className="harmony-workspace w-full min-w-0">{children}</div>
+          <div className="harmony-workspace w-full min-w-0"><ModuleSubnav role="employee" />{children}</div>
         </main>
       </div>
     </div>
