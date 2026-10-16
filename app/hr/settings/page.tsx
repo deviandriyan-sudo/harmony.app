@@ -1348,6 +1348,10 @@ function DangerActionButton({ icon, title, description, disabled, onClick }: { i
 }
 
 function AlertBox({ type, title, message }: { type: 'success' | 'error'; title: string; message: string }) {
+  const [dismissed, setDismissed] = useState<string | null>(null)
+  const noticeKey = `${type}:${message}`
+  if (dismissed === noticeKey) return null
+
   const className = type === 'success'
     ? 'border-green-200 bg-green-50 text-green-700'
     : 'border-orange-200 bg-orange-50 text-orange-700'
@@ -1356,11 +1360,11 @@ function AlertBox({ type, title, message }: { type: 'success' | 'error'; title: 
 
   return (
     <div role={type === 'error' ? 'alert' : undefined} data-harmony-feedback={type === 'error' ? 'error' : undefined} className={`rounded-2xl border p-4 text-sm leading-6 ${className}`}>
-      <div className="mb-1 flex items-center gap-2 font-bold">
-        {icon}
-        {title}
+      <div className="mb-1 flex items-start justify-between gap-3">
+        <div className="flex items-center gap-2 font-bold">{icon}{title}</div>
+        {type === 'error' && <button type="button" aria-label="Tutup pemberitahuan" title="Tutup pemberitahuan" onClick={() => setDismissed(noticeKey)} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl hover:bg-orange-100 focus-visible:outline-2 focus-visible:outline-orange-600"><X size={17} /></button>}
       </div>
-      {message}
+      <p className="break-words">{message}</p>
     </div>
   )
 }

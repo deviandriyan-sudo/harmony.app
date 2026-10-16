@@ -176,6 +176,29 @@ const dashboardSource = fs.readFileSync(path.join(root, 'app/employee/dashboard/
 assert(dashboardSource.includes('Ajukan Saldo PHL') && dashboardSource.includes('/employee/phl'), 'Dashboard belum menyediakan jalur Pengajuan Saldo PHL terpisah.')
 assert(sourceText.includes('harmony-modal-surface'), 'Modal feedback surface belum terpasang.')
 
+// V3.6.2 UI stacking/interaction safeguards, kept in the existing smoke check.
+const sidebarUi = fs.readFileSync(path.join(root, 'components/layout/AppSidebar.tsx'), 'utf8')
+const topbarUi = fs.readFileSync(path.join(root, 'components/layout/Topbar.tsx'), 'utf8')
+const globalCss = fs.readFileSync(path.join(root, 'app/globals.css'), 'utf8')
+const attendanceUi = fs.readFileSync(path.join(root, 'app/employee/attendance/page.tsx'), 'utf8')
+assert(sidebarUi.includes('aria-label={item.title}') && !sidebarUi.includes('title={item.title}'), 'Sidebar masih memakai tooltip native yang dapat menutupi label expanded.')
+assert(globalCss.includes('.harmony-desktop-sidebar { z-index: 45 !important; }'), 'Prioritas layer sidebar belum diperbaiki.')
+assert(globalCss.includes('.harmony-modal-surface { z-index: 90 !important; }'), 'Prioritas layer modal belum diperbaiki.')
+assert(globalCss.includes('rgba(250, 252, 255, .97)'), 'Popover notifikasi masih terlalu transparan.')
+assert(topbarUi.includes('MutationObserver') && topbarUi.includes('Tutup pusat notifikasi'), 'Pusat notifikasi belum menutup ketika modal dibuka.')
+assert(attendanceUi.includes('aria-label="Tutup pemberitahuan"'), 'Error absensi belum memiliki tombol tutup.')
+
+// Notification plumbing must stay present during presentation-only revisions.
+const queueRoute = fs.readFileSync(path.join(root, 'app/api/notifications/queue/route.ts'), 'utf8')
+const cronRoute = fs.readFileSync(path.join(root, 'app/api/cron/attendance-emails/route.ts'), 'utf8')
+const sender = fs.readFileSync(path.join(root, 'lib/notifications-server.ts'), 'utf8')
+const vercel = JSON.parse(fs.readFileSync(path.join(root, 'vercel.json'), 'utf8'))
+assert(queueRoute.includes('processHarmonyJobQueue'), 'Endpoint drain queue email hilang.')
+assert(cronRoute.includes('processHarmonyJobQueue') && cronRoute.includes('processAttendanceEmailOutbox'), 'Cron email tidak mencakup seluruh queue.')
+assert(sender.includes('enqueueHarmonyEmailJob') && sender.includes('scheduleHarmonyJobQueueDrain'), 'Enqueue/background sender email tidak terhubung.')
+assert(vercel.crons?.some(job => job.path === '/api/cron/attendance-emails'), 'Fallback cron email belum dikonfigurasi.')
+
+
 
 const systemControlSource = fs.readFileSync(path.join(root, 'lib/server/system-control.ts'), 'utf8')
 assert(systemControlSource.includes('harmony_system_controls'), 'System maintenance control belum terpasang.')

@@ -908,7 +908,7 @@ body {
 .harmony-sidebar-panel {
   border: 1px solid rgba(255,255,255,.70) !important;
   background:
-    linear-gradient(155deg, rgba(255,255,255,.66), rgba(247,249,253,.43)) !important;
+    linear-gradient(155deg, rgba(255,255,255,.96), rgba(247,249,253,.92)) !important;
   box-shadow:
     inset 0 1px 0 rgba(255,255,255,.96),
     inset 0 -1px 0 rgba(255,255,255,.26),
@@ -1872,30 +1872,45 @@ body {
   }
 }
 
-/* =========================================================
-   MODAL-AWARE ERROR FEEDBACK
-   Page-level errors stay visible above any active modal instead of
-   being hidden behind its backdrop. Modal-local errors remain inline.
-========================================================= */
-body:has(.harmony-modal-surface) [data-harmony-feedback='error'] {
+/* Page-level validation errors must remain actionable when an edit modal is open.
+   Keep them to the top-right on wide screens so they do not cover form inputs. */
+body:has(.harmony-modal-surface) [data-harmony-feedback='error']:not(.harmony-modal-surface [data-harmony-feedback='error']) {
   position: fixed !important;
-  z-index: 10000 !important;
-  top: max(18px, env(safe-area-inset-top)) !important;
-  left: 50% !important;
-  width: min(calc(100vw - 32px), 760px) !important;
-  max-height: 32vh !important;
+  z-index: 110 !important;
+  top: max(16px, env(safe-area-inset-top)) !important;
+  right: 16px !important;
+  left: auto !important;
+  width: min(calc(100vw - 32px), 430px) !important;
+  max-height: min(35dvh, 280px) !important;
   overflow: auto !important;
-  transform: translateX(-50%) !important;
+  transform: none !important;
   margin: 0 !important;
   box-shadow: 0 24px 70px rgba(15, 23, 42, .24) !important;
+  background: rgba(255, 249, 237, .98) !important;
   backdrop-filter: blur(24px) saturate(165%);
   -webkit-backdrop-filter: blur(24px) saturate(165%);
 }
+@media (max-width: 640px) {
+  body:has(.harmony-modal-surface) [data-harmony-feedback='error']:not(.harmony-modal-surface [data-harmony-feedback='error']) {
+    top: max(12px, env(safe-area-inset-top)) !important;
+    right: 12px !important;
+    width: calc(100vw - 24px) !important;
+  }
+}
 
-/* HARMONY navigation refactor: fixed icon rail + overlay, no content reflow. */
+/* HARMONY navigation: fixed icon rail and smoothly resizing desktop workspace. */
 @media (min-width: 1024px) {
+  body { --harmony-sidebar-content-offset: 88px; }
+  body:has(.harmony-sidebar-shell:not(.harmony-sidebar-mobile):is(:hover, :focus-within, .harmony-sidebar-pinned)) {
+    --harmony-sidebar-content-offset: 264px;
+  }
   .harmony-desktop-sidebar { width: 88px !important; overflow: visible; }
-  .harmony-desktop-main { margin-left: 88px !important; }
+  .harmony-shell .harmony-desktop-main {
+    margin-left: var(--harmony-sidebar-content-offset) !important;
+    min-width: 0;
+    transition: margin-left 290ms cubic-bezier(.22, .61, .36, 1);
+  }
+  .harmony-shell .harmony-workspace { min-width: 0; max-width: 100%; }
 }
 .harmony-sidebar-shell {
   width: 88px;
@@ -1925,9 +1940,84 @@ body:has(.harmony-modal-surface) [data-harmony-feedback='error'] {
 .harmony-sidebar-mobile { padding: 10px 5px; width: min(264px, 86vw); height: 100dvh; transition: none; }
 .harmony-module-subnav nav { scrollbar-width: thin; }
 @media (prefers-reduced-motion: reduce) {
-  .harmony-sidebar-shell, .harmony-side-detail { transition: none !important; }
+  .harmony-sidebar-shell, .harmony-side-detail,
+  .harmony-shell .harmony-desktop-main { transition: none !important; }
 }
 @media print {
-  .harmony-desktop-sidebar, .harmony-module-subnav { display: none !important; }
-  .harmony-desktop-main { margin-left: 0 !important; }
+  .harmony-desktop-sidebar, .harmony-module-subnav,
+  body > .harmony-sidebar-shell:not(.harmony-sidebar-mobile),
+  body > .harmony-notification-portal { display: none !important; }
+  .harmony-shell .harmony-desktop-main { margin-left: 0 !important; transition: none !important; }
+}
+
+/* V3.6.2 — Shared overlay order and legible popovers.
+   Avoid competing sticky header/sidebar stacking contexts during hover-expand. */
+@media (min-width: 1024px) {
+  .harmony-desktop-sidebar { z-index: 45 !important; }
+}
+.harmony-topbar { z-index: 25 !important; }
+.harmony-modal-surface { z-index: 90 !important; }
+.harmony-popover-glass {
+  background: rgba(250, 252, 255, .97) !important;
+  backdrop-filter: blur(30px) saturate(160%) !important;
+  -webkit-backdrop-filter: blur(30px) saturate(160%) !important;
+  box-shadow: 0 28px 80px rgba(26, 39, 67, .22) !important;
+}
+body:has(.harmony-modal-surface) .harmony-popover-glass {
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+/* Text should never leak from the collapsed rail even during hover transitions. */
+.harmony-sidebar-shell:not(.harmony-sidebar-mobile):not(:hover):not(:focus-within):not(.harmony-sidebar-pinned) .harmony-side-detail {
+  max-width: 0 !important;
+  flex: 0 0 0 !important;
+  overflow: hidden !important;
+  transform: translateX(-5px);
+}
+.harmony-sidebar-shell:is(:hover, :focus-within, .harmony-sidebar-pinned) .harmony-side-detail,
+.harmony-sidebar-mobile .harmony-side-detail {
+  max-width: 190px;
+  overflow: hidden;
+  transform: translateX(0);
+}
+
+
+/* V3.6.4 — Native overlay layer for the desktop rail and notifications.
+   These are portaled to document.body to escape backdrop/filter/isolation
+   stacking contexts created by page cards, sticky headers, and scroll areas. */
+@media (min-width: 1024px) {
+  body > .harmony-sidebar-shell:not(.harmony-sidebar-mobile) {
+    position: fixed !important;
+    inset: 0 auto auto 0;
+    z-index: 115 !important;
+  }
+  /* Keep the layout's original 88px rail placeholder inert after portal mount. */
+  .harmony-desktop-sidebar:empty { pointer-events: none; }
+}
+body > .harmony-sidebar-shell:not(.harmony-sidebar-mobile) .harmony-sidebar-panel,
+.harmony-sidebar-mobile .harmony-sidebar-panel {
+  background: linear-gradient(155deg, #fdfefe 0%, #f4f7fc 100%) !important;
+  opacity: 1 !important;
+  box-shadow: 0 18px 60px rgba(28, 42, 68, .20), inset 0 1px 0 #fff !important;
+}
+.harmony-notification-portal {
+  z-index: 125 !important;
+  background: #fbfcff !important;
+  opacity: 1 !important;
+  isolation: isolate;
+  overflow-y: auto !important;
+  overscroll-behavior: contain;
+  box-shadow: 0 24px 78px rgba(20, 31, 53, .26) !important;
+}
+.harmony-notification-portal > * { position: relative; }
+/* Never allow navigation or alerts to intercept modal input. */
+body:has(.harmony-modal-surface) > .harmony-sidebar-shell:not(.harmony-sidebar-mobile) {
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+body:has(.harmony-modal-surface) > .harmony-notification-portal {
+  display: none !important;
+}
+@media (max-width: 1023px) {
+  body > .harmony-sidebar-shell:not(.harmony-sidebar-mobile) { display: none !important; }
 }

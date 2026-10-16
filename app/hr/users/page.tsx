@@ -1714,6 +1714,10 @@ function AlertBox({
   type: 'success' | 'error' | 'info'
   message: string
 }) {
+  const [dismissed, setDismissed] = useState<string | null>(null)
+  const noticeKey = `${type}:${message}`
+  if (dismissed === noticeKey) return null
+
   const className =
     type === 'success'
       ? 'border-green-200 bg-green-50 text-green-700'
@@ -1727,7 +1731,10 @@ function AlertBox({
       data-harmony-feedback={type === 'error' ? 'error' : undefined}
       className={`rounded-2xl border p-4 text-sm ${className}`}
     >
-      {message}
+      <div className="flex items-start justify-between gap-3">
+        <span className="min-w-0 break-words">{message}</span>
+        {type === 'error' && <button type="button" aria-label="Tutup pemberitahuan" title="Tutup pemberitahuan" onClick={() => setDismissed(noticeKey)} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl hover:bg-red-100 focus-visible:outline-2 focus-visible:outline-red-600"><X size={17} /></button>}
+      </div>
     </div>
   )
 }

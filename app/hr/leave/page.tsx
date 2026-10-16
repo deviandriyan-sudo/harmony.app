@@ -1823,11 +1823,22 @@ export default function HRLeavePage() {
 
         {errorMessage && (
           <div role="alert" data-harmony-feedback="error" className="rounded-2xl border border-orange-200 bg-orange-50 p-4 text-sm leading-6 text-orange-700">
-            <div className="mb-1 flex items-center gap-2 font-bold">
-              <AlertTriangle size={18} />
-              Perhatian
+            <div className="mb-2 flex items-start justify-between gap-3">
+              <div className="flex items-center gap-2 font-bold">
+                <AlertTriangle size={18} className="shrink-0" />
+                Perhatian
+              </div>
+              <button
+                type="button"
+                aria-label="Tutup pemberitahuan"
+                title="Tutup pemberitahuan"
+                onClick={() => setErrorMessage("")}
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-orange-700 transition hover:bg-orange-100 focus-visible:outline-2 focus-visible:outline-orange-600"
+              >
+                <X size={18} />
+              </button>
             </div>
-            {errorMessage}
+            <p className="break-words">{errorMessage}</p>
           </div>
         )}
 

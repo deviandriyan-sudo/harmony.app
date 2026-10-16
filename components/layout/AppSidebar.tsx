@@ -4,6 +4,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Loader2, LogOut, Pin, PinOff } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { isNavigationActive, type NavigationItem } from '@/lib/navigation'
@@ -23,6 +24,11 @@ export function AppSidebar({ menu, title = 'HARMONY', userName = 'HARMONY User',
   const router = useRouter()
   const [loggingOut, setLoggingOut] = useState(false)
   const [pinned, setPinned] = useState(false)
+  const [portalReady, setPortalReady] = useState(false)
+
+  // Portal the fixed desktop rail above page stacking contexts; the shared
+  // workspace follows its current width through CSS during expand/collapse.
+  useEffect(() => { setPortalReady(true) }, [])
 
   useEffect(() => {
     if (mobile) return
@@ -53,7 +59,7 @@ export function AppSidebar({ menu, title = 'HARMONY', userName = 'HARMONY User',
     } finally { setLoggingOut(false) }
   }
 
-  return <aside className={`harmony-sidebar-shell ${mobile ? 'harmony-sidebar-mobile' : ''} ${pinned && !mobile ? 'harmony-sidebar-pinned' : ''}`} aria-label="Navigasi HARMONY">
+  const sidebar = <aside className={`harmony-sidebar-shell ${mobile ? 'harmony-sidebar-mobile' : ''} ${pinned && !mobile ? 'harmony-sidebar-pinned' : ''}`} aria-label="Navigasi HARMONY">
     <div className="harmony-sidebar-panel flex h-full min-h-0 flex-col overflow-hidden rounded-[25px]">
       <header className="harmony-sidebar-header flex h-[72px] shrink-0 items-center gap-2 border-b px-[13px]">
         <div className="harmony-logo-glass flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-[15px] border">
@@ -73,7 +79,7 @@ export function AppSidebar({ menu, title = 'HARMONY', userName = 'HARMONY User',
           {menu.map(item => {
             const active = isNavigationActive(pathname, item)
             const Icon = item.icon
-            return <Link key={item.href} href={item.href} title={item.title} onClick={onNavigate} aria-current={active ? 'page' : undefined}
+            return <Link key={item.href} href={item.href} aria-label={item.title} onClick={onNavigate} aria-current={active ? 'page' : undefined}
               className={`harmony-nav-item ${active ? 'harmony-nav-active' : ''} ${item.remed ? 'harmony-nav-remed' : ''} group flex h-[49px] items-center gap-[11px] rounded-[15px] px-[9px] text-slate-700 transition-colors duration-200 focus-visible:outline-2 focus-visible:outline-blue-500`}>
               <span className={`harmony-nav-icon flex h-[39px] w-[39px] shrink-0 items-center justify-center rounded-xl ${active ? 'bg-white/10 text-white' : item.remed ? 'bg-emerald-50 text-emerald-700' : 'bg-white/65 text-slate-600 group-hover:text-blue-600'}`}><Icon size={19} strokeWidth={2} /></span>
               <span className={`harmony-side-detail min-w-0 flex-1 truncate text-[13px] font-semibold ${active ? 'text-white' : 'text-slate-700'}`}>{item.title}</span>
@@ -96,6 +102,10 @@ export function AppSidebar({ menu, title = 'HARMONY', userName = 'HARMONY User',
       </footer>
     </div>
   </aside>
+
+  // Keep the same markup for SSR, then move it above page-level stacking
+  // contexts after hydration. Mobile drawers remain inside their own overlay.
+  return !mobile && portalReady ? createPortal(sidebar, document.body) : sidebar
 }
 
 export default AppSidebar

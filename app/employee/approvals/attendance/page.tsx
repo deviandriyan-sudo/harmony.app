@@ -204,6 +204,16 @@ export default function EmployeeAttendanceApprovalListPage() {
     fetchData(false);
   }, [periodMonth, periodReady]);
 
+  // Return from detail lands on the same employee instead of resetting to the summary.
+  useEffect(() => {
+    if (loading || confirmations.length === 0 || typeof window === "undefined") return;
+    const focusedId = new URLSearchParams(window.location.search).get("focus");
+    if (!focusedId) return;
+    const nodes = document.querySelectorAll<HTMLElement>("[data-approval-employee]");
+    const target = Array.from(nodes).find((node) => node.dataset.approvalEmployee === focusedId && node.getClientRects().length > 0);
+    target?.scrollIntoView({ block: "center", behavior: "smooth" });
+  }, [loading, confirmations, filteredConfirmations]);
+
   async function fetchData(isRefresh = false) {
     if (isRefresh) {
       setRefreshing(true);
@@ -642,6 +652,7 @@ export default function EmployeeAttendanceApprovalListPage() {
                       return (
                         <tr
                           key={confirmation.id}
+                          data-approval-employee={confirmation.employee_id}
                           className="border-b border-black/5 transition hover:bg-[#f8f8fa]"
                         >
                           <td className="px-4 py-4 align-top">
@@ -742,7 +753,7 @@ function MobileApprovalCard({
   employee?: Employee;
 }) {
   return (
-    <div className="rounded-[28px] border border-black/5 bg-white p-4 shadow-sm">
+    <div data-approval-employee={confirmation.employee_id} className="rounded-[28px] border border-black/5 bg-white p-4 shadow-sm">
       <EmployeeIdentity confirmation={confirmation} employee={employee} />
 
       <div className="mt-4 grid grid-cols-2 gap-3">

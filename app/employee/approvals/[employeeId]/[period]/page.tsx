@@ -301,9 +301,8 @@ export default function EmployeeApprovalDetailPage() {
     return normalizeStatus(item.supervisor_approval_status) === 'rejected'
   }).length
 
-  const phlCount = submittedLogs.filter((item) => {
-    return Boolean(item.is_phl_candidate)
-  }).length
+  // Hanya PHL yang ditautkan oleh workflow Pengajuan Saldo PHL independen.
+  const phlCount = logs.filter((item) => Boolean(item.phl_work_request_id)).length
 
   const absenceRequestCount = submittedLogs.filter((item) => {
     return Boolean(item.absence_request_type)
@@ -534,7 +533,9 @@ export default function EmployeeApprovalDetailPage() {
             supervisor_approved_at: now,
             supervisor_reviewed_by: supervisorName,
             supervisor_reviewed_at: now,
-            supervisor_note: note || 'Disetujui oleh atasan.',
+            supervisor_note: note || 'Kehadiran disetujui tanpa menambah saldo PHL.',
+            // Kandidat PHL legacy bukan hak saldo. Link yang sudah disetujui tetap utuh.
+            is_phl_candidate: Boolean(log.phl_work_request_id),
             hr_final_status: 'ready_for_hr',
             absence_request_status: log.absence_request_type ? 'approved_supervisor' : log.absence_request_status,
             updated_at: now,
@@ -667,7 +668,8 @@ export default function EmployeeApprovalDetailPage() {
           supervisor_approved_at: now,
           supervisor_reviewed_by: supervisorName,
           supervisor_reviewed_at: now,
-          supervisor_note: 'Disetujui oleh atasan dari pilihan manual.',
+          supervisor_note: 'Kehadiran disetujui tanpa menambah saldo PHL (pilihan manual).',
+          is_phl_candidate: Boolean(log.phl_work_request_id),
           hr_final_status: 'ready_for_hr',
           absence_request_status: log.absence_request_type ? 'approved_supervisor' : log.absence_request_status,
           updated_at: now,
@@ -675,8 +677,9 @@ export default function EmployeeApprovalDetailPage() {
         .eq('id', log.id)
 
       if (error) {
-        setErrorMessage(error.message)
+        setErrorMessage(formatAttendanceApprovalError(error.message))
         setProcessingPeriod(false)
+        await fetchData(false)
         return
       }
     }
@@ -731,7 +734,8 @@ export default function EmployeeApprovalDetailPage() {
           supervisor_approved_at: now,
           supervisor_reviewed_by: supervisorName,
           supervisor_reviewed_at: now,
-          supervisor_note: 'Disetujui oleh atasan dalam approval periode.',
+          supervisor_note: 'Kehadiran disetujui tanpa menambah saldo PHL (approval periode).',
+          is_phl_candidate: Boolean(log.phl_work_request_id),
           hr_final_status: 'ready_for_hr',
           absence_request_status: log.absence_request_type ? 'approved_supervisor' : log.absence_request_status,
           updated_at: now,
@@ -739,8 +743,9 @@ export default function EmployeeApprovalDetailPage() {
         .eq('id', log.id)
 
       if (error) {
-        setErrorMessage(error.message)
+        setErrorMessage(formatAttendanceApprovalError(error.message))
         setProcessingPeriod(false)
+        await fetchData(false)
         return
       }
     }
@@ -774,8 +779,10 @@ export default function EmployeeApprovalDetailPage() {
       .eq('id', periodConfirmation.id)
 
     if (confirmationError) {
-      setErrorMessage(confirmationError.message)
+      setErrorMessage(formatAttendanceApprovalError(confirmationError.message))
       setProcessingPeriod(false)
+      // Perbarui status di layar apabila tanggal berhasil tetapi header periode gagal.
+      await fetchData(false)
       return
     }
 
@@ -785,7 +792,7 @@ export default function EmployeeApprovalDetailPage() {
       emailInfo = await sendSupervisorApprovalNotification({
         action: 'approved',
         scope: 'period',
-        totalDays: pendingLogs.length,
+        totalDays: submittedLogs.length,
         note: 'Periode disetujui oleh atasan.',
       })
     } catch (emailError: any) {
@@ -793,15 +800,11 @@ export default function EmployeeApprovalDetailPage() {
       emailInfo = `Email notifikasi belum terkirim: ${emailError?.message || 'Terjadi kendala saat mengirim email.'}`
     }
 
-    setSuccessMessage(`Periode absensi berhasil disetujui atasan dan data siap diproses HR. Saldo PHL hanya dibentuk melalui Approval PHL terpisah. ${emailInfo}`)
+    setSuccessMessage(`Periode absensi berhasil disetujui atasan dan siap diproses HR. Tidak ada penambahan saldo PHL dari approval absensi. ${emailInfo}`)
     setProcessingPeriod(false)
-
-    if (typeof window !== "undefined") {
-      window.location.replace(
-        `/employee/approvals?period=${encodeURIComponent(periodMonth)}`,
-      )
-      return
-    }}
+    // Tetap di detail agar status Approved dapat dikonfirmasi; kembali ke daftar melalui tombol Kembali.
+    await fetchData(false)
+  }
 
   async function handleRejectPeriod() {
     if (!periodConfirmation || !rejectReason.trim()) {
@@ -855,8 +858,10 @@ export default function EmployeeApprovalDetailPage() {
       .eq('id', periodConfirmation.id)
 
     if (confirmationError) {
-      setErrorMessage(confirmationError.message)
+      setErrorMessage(formatAttendanceApprovalError(confirmationError.message))
       setProcessingPeriod(false)
+      // Perbarui status di layar apabila tanggal berhasil tetapi header periode gagal.
+      await fetchData(false)
       return
     }
 
@@ -923,11 +928,22 @@ export default function EmployeeApprovalDetailPage() {
 
         {errorMessage && (
           <div role="alert" data-harmony-feedback="error" className="rounded-2xl border border-orange-200 bg-orange-50 p-4 text-sm leading-6 text-orange-700">
-            <div className="mb-1 flex items-center gap-2 font-bold">
-              <AlertTriangle size={18} />
-              Perhatian
+            <div className="mb-2 flex items-start justify-between gap-3">
+              <div className="flex items-center gap-2 font-bold">
+                <AlertTriangle size={18} className="shrink-0" />
+                Perhatian
+              </div>
+              <button
+                type="button"
+                aria-label="Tutup pemberitahuan"
+                title="Tutup pemberitahuan"
+                onClick={() => setErrorMessage("")}
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-orange-700 transition hover:bg-orange-100 focus-visible:outline-2 focus-visible:outline-orange-600"
+              >
+                <X size={18} />
+              </button>
             </div>
-            {errorMessage}
+            <p className="break-words">{errorMessage}</p>
           </div>
         )}
 
@@ -979,11 +995,11 @@ export default function EmployeeApprovalDetailPage() {
           <div className="relative flex flex-col gap-5 2xl:flex-row 2xl:items-end 2xl:justify-between">
             <div className="min-w-0">
               <Link
-                href={`/employee/approvals?period=${encodeURIComponent(periodMonth)}`}
+                href={`/employee/approvals/attendance?period=${encodeURIComponent(periodMonth)}&focus=${encodeURIComponent(employeeId)}`}
                 className="mb-5 inline-flex min-h-10 items-center gap-2 rounded-full border border-white/10 bg-white/10 px-4 text-xs font-semibold text-white/75 backdrop-blur-xl transition hover:bg-white/15"
               >
                 <ArrowLeft size={15} />
-                Kembali ke Approval Tim
+                Kembali ke Daftar Absensi
               </Link>
 
               <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-4 py-2 text-xs font-semibold text-white/75 backdrop-blur-xl">
@@ -1109,7 +1125,7 @@ export default function EmployeeApprovalDetailPage() {
 
               <button
                 type="button"
-                disabled={isReadOnly || processingPeriod || pendingDailyCount === 0}
+                disabled={isReadOnly || processingPeriod || (pendingDailyCount === 0 && approvedDailyCount === 0)}
                 onClick={handleApprovePeriod}
                 className="inline-flex min-h-10 items-center justify-center gap-2 rounded-2xl bg-green-600 px-4 text-xs font-bold text-white transition hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-60"
               >
@@ -1118,7 +1134,7 @@ export default function EmployeeApprovalDetailPage() {
                 ) : (
                   <CheckCircle2 size={16} />
                 )}
-                Approve Semua
+                {pendingDailyCount === 0 ? 'Selesaikan Periode' : 'Approve Semua'}
               </button>
 
               <button
@@ -1150,7 +1166,7 @@ export default function EmployeeApprovalDetailPage() {
           {!loading && (
             <div className="space-y-4 p-4 sm:p-5">
               <div className="rounded-[24px] border border-blue-100 bg-blue-50 px-4 py-3 text-xs leading-6 text-blue-700">
-                <span className="font-bold">Catatan:</span> Centang baris pending untuk approve manual, gunakan Approve Semua untuk menyetujui seluruh tanggal pending, atau buka icon Detail untuk melihat bukti/evidence PHL dan keterangan.
+                <span className="font-bold">Catatan:</span> Approve absensi hanya menyetujui kehadiran/jam kerja, bukan memberikan saldo PHL. Saldo PHL mengikuti Pengajuan Saldo PHL terpisah. Jika seluruh tanggal sudah disetujui tetapi status periode Pending, klik Selesaikan Periode.
               </div>
 
               {calendarRows.length === 0 ? (
@@ -2048,6 +2064,13 @@ function PeriodStatusBadge({
   )
 }
 
+function formatAttendanceApprovalError(message: string) {
+  if (/PHL credit must originate from an approved independent PHL work request/i.test(message)) {
+    return 'Database masih menolak proses karena mendeteksi kredit PHL dari approval absensi. Tidak ada saldo PHL yang boleh dibuat di sini. Periksa status tanggal sebelum mencoba kembali dan laporkan ke HR jika tetap terjadi.'
+  }
+  return message
+}
+
 function getDisplayStatus(row: CalendarRow) {
   const log = row.log
 
@@ -2066,18 +2089,18 @@ function getDisplayStatus(row: CalendarRow) {
 
   if (log?.phl_work_request_id) return 'phl'
 
-  if (hasAttendance && (row.is_weekend || row.holiday_name) && log?.is_phl_candidate) {
-    if (log?.supervisor_approval_status === 'approved') return 'phl'
-    return 'pending_phl'
+  // Work on a holiday can be recognized as presence without PHL entitlement.
+  // Do not revive legacy phl candidates or orphan phl/pending_phl statuses.
+  if (hasAttendance && ['phl', 'pending_phl', 'off_day'].includes(normalizeStatus(log?.status))) {
+    return 'present'
   }
 
   if (row.is_weekend || row.holiday_name) {
     if (!hasAttendance) return 'off_day'
   }
 
-  if (log?.status) return log.status
+  if (log?.status && !['phl', 'pending_phl'].includes(normalizeStatus(log.status))) return log.status
   if (hasAttendance) return 'present'
-
   return row.status
 }
 
@@ -2129,9 +2152,17 @@ function calculatePeriodTotals(calendarRows: CalendarRow[]) {
       totals.totalWorkDays += 1
     }
 
-    if (status === 'phl' || status === 'pending_phl') {
-      totals.phl += 1
+    const hasWorkTime = Boolean(
+      row.log?.check_in || row.log?.check_out || row.log?.manual_check_in ||
+      row.log?.manual_check_out || row.log?.requested_check_in || row.log?.requested_check_out
+    )
+    if (isOffday && hasWorkTime && ['present', 'late', 'incomplete', 'phl', 'official_travel'].includes(status)) {
       totals.holidayWork += 1
+    }
+
+    // PHL terbentuk hanya dari request independen yang sudah tertaut.
+    if (status === 'phl' && row.log?.phl_work_request_id) {
+      totals.phl += 1
       return
     }
 

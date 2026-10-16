@@ -15,6 +15,7 @@ import {
   X,
 } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 
 import { supabase } from '@/lib/supabase'
 import type {
@@ -67,6 +68,20 @@ export function Topbar({
   badge = 'HARMONY System',
 }: TopbarProps) {
   const dropdownRef = useRef<HTMLDivElement | null>(null)
+  const popoverRef = useRef<HTMLDivElement | null>(null)
+  const [popoverPosition, setPopoverPosition] = useState({ top: 78, right: 16, maxHeight: 600 })
+
+  function updatePopoverPosition() {
+    const anchor = dropdownRef.current
+    if (!anchor) return
+    const rect = anchor.getBoundingClientRect()
+    const top = Math.min(rect.bottom + 10, window.innerHeight - 160)
+    setPopoverPosition({
+      top: Math.max(12, top),
+      right: Math.max(12, window.innerWidth - rect.right),
+      maxHeight: Math.max(140, window.innerHeight - top - 12),
+    })
+  }
 
   const [currentEmail, setCurrentEmail] = useState('')
   const [notifications, setNotifications] = useState<NotificationLog[]>([])
@@ -97,7 +112,8 @@ export function Topbar({
     function handleClickOutside(event: MouseEvent) {
       if (
         dropdownRef.current &&
-        !dropdownRef.current.contains(event.target as Node)
+        !dropdownRef.current.contains(event.target as Node) &&
+        !popoverRef.current?.contains(event.target as Node)
       ) {
         setIsOpen(false)
       }
@@ -109,6 +125,35 @@ export function Topbar({
       document.removeEventListener('mousedown', handleClickOutside)
     }
   }, [])
+
+  useEffect(() => {
+    if (!isOpen) return
+
+    updatePopoverPosition()
+    window.addEventListener('resize', updatePopoverPosition)
+    window.addEventListener('scroll', updatePopoverPosition, true)
+
+    if (document.querySelector('.harmony-modal-surface')) {
+      setIsOpen(false)
+      return
+    }
+
+    const observer = new MutationObserver(() => {
+      if (document.querySelector('.harmony-modal-surface')) setIsOpen(false)
+    })
+    observer.observe(document.body, { childList: true, subtree: true })
+
+    function onEscape(event: KeyboardEvent) {
+      if (event.key === 'Escape') setIsOpen(false)
+    }
+    document.addEventListener('keydown', onEscape)
+    return () => {
+      observer.disconnect()
+      document.removeEventListener('keydown', onEscape)
+      window.removeEventListener('resize', updatePopoverPosition)
+      window.removeEventListener('scroll', updatePopoverPosition, true)
+    }
+  }, [isOpen])
 
   useEffect(() => {
     let active = true
@@ -265,6 +310,7 @@ export function Topbar({
 
   async function handleToggleNotification() {
     const nextOpen = !isOpen
+    if (nextOpen) updatePopoverPosition()
     setIsOpen(nextOpen)
 
     if (nextOpen) {
@@ -415,6 +461,8 @@ export function Topbar({
             <button
               type="button"
               onClick={handleToggleNotification}
+              aria-controls="harmony-notification-panel"
+              aria-expanded={isOpen}
               className="harmony-topbar-action relative flex h-11 items-center justify-center gap-2 rounded-full border px-4 text-sm font-semibold text-[#25272c] transition"
             >
               <span className="relative">
@@ -430,8 +478,8 @@ export function Topbar({
               Notifications
             </button>
 
-            {isOpen && (
-              <div className="harmony-popover-glass absolute right-0 top-[58px] z-50 w-[min(460px,calc(100vw-32px))] overflow-hidden rounded-[28px] border">
+            {isOpen && createPortal(
+              <div ref={popoverRef} id="harmony-notification-panel" className="harmony-popover-glass harmony-notification-portal fixed w-[min(460px,calc(100vw-24px))] overflow-hidden rounded-[28px] border" style={popoverPosition} role="dialog" aria-label="Pusat Notifikasi">
                 <div className="flex items-start justify-between gap-3 border-b border-black/5 p-5">
                   <div>
                     <h2 className="text-base font-bold tracking-[-0.02em] text-[#1d1d1f]">
@@ -481,6 +529,7 @@ export function Topbar({
                     <button
                       type="button"
                       onClick={() => setIsOpen(false)}
+                      aria-label="Tutup pusat notifikasi"
                       className="flex h-9 w-9 items-center justify-center rounded-2xl bg-[#f5f5f7] text-[#6e6e73] transition hover:bg-[#e8f2ff] hover:text-[#007aff]"
                     >
                       <X size={16} />
@@ -731,7 +780,7 @@ export function Topbar({
                 <div className="border-t border-black/5 bg-[#f5f5f7]/70 px-5 py-3 text-center text-[11px] leading-5 text-[#86868b]">
                   Task dihitung langsung dari status workflow canonical. Riwayat event tetap diambil dari notification_logs.
                 </div>
-              </div>
+              </div>, document.body
             )}
           </div>
         </div>

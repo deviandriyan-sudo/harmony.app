@@ -2162,11 +2162,22 @@ export default function EmployeeAttendancePage() {
 
         {errorMessage && (
           <div role="alert" data-harmony-feedback="error" className="rounded-2xl border border-orange-200 bg-orange-50 p-4 text-sm leading-6 text-orange-700">
-            <div className="mb-1 flex items-center gap-2 font-bold">
-              <AlertTriangle size={18} />
-              Perhatian
+            <div className="mb-2 flex items-start justify-between gap-3">
+              <div className="flex items-center gap-2 font-bold">
+                <AlertTriangle size={18} className="shrink-0" />
+                Perhatian
+              </div>
+              <button
+                type="button"
+                aria-label="Tutup pemberitahuan"
+                title="Tutup pemberitahuan"
+                onClick={() => setErrorMessage("")}
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-orange-700 transition hover:bg-orange-100 focus-visible:outline-2 focus-visible:outline-orange-600"
+              >
+                <X size={18} />
+              </button>
             </div>
-            {errorMessage}
+            <p className="break-words">{errorMessage}</p>
           </div>
         )}
 
@@ -4088,23 +4099,21 @@ function isPotentialPHL(row: CalendarDayRow, draft?: RowDraft) {
   if (meta?.isPHLClaim) return false;
   if (isOffDayPHLOptOut(row, draft)) return false;
 
-  // V3.3: absensi tidak lagi menciptakan PHL otomatis dari weekend/libur.
-  // Hanya PHL yang sudah tertaut dari workflow PHL independen atau record legacy
-  // yang tetap tampil pada halaman absensi.
-  if (row.log?.phl_work_request_id) return true;
-  if (row.log?.is_phl_candidate === true) return true;
-
-  return false;
+  // Kehadiran di weekend/libur tidak otomatis menjadi hak PHL.
+  // Saldo hanya berasal dari pengajuan kerja PHL independen yang sudah disetujui.
+  // is_phl_candidate legacy tidak lagi menjadikan absensi sebagai permohonan saldo.
+  return Boolean(row.log?.phl_work_request_id);
 }
 
 function getSubmittedStatus(row: CalendarDayRow, draft: RowDraft) {
   const meta = getDailyTypeMeta(draft.daily_type);
 
-  if (isOffDayPHLOptOut(row, draft)) return "off_day";
+  // Karyawan dapat mengakui jam kerja di hari libur tanpa mengajukan saldo PHL.
+  if (isOffDayPHLOptOut(row, draft)) return hasAttendanceActivity(row, draft) ? "present" : "off_day";
   if (isPotentialPHL(row, draft)) return "present";
   if (isLeaveRequestOnOffDay(row, draft)) return "off_day";
   if (meta.status) return meta.status;
-  if (row.log?.status) return row.log.status;
+  if (row.log?.status && !["phl", "pending_phl"].includes(row.log.status)) return row.log.status;
   if (draft.manual_check_in || draft.manual_check_out) return "present";
   if (row.is_weekend || row.holiday_name) return "off_day";
 
@@ -4114,7 +4123,7 @@ function getSubmittedStatus(row: CalendarDayRow, draft: RowDraft) {
 function getDisplayStatus(row: CalendarDayRow, draft: RowDraft) {
   const meta = getDailyTypeMeta(draft.daily_type);
 
-  if (isOffDayPHLOptOut(row, draft)) return "off_day";
+  if (isOffDayPHLOptOut(row, draft)) return hasAttendanceActivity(row, draft) ? "present" : "off_day";
 
   if (row.log?.phl_work_request_id) return "phl";
 
@@ -4283,9 +4292,13 @@ function calculatePeriodTotals(
       return;
     }
 
-    if (status === "phl" || status === "pending_phl") {
-      result.phl += 1;
+    const hasWorkTime = hasAttendanceActivity(row, draft);
+    if (isOffday && hasWorkTime && ["present", "late", "incomplete", "phl", "official_travel"].includes(status)) {
       result.holidayWork += 1;
+    }
+
+    if (status === "phl" && row.log?.phl_work_request_id) {
+      result.phl += 1;
       return;
     }
 
