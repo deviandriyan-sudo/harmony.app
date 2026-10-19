@@ -2085,3 +2085,253 @@ body:has(.harmony-modal-surface) > .harmony-notification-portal {
 @media (prefers-reduced-motion: reduce) {
   .harmony-phl-review-panel *, .harmony-phl-review-item * { transition-duration: 0.01ms !important; }
 }
+
+/* ============================================================================
+   HARMONY V3.6.9 · ULTRA GLASS / PROFESSIONAL
+   Presentation only: all roles, including Re-Med and employee workspaces.
+   Intent: quieter canvas, stronger glass edges/depth, high reading contrast.
+   Keep semantic warning/error/success surfaces and approval states untouched.
+   ============================================================================ */
+:root {
+  --harmony-bg: #edf4fc;
+  --harmony-workspace-bg: #edf4fb;
+  --harmony-text: #172b46;
+  --harmony-muted: #516782;
+  --harmony-subtle: #657a91;
+  --harmony-blue: #1764db;
+  --harmony-blue-soft: #e8f1ff;
+  --harmony-teal: #088d83;
+  --harmony-indigo: #6456c5;
+  --harmony-border: rgba(255, 255, 255, 0.76);
+  --harmony-border-strong: rgba(99, 139, 188, 0.25);
+  --glass-border: rgba(255, 255, 255, 0.9);
+  --harmony-surface-glass: rgba(248, 252, 255, 0.78);
+  --harmony-card: rgba(248, 252, 255, 0.76);
+  --harmony-card-strong: rgba(252, 254, 255, 0.91);
+  --harmony-ultra-edge: inset 0 1.5px 0 rgba(255, 255, 255, 0.98),
+    inset 0 -1px 0 rgba(106, 151, 201, 0.14),
+    inset 1px 0 0 rgba(255, 255, 255, 0.6);
+  --harmony-ultra-shadow: var(--harmony-ultra-edge),
+    0 0 0 1px rgba(80, 118, 168, 0.08),
+    0 8px 18px rgba(47, 88, 141, 0.06),
+    0 24px 56px rgba(41, 81, 128, 0.11);
+  --harmony-ultra-shadow-hover: var(--harmony-ultra-edge),
+    0 0 0 1px rgba(49, 113, 200, 0.17),
+    0 15px 30px rgba(45, 89, 143, 0.1),
+    0 27px 64px rgba(41, 81, 128, 0.13);
+  --glass-shadow: var(--harmony-ultra-shadow);
+  --glass-shadow-hover: var(--harmony-ultra-shadow-hover);
+}
+
+/* Quiet background: no giant bokeh, orbs, decorative illustrations, or patterns. */
+body,
+.harmony-shell {
+  background: linear-gradient(140deg, #e6f0fc 0%, #f4f8fd 52%, #eaf1fa 100%) !important;
+  background-attachment: fixed !important;
+}
+.harmony-workspace {
+  background:
+    linear-gradient(118deg, rgba(180, 213, 247, 0.16), transparent 42%),
+    linear-gradient(155deg, #edf5fe 0%, #f5f8fd 52%, #ebf2fb 100%) !important;
+}
+.harmony-workspace::before,
+.harmony-workspace::after { display: none !important; }
+
+/* Main page surfaces: frosted optics are visible because the canvas is quiet. */
+.harmony-workspace :is(
+  .harmony-card, .harmony-card-solid, .harmony-card-soft,
+  .harmony-unified-surface, .harmony-metric-card,
+  .harmony-unified-toolbar, .harmony-subtle-panel,
+  .harmony-glass, .harmony-phl-review-panel
+) {
+  border: 1px solid rgba(255, 255, 255, 0.91) !important;
+  background:
+    linear-gradient(155deg, rgba(255, 255, 255, 0.93) 0%, rgba(246, 251, 255, 0.74) 54%, rgba(231, 241, 255, 0.64) 100%) !important;
+  box-shadow: var(--harmony-ultra-shadow) !important;
+  backdrop-filter: blur(32px) saturate(156%) !important;
+  -webkit-backdrop-filter: blur(32px) saturate(156%) !important;
+}
+.harmony-workspace :is(.harmony-unified-surface, .harmony-card, .harmony-metric-card):hover {
+  border-color: rgba(255, 255, 255, 0.99) !important;
+  box-shadow: var(--harmony-ultra-shadow-hover) !important;
+}
+
+/* Colored glass metrics only; never recolor status chips or validation feedback. */
+.harmony-workspace .harmony-metric-card:nth-child(4n+1) {
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.94), rgba(223, 238, 255, 0.73)) !important;
+}
+.harmony-workspace .harmony-metric-card:nth-child(4n+2) {
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.94), rgba(220, 245, 239, 0.73)) !important;
+}
+.harmony-workspace .harmony-metric-card:nth-child(4n+3) {
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.94), rgba(235, 230, 252, 0.74)) !important;
+}
+.harmony-workspace .harmony-metric-card:nth-child(4n+4) {
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.94), rgba(253, 240, 220, 0.72)) !important;
+}
+
+/* Fallback for older pages still using Tailwind's white bordered cards. */
+.harmony-workspace :is(section, article, div)[class*="bg-white"][class*="rounded-"][class*="border"]:not(.harmony-modal-surface *):not(.harmony-notification-portal *) {
+  border-color: rgba(255, 255, 255, 0.86);
+  background-color: rgba(251, 253, 255, 0.8);
+  box-shadow: var(--harmony-ultra-edge), 0 10px 26px rgba(49, 90, 144, 0.065);
+}
+
+/* Dark hero retained as a purposeful point of contrast, not a giant opaque slab. */
+.harmony-workspace :is(.harmony-hero-v25, .harmony-glass-dark) {
+  border-color: rgba(201, 230, 255, 0.3) !important;
+  background:
+    linear-gradient(125deg, rgba(18, 43, 77, 0.96), rgba(34, 64, 102, 0.94) 66%, rgba(23, 79, 116, 0.93)) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.23),
+    inset 0 -1px 0 rgba(154, 205, 250, 0.08),
+    0 24px 52px rgba(32, 66, 107, 0.2) !important;
+  color: #f7fbff;
+}
+
+/* Consistent glass controls and modular tabs; selected/semantic states keep priority. */
+.harmony-module-subnav,
+.harmony-topbar,
+.harmony-mobile-topbar {
+  border-color: rgba(255, 255, 255, 0.83) !important;
+  background: rgba(238, 246, 255, 0.82) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.99),
+    0 9px 25px rgba(47, 88, 141, 0.085) !important;
+  backdrop-filter: blur(32px) saturate(160%) !important;
+  -webkit-backdrop-filter: blur(32px) saturate(160%) !important;
+}
+.harmony-topbar-search,
+.harmony-topbar-action,
+.harmony-topbar-badge,
+.harmony-mobile-brand,
+.harmony-mobile-glass {
+  border-color: rgba(255, 255, 255, 0.94) !important;
+  background: rgba(255, 255, 255, 0.77) !important;
+  box-shadow: var(--harmony-ultra-edge), 0 7px 18px rgba(49, 90, 144, 0.07) !important;
+}
+.harmony-workspace :where(input:not([type='checkbox']):not([type='radio']):not([type='file']), select, textarea) {
+  border-color: rgba(153, 181, 211, 0.35);
+  background-color: rgba(253, 254, 255, 0.88);
+  color: #183250;
+}
+.harmony-workspace :where(input:not([type='checkbox']):not([type='radio']):not([type='file']), select, textarea):focus-visible {
+  outline-color: #2778e5;
+  border-color: rgba(39, 120, 229, 0.54);
+  box-shadow: 0 0 0 3px rgba(39, 120, 229, 0.12);
+}
+.harmony-workspace :where(button, a, input, select, textarea):focus-visible {
+  outline: 2px solid #2476dd;
+  outline-offset: 2px;
+}
+.harmony-workspace :where(.harmony-button-native-outline, .harmony-button-native-secondary, .harmony-button-secondary, .harmony-action-soft) {
+  background: rgba(250, 253, 255, 0.87) !important;
+  border-color: rgba(255, 255, 255, 0.94) !important;
+  box-shadow: var(--harmony-ultra-edge), 0 6px 15px rgba(49, 90, 144, 0.06) !important;
+  color: #244466;
+}
+.harmony-workspace :where(.harmony-button-native-outline, .harmony-button-native-secondary, .harmony-button-secondary, .harmony-action-soft):hover {
+  background: rgba(236, 246, 255, 0.96) !important;
+  color: #103d77;
+}
+
+/* Sidebar is clearly glass but sufficiently opaque to prevent labels behind it. */
+body > .harmony-sidebar-shell:not(.harmony-sidebar-mobile) .harmony-sidebar-panel,
+.harmony-sidebar-mobile .harmony-sidebar-panel {
+  border: 1px solid rgba(255, 255, 255, 0.95) !important;
+  background: linear-gradient(155deg, rgba(242, 249, 255, 0.96), rgba(226, 239, 252, 0.94)) !important;
+  box-shadow: var(--harmony-ultra-edge), 0 19px 46px rgba(36, 70, 113, 0.2) !important;
+  backdrop-filter: blur(44px) saturate(166%) !important;
+  -webkit-backdrop-filter: blur(44px) saturate(166%) !important;
+}
+.harmony-sidebar-user,
+.harmony-logo-glass,
+.harmony-logout {
+  border-color: rgba(255, 255, 255, 0.9) !important;
+  background: rgba(249, 253, 255, 0.8) !important;
+  box-shadow: var(--harmony-ultra-edge), 0 8px 18px rgba(50, 94, 147, 0.065) !important;
+}
+.harmony-nav-active,
+.harmony-nav-active.harmony-nav-remed {
+  border: 1px solid rgba(181, 220, 255, 0.48) !important;
+  background: linear-gradient(130deg, #154b9c, #2078df 76%, #1884cc) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3),
+    0 9px 23px rgba(27, 104, 196, 0.22) !important;
+  color: #fff !important;
+}
+.harmony-nav-active.harmony-nav-remed {
+  background: linear-gradient(130deg, #126454, #138c7c) !important;
+}
+.harmony-nav-item:not(.harmony-nav-active):hover {
+  background: rgba(250, 253, 255, 0.9) !important;
+}
+
+/* Portaled notification must sit above content, yet below dialog layer. */
+.harmony-notification-portal,
+.harmony-popover-glass {
+  border-color: rgba(255, 255, 255, 0.95) !important;
+  background: rgba(250, 253, 255, 0.98) !important;
+  box-shadow: var(--harmony-ultra-edge), 0 26px 67px rgba(34, 67, 113, 0.2) !important;
+}
+
+/* Public login and password reset follow same visual language, without blobs. */
+.harmony-login-bg,
+.harmony-reference-login-bg {
+  background: linear-gradient(140deg, #e5f0fc, #f5f9fd 56%, #eaf1fb) !important;
+}
+.harmony-reference-login-bg::before,
+.harmony-reference-login-bg::after,
+.harmony-reference-orb { opacity: 0.16 !important; }
+.harmony-login-shell,
+.harmony-reference-shell {
+  border-color: rgba(255, 255, 255, 0.94) !important;
+  box-shadow: var(--harmony-ultra-edge), 0 35px 85px rgba(35, 71, 119, 0.16) !important;
+}
+.harmony-login-field,
+.harmony-reference-field,
+.harmony-login-google,
+.harmony-reference-google {
+  border-color: rgba(255, 255, 255, 0.95) !important;
+  background: rgba(252, 254, 255, 0.83) !important;
+  box-shadow: var(--harmony-ultra-edge), 0 8px 18px rgba(43, 84, 132, 0.07) !important;
+}
+
+/* Accessibility and export/print. Do not print semi-transparent reporting tables. */
+@media (prefers-reduced-transparency: reduce) {
+  .harmony-workspace :is(.harmony-card, .harmony-card-solid, .harmony-card-soft, .harmony-unified-surface, .harmony-metric-card, .harmony-unified-toolbar, .harmony-subtle-panel),
+  .harmony-sidebar-panel,
+  .harmony-topbar,
+  .harmony-popover-glass { background: #f8fbff !important; backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
+}
+@media (max-width: 767px) {
+  .harmony-workspace :is(.harmony-card, .harmony-card-solid, .harmony-card-soft, .harmony-unified-surface, .harmony-metric-card) {
+    backdrop-filter: blur(20px) saturate(145%) !important;
+    -webkit-backdrop-filter: blur(20px) saturate(145%) !important;
+  }
+}
+@media print {
+  body, .harmony-shell, .harmony-workspace,
+  .harmony-workspace :is(.harmony-card, .harmony-card-solid, .harmony-card-soft, .harmony-unified-surface, .harmony-metric-card, .harmony-unified-toolbar, .harmony-subtle-panel) {
+    background: #fff !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+  .harmony-workspace :is(.harmony-hero-v25, .harmony-glass-dark) {
+    background: #fff !important; color: #172b46 !important;
+  }
+}
+
+/* OAuth callback and password reset retain the same quiet ultra-glass canvas. */
+.harmony-public-page {
+  background: linear-gradient(140deg, #e5f0fc, #f5f9fd 56%, #eaf1fb) !important;
+}
+.harmony-public-page > .pointer-events-none { opacity: 0.16; }
+.harmony-public-shell {
+  border-color: rgba(255, 255, 255, 0.94) !important;
+  background: linear-gradient(150deg, rgba(255, 255, 255, 0.94), rgba(235, 245, 255, 0.8)) !important;
+  box-shadow: var(--harmony-ultra-edge), 0 30px 80px rgba(36, 74, 121, 0.16) !important;
+  backdrop-filter: blur(32px) saturate(150%) !important;
+  -webkit-backdrop-filter: blur(32px) saturate(150%) !important;
+}
+@media print {
+  .harmony-public-page, .harmony-public-shell { background: #fff !important; box-shadow: none !important; }
+}

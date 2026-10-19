@@ -134,8 +134,8 @@ export default function ResetPasswordPage() {
 
   if (checkingSession) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-[#f5f5f7] p-6">
-        <div className="w-full max-w-md rounded-[32px] border border-black/5 bg-white p-8 text-center shadow-[0_24px_70px_rgba(15,23,42,0.12)]">
+      <main className="harmony-public-page flex min-h-screen items-center justify-center bg-[#f5f5f7] p-6">
+        <div className="harmony-public-shell w-full max-w-md rounded-[32px] border border-black/5 bg-white p-8 text-center shadow-[0_24px_70px_rgba(15,23,42,0.12)]">
           <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[#e8f2ff] text-[#007aff]">
             <Loader2 size={26} className="animate-spin" />
           </div>
@@ -153,13 +153,13 @@ export default function ResetPasswordPage() {
   }
 
   return (
-    <main className="relative min-h-screen overflow-hidden bg-[#f4f7fb] px-5 py-6 text-[#1d1d1f]">
+    <main className="harmony-public-page relative min-h-screen overflow-hidden bg-[#f4f7fb] px-5 py-6 text-[#1d1d1f]">
       <div className="pointer-events-none absolute -left-32 -top-32 h-96 w-96 rounded-full bg-[#007aff]/20 blur-3xl" />
       <div className="pointer-events-none absolute -bottom-36 right-0 h-[30rem] w-[30rem] rounded-full bg-[#af52de]/20 blur-3xl" />
       <div className="pointer-events-none absolute left-1/2 top-1/3 h-80 w-80 -translate-x-1/2 rounded-full bg-[#34c759]/12 blur-3xl" />
 
       <section className="relative mx-auto flex min-h-[calc(100vh-48px)] w-full max-w-5xl items-center justify-center">
-        <div className="grid w-full overflow-hidden rounded-[42px] border border-white/70 bg-white/72 shadow-[0_35px_100px_rgba(15,23,42,0.16)] backdrop-blur-2xl lg:grid-cols-[0.9fr_1.1fr]">
+        <div className="harmony-public-shell grid w-full overflow-hidden rounded-[42px] border border-white/70 bg-white/72 shadow-[0_35px_100px_rgba(15,23,42,0.16)] backdrop-blur-2xl lg:grid-cols-[0.9fr_1.1fr]">
           <section className="relative hidden min-h-[580px] overflow-hidden bg-[#111113] p-9 text-white lg:block">
             <div className="pointer-events-none absolute -right-20 -top-20 h-72 w-72 rounded-full bg-[#007aff]/35 blur-3xl" />
             <div className="pointer-events-none absolute -bottom-28 -left-20 h-72 w-72 rounded-full bg-[#af52de]/25 blur-3xl" />

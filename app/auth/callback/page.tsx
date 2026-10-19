@@ -68,8 +68,8 @@ export default function AuthCallbackPage() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-[#f5f5f7] p-6">
-      <div className="w-full max-w-md rounded-[34px] border border-black/5 bg-white p-8 text-center shadow-xl">
+    <main className="harmony-public-page flex min-h-screen items-center justify-center bg-[#f5f5f7] p-6">
+      <div className="harmony-public-shell w-full max-w-md rounded-[34px] border border-black/5 bg-white p-8 text-center shadow-xl">
         <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-3xl bg-[#e8f2ff] text-[#007aff]">
           <ShieldCheck size={28} />
         </div>
