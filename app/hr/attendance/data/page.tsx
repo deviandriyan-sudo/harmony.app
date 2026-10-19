@@ -108,6 +108,10 @@ export default function HRAttendanceDataPage() {
           </div>
         </section>
 
+        <div className="flex justify-end">
+          <Link href="/hr/attendance/export/history" className="harmony-button-secondary"><FileSpreadsheet size={16}/>Export Detail Multi-Periode</Link>
+        </div>
+
         <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
           <MetricCard label="Karyawan" value={totals.employees} tone="blue" />
           <MetricCard label="Kehadiran Tercatat" value={totals.recorded} tone="blue" />

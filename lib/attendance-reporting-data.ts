@@ -79,16 +79,36 @@ export type AttendanceReportingRow = {
   synthetic: boolean
 }
 
+/** Historical HR exports must not silently stop at Supabase's default row limit. */
+async function allPages<T>(
+  query: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>,
+): Promise<{ data: T[]; error: { message: string } | null }> {
+  const output: T[] = []
+  const pageSize = 500
+  for (let offset = 0; ; offset += pageSize) {
+    const result = await query(offset, offset + pageSize - 1)
+    if (result.error) return { data: [], error: result.error }
+    output.push(...(result.data || []))
+    if ((result.data || []).length < pageSize) break
+    if (offset >= 100000) return { data: [], error: { message: 'Jumlah data terlalu besar. Persempit rentang laporan.' } }
+  }
+  return { data: output, error: null }
+}
+
 export async function loadAttendanceReportingDataset(
   supabase: SupabaseClient,
   periodMonth: string,
+  options: { exhaustive?: boolean } = {},
 ): Promise<AttendanceReportingDataset> {
   const range = getCutoffRange(periodMonth)
   const warnings: string[] = []
 
   const [employeeResult, logResult, holidayResult, confirmationResult] = await Promise.all([
     supabase.from('employees').select('*').order('full_name', { ascending: true }),
-    supabase
+    options.exhaustive ? allPages((from, to) => supabase
+      .from('attendance_logs').select('*')
+      .is('deleted_at', null).gte('attendance_date', range.start).lte('attendance_date', range.end)
+      .order('attendance_date', { ascending: true }).order('id', { ascending: true }).range(from, to)) : supabase
       .from('attendance_logs')
       .select('*')
       .is('deleted_at', null)
@@ -113,13 +133,18 @@ export async function loadAttendanceReportingDataset(
   if (confirmationResult.error) throw confirmationResult.error
 
   const [leaveResult, phlResult, requestTypeResult] = await Promise.all([
-    supabase
+    options.exhaustive ? allPages((from, to) => supabase
+      .from('leave_requests').select('*').lte('start_date', range.end).gte('end_date', range.start)
+      .order('start_date', { ascending: true }).order('id', { ascending: true }).range(from, to)) : supabase
       .from('leave_requests')
       .select('*')
       .lte('start_date', range.end)
       .gte('end_date', range.start)
       .order('start_date', { ascending: true }),
-    supabase
+    options.exhaustive ? allPages((from, to) => supabase
+      .from('phl_records').select('*').eq('source', 'employee_phl_claim')
+      .gte('phl_date', range.start).lte('phl_date', range.end)
+      .order('phl_date', { ascending: true }).order('id', { ascending: true }).range(from, to)) : supabase
       .from('phl_records')
       .select('*')
       .eq('source', 'employee_phl_claim')
@@ -202,6 +227,7 @@ export async function loadAttendanceReportingDataset(
 export function buildAttendanceReportingRows(
   dataset: AttendanceReportingDataset,
   periodMonth: string,
+  options: { includeInactive?: boolean } = {},
 ): AttendanceReportingRow[] {
   const range = getCutoffRange(periodMonth)
   const confirmationMap = new Map<string, AttendancePeriodConfirmation>()
@@ -247,7 +273,7 @@ export function buildAttendanceReportingRows(
         hasPeriodActivity,
       }
     })
-    .filter((row) => row.employee.is_active !== false || row.hasPeriodActivity)
+    .filter((row) => options.includeInactive || row.employee.is_active !== false || row.hasPeriodActivity)
     .map(({ hasPeriodActivity: _hasPeriodActivity, ...row }) => row)
     .sort((a, b) =>
       String(a.employee.full_name || a.employee.employee_number || a.employee.machine_pin || '').localeCompare(

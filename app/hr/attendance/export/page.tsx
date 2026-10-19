@@ -446,6 +446,11 @@ export default function HRAttendanceExportPage() {
           </div>
         </section>
 
+        <section className="harmony-card flex flex-wrap items-center justify-between gap-3 p-4 sm:p-5">
+          <div className="flex items-center gap-3"><div className="rounded-2xl bg-blue-50 p-3 text-blue-700"><FileSpreadsheet size={20}/></div><div><h2 className="font-semibold text-slate-800">Butuh detail absensi beberapa bulan?</h2><p className="mt-1 text-xs text-slate-600">Pilih 1 atau beberapa karyawan, cek manual/fingerprint, lalu unduh Excel lintas periode.</p></div></div>
+          <Link href="/hr/attendance/export/history" className="harmony-button-primary"><Download size={16}/>Export Detail Multi-Periode</Link>
+        </section>
+
         <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
           <MetricCard label="Karyawan" value={totals.employees} tone="blue" />
           <MetricCard label="Kehadiran Tercatat" value={totals.recorded} tone="blue" />

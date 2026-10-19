@@ -92,6 +92,9 @@ function cellStyle(heading: string, value: ReportValue, row: ReportRow, rowNumbe
   const label = heading.toLowerCase()
   const normalized = String(value ?? '').trim().toLowerCase()
   const base = rowNumber % 2 === 0 ? 0 : 2
+  if (/perlu pemeriksaan/.test(label) && normalized === 'ya') return 4
+  if (/indikator pemeriksaan/.test(label) && normalized) return /konflik|hanya pulang/.test(normalized) ? 7 : 4
+  if (/jam (masuk|pulang) manual|request koreksi/.test(label) && normalized && normalized !== '-') return 5
   if (/nominal|plafond|saldo.*rp|biaya|total dibayar|jumlah.*rp|amount|total.*klaim/i.test(label) && typeof value === 'number') return 11
   if (/terlambat|pulang cepat/.test(label) && value !== '' && value != null && (normalized === 'ya' || Number(value) > 0)) return 4
   if (/manual|koreksi/.test(label) && !/pending/.test(label) && normalized && normalized !== '-' && normalized !== 'tidak' && normalized !== '0') return 5
