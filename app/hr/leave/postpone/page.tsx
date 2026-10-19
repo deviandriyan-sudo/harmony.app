@@ -727,7 +727,7 @@ async function notifyPostponeDecisionByEmail({
       success: true,
 
       message:
-        `Email notifikasi terkirim ke ${recipientEmail}.`,
+        `Notifikasi email diproses untuk ${recipientEmail}.`,
     }
   } catch (error: any) {
     return {

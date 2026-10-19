@@ -992,7 +992,7 @@ export default function EmployeeLeavePage() {
 
     setSuccessMessage(
       notificationResult.success
-        ? `${selectedRequestMeta.label} berhasil diajukan dan email notifikasi terkirim ke ${notificationResult.count} penerima.`
+        ? `${selectedRequestMeta.label} berhasil diajukan dan notifikasi email diproses untuk ${notificationResult.count} penerima.`
         : `${selectedRequestMeta.label} berhasil diajukan, tetapi email notifikasi belum terkirim: ${notificationResult.message}.`
     )
 

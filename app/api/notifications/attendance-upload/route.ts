@@ -1,14 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireHRApi, apiError } from '@/lib/server/hr-api-auth'
-import { getAttendanceEmailStats, processAttendanceEmailOutbox } from '@/lib/server/attendance-email-outbox'
+import { getAttendanceEmailDiagnostics, processAttendanceEmailOutbox } from '@/lib/server/attendance-email-outbox'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
+export const maxDuration = 60
 
 export async function GET(request: NextRequest) {
   try {
     const { admin } = await requireHRApi(request)
-    return NextResponse.json({ ok: true, counts: await getAttendanceEmailStats(admin) },
+    return NextResponse.json({ ok: true, ...await getAttendanceEmailDiagnostics(admin) },
       { headers: { 'Cache-Control': 'no-store' } })
   } catch (error) {
     const details = apiError(error)

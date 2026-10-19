@@ -298,7 +298,8 @@ export async function getResendDomainDiagnostic(): Promise<ResendDomainDiagnosti
 }
 
 export async function deliverHarmonyServerEmail(
-  payload: HarmonyServerEmailPayload
+  payload: HarmonyServerEmailPayload,
+  options: { maxAttempts?: number; timeoutMs?: number } = {},
 ): Promise<HarmonyServerEmailResult> {
   const control = await getHarmonySystemControl(supabaseAdmin)
   if (!control.emailEnabled) {
@@ -441,9 +442,11 @@ export async function deliverHarmonyServerEmail(
   const idempotencyKey = payload.idempotencyKey || `harmony-${randomUUID()}`
   let lastError = 'Pengiriman email gagal.'
 
-  for (let attempt = 0; attempt < 3; attempt++) {
+  const maxAttempts = Math.max(1, Math.min(3, Number(options.maxAttempts || 3)))
+  const timeoutMs = Math.max(3000, Math.min(20000, Number(options.timeoutMs || 20000)))
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
     const controller = new AbortController()
-    const timeout = setTimeout(() => controller.abort(), 20000)
+    const timeout = setTimeout(() => controller.abort(), timeoutMs)
     try {
       const response = await fetch('https://api.resend.com/emails', {
         method: 'POST',
@@ -465,14 +468,14 @@ export async function deliverHarmonyServerEmail(
         }
       }
       lastError = result?.message || `Email gagal dikirim melalui Resend (HTTP ${response.status}).`
-      if (![429, 500, 502, 503, 504].includes(response.status) || attempt === 2) {
+      if (![429, 500, 502, 503, 504].includes(response.status) || attempt === maxAttempts - 1) {
         return { ok: false, message: lastError, detail: result }
       }
     } catch (error: any) {
       lastError = error?.name === 'AbortError'
-        ? 'Pengiriman email melewati batas waktu 20 detik.'
+        ? 'Pengiriman email melewati batas waktu provider.'
         : error?.message || 'Tidak dapat menghubungi Resend.'
-      if (attempt === 2) return { ok: false, message: lastError }
+      if (attempt === maxAttempts - 1) return { ok: false, message: lastError }
     } finally {
       clearTimeout(timeout)
     }
@@ -546,16 +549,28 @@ export async function sendHarmonyServerEmail(
     }
   }
 
-  scheduleHarmonyJobQueueDrain()
+  if (queued.status === 'failed') {
+    return { ok: false, message: 'Email pernah gagal permanen; gunakan Coba Lagi pada Diagnostik Email.' }
+  }
+
+  const scheduled = queued.status === 'completed' ? true : scheduleHarmonyJobQueueDrain()
+  const system = await getHarmonySystemControl(supabaseAdmin)
+  const paused = !system.configured || !system.emailEnabled
   return {
     ok: true,
-    message: queued.duplicate
-      ? 'Email sudah ada di antrean HARMONY.'
-      : 'Email masuk antrean HARMONY dan akan dikirim di background.',
+    message: queued.status === 'completed'
+        ? 'Email notifikasi sebelumnya sudah diterima oleh provider.'
+        : paused
+          ? 'Email tersimpan dalam antrean, tetapi worker sedang ditunda oleh System Control.'
+          : queued.duplicate
+            ? 'Email sudah ada di antrean HARMONY (belum tentu terkirim).'
+            : scheduled
+              ? 'Email tersimpan di antrean dan dijadwalkan untuk dikirim.'
+              : 'Email tersimpan di antrean; penjadwalan otomatis tidak tersedia. Periksa cron/queue.',
     providerId: null,
-    queued: true,
+    queued: queued.status !== 'completed',
     queueId: queued.id,
-    detail: { queued: true, duplicate: queued.duplicate, status: queued.status },
+    detail: { queued: queued.status !== 'completed', duplicate: queued.duplicate, status: queued.status, scheduled, paused },
   }
 }
 

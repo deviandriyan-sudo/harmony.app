@@ -1,16 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
 
 import { apiError, requireHRApi } from '@/lib/server/hr-api-auth'
-import { getHarmonyJobQueueStats, processHarmonyJobQueue } from '@/lib/server/job-queue'
+import { getHarmonyJobQueueDiagnostics, processHarmonyJobQueue } from '@/lib/server/job-queue'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
+export const maxDuration = 60
 
 export async function GET(request: NextRequest) {
   try {
     const { admin } = await requireHRApi(request)
-    const counts = await getHarmonyJobQueueStats(admin)
-    return NextResponse.json({ ok: true, counts }, { headers: { 'Cache-Control': 'no-store' } })
+    const diagnostics = await getHarmonyJobQueueDiagnostics(admin)
+    return NextResponse.json({ ok: true, ...diagnostics }, { headers: { 'Cache-Control': 'no-store' } })
   } catch (error) {
     const details = apiError(error)
     return NextResponse.json({ ok: false, message: details.message }, { status: details.status })

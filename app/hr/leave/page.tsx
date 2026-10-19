@@ -451,7 +451,7 @@ async function sendHRLeaveDecisionEmail({
 
     return {
       success: true,
-      message: `Email notifikasi terkirim ke ${recipient.email}.`,
+      message: `Notifikasi email diproses untuk ${recipient.email}.`,
     }
   } catch (error: any) {
     return {
@@ -515,7 +515,7 @@ async function sendHRLeaveCancellationEmail({
 
     return {
       success: true,
-      message: `Email notifikasi terkirim ke ${recipient.email}.`,
+      message: `Notifikasi email diproses untuk ${recipient.email}.`,
     }
   } catch (error: any) {
     return {
@@ -583,7 +583,7 @@ async function sendHRPHLDecisionEmail({
 
     return {
       success: true,
-      message: `Email notifikasi terkirim ke ${recipient.email}.`,
+      message: `Notifikasi email diproses untuk ${recipient.email}.`,
     }
   } catch (error: any) {
     return {
@@ -651,7 +651,7 @@ async function sendHRPHLCancellationEmail({
 
     return {
       success: true,
-      message: `Email notifikasi terkirim ke ${recipient.email}.`,
+      message: `Notifikasi email diproses untuk ${recipient.email}.`,
     }
   } catch (error: any) {
     return {

@@ -112,6 +112,13 @@ export async function processHarmonyJobQueue(
     }
   }
 
+  const { getNotificationEnvironmentStatus } = await import('@/lib/notifications-server')
+  const env = getNotificationEnvironmentStatus()
+  if (!env.resendApiKeyConfigured || !env.fromConfigured) {
+    return { ok: false, paused: true, claimed: 0, completed: 0, failed: 0, remaining: 0,
+      message: 'Resend belum siap: cek RESEND_API_KEY dan NOTIFICATION_FROM_EMAIL.' }
+  }
+
   const { data, error } = await admin.rpc('harmony_claim_jobs_v1', {
     p_job_type: 'email',
     p_limit: Math.max(1, Math.min(Number(options.limit || 8), 25)),
@@ -139,11 +146,11 @@ export async function processHarmonyJobQueue(
         text: payload.text,
         replyTo: payload.replyTo,
         idempotencyKey: payload.idempotencyKey,
-      })
-    } catch (error: any) {
+      }, { maxAttempts: 1, timeoutMs: 10000 })
+    } catch (error: unknown) {
       result = {
         ok: false,
-        message: error?.message || 'Worker queue gagal memproses email.',
+        message: error instanceof Error ? error.message : 'Worker queue gagal memproses email.',
       }
     }
 
@@ -170,8 +177,10 @@ export async function processHarmonyJobQueue(
 
       if (saved.error) {
         console.error('HARMONY queue completion update failed:', saved.error.message)
+        failed++
+      } else {
+        completed++
       }
-      completed++
     } else {
       const saved = await admin
         .from('harmony_job_queue')
@@ -223,17 +232,80 @@ export async function processHarmonyJobQueue(
   }
 }
 
-export function scheduleHarmonyJobQueueDrain() {
+// A Vercel request may enqueue several notifications. Drain multiple small batches,
+// not only the first eight jobs, so later emails are not stranded until the next cron.
+// next/server.after() keeps the worker attached to the request lifecycle.
+export function scheduleHarmonyJobQueueDrain(): boolean {
   try {
     after(async () => {
+      const startedAt = Date.now()
       try {
-        await processHarmonyJobQueue(supabaseAdmin, { limit: 8 })
+        for (let batchNumber = 0; batchNumber < 4; batchNumber++) {
+          if (Date.now() - startedAt > 18_000) break
+          const batch = await processHarmonyJobQueue(supabaseAdmin, { limit: 2 })
+          if (batch.paused || !batch.claimed || !batch.remaining) break
+          // Do not repeatedly claim jobs during a provider outage.
+          if (batch.failed && !batch.completed) break
+        }
       } catch (error) {
-        console.error('HARMONY background queue drain failed:', error)
+        console.error('HARMONY background notification drain failed:', error)
       }
     })
-  } catch {
-    // Outside a request lifecycle there is no after() context. Cron is the fallback.
+    return true
+  } catch (error) {
+    // A background context is not always available (scripts, tests).
+    // A scheduled cron or an authenticated HR manual drain is still required.
+    console.warn('HARMONY after() queue scheduling unavailable:', error)
+    return false
+  }
+}
+
+// Never return recipient addresses, email body, or database payload from diagnostics.
+export async function getHarmonyJobQueueDiagnostics(admin: SupabaseClient) {
+  const [counts, control, provider] = await Promise.all([
+    getHarmonyJobQueueStats(admin),
+    getHarmonySystemControl(admin),
+    import('@/lib/notifications-server').then(({ getNotificationEnvironmentStatus }) =>
+      getNotificationEnvironmentStatus(),
+    ),
+  ])
+  const now = new Date().toISOString()
+  const [{ count: due, error: dueError }, { data: recent, error: recentError }] = await Promise.all([
+    admin.from('harmony_job_queue').select('id', { head: true, count: 'exact' })
+      .eq('job_type', 'email').eq('status', 'pending').lte('next_attempt_at', now),
+    admin.from('harmony_job_queue')
+      .select('status,attempts,last_error,updated_at,next_attempt_at')
+      .eq('job_type', 'email')
+      .in('status', ['failed', 'pending', 'processing'])
+      .order('updated_at', { ascending: false }).limit(12),
+  ])
+  if (dueError) throw new Error(dueError.message)
+  if (recentError) throw new Error(recentError.message)
+  const errors = (recent || []).filter((row) => Boolean(row.last_error)).slice(0, 5)
+    .map((row) => ({
+      status: row.status,
+      attempts: Number(row.attempts || 0),
+      at: row.updated_at,
+      message: String(row.last_error || '').replace(/[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}/g, '[email]').slice(0, 250),
+    }))
+  const pausedReason = !control.configured
+    ? 'System Control belum tersedia/terbaca. Worker berhenti agar maintenance tidak dilanggar.'
+    : !control.emailEnabled
+      ? 'Maintenance Mode aktif; pengiriman email ditunda.'
+      : !provider.resendApiKeyConfigured || !provider.fromConfigured
+        ? 'Konfigurasi RESEND_API_KEY atau NOTIFICATION_FROM_EMAIL belum lengkap.'
+        : null
+  return {
+    counts,
+    due: due || 0,
+    paused: Boolean(pausedReason),
+    paused_reason: pausedReason,
+    system_control_configured: control.configured,
+    email_enabled: control.emailEnabled,
+    sender_configured: provider.fromConfigured,
+    provider_configured: provider.resendApiKeyConfigured,
+    last_errors: errors,
+    checked_at: now,
   }
 }
 

@@ -32,6 +32,8 @@ type DiagnosticData = {
     sender_domain?: string | null
     notification_reply_to?: string | null
     app_url?: string | null
+    cron_secret_configured?: boolean
+    cron_fallback_schedule?: string
   }
   domain?: {
     checked?: boolean
@@ -50,6 +52,17 @@ type AppUser = {
   email: string
   role: string
   is_active?: boolean | null
+}
+
+type QueueDiagnostics = {
+  due?: number
+  paused?: boolean
+  paused_reason?: string | null
+  system_control_configured?: boolean
+  email_enabled?: boolean
+  sender_configured?: boolean
+  provider_configured?: boolean
+  last_errors?: Array<{ status: string; attempts: number; at: string; message: string }>
 }
 
 type MessageState = {
@@ -80,8 +93,10 @@ export default function HRNotificationDiagnosticsPage() {
     useState<MessageState | null>(null)
   const [notificationQueue, setNotificationQueue] = useState<Record<string, number> | null>(null)
   const [notificationQueueProcessing, setNotificationQueueProcessing] = useState(false)
+  const [notificationDiagnostics, setNotificationDiagnostics] = useState<QueueDiagnostics | null>(null)
   const [attendanceQueue, setAttendanceQueue] = useState<Record<string, number> | null>(null)
   const [queueProcessing, setQueueProcessing] = useState(false)
+  const [attendanceDiagnostics, setAttendanceDiagnostics] = useState<QueueDiagnostics | null>(null)
 
   const canAccess = useMemo(() => {
     const role = normalize(appUser?.role)
@@ -179,10 +194,16 @@ export default function HRNotificationDiagnosticsPage() {
         headers: { Authorization: `Bearer ${token}` }, cache: 'no-store',
       })
       const result = await response.json().catch(() => null)
-      if (response.ok && result?.counts) setNotificationQueue(result.counts)
-      else setNotificationQueue(null)
+      if (response.ok && result?.counts) {
+        setNotificationQueue(result.counts)
+        setNotificationDiagnostics(result)
+      } else {
+        setNotificationQueue(null)
+        setNotificationDiagnostics({ paused: true, paused_reason: result?.message || 'Antrean tidak dapat dibaca.' })
+      }
     } catch {
       setNotificationQueue(null)
+      setNotificationDiagnostics({ paused: true, paused_reason: 'Gagal menghubungi API antrean notifikasi.' })
     }
   }
 
@@ -226,10 +247,16 @@ export default function HRNotificationDiagnosticsPage() {
         headers: { Authorization: `Bearer ${token}` }, cache: 'no-store',
       })
       const result = await response.json().catch(() => null)
-      if (response.ok && result?.counts) setAttendanceQueue(result.counts)
-      else setAttendanceQueue(null)
+      if (response.ok && result?.counts) {
+        setAttendanceQueue(result.counts)
+        setAttendanceDiagnostics(result)
+      } else {
+        setAttendanceQueue(null)
+        setAttendanceDiagnostics({ paused: true, paused_reason: result?.message || 'Antrean absensi tidak dapat dibaca.' })
+      }
     } catch {
       setAttendanceQueue(null)
+      setAttendanceDiagnostics({ paused: true, paused_reason: 'Gagal menghubungi API antrean absensi.' })
     }
   }
 
@@ -619,6 +646,13 @@ export default function HRNotificationDiagnosticsPage() {
               />
             </section>
 
+            <section className="rounded-[20px] border border-blue-100 bg-blue-50/85 px-4 py-3 text-xs text-blue-950">
+              <strong>Status worker:</strong> Email yang masuk antrean belum tentu diterima Resend.
+              Fallback Vercel berjalan sekali sehari (00:00 UTC); pemrosesan segera memakai background worker dan tombol Proses Queue.
+              <span className="ml-2 font-semibold">CRON_SECRET: {environment?.cron_secret_configured ? 'Tersedia' : 'Belum tersedia / terlalu pendek'}.</span>
+              Periksa status job di bawah dan lakukan Test Email untuk memvalidasi sender.
+            </section>
+
             <section className="rounded-[24px] border border-black/5 bg-white/75 p-4 shadow-sm backdrop-blur-xl sm:p-5">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
@@ -632,6 +666,7 @@ export default function HRNotificationDiagnosticsPage() {
                   Proses Queue
                 </button>
               </div>
+              <QueueHealthPanel diagnostics={notificationDiagnostics} />
               {notificationQueue ? (
                 <>
                   <div className="mt-4 grid grid-cols-2 gap-2 text-sm sm:grid-cols-4">
@@ -661,6 +696,7 @@ export default function HRNotificationDiagnosticsPage() {
                   Proses Antrean
                 </button>
               </div>
+              <QueueHealthPanel diagnostics={attendanceDiagnostics} />
               {attendanceQueue && (
                 <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-slate-500">
                   <span>Email karyawan valid: <strong>{attendanceQueue.eligible_employees || 0}</strong></span>
@@ -887,6 +923,32 @@ function Checklist({
       <span className="text-sm leading-6 text-slate-700">
         {text}
       </span>
+    </div>
+  )
+}
+function QueueHealthPanel({ diagnostics }: { diagnostics: QueueDiagnostics | null }) {
+  if (!diagnostics) return null
+  return (
+    <div className="mt-3 space-y-2 text-xs">
+      {diagnostics.paused ? (
+        <p role="alert" className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 font-semibold text-amber-900">
+          Antrean tertunda: {diagnostics.paused_reason || 'Periksa pengaturan email.'}
+        </p>
+      ) : (
+        <p className="text-slate-600">
+          Siap diproses sekarang: <strong className="text-slate-900">{diagnostics.due ?? 0}</strong>. Status antrean tidak sama dengan bukti email sudah masuk inbox.
+        </p>
+      )}
+      {Boolean(diagnostics.last_errors?.length) && (
+        <div className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-rose-900">
+          <p className="mb-1 font-bold">Error pengiriman terakhir</p>
+          {diagnostics.last_errors?.slice(0, 3).map((error, index) => (
+            <p key={`${error.at}-${index}`} className="mb-1 break-words">
+              {error.status} · Percobaan {error.attempts} · {error.message}
+            </p>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

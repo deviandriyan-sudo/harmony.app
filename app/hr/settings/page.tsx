@@ -470,7 +470,7 @@ export default function HRSettingsPage() {
         'karyawan'
 
       const notificationText = result?.notification?.success
-        ? ` Email notifikasi berhasil dikirim ke ${employeeEmail}.`
+        ? ` Notifikasi email sudah diproses untuk ${employeeEmail}.`
         : result?.notification?.message
           ? ` Akun berhasil diproses, tetapi email belum terkirim: ${result.notification.message}`
           : ''

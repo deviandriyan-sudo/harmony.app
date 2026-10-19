@@ -307,6 +307,8 @@ export async function GET(request: Request) {
       notification_reply_to:
         environment.replyTo || null,
       app_url: environment.appUrl,
+      cron_secret_configured: String(process.env.CRON_SECRET || '').length >= 16,
+      cron_fallback_schedule: 'Harian, 00:00 UTC (vercel.json)',
     },
     domain,
     system_control: {

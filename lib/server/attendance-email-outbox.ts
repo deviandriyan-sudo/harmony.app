@@ -34,7 +34,7 @@ export async function processAttendanceEmailOutbox(admin: SupabaseClient) {
       message: 'Resend belum dikonfigurasi (RESEND_API_KEY / NOTIFICATION_FROM_EMAIL).' }
   }
 
-  const { data, error } = await admin.rpc('harmony_claim_attendance_emails_v1', { p_limit: 8 })
+  const { data, error } = await admin.rpc('harmony_claim_attendance_emails_v1', { p_limit: 3 })
   if (error) throw new Error(`Antrean email belum siap: ${error.message}. Jalankan migration HARMONY_ATTENDANCE_EMAIL_OUTBOX_V1.sql.`)
 
   const jobs = (data || []) as AttendanceEmailJob[]
@@ -54,7 +54,7 @@ export async function processAttendanceEmailOutbox(admin: SupabaseClient) {
         html: buildServerHarmonyEmailHtml({ title, message, actionLabel: 'Periksa Absensi', actionUrl: path }),
         text: buildServerHarmonyEmailText({ title, message, actionLabel: 'Periksa Absensi', actionUrl: path }),
         idempotencyKey: `harmony-attendance-${job.id}`,
-      })
+      }, { maxAttempts: 1, timeoutMs: 10000 })
     } catch (err) {
       result = { ok: false, message: err instanceof Error ? err.message : 'Gagal mengirim email.' }
     }
@@ -116,4 +116,45 @@ export async function getAttendanceEmailStats(admin: SupabaseClient) {
   ).length
   return { ...Object.fromEntries(values), missing_email: missingEmail,
     eligible_employees: (active || []).length - missingEmail } as Record<string, number>
+}
+
+// HR-only diagnostic helper. Exclude employee addresses and message bodies.
+export async function getAttendanceEmailDiagnostics(admin: SupabaseClient) {
+  const [counts, control] = await Promise.all([
+    getAttendanceEmailStats(admin),
+    getHarmonySystemControl(admin),
+  ])
+  const env = getNotificationEnvironmentStatus()
+  const now = new Date().toISOString()
+  const [{ count: due, error: dueError }, { data: recent, error: recentError }] = await Promise.all([
+    admin.from('harmony_attendance_email_outbox')
+      .select('id', { head: true, count: 'exact' }).eq('status', 'pending')
+      .lte('next_attempt_at', now),
+    admin.from('harmony_attendance_email_outbox')
+      .select('status,attempts,last_error,updated_at')
+      .in('status', ['failed', 'pending', 'sending'])
+      .order('updated_at', { ascending: false }).limit(12),
+  ])
+  if (dueError) throw new Error(dueError.message)
+  if (recentError) throw new Error(recentError.message)
+  const pausedReason = !control.configured
+    ? 'System Control belum tersedia/terbaca.'
+    : !control.emailEnabled
+      ? 'Maintenance Mode aktif.'
+      : !env.resendApiKeyConfigured || !env.fromConfigured
+        ? 'Konfigurasi Resend/sender belum lengkap.'
+        : null
+  return {
+    counts,
+    due: due || 0,
+    paused: Boolean(pausedReason),
+    paused_reason: pausedReason,
+    last_errors: (recent || []).filter((row) => Boolean(row.last_error)).slice(0, 5).map((row) => ({
+      status: row.status,
+      attempts: Number(row.attempts || 0),
+      at: row.updated_at,
+      message: String(row.last_error || '').replace(/[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}/g, '[email]').slice(0, 250),
+    })),
+    checked_at: now,
+  }
 }

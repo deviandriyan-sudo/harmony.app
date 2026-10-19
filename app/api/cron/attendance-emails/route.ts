@@ -23,16 +23,17 @@ export async function GET(request: NextRequest) {
   }
 
   const started = Date.now()
-  const general = { completed: 0, failed: 0, remaining: 0, paused: false, batches: 0, error: '' }
-  const attendance = { sent: 0, failed: 0, remaining: 0, paused: false, batches: 0, error: '' }
+  const general = { completed: 0, failed: 0, remaining: 0, paused: false, batches: 0, error: '', message: '' }
+  const attendance = { sent: 0, failed: 0, remaining: 0, paused: false, batches: 0, error: '', message: '' }
 
   try {
     while (general.batches < 6 && Date.now() - started < 24_000) {
-      const batch = await processHarmonyJobQueue(supabaseAdmin, { limit: 8 })
+      const batch = await processHarmonyJobQueue(supabaseAdmin, { limit: 2 })
       general.completed += batch.completed
       general.failed += batch.failed
       general.remaining = batch.remaining
       general.paused = batch.paused
+      general.message = batch.message
       general.batches++
       if (batch.paused || !batch.claimed || !batch.remaining) break
     }
@@ -42,12 +43,13 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    while (attendance.batches < 8 && Date.now() - started < 44_000) {
+    while (attendance.batches < 8 && Date.now() - started < 32_000) {
       const batch = await processAttendanceEmailOutbox(supabaseAdmin)
       attendance.sent += batch.sent
       attendance.failed += batch.failed
       attendance.remaining = batch.remaining
       attendance.paused = batch.paused
+      attendance.message = batch.message
       attendance.batches++
       if (batch.paused || !batch.claimed || !batch.remaining) break
     }
@@ -56,7 +58,7 @@ export async function GET(request: NextRequest) {
     console.error('HARMONY attendance queue cron failed:', error)
   }
 
-  const ok = !general.error && !attendance.error && general.failed === 0 && attendance.failed === 0
+  const ok = !general.error && !attendance.error && general.failed === 0 && attendance.failed === 0 && !general.paused && !attendance.paused
   return NextResponse.json(
     { ok, general, attendance },
     { status: ok ? 200 : 207, headers: { 'Cache-Control': 'no-store' } },

@@ -492,7 +492,7 @@ export default function EmployeeLeavePostponePage() {
       setMessage({
         type: 'success',
         text: notificationResult.success
-          ? `Pengajuan postpone berhasil dikirim dan email notifikasi terkirim ke ${notificationResult.count} penerima.`
+          ? `Pengajuan postpone berhasil dikirim dan notifikasi email diproses untuk ${notificationResult.count} penerima.`
           : `Pengajuan postpone berhasil dikirim, tetapi email notifikasi belum terkirim: ${notificationResult.message}`,
       })
     } catch (error: any) {

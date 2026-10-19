@@ -672,7 +672,7 @@ export default function EmployeeLeaveApprovalPage() {
       setMessage({
         type: 'success',
         text: notification.success
-          ? 'Pengajuan berhasil disetujui dan email notifikasi terkirim.'
+          ? 'Pengajuan berhasil disetujui dan notifikasi email sudah diproses.'
           : `Pengajuan berhasil disetujui. Namun ${notification.message}`,
       })
 
@@ -741,7 +741,7 @@ export default function EmployeeLeaveApprovalPage() {
       setMessage({
         type: 'success',
         text: notification.success
-          ? 'Pengajuan berhasil ditolak dan email notifikasi terkirim.'
+          ? 'Pengajuan berhasil ditolak dan notifikasi email sudah diproses.'
           : `Pengajuan berhasil ditolak. Namun ${notification.message}`,
       })
 

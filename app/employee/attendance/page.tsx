@@ -1900,7 +1900,7 @@ export default function EmployeeAttendancePage() {
       [
         `${isSupervisorRejected ? "Revisi absensi" : "Absensi"} periode ${formatDisplayDate(periodRange.start)} s.d. ${formatDisplayDate(periodRange.end)} berhasil ${isSupervisorRejected ? "dikirim ulang" : "dikirim"} ke atasan sebagai SATU PERIODE penuh.`,
         notificationResult.sent
-          ? `Notifikasi email sudah dikirim ke ${notificationResult.totalRecipients} atasan.`
+          ? `Notifikasi untuk ${notificationResult.totalRecipients} atasan sudah diproses melalui antrean email; cek status pengiriman di HARMONY.`
           : `Data berhasil tersimpan, tetapi email notifikasi belum terkirim: ${notificationResult.message}`,
       ].join(" "),
     );
