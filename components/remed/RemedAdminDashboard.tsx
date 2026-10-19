@@ -2,13 +2,14 @@
 
 import Link from 'next/link'
 import { useCallback, useEffect, useState } from 'react'
-import { Banknote, ClipboardCheck, FileText, WalletCards } from 'lucide-react'
+import { Banknote, ClipboardCheck, Download, FileText, WalletCards } from 'lucide-react'
 import { ClaimAdminActions } from '@/components/remed/ClaimAdminActions'
 import { RemedClaimList } from '@/components/remed/RemedClaimList'
 import { RemedStatCard } from '@/components/remed/RemedStatCard'
 import { formatRupiah } from '@/lib/remed'
 import { remedFetch } from '@/lib/remed-client'
 import type { RemedClaim } from '@/types/remed'
+import { downloadRemedClaimsXlsx } from '@/lib/export/remed-report'
 
 type DashboardPayload = {
   stats?: { totalClaims?: number; pending?: number; paidCount?: number; paidTotal?: number }
@@ -18,6 +19,7 @@ type DashboardPayload = {
 export function RemedAdminDashboard({ role }: { role: 'hr' | 'finance' }) {
   const [data, setData] = useState<DashboardPayload | null>(null)
   const [error, setError] = useState('')
+  const [exporting, setExporting] = useState(false)
   const load = useCallback(async () => {
     setError('')
     try { setData(await remedFetch<DashboardPayload>('/api/remed/dashboard')) }
@@ -26,6 +28,19 @@ export function RemedAdminDashboard({ role }: { role: 'hr' | 'finance' }) {
     }
   }, [role])
   useEffect(() => { void load() }, [load])
+  const exportAll = async () => {
+    setExporting(true)
+    setError('')
+    try {
+      const response = await remedFetch<{ claims: RemedClaim[] }>('/api/remed/reports')
+      if (!response.claims?.length) throw new Error('Belum ada klaim untuk diexport.')
+      downloadRemedClaimsXlsx(response.claims, `${role.toUpperCase()}_SEMUA`)
+    } catch (issue: unknown) {
+      setError(issue instanceof Error ? issue.message : 'Export Excel gagal.')
+    } finally {
+      setExporting(false)
+    }
+  }
   const actions = role === 'hr' ? [
     ['Review Klaim', '/remed/hr/claims'],
     ['Riwayat', '/remed/hr/history'],
@@ -40,6 +55,7 @@ export function RemedAdminDashboard({ role }: { role: 'hr' | 'finance' }) {
       <div><h1 className="text-xl font-bold tracking-tight text-slate-900">Re-Med {role === 'hr' ? 'HR' : 'Finance'}</h1>
         <p className="mt-1 text-xs text-slate-500">Ringkasan dan tindakan utama</p></div>
       <div className="flex flex-wrap gap-2">
+        <button type="button" className="harmony-button-secondary inline-flex min-h-10 items-center gap-1.5 px-3 text-xs font-semibold disabled:opacity-50" disabled={exporting} onClick={() => void exportAll()}><Download size={15}/> {exporting ? 'Menyiapkan...' : 'Excel Semua Klaim'}</button>
         {actions.map(([label, href]) => <Link key={href} href={href} className="harmony-button-secondary inline-flex min-h-10 items-center px-3 text-xs font-semibold">{label}</Link>)}
       </div>
     </header>

@@ -22,6 +22,8 @@ import {
 } from "lucide-react";
 
 import { Topbar } from "@/components/layout/Topbar";
+import { downloadRawCsv, downloadStyledWorkbook } from "@/lib/export/styled-workbook";
+import { estimatedLateMinutes, lateDescription, minutesBetween } from "@/lib/export/attendance-details";
 import {
   HarmonyAttachmentViewer,
   HarmonyPendingAttachmentPicker,
@@ -2079,67 +2081,82 @@ export default function EmployeeAttendancePage() {
     return "";
   }
 
-  function exportCsv() {
-    const rows = calendarRows.map((row) => {
+  function buildEmployeeExportRows() {
+    return calendarRows.map((row) => {
       const draft = getDraft(row);
       const meta = getDailyTypeMeta(draft.daily_type);
-
+      const machineIn = row.log?.check_in || "";
+      const machineOut = row.log?.check_out || "";
+      const manualIn = row.log?.manual_check_in || draft.manual_check_in || "";
+      const manualOut = row.log?.manual_check_out || draft.manual_check_out || "";
+      const effectiveIn = machineIn || manualIn;
+      const effectiveOut = machineOut || manualOut;
+      const status = getDisplayStatus(row, draft);
+      const isLate = status === "late" || row.log?.status === "late";
+      const offday = Boolean(row.is_weekend || row.holiday_name);
       return {
-        periode: getPeriodLabel(periodMonth),
-        full_name: employee?.full_name || "",
-        employee_number: employee?.employee_number || "",
-        machine_pin: employee?.machine_pin || "",
-        department: employee?.department || "",
-        position: employee?.position || "",
-        attendance_date: row.date,
-        day_name: row.day_name,
-        check_in: row.log?.check_in || "",
-        check_out: row.log?.check_out || "",
-        manual_check_in:
-          row.log?.manual_check_in || draft.manual_check_in || "",
-        manual_check_out:
-          row.log?.manual_check_out || draft.manual_check_out || "",
-        duration: formatDuration(row.log?.work_duration_minutes),
-        status: formatStatus(getDisplayStatus(row, draft), row.log),
-        keterangan: isOffDayPHLOptOut(row, draft)
-          ? "Tidak Mengajukan PHL"
-          : row.log?.absence_request_label || meta.label,
-        employee_confirmation_status:
-          row.log?.employee_confirmation_status || "",
-        supervisor_approval_status: row.log?.supervisor_approval_status || "",
-        hr_final_status: row.log?.hr_final_status || "",
-        phl_candidate: isPotentialPHL(row, draft) ? "YES" : "NO",
-        holiday: row.holiday_name || (row.is_weekend ? "Weekend" : ""),
-        period_locked: isPeriodLocked ? "YES" : isProcessReadOnly ? "READ_ONLY" : "NO",
+        Periode: getPeriodLabel(periodMonth),
+        Nama: employee?.full_name || "",
+        NIP: employee?.employee_number || "",
+        'PIN Mesin': employee?.machine_pin || "",
+        Unit: employee?.department || "",
+        Jabatan: employee?.position || "",
+        Tanggal: row.date,
+        Hari: row.day_name,
+        'Jam Masuk Mesin': machineIn,
+        'Jam Pulang Mesin': machineOut,
+        'Manual Check In': manualIn,
+        'Manual Check Out': manualOut,
+        'Check In Efektif': effectiveIn,
+        'Check Out Efektif': effectiveOut,
+        'Ada Input Manual': manualIn || manualOut ? 'YA' : 'TIDAK',
+        'Sumber Kehadiran': (manualIn || manualOut) && (machineIn || machineOut) ? 'Mesin + Manual' : (manualIn || manualOut) ? 'Manual' : (machineIn || machineOut) ? 'Mesin' : 'Tidak ada',
+        'Durasi Kerja (menit)': row.log?.work_duration_minutes ?? minutesBetween(effectiveIn, effectiveOut),
+        'Status Kehadiran': formatStatus(status, row.log),
+        'Terlambat': isLate ? 'YA' : 'TIDAK',
+        'Terlambat (menit, estimasi 08.00)': estimatedLateMinutes(isLate, effectiveIn, offday),
+        'Keterangan Terlambat': lateDescription(isLate, effectiveIn, offday),
+        Keterangan: isOffDayPHLOptOut(row, draft) ? 'Tidak Mengajukan PHL' : row.log?.absence_request_label || meta.label,
+        'Catatan Karyawan': row.log?.employee_daily_note || draft.employee_daily_note || '',
+        'Alasan Koreksi': row.log?.correction_reason || '',
+        'Status Karyawan': row.log?.employee_confirmation_status || '',
+        'Status Atasan': row.log?.supervisor_approval_status || '',
+        'Status HR': row.log?.hr_final_status || '',
+        'Kandidat PHL': isPotentialPHL(row, draft) ? 'YA' : 'TIDAK',
+        Libur: row.holiday_name || (row.is_weekend ? 'Weekend' : ''),
+        'Kunci Periode': isPeriodLocked ? 'Locked' : isProcessReadOnly ? 'READ_ONLY' : 'Unlocked',
       };
     });
+  }
 
-    const headers = Object.keys(rows[0] || { periode: "", full_name: "" });
+  function exportExcel() {
+    const rows = buildEmployeeExportRows();
+    downloadStyledWorkbook(`HARMONY_ABSENSI_${employee?.employee_number || 'KARYAWAN'}_${periodMonth}.xlsx`, [
+      { name: 'Ringkasan', rows: [
+        { Komponen: 'Nama Karyawan', Nilai: employee?.full_name || '' },
+        { Komponen: 'Nomor Karyawan', Nilai: employee?.employee_number || '' },
+        { Komponen: 'Periode', Nilai: getPeriodLabel(periodMonth) },
+        { Komponen: 'Jumlah Tanggal', Nilai: rows.length },
+        { Komponen: 'Hari Hadir', Nilai: rows.filter((r) => /hadir|present/i.test(r['Status Kehadiran'])).length },
+        { Komponen: 'Hari Terlambat', Nilai: rows.filter((r) => r.Terlambat === 'YA').length },
+        { Komponen: 'Tanggal Dengan Input Manual', Nilai: rows.filter((r) => r['Ada Input Manual'] === 'YA').length },
+        { Komponen: 'Catatan', Nilai: 'Estimasi menit keterlambatan memakai acuan 08.00 hanya untuk hari berstatus Late; periksa jadwal shift sebelum dipakai untuk payroll.' },
+      ] },
+      { name: 'Detail Harian', rows },
+      { name: 'Panduan Warna', rows: [
+        { Status: 'Hadir / Approved', Keterangan: 'Hijau' },
+        { Status: 'Terlambat / Pending', Keterangan: 'Amber' },
+        { Status: 'Manual', Keterangan: 'Biru' },
+        { Status: 'Cuti / Izin / PHL', Keterangan: 'Ungu' },
+        { Status: 'Alpa / Rejected', Keterangan: 'Merah' },
+        { Status: 'Weekend / Libur', Keterangan: 'Abu muda' },
+        { Status: 'Terlambat (menit)', Keterangan: 'Estimasi dengan referensi 08.00, bukan ketetapan payroll/shift' },
+      ] },
+    ]);
+  }
 
-    const csv = [
-      headers.join(","),
-      ...rows.map((row) => {
-        return headers
-          .map((header) => {
-            const value = String(row[header as keyof typeof row] ?? "");
-            return `"${value.replace(/"/g, '""')}"`;
-          })
-          .join(",");
-      }),
-    ].join("\n");
-
-    const blob = new Blob([csv], {
-      type: "text/csv;charset=utf-8;",
-    });
-
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-
-    link.href = url;
-    link.download = `rekap-absensi-${employee?.full_name || "employee"}-${periodMonth}.csv`;
-    link.click();
-
-    URL.revokeObjectURL(url);
+  function exportCsv() {
+    downloadRawCsv(`HARMONY_ABSENSI_${employee?.employee_number || 'KARYAWAN'}_${periodMonth}.csv`, buildEmployeeExportRows());
   }
 
   return (
@@ -2398,11 +2415,14 @@ export default function EmployeeAttendancePage() {
 
                   <button
                     type="button"
-                    onClick={exportCsv}
+                    onClick={exportExcel}
                     className="harmony-button-secondary ml-auto w-full sm:ml-0 sm:w-auto"
                   >
                     <Download size={18} />
-                    Export
+                    Excel Berwarna
+                  </button>
+                  <button type="button" onClick={exportCsv} className="harmony-button-secondary w-full sm:w-auto">
+                    <Download size={16} /> CSV Raw
                   </button>
 
                   <button

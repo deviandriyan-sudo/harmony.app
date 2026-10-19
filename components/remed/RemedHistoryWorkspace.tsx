@@ -1,10 +1,11 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { History, Loader2, RefreshCw } from 'lucide-react'
+import { Download, History, Loader2, RefreshCw } from 'lucide-react'
 import { RemedPageHeader } from '@/components/remed/RemedPageHeader'
 import { RemedProcessHistory } from '@/components/remed/RemedProcessHistory'
 import { remedFetch } from '@/lib/remed-client'
+import { downloadRemedHistoryXlsx } from '@/lib/export/remed-report'
 import type { RemedProcessHistory as HistoryItem } from '@/types/remed'
 
 export function RemedHistoryWorkspace({ role }: { role: 'hr' | 'finance' }) {
@@ -32,9 +33,10 @@ export function RemedHistoryWorkspace({ role }: { role: 'hr' | 'finance' }) {
           ? 'Approval, reject, pembayaran, pembatalan, dan penghapusan klaim dalam satu riwayat proses.'
           : 'Approval HR/Finance, reject beserta alasan, pembayaran, pembatalan, dan penghapusan dalam satu menu.'}
         icon={History}
-        actions={<button type="button" onClick={() => void load()} disabled={loading} className="harmony-button-secondary min-h-10 px-4">
-          {loading ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />} Refresh
-        </button>}
+        actions={<div className="flex flex-wrap gap-2">
+          <button type="button" onClick={() => downloadRemedHistoryXlsx(history, role.toUpperCase())} disabled={loading || !history.length} className="harmony-button-secondary min-h-10 px-4 disabled:opacity-50"><Download size={16} /> Excel Berwarna</button>
+          <button type="button" onClick={() => void load()} disabled={loading} className="harmony-button-secondary min-h-10 px-4">{loading ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />} Refresh</button>
+        </div>}
       />
       {error ? <div className="rounded-[22px] border border-red-100 bg-red-50 p-4 text-sm text-red-700">{error}</div> : null}
       <RemedProcessHistory history={history} allowDelete={role === 'hr'} onDeleted={role === 'hr' ? load : undefined} />

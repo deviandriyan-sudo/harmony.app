@@ -2,7 +2,8 @@
 
 import Link from 'next/link'
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
-import * as XLSX from 'xlsx'
+import { downloadRawCsv, downloadStyledWorkbook } from '@/lib/export/styled-workbook'
+import { estimatedLateMinutes, lateDescription, minutesBetween } from '@/lib/export/attendance-details'
 import {
   AlertTriangle,
   ArrowLeft,
@@ -188,6 +189,11 @@ export default function HRAttendanceExportPage() {
         'Sumber Kehadiran': day.sourceLabel,
         'Manual Approved': day.manualApproved ? 'YA' : 'TIDAK',
         Terlambat: day.isLate ? 'YA' : 'TIDAK',
+        'Terlambat (menit, estimasi 08.00)': estimatedLateMinutes(day.isLate, day.effectiveCheckIn, day.isWeekend || day.isHoliday),
+        'Keterangan Terlambat': lateDescription(day.isLate, day.effectiveCheckIn, day.isWeekend || day.isHoliday),
+        'Pulang Cepat (menit)': '',
+        'Durasi Kerja (menit)': minutesBetween(day.effectiveCheckIn, day.effectiveCheckOut),
+        'Ada Input Manual': day.hasManualTime ? 'YA' : 'TIDAK',
         Weekend: day.isWeekend ? 'YA' : 'TIDAK',
         Libur: day.isHoliday ? day.holidayName || 'YA' : 'TIDAK',
         'Request ID': day.requestId,
@@ -223,6 +229,8 @@ export default function HRAttendanceExportPage() {
         Jabatan: log.position || '',
         'Machine Check In': log.check_in || '',
         'Machine Check Out': log.check_out || '',
+        'Durasi Kerja (menit)': minutesBetween(log.check_in || log.manual_check_in, log.check_out || log.manual_check_out),
+        'Terlambat Menurut Mesin': String(log.status || '').toLowerCase() === 'late' ? 'YA' : 'TIDAK',
         'Manual Check In': log.manual_check_in || '',
         'Manual Check Out': log.manual_check_out || '',
         'Requested Check In': log.requested_check_in || '',
@@ -325,6 +333,18 @@ export default function HRAttendanceExportPage() {
         'Dasar Tunjangan': 'TIDAK sampai konflik selesai.',
       },
       {
+        Komponen: 'Estimasi terlambat (acuan 08.00)',
+        Definisi: 'Menit ditampilkan hanya bila status mesin sudah Late dan jam masuk setelah 08.00. Ini estimasi informasional, bukan dasar potongan payroll; aturan shift/toleransi wajib diverifikasi.',
+        'Kehadiran Tercatat': 'TETAP HADIR',
+        'Dasar Tunjangan': 'Tidak diubah oleh laporan',
+      },
+      {
+        Komponen: 'Pulang cepat',
+        Definisi: 'Belum dihitung otomatis karena roster/jadwal akhir shift per karyawan tidak tersedia dalam dataset laporan. Jam pulang mesin dan manual tetap disajikan lengkap.',
+        'Kehadiran Tercatat': 'TETAP DITAMPILKAN',
+        'Dasar Tunjangan': 'Tidak diubah oleh laporan',
+      },
+      {
         Komponen: 'TOTAL KEHADIRAN TERVERIFIKASI',
         Definisi: 'Jumlah unique day: Hadir Kantor + approved Manual/Lapangan + approved ST/Tugas Luar + Kerja Hari Libur yang valid.',
         'Kehadiran Tercatat': 'YA',
@@ -342,15 +362,24 @@ export default function HRAttendanceExportPage() {
       const recap = buildRecapRows()
       if (!recap.length) throw new Error('Tidak ada data sesuai filter untuk diexport.')
 
-      const workbook = XLSX.utils.book_new()
-      XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(recap), 'Rekap Kehadiran')
-      XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(buildDailyRows()), 'Detail Harian')
-      XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(buildRawLogRows()), 'Raw Attendance Logs')
-      XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(buildRequestRows()), 'Approved Request Sources')
-      XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(buildDefinitionRows()), 'Definisi')
-
       const fileName = `HARMONY_KEHADIRAN_TUNJANGAN_${periodMonth}_${filter}.xlsx`
-      XLSX.writeFile(workbook, fileName)
+      downloadStyledWorkbook(fileName, [
+        { name: 'Ringkasan', rows: [
+          { Komponen: 'Periode', Nilai: range.label },
+          { Komponen: 'Jumlah Karyawan', Nilai: totals.employees },
+          { Komponen: 'Kehadiran Tercatat', Nilai: totals.recorded },
+          { Komponen: 'Dasar Tunjangan', Nilai: totals.transport },
+          { Komponen: 'Hari Terlambat', Nilai: totals.late },
+          { Komponen: 'Manual Belum Verifikasi', Nilai: totals.manualPending },
+          { Komponen: 'Tanpa Data', Nilai: totals.noRecord },
+          { Komponen: 'Konflik Data', Nilai: totals.conflict },
+        ] },
+        { name: 'Rekap Kehadiran', rows: recap },
+        { name: 'Detail Harian', rows: buildDailyRows() },
+        { name: 'Raw Attendance Logs', rows: buildRawLogRows() },
+        { name: 'Approved Requests', rows: buildRequestRows() },
+        { name: 'Definisi', rows: buildDefinitionRows() },
+      ])
       setSuccessMessage(`Export XLSX berhasil: ${fileName}`)
     } catch (error: any) {
       setErrorMessage(error?.message || 'Export XLSX gagal.')
@@ -368,19 +397,7 @@ export default function HRAttendanceExportPage() {
       const recap = buildRecapRows()
       if (!recap.length) throw new Error('Tidak ada data sesuai filter untuk diexport.')
 
-      const headers = Object.keys(recap[0])
-      const csv = [
-        headers.map(csvCell).join(','),
-        ...recap.map((row) => headers.map((header) => csvCell(row[header as keyof typeof row])).join(',')),
-      ].join('\n')
-
-      const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8;' })
-      const url = URL.createObjectURL(blob)
-      const link = document.createElement('a')
-      link.href = url
-      link.download = `HARMONY_KEHADIRAN_TUNJANGAN_${periodMonth}_${filter}.csv`
-      link.click()
-      URL.revokeObjectURL(url)
+      downloadRawCsv(`HARMONY_KEHADIRAN_TUNJANGAN_${periodMonth}_${filter}.csv`, recap)
       setSuccessMessage('Export CSV berhasil.')
     } catch (error: any) {
       setErrorMessage(error?.message || 'Export CSV gagal.')
@@ -458,7 +475,7 @@ export default function HRAttendanceExportPage() {
             <div className="flex flex-wrap justify-end gap-2">
               <button type="button" onClick={fetchData} disabled={loading} className="harmony-button-secondary disabled:opacity-50"><RefreshCcw size={16} className={loading ? 'animate-spin' : ''} />Refresh</button>
               <button type="button" onClick={handleExportCsv} disabled={exporting || !filteredRows.length} className="harmony-button-secondary disabled:opacity-50"><Download size={16} />CSV</button>
-              <button type="button" onClick={handleExportXlsx} disabled={exporting || !filteredRows.length} className="harmony-button-primary disabled:opacity-50">{exporting ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}XLSX 5 Sheet</button>
+              <button type="button" onClick={handleExportXlsx} disabled={exporting || !filteredRows.length} className="harmony-button-primary disabled:opacity-50">{exporting ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}Excel Berwarna · 6 Sheet</button>
             </div>
           </div>
 
@@ -521,7 +538,7 @@ export default function HRAttendanceExportPage() {
             <div className="flex items-start gap-3"><ShieldCheck size={18} className="mt-1 shrink-0" /><div><strong>Yang masuk dasar hari tunjangan:</strong><br />Fingerprint lengkap + manual approved + ST/tugas luar approved + kerja hari libur yang valid. Satu tanggal hanya dihitung satu kali.</div></div>
           </div>
           <div className="rounded-[26px] border border-blue-100 bg-blue-50 p-5 text-sm leading-7 text-blue-800">
-            <div className="flex items-start gap-3"><FileSpreadsheet size={18} className="mt-1 shrink-0" /><div><strong>XLSX punya 5 sheet audit:</strong><br />Rekap Kehadiran, Detail Harian, Raw Attendance Logs, Approved Request Sources, dan Definisi. Jadi data mesin/manual/ST dapat ditelusuri sampai sumbernya.</div></div>
+            <div className="flex items-start gap-3"><FileSpreadsheet size={18} className="mt-1 shrink-0" /><div><strong>XLSX berwarna dengan 6 sheet:</strong><br />Ringkasan, Rekap Kehadiran, Detail Harian, Raw Attendance Logs, Approved Requests, dan Definisi. Termasuk input manual, status terlambat, dan estimasi menit (perlu verifikasi jadwal kerja). Jadi data mesin/manual/ST dapat ditelusuri sampai sumbernya.</div></div>
           </div>
         </section>
       </section>
@@ -551,4 +568,4 @@ function workflowLabel(value: unknown) {
   return map[key] || String(value || '-')
 }
 
-function csvCell(value: unknown) { return `"${String(value ?? '').replace(/"/g, '""')}"` }
+

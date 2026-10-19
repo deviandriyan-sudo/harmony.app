@@ -18,6 +18,7 @@ import {
   UserRound,
 } from "lucide-react";
 
+import { downloadRawCsv, downloadStyledWorkbook } from '@/lib/export/styled-workbook';
 import { Topbar } from "@/components/layout/Topbar";
 import { supabase } from "@/lib/supabase";
 import { useAttendancePeriodQuery } from "@/lib/use-attendance-period";
@@ -156,12 +157,7 @@ export default function AttendanceAuditPage() {
     setLoading(false);
   }
 
-  function exportCsv() {
-    if (filteredLogs.length === 0) {
-      setErrorMessage("Tidak ada data audit untuk diexport.");
-      return;
-    }
-
+  function buildAuditExportRows() {
     const rows = filteredLogs.map((item, index) => ({
       No: index + 1,
       Waktu: formatDateTime(item.created_at || ""),
@@ -181,33 +177,25 @@ export default function AttendanceAuditPage() {
       Metadata: JSON.stringify(item.metadata || {}),
     }));
 
-    const headers = Object.keys(rows[0]);
-    const csv = [
-      headers.join(","),
-      ...rows.map((row) => {
-        return headers
-          .map((header) => {
-            const value = String(row[header as keyof typeof row] ?? "");
-            return `"${value.replace(/"/g, '""')}"`;
-          })
-          .join(",");
-      }),
-    ].join("\n");
+    return rows;
+  }
 
-    const blob = new Blob([`\uFEFF${csv}`], {
-      type: "text/csv;charset=utf-8;",
-    });
+  function exportExcel() {
+    if (!filteredLogs.length) return setErrorMessage('Tidak ada data audit untuk diexport.');
+    downloadStyledWorkbook(`HARMONY_AUDIT_ABSENSI_${periodMonth}.xlsx`, [
+      { name: 'Ringkasan', rows: [
+        { Komponen: 'Periode', Nilai: periodMonth },
+        { Komponen: 'Jumlah Peristiwa', Nilai: filteredLogs.length },
+      ] },
+      { name: 'Detail Audit', rows: buildAuditExportRows() },
+    ]);
+    setSuccessMessage('Excel audit berwarna berhasil dibuat.');
+  }
 
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-
-    link.href = url;
-    link.download = `AUDIT_ABSENSI_${periodMonth}.csv`;
-    link.click();
-
-    URL.revokeObjectURL(url);
-
-    setSuccessMessage("Export CSV audit absensi berhasil dibuat.");
+  function exportCsv() {
+    if (!filteredLogs.length) return setErrorMessage('Tidak ada data audit untuk diexport.');
+    downloadRawCsv(`HARMONY_AUDIT_ABSENSI_${periodMonth}.csv`, buildAuditExportRows());
+    setSuccessMessage('CSV audit berhasil dibuat.');
   }
 
   return (
@@ -352,12 +340,12 @@ export default function AttendanceAuditPage() {
 
               <button
                 type="button"
-                onClick={exportCsv}
+                onClick={exportExcel}
                 className="harmony-button-secondary min-h-12 min-w-0 self-end justify-center"
               >
-                <Download size={18} />
-                Export CSV
+                <Download size={18} /> Excel Berwarna
               </button>
+              <button type="button" onClick={exportCsv} className="harmony-button-secondary min-h-12 min-w-0 self-end justify-center"><Download size={15}/> CSV Raw</button>
 
               <button
                 type="button"
