@@ -425,7 +425,22 @@ export async function GET(request: NextRequest) {
       if (!subordinateIds.length) {
         return NextResponse.json({ success: true, requests: [] })
       }
-      query = query.in('employee_id', subordinateIds)
+      const requestedEmployeeId = clean(request.nextUrl.searchParams.get('employee_id'))
+      if (requestedEmployeeId) {
+        if (!isUuid(requestedEmployeeId) || !subordinateIds.includes(requestedEmployeeId)) {
+          return NextResponse.json(
+            { success: false, error: 'Employee bukan bawahan yang dapat Anda review.' },
+            { status: 403 },
+          )
+        }
+        query = query.eq('employee_id', requestedEmployeeId)
+      } else {
+        query = query.in('employee_id', subordinateIds)
+      }
+      const dateFrom = clean(request.nextUrl.searchParams.get('date_from'))
+      const dateTo = clean(request.nextUrl.searchParams.get('date_to'))
+      if (/^\d{4}-\d{2}-\d{2}$/.test(dateFrom)) query = query.gte('work_date', dateFrom)
+      if (/^\d{4}-\d{2}-\d{2}$/.test(dateTo)) query = query.lte('work_date', dateTo)
     } else {
       if (!context.employee) {
         return NextResponse.json(

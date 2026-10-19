@@ -26,7 +26,7 @@ type Filter = 'pending' | 'approved' | 'rejected' | 'all'
 
 export default function PHLApprovalPage() {
   const [requests, setRequests] = useState<PHLWorkRequest[]>([])
-  const [filter, setFilter] = useState<Filter>('pending')
+  const [filter, setFilter] = useState<Filter>('all')
   const [loading, setLoading] = useState(true)
   const [processing, setProcessing] = useState('')
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
@@ -43,18 +43,43 @@ export default function PHLApprovalPage() {
     rejected: requests.filter((item) => item.status === 'rejected').length,
   }), [requests])
 
-  useEffect(() => { void load() }, [])
+  useEffect(() => {
+    // Keep the destination filter aligned with the selected summary metric.
+    // No URL filter: show pending when action exists, otherwise show all records.
+    const requested = new URLSearchParams(window.location.search).get('status')
+    const validFilter: Filter | null = requested === 'pending' || requested === 'approved' || requested === 'rejected' || requested === 'all'
+      ? requested
+      : null
+    void load(validFilter)
+  }, [])
 
-  async function load() {
+  async function load(requestedFilter?: Filter | null) {
     setLoading(true)
     setMessage(null)
     try {
-      setRequests(await fetchPHLWorkRequests('team'))
+      const result = await fetchPHLWorkRequests('team')
+      setRequests(result)
+      if (requestedFilter !== undefined) {
+        const nextFilter = requestedFilter || (result.some((item) => item.status === 'pending_supervisor') ? 'pending' : 'all')
+        setFilter(nextFilter)
+        if (requestedFilter === null) {
+          const url = new URL(window.location.href)
+          url.searchParams.set('status', nextFilter)
+          window.history.replaceState(window.history.state, '', url.pathname + url.search + url.hash)
+        }
+      }
     } catch (error: any) {
       setMessage({ type: 'error', text: error?.message || 'Data approval PHL gagal dimuat.' })
     } finally {
       setLoading(false)
     }
+  }
+
+  function selectFilter(next: Filter) {
+    setFilter(next)
+    const url = new URL(window.location.href)
+    url.searchParams.set('status', next)
+    window.history.replaceState(window.history.state, '', url.pathname + url.search + url.hash)
   }
 
   async function decide(item: PHLWorkRequest, decision: 'approve' | 'reject') {
@@ -84,7 +109,8 @@ export default function PHLApprovalPage() {
           ? `${result.message} Namun email employee belum terkirim: ${result.notification.message}`
           : result.message,
       })
-      await load()
+      // When the last pending request is completed, reveal history instead of an empty Pending tab.
+      await load(filter === 'pending' ? null : undefined)
     } catch (error: any) {
       setMessage({ type: 'error', text: error?.message || 'Approval PHL gagal diproses.' })
     } finally {
@@ -130,7 +156,7 @@ export default function PHLApprovalPage() {
                 <button
                   key={item}
                   type="button"
-                  onClick={() => setFilter(item)}
+                  onClick={() => selectFilter(item)}
                   className={[
                     'rounded-full px-4 py-2 text-xs font-bold transition',
                     filter === item ? 'bg-[#1d1d1f] text-white' : 'bg-[#f5f5f7] text-[#6e6e73]',
@@ -146,10 +172,22 @@ export default function PHLApprovalPage() {
           </div>
         </div>
 
+        {!loading && counts.pending === 0 && requests.length > 0 && filter === 'all' && (
+          <div className="harmony-card flex flex-wrap items-center justify-between gap-3 px-5 py-4 text-sm text-[#355c47]">
+            <span className="inline-flex items-center gap-2"><CheckCircle2 size={18} />Tidak ada PHL menunggu approval. {counts.approved} disetujui, {counts.rejected} ditolak.</span>
+            <span className="text-xs text-[#6e6e73]">Menampilkan seluruh riwayat pengajuan.</span>
+          </div>
+        )}
+
         {loading ? (
           <div className="harmony-card flex items-center gap-3 p-6 text-sm text-[#6e6e73]"><Loader2 size={18} className="animate-spin" />Memuat approval PHL...</div>
         ) : filtered.length === 0 ? (
-          <div className="harmony-card p-8 text-center text-sm text-[#86868b]">Tidak ada pengajuan PHL pada filter ini.</div>
+          <div className="harmony-card space-y-3 p-8 text-center text-sm text-[#86868b]">
+            <p>{filter === 'pending' ? 'Tidak ada pengajuan PHL yang menunggu approval.' : 'Tidak ada pengajuan PHL pada filter ini.'}</p>
+            {requests.length > 0 && filter !== 'all' && (
+              <button type="button" onClick={() => selectFilter('all')} className="rounded-full bg-[#e8f2ff] px-4 py-2 text-xs font-semibold text-[#0059b8]">Lihat Semua Pengajuan ({requests.length})</button>
+            )}
+          </div>
         ) : (
           <div className="grid gap-4 xl:grid-cols-2">
             {filtered.map((item) => (

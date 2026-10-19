@@ -10,6 +10,8 @@ import {
   CalendarDays,
   CheckCircle2,
   Clock3,
+  WalletCards,
+  ExternalLink,
   Eye,
   FileText,
   Loader2,
@@ -27,6 +29,7 @@ import { Topbar } from '@/components/layout/Topbar'
 import { HarmonyAttachmentViewer } from '@/components/attachments/HarmonyAttachments'
 import { supabase } from '@/lib/supabase'
 import { sendHarmonyWorkflowNotification } from '@/lib/notifications'
+import { fetchTeamPHLWorkRequestsForPeriod, reviewPHLWorkRequest, type PHLWorkRequest, formatPHLMinutes, phlWorkStatusLabel } from '@/lib/phl-work'
 
 type AppUser = {
   id: string
@@ -234,6 +237,10 @@ export default function EmployeeApprovalDetailPage() {
 
   const [logs, setLogs] = useState<AttendanceLog[]>([])
   const [holidays, setHolidays] = useState<Holiday[]>([])
+  const [phlRequests, setPhlRequests] = useState<PHLWorkRequest[]>([])
+  const [phlLoading, setPhlLoading] = useState(false)
+  const [phlError, setPhlError] = useState('')
+  const [phlProcessingId, setPhlProcessingId] = useState('')
   const [periodConfirmation, setPeriodConfirmation] = useState<PeriodConfirmation | null>(null)
 
   const [selectedLog, setSelectedLog] = useState<AttendanceLog | null>(null)
@@ -302,7 +309,18 @@ export default function EmployeeApprovalDetailPage() {
   }).length
 
   // Hanya PHL yang ditautkan oleh workflow Pengajuan Saldo PHL independen.
-  const phlCount = logs.filter((item) => Boolean(item.phl_work_request_id)).length
+  const phlCount = phlRequests.filter((item) => item.status === 'approved').length
+  const phlPendingCount = phlRequests.filter((item) => item.status === 'pending_supervisor').length
+  const phlByDate = useMemo(() => {
+    const map = new Map<string, PHLWorkRequest>()
+    for (const item of phlRequests) {
+      const existing = map.get(item.work_date)
+      if (!existing || (item.status === 'pending_supervisor' && existing.status !== 'pending_supervisor')) {
+        map.set(item.work_date, item)
+      }
+    }
+    return map
+  }, [phlRequests])
 
   const absenceRequestCount = submittedLogs.filter((item) => {
     return Boolean(item.absence_request_type)
@@ -348,6 +366,7 @@ export default function EmployeeApprovalDetailPage() {
     setSelectedLogIds([])
     setRejectTarget(null)
     setRejectReason('')
+    setPhlError('')
 
     if (!employeeId || !isValidPeriodMonth(periodMonth)) {
       setErrorMessage(
@@ -459,6 +478,62 @@ export default function EmployeeApprovalDetailPage() {
 
     setLogs(attendanceData || [])
     setLoading(false)
+    // Independent PHL review: failures here must not block attendance approval.
+    await refreshPeriodPHL()
+  }
+
+  async function refreshPeriodPHL() {
+    if (!employeeId) return
+    setPhlLoading(true)
+    setPhlError('')
+    try {
+      const items = await fetchTeamPHLWorkRequestsForPeriod(employeeId, periodRange.start, periodRange.end)
+      setPhlRequests(items)
+    } catch (error: any) {
+      setPhlError(error?.message || 'Pengajuan PHL gagal dimuat.')
+      setPhlRequests([])
+    } finally {
+      setPhlLoading(false)
+    }
+  }
+
+  async function decidePHLWork(item: PHLWorkRequest, decision: 'approve' | 'reject') {
+    if (item.status !== 'pending_supervisor' || phlProcessingId) return
+    // An attendance approval and a PHL entitlement decision are separate actions.
+    const label = decision === 'approve' ? 'Setujui hak saldo PHL' : 'Tolak hak saldo PHL'
+    const note = window.prompt(
+      `${label} untuk ${item.full_name || employee?.full_name || 'karyawan'} pada ${formatDisplayDate(item.work_date)}.\n\n${item.work_purpose}\n\nCatatan atasan:`,
+      decision === 'approve' ? 'Penugasan dan bukti telah diverifikasi.' : '',
+    )
+    if (note === null) return
+    if (decision === 'reject' && note.trim().length < 3) {
+      setErrorMessage('Alasan penolakan saldo PHL minimal 3 karakter.')
+      return
+    }
+    if (!window.confirm(decision === 'approve'
+      ? 'Setujui pengajuan PHL ini? Saldo +1 akan diberikan HANYA oleh workflow PHL independen dan absensi tetap tercatat.'
+      : 'Tolak hak saldo PHL ini? Kehadiran yang tercatat tidak akan dihapus.')) return
+
+    setPhlProcessingId(item.id)
+    setErrorMessage('')
+    setSuccessMessage('')
+    try {
+      const result = await reviewPHLWorkRequest(item.id, decision, note.trim())
+      setSuccessMessage(result?.notification?.ok === false
+        ? `${result.message} Email pemberitahuan belum terkirim: ${result.notification.message}`
+        : (result.message || 'Keputusan PHL berhasil disimpan.'))
+      await refreshPeriodPHL()
+      // Sync may create/link an attendance log; refresh independently after success.
+      const attendanceResult = await supabase.from('attendance_logs').select('*')
+        .eq('employee_id', employeeId).is('deleted_at', null)
+        .gte('attendance_date', periodRange.start).lte('attendance_date', periodRange.end)
+        .order('attendance_date', { ascending: true })
+      if (!attendanceResult.error) setLogs(attendanceResult.data || [])
+    } catch (error: any) {
+      setErrorMessage(error?.message || 'Approval saldo PHL tidak berhasil. Saldo tidak boleh ditambahkan manual.')
+    } finally {
+      setPhlProcessingId('')
+    }
   }
 
   function getSupervisorName() {
@@ -1022,7 +1097,7 @@ export default function EmployeeApprovalDetailPage() {
               <HeroMetric label="Approved" value={String(approvedDailyCount)} />
               <HeroMetric label="Rejected" value={String(rejectedDailyCount)} />
               <HeroMetric label="Keterangan" value={String(absenceRequestCount)} />
-              <HeroMetric label="PHL Tertaut" value={String(phlCount)} />
+              <HeroMetric label="PHL Disetujui" value={String(phlCount)} />
             </div>
           </div>
         </div>
@@ -1060,6 +1135,56 @@ export default function EmployeeApprovalDetailPage() {
             tone="purple"
           />
         </div>
+
+        <section className="harmony-card harmony-phl-review-panel space-y-4 p-4 sm:p-5" aria-label="Keputusan saldo PHL periode ini">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <div className="flex items-center gap-2 text-base font-semibold text-[#253453]">
+                <WalletCards size={19} className="text-[#7664bf]" />
+                Persetujuan PHL dari Absensi
+                {phlPendingCount > 0 && <span className="rounded-full bg-violet-100 px-2.5 py-1 text-xs text-violet-800">{phlPendingCount} menunggu</span>}
+              </div>
+              <p className="mt-1 text-xs leading-5 text-[#59677b]">Dua keputusan terpisah: setujui jam kerja pada tabel absensi, lalu setujui saldo hanya jika ada pengajuan PHL beserta bukti. Keduanya memakai workflow PHL yang sama.</p>
+            </div>
+            <div className="flex gap-2">
+              <button type="button" onClick={() => void refreshPeriodPHL()} disabled={phlLoading} className="harmony-button-secondary inline-flex items-center gap-2 !px-3 !py-2 text-xs"><RefreshCcw size={14} className={phlLoading ? 'animate-spin' : ''} /> Refresh</button>
+              <Link href="/employee/approvals/phl?status=all" className="harmony-button-secondary inline-flex items-center gap-2 !px-3 !py-2 text-xs">Modul PHL <ExternalLink size={13}/></Link>
+            </div>
+          </div>
+          {phlError && <div role="alert" className="rounded-xl bg-orange-50 p-3 text-xs text-orange-800">Pengajuan PHL belum terbaca: {phlError}</div>}
+          {phlLoading && <div className="flex items-center gap-2 text-xs text-[#59677b]"><Loader2 size={14} className="animate-spin" /> Memuat pengajuan saldo...</div>}
+          {!phlLoading && !phlError && phlRequests.length === 0 && (
+            <p className="rounded-2xl border border-dashed border-violet-200/80 bg-white/50 px-4 py-3 text-xs text-[#59677b]">Belum ada Pengajuan Saldo PHL pada periode ini. Kehadiran tetap bisa disetujui tanpa saldo. Karyawan dapat mengajukan PHL dari menu Pengajuan Saldo PHL dengan Surat Tugas dan durasi minimal 4 jam.</p>
+          )}
+          {phlRequests.length > 0 && (
+            <div className="grid gap-3 xl:grid-cols-2">
+              {phlRequests.map((item) => (
+                <article key={item.id} className="harmony-phl-review-item rounded-2xl p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2"><strong className="text-sm text-[#253453]">{formatDisplayDate(item.work_date)}</strong>
+                        <span className={`rounded-full px-2 py-1 text-[11px] font-semibold ${item.status === 'approved' ? 'bg-emerald-100 text-emerald-800' : item.status === 'pending_supervisor' ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-700'}`}>{phlWorkStatusLabel(item.status)}</span>
+                      </div>
+                      <p className="mt-1 text-xs text-[#59677b]">{item.work_start_time.slice(0,5)}–{item.work_end_time.slice(0,5)} · {formatPHLMinutes(item.requested_work_minutes)} · {item.work_purpose}</p>
+                    </div>
+                    {item.status === 'pending_supervisor' && (
+                      <div className="flex shrink-0 flex-wrap gap-2">
+                        <button type="button" disabled={Boolean(phlProcessingId)} onClick={() => void decidePHLWork(item, 'approve')} className="inline-flex items-center gap-1.5 rounded-xl bg-violet-700 px-3 py-2 text-xs font-semibold text-white transition hover:bg-violet-800 disabled:opacity-50"><WalletCards size={14}/> {phlProcessingId === item.id ? 'Memproses...' : 'Setujui PHL'}</button>
+                        <button type="button" disabled={Boolean(phlProcessingId)} onClick={() => void decidePHLWork(item, 'reject')} className="rounded-xl border border-red-200/80 bg-white/70 px-3 py-2 text-xs font-semibold text-red-700 disabled:opacity-50">Tolak PHL</button>
+                      </div>
+                    )}
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {item.attachments?.length ? item.attachments.map((file) => file.signed_url ? (
+                      <a key={file.id} href={file.signed_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 rounded-lg border border-violet-200/70 bg-white/65 px-2.5 py-1.5 text-[11px] text-violet-800 hover:bg-white"><FileText size={12}/>{file.file_name}</a>
+                    ) : <span key={file.id} className="text-[11px] text-[#59677b]">{file.file_name}</span>) : <span className="text-[11px] text-amber-700">Tidak ada Surat Tugas terlampir; approval akan divalidasi server.</span>}
+                  </div>
+                  {item.supervisor_note && item.status !== 'pending_supervisor' && <p className="mt-2 text-xs text-[#59677b]">Catatan: {item.supervisor_note}</p>}
+                </article>
+              ))}
+            </div>
+          )}
+        </section>
 
         <div className="harmony-card overflow-hidden">
           <div className="flex flex-col gap-4 border-b border-black/5 p-5 sm:p-6 xl:flex-row xl:items-center xl:justify-between">
@@ -1166,7 +1291,7 @@ export default function EmployeeApprovalDetailPage() {
           {!loading && (
             <div className="space-y-4 p-4 sm:p-5">
               <div className="rounded-[24px] border border-blue-100 bg-blue-50 px-4 py-3 text-xs leading-6 text-blue-700">
-                <span className="font-bold">Catatan:</span> Approve absensi hanya menyetujui kehadiran/jam kerja, bukan memberikan saldo PHL. Saldo PHL mengikuti Pengajuan Saldo PHL terpisah. Jika seluruh tanggal sudah disetujui tetapi status periode Pending, klik Selesaikan Periode.
+                <span className="font-bold">Dua keputusan:</span> tombol hijau menyetujui kehadiran tanpa menambah saldo. Tombol ungu menyetujui PHL berdasarkan permohonan dan bukti yang sudah diajukan. Jika periode masih Pending setelah seluruh tanggal disetujui, gunakan Selesaikan Periode.
               </div>
 
               {calendarRows.length === 0 ? (
@@ -1321,6 +1446,14 @@ export default function EmployeeApprovalDetailPage() {
                                       <Eye size={15} />
                                     </IconActionButton>
 
+                                    {phlByDate.get(row.date)?.status === 'pending_supervisor' && (
+                                      <button type="button" title="Setujui Saldo PHL untuk tanggal ini" aria-label={`Setujui PHL ${row.date}`}
+                                        disabled={Boolean(phlProcessingId)} onClick={() => void decidePHLWork(phlByDate.get(row.date)!, 'approve')}
+                                        className="inline-flex h-8 items-center gap-1 rounded-xl bg-violet-100 px-2 text-[10px] font-bold text-violet-800 transition hover:bg-violet-200 disabled:opacity-50">
+                                        <WalletCards size={15}/><span>PHL</span>
+                                      </button>
+                                    )}
+
                                     <IconActionButton
                                       label="Approve"
                                       tone="green"
@@ -1381,6 +1514,9 @@ export default function EmployeeApprovalDetailPage() {
                           processing={Boolean(log?.id && processingId === log.id)}
                           onSelect={() => toggleDailySelection(log)}
                           onDetail={() => log && setSelectedLog(log)}
+                          phlRequest={phlByDate.get(row.date) || null}
+                          phlProcessing={Boolean(phlProcessingId)}
+                          onApprovePHL={() => { const item = phlByDate.get(row.date); if (item) void decidePHLWork(item, 'approve') }}
                           onApprove={() => log && handleDailyApproval(log, 'approve')}
                           onReject={() => {
                             if (!log) return
@@ -1497,6 +1633,9 @@ function DailyMobileApprovalCard({
   onDetail,
   onApprove,
   onReject,
+  phlRequest,
+  phlProcessing,
+  onApprovePHL,
 }: {
   row: CalendarRow
   log: AttendanceLog | null
@@ -1508,6 +1647,9 @@ function DailyMobileApprovalCard({
   onDetail: () => void
   onApprove: () => void
   onReject: () => void
+  phlRequest: PHLWorkRequest | null
+  phlProcessing: boolean
+  onApprovePHL: () => void
 }) {
   const proofCount = getProofCount(log)
 
@@ -1578,6 +1720,9 @@ function DailyMobileApprovalCard({
             <IconActionButton label="Detail" tone="blue" onClick={onDetail}>
               <Eye size={15} />
             </IconActionButton>
+            {phlRequest?.status === 'pending_supervisor' && (
+              <button type="button" onClick={onApprovePHL} disabled={phlProcessing} className="flex h-9 items-center gap-1 rounded-xl bg-violet-100 px-2 text-xs font-bold text-violet-800 disabled:opacity-50"><WalletCards size={15}/>PHL</button>
+            )}
             <IconActionButton label="Approve" tone="green" disabled={!canProcess || processing} onClick={onApprove}>
               <CheckCircle2 size={15} />
             </IconActionButton>

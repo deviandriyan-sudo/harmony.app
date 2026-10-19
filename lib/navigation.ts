@@ -14,7 +14,7 @@ export type NavigationItem = {
   activePrefixes?: readonly string[]
   remed?: boolean
 }
-export type NavigationTab = { title: string; href: string }
+export type NavigationTab = { title: string; href: string; activePrefixes?: readonly string[] }
 export type ModuleNavigation = {
   title: string
   prefixes: readonly string[]
@@ -117,8 +117,7 @@ export function resolveDetailTabs(role: NavigationRole, pathname: string): Navig
   if (routeMatches(pathname, '/hr/attendance')) return [
     { title: 'Ringkasan', href: '/hr/attendance' },
     { title: 'Upload', href: '/hr/attendance/upload' },
-    { title: 'Data', href: '/hr/attendance/data' },
-    { title: 'Approval', href: '/hr/attendance/approvals' },
+    { title: 'Data & Review', href: '/hr/attendance/data', activePrefixes: ['/hr/attendance/data', '/hr/attendance/approvals'] },
     { title: 'Laporan', href: '/hr/attendance/final-report' },
     { title: 'Export', href: '/hr/attendance/export' },
     { title: 'Sync', href: '/hr/attendance/sync' },

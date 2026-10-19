@@ -80,6 +80,28 @@ export async function fetchPHLWorkRequests(
   return payload?.requests || []
 }
 
+/** Shared supervisor workflow for a single employee and attendance period.
+ * The server validates subordinate access before returning any PHL evidence.
+ */
+export async function fetchTeamPHLWorkRequestsForPeriod(
+  employeeId: string,
+  dateFrom: string,
+  dateTo: string,
+) {
+  const token = await accessToken()
+  const params = new URLSearchParams({
+    scope: 'team', employee_id: employeeId, date_from: dateFrom, date_to: dateTo,
+  })
+  const response = await fetch(`/api/phl/work-requests?${params.toString()}`, {
+    headers: { Authorization: `Bearer ${token}` }, cache: 'no-store',
+  })
+  const payload = (await response.json().catch(() => null)) as PHLWorkListResponse | null
+  if (!response.ok || payload?.success === false) {
+    throw new Error(payload?.error || 'Pengajuan PHL periode ini gagal dimuat.')
+  }
+  return payload?.requests || []
+}
+
 export async function submitPHLWorkRequest(input: {
   workDate: string
   startTime: string

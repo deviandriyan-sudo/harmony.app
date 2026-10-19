@@ -500,7 +500,10 @@ export default function EmployeeApprovalsPage() {
           <ApprovalModuleCard
             title="Approval PHL Kerja"
             description="Review penugasan PHL berdasarkan Surat Tugas dan durasi form minimal 4 jam. Approve menambah +1 saldo PHL dan menyinkronkan absensi bila belum tercatat."
-            href="/employee/approvals/phl"
+            href={`/employee/approvals/phl?status=${phlWorkSummary.pending > 0 ? 'pending' : 'all'}`}
+            metricHref={(label) => `/employee/approvals/phl?status=${
+              label === 'Total Request' ? 'all' : label.toLowerCase()
+            }`}
             icon={<WalletCards size={25} />}
             tone="purple"
             metrics={[
@@ -900,6 +903,7 @@ function ApprovalModuleCard({
   tone,
   metrics,
   highlights,
+  metricHref,
 }: {
   title: string
   description: string
@@ -911,6 +915,7 @@ function ApprovalModuleCard({
     value: number
   }[]
   highlights: string[]
+  metricHref?: (label: string) => string
 }) {
   const toneClass = {
     blue: 'bg-[#e8f2ff] text-[#007aff]',
@@ -918,11 +923,8 @@ function ApprovalModuleCard({
   }[tone]
 
   return (
-    <Link
-      href={href}
-      className="group harmony-metric-card block overflow-hidden p-0"
-    >
-      <div className="border-b border-black/5 p-6">
+    <div className="group harmony-metric-card block overflow-hidden p-0">
+      <Link href={href} className="block border-b border-black/5 p-6 transition hover:bg-black/[0.02] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[#007aff]">
         <div className="flex items-start justify-between gap-4">
           <div className={`flex h-14 w-14 items-center justify-center rounded-3xl ${toneClass}`}>
             {icon}
@@ -941,13 +943,15 @@ function ApprovalModuleCard({
         <p className="mt-3 text-sm leading-6 text-[#6e6e73]">
           {description}
         </p>
-      </div>
+      </Link>
 
       <div className="grid gap-3 border-b border-black/5 p-6 md:grid-cols-4">
         {metrics.map((item) => (
-          <div
+          <Link
             key={item.label}
-            className="rounded-[20px] bg-[#f5f5f7]/80 p-4"
+            href={metricHref ? metricHref(item.label) : href}
+            aria-label={`Lihat ${item.label}: ${item.value} - ${title}`}
+            className="rounded-[20px] bg-[#f5f5f7]/80 p-4 transition hover:bg-[#e8f2ff] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#007aff]"
           >
             <p className="text-xs font-semibold text-[#6e6e73]">
               {item.label}
@@ -956,7 +960,7 @@ function ApprovalModuleCard({
             <p className="mt-2 text-2xl font-semibold text-[#1d1d1f]">
               {item.value}
             </p>
-          </div>
+          </Link>
         ))}
       </div>
 
@@ -976,7 +980,7 @@ function ApprovalModuleCard({
           </div>
         ))}
       </div>
-    </Link>
+    </div>
   )
 }
 

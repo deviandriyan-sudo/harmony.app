@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useMemo, type ReactNode } from 'react'
 import {
   AlertTriangle,
   ArrowLeft,
@@ -14,49 +14,13 @@ import {
 } from 'lucide-react'
 
 import { Topbar } from '@/components/layout/Topbar'
-import { supabase } from '@/lib/supabase'
-import {
-  getCutoffRange,
-  isUuid,
-} from '@/lib/attendance-reporting'
-import { useAttendancePeriodQuery } from '@/lib/use-attendance-period'
-import {
-  buildAttendanceReportingRows,
-  loadAttendanceReportingDataset,
-  type AttendanceReportingDataset,
-} from '@/lib/attendance-reporting-data'
+import { AttendanceWorkspaceTabs } from '@/components/attendance/AttendanceWorkspaceTabs'
+import { isUuid } from '@/lib/attendance-reporting'
+import { useHRAttendanceReporting } from '@/components/attendance/useHRAttendanceReporting'
 
 export default function HRAttendanceDataPage() {
-  const { periodMonth, setPeriodMonth, periodReady } = useAttendancePeriodQuery()
-  const [dataset, setDataset] = useState<AttendanceReportingDataset | null>(null)
-  const [search, setSearch] = useState('')
-  const [loading, setLoading] = useState(true)
-  const [errorMessage, setErrorMessage] = useState('')
-
-  const range = useMemo(() => getCutoffRange(periodMonth), [periodMonth])
-  const rows = useMemo(
-    () => (dataset ? buildAttendanceReportingRows(dataset, periodMonth) : []),
-    [dataset, periodMonth],
-  )
-
-  const filteredRows = useMemo(() => {
-    const keyword = search.trim().toLowerCase()
-    if (!keyword) return rows
-
-    return rows.filter((row) =>
-      [
-        row.employee.full_name,
-        row.employee.employee_number,
-        row.employee.machine_pin,
-        row.employee.department,
-        row.employee.position,
-      ]
-        .filter(Boolean)
-        .join(' ')
-        .toLowerCase()
-        .includes(keyword),
-    )
-  }, [rows, search])
+  const { periodMonth, setPeriodMonth, dataset, search, setSearch, loading, errorMessage, range, rows, filteredRows, fetchData } =
+    useHRAttendanceReporting('Data absensi gagal dimuat.')
 
   const totals = useMemo(
     () =>
@@ -88,35 +52,15 @@ export default function HRAttendanceDataPage() {
     [filteredRows],
   )
 
-  useEffect(() => {
-    if (!periodReady) return
-    fetchData()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [periodMonth, periodReady])
-
-  async function fetchData() {
-    setLoading(true)
-    setErrorMessage('')
-
-    try {
-      const loaded = await loadAttendanceReportingDataset(supabase, periodMonth)
-      setDataset(loaded)
-    } catch (error: any) {
-      setDataset(null)
-      setErrorMessage(error?.message || 'Data absensi gagal dimuat.')
-    } finally {
-      setLoading(false)
-    }
-  }
-
   return (
     <>
       <Topbar
         title="Data Absensi"
-        description="Monitoring seluruh sumber kehadiran tanpa menunggu employee submit."
+        description="Data kehadiran aktual, termasuk sebelum karyawan submit."
       />
 
       <section className="harmony-page-bg min-h-screen space-y-5 overflow-x-hidden p-4 sm:p-6">
+        <AttendanceWorkspaceTabs current="data" period={periodMonth} />
         {errorMessage && <AlertBox message={errorMessage} />}
 
         {dataset?.warnings.map((warning) => (
@@ -186,7 +130,7 @@ export default function HRAttendanceDataPage() {
 
             <div className="flex flex-wrap gap-2">
               <Link href={`/hr/attendance/approvals?period=${periodMonth}`} className="harmony-button-secondary">
-                HR Review
+                Buka Review HR
               </Link>
               <Link href={`/hr/attendance/export?period=${periodMonth}`} className="harmony-button-primary">
                 <FileSpreadsheet size={16} />

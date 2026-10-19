@@ -273,6 +273,12 @@ export async function POST(
       .maybeSingle()
     if (targetError) throw targetError
     if (!target) return NextResponse.json({ success: false, error: 'Pengajuan PHL tidak ditemukan.' }, { status: 404 })
+    if (clean(target.status) !== 'pending_supervisor') {
+      return NextResponse.json(
+        { success: false, error: 'Pengajuan PHL ini sudah diproses. Refresh halaman untuk melihat status terbaru.' },
+        { status: 409 },
+      )
+    }
 
     const allowed = await isPHLSupervisorOf(auth.admin, auth.employee, target.employee_id)
     if (!allowed) {

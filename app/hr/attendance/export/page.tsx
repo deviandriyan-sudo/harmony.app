@@ -16,19 +16,12 @@ import {
 } from 'lucide-react'
 
 import { Topbar } from '@/components/layout/Topbar'
-import { supabase } from '@/lib/supabase'
 import {
   formatDateID,
   formatDateTimeID,
-  getCutoffRange,
 } from '@/lib/attendance-reporting'
-import { useAttendancePeriodQuery } from '@/lib/use-attendance-period'
-import {
-  buildAttendanceReportingRows,
-  loadAttendanceReportingDataset,
-  type AttendanceReportingDataset,
-  type AttendanceReportingRow,
-} from '@/lib/attendance-reporting-data'
+import { useHRAttendanceReporting } from '@/components/attendance/useHRAttendanceReporting'
+import type { AttendanceReportingRow } from '@/lib/attendance-reporting-data'
 
 type ReportFilter =
   | 'all'
@@ -40,20 +33,11 @@ type ReportFilter =
   | 'no_record'
 
 export default function HRAttendanceExportPage() {
-  const { periodMonth, setPeriodMonth, periodReady } = useAttendancePeriodQuery()
-  const [dataset, setDataset] = useState<AttendanceReportingDataset | null>(null)
-  const [search, setSearch] = useState('')
+  const { periodMonth, setPeriodMonth, dataset, search, setSearch, loading, errorMessage, setErrorMessage, range, rows, fetchData } =
+    useHRAttendanceReporting('Laporan absensi gagal mengambil data dari Supabase.')
   const [filter, setFilter] = useState<ReportFilter>('all')
-  const [loading, setLoading] = useState(true)
   const [exporting, setExporting] = useState(false)
-  const [errorMessage, setErrorMessage] = useState('')
   const [successMessage, setSuccessMessage] = useState('')
-
-  const range = useMemo(() => getCutoffRange(periodMonth), [periodMonth])
-  const rows = useMemo<AttendanceReportingRow[]>(
-    () => (dataset ? buildAttendanceReportingRows(dataset, periodMonth) : []),
-    [dataset, periodMonth],
-  )
 
   const filteredRows = useMemo(() => {
     const keyword = search.trim().toLowerCase()
@@ -134,30 +118,10 @@ export default function HRAttendanceExportPage() {
   }, [filteredRows])
 
   useEffect(() => {
-    if (!periodReady) return
-    fetchData()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [periodMonth, periodReady])
-
-  useEffect(() => {
     if (typeof window === 'undefined') return
     const querySearch = new URLSearchParams(window.location.search).get('q')
     if (querySearch) setSearch(querySearch)
   }, [])
-
-  async function fetchData() {
-    setLoading(true)
-    setErrorMessage('')
-
-    try {
-      setDataset(await loadAttendanceReportingDataset(supabase, periodMonth))
-    } catch (error: any) {
-      setDataset(null)
-      setErrorMessage(error?.message || 'Laporan absensi gagal mengambil data dari Supabase.')
-    } finally {
-      setLoading(false)
-    }
-  }
 
   function buildRecapRows() {
     return filteredRows.map((row, index) => ({
