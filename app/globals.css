@@ -2335,3 +2335,269 @@ body > .harmony-sidebar-shell:not(.harmony-sidebar-mobile) .harmony-sidebar-pane
 @media print {
   .harmony-public-page, .harmony-public-shell { background: #fff !important; box-shadow: none !important; }
 }
+
+
+/* ============================================================================
+   HARMONY — MATTE FROSTED GLASS / APPLE-INSPIRED UI
+   Visual-only layer. No navigation, permission, state, or business-rule changes.
+   A quiet background, natural translucency, softened thick glass edges,
+   restrained highlights, readable tables and accessible modal/alert surfaces.
+   ============================================================================ */
+:root {
+  --harmony-bg: #eaf2fc;
+  --harmony-workspace-bg: #edf4fd;
+  --harmony-surface-glass: rgba(246, 251, 255, .67);
+  --harmony-card: rgba(246, 251, 255, .68);
+  --harmony-card-strong: rgba(247, 252, 255, .84);
+  --harmony-border: rgba(255,255,255,.68);
+  --harmony-border-strong: rgba(128,166,211,.35);
+  --harmony-text: #162b4a;
+  --harmony-muted: #526985;
+  --harmony-subtle: #637d98;
+  --harmony-blue: #1769db;
+  --glass-border: rgba(255,255,255,.73);
+  --harmony-matte-edge:
+    inset 0 2px 0 rgba(255,255,255,.86),
+    inset 0 -2px 0 rgba(112,157,210,.14),
+    inset 1px 0 0 rgba(255,255,255,.52),
+    0 0 0 1px rgba(76,123,180,.11);
+  --harmony-matte-shadow:
+    var(--harmony-matte-edge),
+    0 9px 28px rgba(39,73,121,.075),
+    0 24px 49px rgba(41,78,128,.055);
+  --harmony-matte-shadow-hover:
+    var(--harmony-matte-edge),
+    0 13px 30px rgba(37,81,143,.115),
+    0 27px 52px rgba(41,78,128,.068);
+  --glass-shadow: var(--harmony-matte-shadow);
+  --glass-shadow-hover: var(--harmony-matte-shadow-hover);
+}
+
+/* No bokeh, shiny streaks, animated light flares or prominent artwork. */
+body, .harmony-shell {
+  background: linear-gradient(128deg,#e5eefb 0%,#f0f5fd 48%,#e8f0fa 100%) fixed !important;
+}
+.harmony-workspace,
+.harmony-page, .harmony-page-bg {
+  background: linear-gradient(137deg,rgba(216,233,252,.36),rgba(246,249,255,.56) 49%,rgba(220,234,252,.38)) !important;
+}
+.harmony-workspace::before, .harmony-workspace::after { display:none !important; }
+
+/* A subtle transparent glass wall, not a white solid card. */
+.harmony-workspace :is(
+  .harmony-card,.harmony-card-solid,.harmony-card-soft,
+  .harmony-glass,.harmony-unified-surface,.harmony-metric-card,
+  .harmony-unified-toolbar,.harmony-subtle-panel,.harmony-phl-review-panel
+) {
+  background: linear-gradient(152deg,rgba(255,255,255,.72),rgba(239,247,255,.54)) !important;
+  border: 1px solid rgba(255,255,255,.74) !important;
+  box-shadow: var(--harmony-matte-shadow) !important;
+  backdrop-filter: blur(27px) saturate(119%) !important;
+  -webkit-backdrop-filter: blur(27px) saturate(119%) !important;
+}
+.harmony-workspace :is(.harmony-card,.harmony-unified-surface,.harmony-metric-card):hover {
+  box-shadow: var(--harmony-matte-shadow-hover) !important;
+  border-color: rgba(255,255,255,.83) !important;
+}
+.harmony-workspace .harmony-metric-card::before,
+.harmony-workspace .harmony-metric-card::after {
+  opacity: .14 !important;
+}
+.harmony-workspace .harmony-metric-card:hover { transform: translateY(-1px) !important; }
+/* Restrained status tint, independent of text/status semantic colors. */
+.harmony-workspace .harmony-metric-card:nth-child(4n+1) {
+  background:linear-gradient(148deg,rgba(255,255,255,.72),rgba(220,236,254,.59)) !important;
+}
+.harmony-workspace .harmony-metric-card:nth-child(4n+2) {
+  background:linear-gradient(148deg,rgba(255,255,255,.72),rgba(222,245,237,.57)) !important;
+}
+.harmony-workspace .harmony-metric-card:nth-child(4n+3) {
+  background:linear-gradient(148deg,rgba(255,255,255,.72),rgba(234,230,252,.57)) !important;
+}
+.harmony-workspace .harmony-metric-card:nth-child(4n+4) {
+  background:linear-gradient(148deg,rgba(255,255,255,.72),rgba(250,237,223,.58)) !important;
+}
+/* Legacy panels only: leave red, green and warning semantic backgrounds intact. */
+.harmony-workspace :is(section,article,div)[class*='bg-white'][class*='rounded-'][class*='border']:not(.harmony-modal-surface *):not(.harmony-notification-portal *) {
+  background-color: rgba(247,251,255,.67) !important;
+  border-color:rgba(255,255,255,.72) !important;
+  box-shadow:var(--harmony-matte-edge),0 9px 24px rgba(43,81,130,.055) !important;
+  backdrop-filter:blur(23px) saturate(114%) !important;
+  -webkit-backdrop-filter:blur(23px) saturate(114%) !important;
+}
+
+/* Deep blue glass banner: translucent and matte, not black/opaque or glowing. */
+.harmony-workspace :is(.harmony-hero-v25,.harmony-glass-dark) {
+  background: linear-gradient(119deg,rgba(28,76,145,.88),rgba(60,119,192,.80) 65%,rgba(88,146,205,.76)) !important;
+  border:1px solid rgba(208,235,255,.55) !important;
+  box-shadow:
+    inset 0 2px 0 rgba(255,255,255,.28),
+    inset 0 -2px 0 rgba(108,166,224,.24),
+    0 0 0 1px rgba(58,114,175,.18),
+    0 15px 31px rgba(37,84,145,.12) !important;
+  backdrop-filter:blur(28px) saturate(120%) !important;
+  -webkit-backdrop-filter:blur(28px) saturate(120%) !important;
+  color:#fff !important;
+}
+.harmony-workspace :is(.harmony-hero-v25,.harmony-glass-dark)::before { opacity:0 !important; }
+.harmony-workspace .harmony-hero-v25[data-accent='remed'] {
+  background:linear-gradient(119deg,rgba(24,91,88,.9),rgba(50,131,136,.81)) !important;
+}
+
+/* Chrome: floating navigation and sidebar retain exactly the same glass recipe. */
+.harmony-module-subnav,.harmony-topbar,.harmony-mobile-topbar {
+  background:rgba(236,245,255,.67) !important;
+  border-color:rgba(255,255,255,.72) !important;
+  box-shadow:var(--harmony-matte-edge),0 8px 23px rgba(36,78,125,.06) !important;
+  backdrop-filter:blur(29px) saturate(118%) !important;
+  -webkit-backdrop-filter:blur(29px) saturate(118%) !important;
+}
+body > .harmony-sidebar-shell:not(.harmony-sidebar-mobile) .harmony-sidebar-panel,
+.harmony-sidebar-mobile .harmony-sidebar-panel {
+  background:linear-gradient(155deg,rgba(241,248,255,.84),rgba(225,239,254,.79)) !important;
+  opacity:1 !important;
+  border:1px solid rgba(255,255,255,.76) !important;
+  box-shadow:var(--harmony-matte-edge),0 18px 39px rgba(45,79,125,.13) !important;
+  backdrop-filter:blur(34px) saturate(116%) !important;
+  -webkit-backdrop-filter:blur(34px) saturate(116%) !important;
+}
+.harmony-logo-glass,.harmony-sidebar-user,.harmony-logout,
+.harmony-topbar-search,.harmony-topbar-action,.harmony-topbar-badge,
+.harmony-mobile-glass,.harmony-mobile-brand {
+  background:rgba(250,253,255,.63) !important;
+  border-color:rgba(255,255,255,.74) !important;
+  box-shadow:var(--harmony-matte-edge),0 7px 16px rgba(38,75,124,.045) !important;
+  backdrop-filter:blur(23px) saturate(115%) !important;
+  -webkit-backdrop-filter:blur(23px) saturate(115%) !important;
+}
+.harmony-nav-active:not(.harmony-nav-remed) {
+  background:linear-gradient(132deg,rgba(25,90,185,.94),rgba(49,123,215,.91)) !important;
+  border-color:rgba(210,237,255,.58) !important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.34),0 5px 13px rgba(36,91,164,.18) !important;
+}
+.harmony-nav-active.harmony-nav-remed {
+  background:linear-gradient(132deg,rgba(21,109,95,.94),rgba(39,144,126,.91)) !important;
+}
+
+/* Buttons have gentle curved edges; no glossy hotspot or neon glow. */
+.harmony-workspace :is(.harmony-button-secondary,.harmony-button-native-secondary,.harmony-button-native-outline,.harmony-action-soft),
+.harmony-topbar-action {
+  background:rgba(250,253,255,.66) !important;
+  border-color:rgba(255,255,255,.74) !important;
+  box-shadow:var(--harmony-matte-edge),0 5px 13px rgba(38,75,124,.045) !important;
+  backdrop-filter:blur(17px) saturate(113%) !important;
+  -webkit-backdrop-filter:blur(17px) saturate(113%) !important;
+}
+.harmony-workspace :is(.harmony-button-primary,.harmony-button-blue,.harmony-button-native,.harmony-action-primary) {
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.22),0 6px 15px rgba(37,84,145,.13) !important;
+}
+.harmony-workspace :is(.harmony-button-blue):not(:disabled) {
+  background:linear-gradient(180deg,rgba(32,126,240,.95),rgba(23,98,211,.94)) !important;
+}
+.harmony-workspace :is(button,a)[class*='bg-green-']:not(:disabled),
+.harmony-workspace :is(button,a)[class*='bg-emerald-']:not(:disabled),
+.harmony-workspace :is(button,a)[class*='bg-red-']:not(:disabled) {
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.24),0 5px 12px rgba(35,73,122,.08) !important;
+}
+.harmony-workspace .harmony-action-group {
+  background:rgba(220,235,252,.39) !important;
+  border-color:rgba(255,255,255,.72) !important;
+  box-shadow:var(--harmony-matte-edge) !important;
+}
+
+/* Readable form elements, select popovers and grid/table headers. */
+.harmony-workspace :where(input:not([type='checkbox']):not([type='radio']):not([type='file']),select,textarea),
+.harmony-input,.harmony-select,.harmony-textarea {
+  background:rgba(252,254,255,.73) !important;
+  color:#1c3659;
+  border-color:rgba(255,255,255,.73) !important;
+  box-shadow:var(--harmony-matte-edge),0 5px 11px rgba(39,76,124,.045) !important;
+  backdrop-filter:blur(15px) saturate(115%) !important;
+  -webkit-backdrop-filter:blur(15px) saturate(115%) !important;
+}
+.harmony-workspace :where(input:not([type='checkbox']):not([type='radio']):not([type='file']),select,textarea):focus-visible {
+  border-color:rgba(38,112,215,.7) !important;
+  outline:2px solid rgba(38,112,215,.75);
+  outline-offset:1px;
+}
+.harmony-topbar-search input,.harmony-topbar-search input:focus { background:transparent !important;box-shadow:none !important; }
+.harmony-workspace :is(table thead,.harmony-table thead) {
+  background:rgba(226,239,254,.52) !important;
+  backdrop-filter:blur(18px) saturate(115%) !important;
+  -webkit-backdrop-filter:blur(18px) saturate(115%) !important;
+}
+.harmony-workspace table tbody tr:hover { background:rgba(231,242,255,.43) !important; }
+
+/* Overlays do not hide other controls or notifications behind modal dialog. */
+.harmony-modal-surface:is(.flex.items-center.justify-center) {
+  background:rgba(27,47,78,.25) !important;
+  backdrop-filter:blur(10px) saturate(102%) !important;
+  -webkit-backdrop-filter:blur(10px) saturate(102%) !important;
+}
+.harmony-modal-surface:is(.flex.items-center.justify-center) > :first-child {
+  background:linear-gradient(152deg,rgba(248,252,255,.83),rgba(229,242,255,.76)) !important;
+  border:1px solid rgba(255,255,255,.78) !important;
+  box-shadow:var(--harmony-matte-edge),0 27px 75px rgba(22,46,82,.19) !important;
+  backdrop-filter:blur(33px) saturate(119%) !important;
+  -webkit-backdrop-filter:blur(33px) saturate(119%) !important;
+}
+/* Preserve dark destructive confirmation headers and their white text. */
+.harmony-modal-surface:is(.flex.items-center.justify-center) > :first-child > :is(header,div)[class*='bg-white'] {
+  background:rgba(246,251,255,.45) !important;
+}
+.harmony-modal-surface:is(.flex.items-center.justify-center) :is(input,select,textarea) {
+  border-color:rgba(179,207,237,.6);
+  background:rgba(255,255,255,.64);
+  backdrop-filter:blur(14px);
+  -webkit-backdrop-filter:blur(14px);
+}
+/* Notification portal is a floating window, not an opaque rectangle. */
+.harmony-popover-glass,.harmony-notification-portal {
+  background:rgba(247,251,255,.88) !important;
+  border-color:rgba(255,255,255,.82) !important;
+  box-shadow:var(--harmony-matte-edge),0 22px 54px rgba(29,57,94,.18) !important;
+  backdrop-filter:blur(31px) saturate(115%) !important;
+  -webkit-backdrop-filter:blur(31px) saturate(115%) !important;
+}
+/* Existing status semantics remain recognizable when frosted. */
+.harmony-workspace [data-harmony-feedback='error'],
+.harmony-modal-surface [data-harmony-feedback='error'] {
+  background-color:rgba(255,239,234,.89) !important;
+  border-color:rgba(237,141,117,.54) !important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.8),0 5px 13px rgba(126,65,53,.045);
+}
+
+/* Protected accessibility / printing / reduced-motion fallbacks. */
+@media (prefers-reduced-transparency:reduce) {
+  .harmony-workspace :is(.harmony-card,.harmony-card-solid,.harmony-card-soft,.harmony-unified-surface,.harmony-metric-card,.harmony-glass),
+  .harmony-modal-surface:is(.flex.items-center.justify-center)>:first-child,
+  .harmony-notification-portal,.harmony-popover-glass,.harmony-sidebar-panel {
+    background:#f3f8ff !important;
+    backdrop-filter:none !important;
+    -webkit-backdrop-filter:none !important;
+  }
+}
+@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))) {
+  .harmony-workspace :is(.harmony-card,.harmony-card-solid,.harmony-unified-surface,.harmony-metric-card),
+  .harmony-modal-surface:is(.flex.items-center.justify-center)>:first-child,
+  .harmony-notification-portal,.harmony-sidebar-panel {background:rgba(244,249,255,.97) !important;}
+}
+@media (max-width:767px) {
+  .harmony-workspace :is(.harmony-card,.harmony-unified-surface,.harmony-metric-card),
+  .harmony-sidebar-panel,.harmony-modal-surface:is(.flex.items-center.justify-center)>:first-child {
+    backdrop-filter:blur(19px) saturate(112%) !important;
+    -webkit-backdrop-filter:blur(19px) saturate(112%) !important;
+  }
+}
+@media print {
+  body,.harmony-shell,.harmony-workspace,.harmony-page,
+  .harmony-workspace :is(.harmony-card,.harmony-card-solid,.harmony-card-soft,.harmony-unified-surface,.harmony-metric-card),
+  .harmony-workspace :is(.harmony-hero-v25,.harmony-glass-dark) {
+    background:#fff !important;
+    color:#172b46 !important;
+    box-shadow:none !important;
+    backdrop-filter:none !important;
+    -webkit-backdrop-filter:none !important;
+  }
+}
+
