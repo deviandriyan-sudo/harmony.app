@@ -61,6 +61,27 @@ type NotificationLog = {
 }
 
 const TASK_REFRESH_MS = 60_000
+const TASK_READ_STORAGE_PREFIX = 'harmony-task-read-v1:'
+
+// Task IDs represent live workflow aggregates. Refresh the badge if the aggregate changes.
+function taskFingerprint(item: HarmonyActionTask) {
+  return [item.id, item.count, item.period_month || '', item.oldest_created_at || ''].join('|')
+}
+
+function loadTaskReadState(userId: string): Record<string, string> {
+  if (!userId || typeof window === 'undefined') return {}
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(TASK_READ_STORAGE_PREFIX + userId) || '{}')
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {}
+    return Object.fromEntries(
+      Object.entries(parsed)
+        .filter(([key, value]) => typeof key === 'string' && typeof value === 'string')
+        .slice(-500),
+    ) as Record<string, string>
+  } catch {
+    return {}
+  }
+}
 
 export function Topbar({
   title,
@@ -87,6 +108,9 @@ export function Topbar({
   const [notifications, setNotifications] = useState<NotificationLog[]>([])
   const [tasks, setTasks] = useState<HarmonyActionTask[]>([])
   const [taskWarning, setTaskWarning] = useState('')
+  const [currentUserId, setCurrentUserId] = useState('')
+  const [readTaskKeys, setReadTaskKeys] = useState<Record<string, string>>({})
+  const [showReadTasks, setShowReadTasks] = useState(false)
 
   const [isOpen, setIsOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
@@ -98,11 +122,46 @@ export function Topbar({
     return notifications.filter((item) => !item.read_at).length
   }, [notifications])
 
-  const pendingTaskCount = useMemo(() => {
-    return tasks.reduce((sum, item) => sum + Math.max(1, Number(item.count || 1)), 0)
-  }, [tasks])
-
+  const unreadTasks = useMemo(
+    () => tasks.filter((item) => !readTaskKeys[taskFingerprint(item)]),
+    [tasks, readTaskKeys],
+  )
+  const visibleTasks = showReadTasks ? tasks : unreadTasks
+  const pendingTaskCount = useMemo(
+    () => unreadTasks.reduce((sum, item) => sum + Math.max(1, Number(item.count || 1)), 0),
+    [unreadTasks],
+  )
+  const allTaskCount = useMemo(
+    () => tasks.reduce((sum, item) => sum + Math.max(1, Number(item.count || 1)), 0),
+    [tasks],
+  )
   const totalBadgeCount = pendingTaskCount + unreadHistoryCount
+
+  function saveTaskReadState(next: Record<string, string>) {
+    if (!currentUserId) return
+    setReadTaskKeys(next)
+    try {
+      window.localStorage.setItem(
+        TASK_READ_STORAGE_PREFIX + currentUserId,
+        JSON.stringify(Object.fromEntries(Object.entries(next).slice(-500))),
+      )
+    } catch {
+      setErrorMessage('Status task tidak dapat disimpan pada browser ini.')
+    }
+  }
+
+  function markTaskRead(item: HarmonyActionTask) {
+    if (!currentUserId) return
+    saveTaskReadState({ ...readTaskKeys, [taskFingerprint(item)]: new Date().toISOString() })
+  }
+
+  function markAllTasksRead() {
+    if (!currentUserId || unreadTasks.length === 0) return
+    const next = { ...readTaskKeys }
+    const now = new Date().toISOString()
+    for (const item of unreadTasks) next[taskFingerprint(item)] = now
+    saveTaskReadState(next)
+  }
 
   useEffect(() => {
     void fetchCurrentUserAndNotifications()
@@ -198,6 +257,8 @@ export function Topbar({
 
       if (sessionError || !sessionData.session?.user?.email) {
         setCurrentEmail('')
+        setCurrentUserId('')
+        setReadTaskKeys({})
         setNotifications([])
         setTasks([])
         return
@@ -207,6 +268,8 @@ export function Topbar({
       const token = sessionData.session.access_token
 
       setCurrentEmail(email)
+      setCurrentUserId(sessionData.session.user.id)
+      setReadTaskKeys(loadTaskReadState(sessionData.session.user.id))
 
       await Promise.all([
         fetchNotifications(email),
@@ -357,6 +420,9 @@ export function Topbar({
   }
 
   async function handleMarkAllAsRead() {
+    // Acknowledging a task only changes this user's notification badge.
+    // It NEVER changes underlying attendance/leave/PHL approval statuses.
+    markAllTasksRead()
     if (!currentEmail || unreadHistoryCount === 0) return
 
     setIsMarking(true)
@@ -488,8 +554,8 @@ export function Topbar({
 
                     <p className="mt-1 text-xs leading-5 text-[#86868b]">
                       {pendingTaskCount > 0
-                        ? `${pendingTaskCount} task perlu tindakan`
-                        : 'Tidak ada task yang tertunda'}
+                        ? `${pendingTaskCount} task belum dibaca`
+                        : 'Tidak ada task baru'}
                       {' · '}
                       {unreadHistoryCount} riwayat belum dibaca
                     </p>
@@ -514,8 +580,8 @@ export function Topbar({
                     <button
                       type="button"
                       onClick={handleMarkAllAsRead}
-                      disabled={isMarking || unreadHistoryCount === 0}
-                      title="Tandai semua riwayat sebagai dibaca"
+                      disabled={isMarking || (unreadHistoryCount === 0 && unreadTasks.length === 0)}
+                      title="Tandai semua task dan riwayat sebagai dibaca"
                       className="inline-flex h-9 items-center gap-1.5 rounded-2xl bg-[#f5f5f7] px-3 text-xs font-bold text-[#1d1d1f] transition hover:bg-[#e8f2ff] disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       {isMarking ? (
@@ -566,14 +632,25 @@ export function Topbar({
                             </h3>
                           </div>
 
-                          {pendingTaskCount > 0 && (
-                            <span className="rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-bold text-amber-800">
-                              {pendingTaskCount} task
-                            </span>
-                          )}
+                          <div className="flex items-center gap-2">
+                            {allTaskCount > 0 && (
+                              <button
+                                type="button"
+                                onClick={() => setShowReadTasks((value) => !value)}
+                                className="rounded-full border border-amber-200 bg-white px-2.5 py-1 text-[11px] font-bold text-amber-800 hover:bg-amber-50"
+                              >
+                                {showReadTasks ? 'Hanya belum dibaca' : `Lihat semua (${allTaskCount})`}
+                              </button>
+                            )}
+                            {pendingTaskCount > 0 && (
+                              <span className="rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-bold text-amber-800">
+                                {pendingTaskCount} baru
+                              </span>
+                            )}
+                          </div>
                         </div>
 
-                        {tasks.length === 0 ? (
+                        {visibleTasks.length === 0 ? (
                           <div className="px-5 pb-5 pt-2">
                             <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-4">
                               <div className="flex items-start gap-3">
@@ -583,10 +660,12 @@ export function Topbar({
                                 />
                                 <div>
                                   <p className="text-sm font-bold text-emerald-800">
-                                    Semua task selesai
+                                    {tasks.length === 0 ? 'Semua task selesai' : 'Tidak ada task belum dibaca'}
                                   </p>
                                   <p className="mt-1 text-xs leading-5 text-emerald-700">
-                                    Tidak ada pekerjaan workflow HARMONY yang saat ini membutuhkan tindakan Anda.
+                                    {tasks.length === 0
+                                      ? 'Tidak ada pekerjaan workflow yang membutuhkan tindakan Anda.'
+                                      : 'Task yang ditandai dibaca tetap ada dalam workflow. Gunakan Lihat semua untuk membukanya kembali.'}
                                   </p>
                                 </div>
                               </div>
@@ -594,12 +673,10 @@ export function Topbar({
                           </div>
                         ) : (
                           <div className="space-y-2 px-3 pb-4">
-                            {tasks.map((item) => (
-                              <button
+                            {visibleTasks.map((item) => (
+                              <div
                                 key={item.id}
-                                type="button"
-                                onClick={() => openTask(item)}
-                                className="block w-full rounded-2xl border border-amber-100 bg-white p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-amber-200 hover:shadow-md"
+                                className={`rounded-2xl border p-4 shadow-sm transition ${readTaskKeys[taskFingerprint(item)] ? 'border-slate-200 bg-slate-50' : 'border-amber-100 bg-white'}`}
                               >
                                 <div className="flex items-start gap-3">
                                   <div
@@ -652,13 +729,33 @@ export function Topbar({
                                     </div>
                                   </div>
                                 </div>
-                              </button>
+                                <div className="mt-3 flex justify-end gap-2 border-t border-amber-100/70 pt-3">
+                                  {readTaskKeys[taskFingerprint(item)] ? (
+                                    <span className="self-center text-[11px] font-semibold text-slate-500">Sudah dibaca</span>
+                                  ) : (
+                                    <button
+                                      type="button"
+                                      onClick={() => markTaskRead(item)}
+                                      className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                                    >
+                                      Tandai dibaca
+                                    </button>
+                                  )}
+                                  <button
+                                    type="button"
+                                    onClick={() => openTask(item)}
+                                    className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700"
+                                  >
+                                    Buka pekerjaan
+                                  </button>
+                                </div>
+                              </div>
                             ))}
                           </div>
                         )}
 
                         <div className="border-t border-amber-100 px-5 py-3 text-[11px] leading-5 text-amber-700">
-                          Task tidak dapat ditandai “dibaca”. Task akan hilang otomatis setelah pekerjaan pada workflow terkait benar-benar selesai.
+                          Tandai dibaca hanya menyembunyikan pengingat pada browser ini, bukan menyetujui atau menghapus pekerjaan. Jika jumlah task berubah, pengingat baru akan muncul lagi.
                         </div>
                       </section>
 

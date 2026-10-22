@@ -109,6 +109,12 @@ type LeaveRequest = {
   updated_at?: string | null
 }
 
+const PHL_EXCEPTION_MARKER = 'PENGECUALIAN HR — TANPA POTONG SALDO:'
+
+function isPHLException(record: { hr_note?: string | null }) {
+  return String(record.hr_note || '').startsWith(PHL_EXCEPTION_MARKER)
+}
+
 type PHLRecord = {
   id: string
   source_attendance_log_id?: string | null
@@ -661,7 +667,8 @@ async function sendHRPHLCancellationEmail({
   }
 }
 
-function appendNotificationText(baseMessage: string, notification: { success: boolean; message: string }) {
+function appendNotificationText(baseMessage: string, notification: { success: boolean; message: string } | null) {
+  if (!notification) return baseMessage
   return notification.success
     ? `${baseMessage} ${notification.message}`
     : `${baseMessage} Namun email notifikasi belum terkirim: ${notification.message}`
@@ -687,6 +694,8 @@ export default function HRLeavePage() {
   const [selectedPHLRecord, setSelectedPHLRecord] = useState<PHLRecord | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null)
 
+  const [exceptionPHLRecord, setExceptionPHLRecord] = useState<PHLRecord | null>(null)
+  const [exceptionPHLReason, setExceptionPHLReason] = useState('')
   const [rejectPHLRecord, setRejectPHLRecord] = useState<PHLRecord | null>(null)
   const [rejectPHLReason, setRejectPHLReason] = useState('')
 
@@ -1161,12 +1170,14 @@ export default function HRLeavePage() {
           ? ` Saldo manual employee: ${result.employee_override_before} → ${result.employee_override_after} hari.`
           : ''
 
-      const notification = await sendHRPHLDecisionEmail({
-        record,
-        decision: 'approved',
-        hrName: approvedBy,
-        note: approvalNote,
-      })
+      const notification = result.already_approved
+        ? null
+        : await sendHRPHLDecisionEmail({
+            record,
+            decision: 'approved',
+            hrName: approvedBy,
+            note: approvalNote,
+          })
 
       setSuccessMessage(
         appendNotificationText(
@@ -1179,6 +1190,48 @@ export default function HRLeavePage() {
         error?.message ||
           'Klaim PHL gagal disetujui. Pastikan SQL atomic workflow PHL sudah dijalankan.'
       )
+    } finally {
+      setProcessingId('')
+      await fetchData({ preserveMessages: true })
+    }
+  }
+
+  async function approvePHLException() {
+    if (!exceptionPHLRecord) return
+    const record = exceptionPHLRecord
+    const reason = exceptionPHLReason.trim()
+    if (reason.length < 15) {
+      setErrorMessage('Alasan pengecualian HR wajib minimal 15 karakter.')
+      return
+    }
+    setProcessingId(record.id)
+    setErrorMessage('')
+    setSuccessMessage('')
+    try {
+      const { data, error } = await supabase.rpc('hr_approve_phl_claim_exception_v1', {
+        p_claim_record_id: record.id,
+        p_reason: reason,
+      })
+      if (error) throw error
+      const result = data as { success?: boolean; already_approved?: boolean; message?: string } | null
+      if (!result?.success) throw new Error(result?.message || 'Approval pengecualian belum berhasil.')
+      // Jangan mengirim ulang notifikasi jika RPC idempoten melaporkan sudah approved.
+      const notification = result.already_approved
+        ? null
+        : await sendHRPHLDecisionEmail({
+            record,
+            decision: 'approved',
+            hrName: appUser?.email || 'HR Administrator',
+            note: `Disetujui sebagai PENGECUALIAN HR tanpa pemotongan saldo. ${reason}`,
+          })
+      setSuccessMessage(appendNotificationText(
+        result.message || 'Pengecualian HR berhasil disetujui tanpa debit saldo.',
+        notification
+      ))
+      setExceptionPHLRecord(null)
+      setExceptionPHLReason('')
+    } catch (error: any) {
+      setErrorMessage(error?.message || 'Pengecualian gagal. Pastikan SQL V3.7.4 telah dijalankan.')
     } finally {
       setProcessingId('')
       await fetchData({ preserveMessages: true })
@@ -1282,14 +1335,16 @@ export default function HRLeavePage() {
     }
 
     try {
-      const { data, error } = await supabase.rpc(
-        'hr_cancel_approved_phl_claim_atomic',
-        {
-          p_claim_record_id: targetRecord.id,
-          p_cancelled_by: cancelledBy,
-          p_note: reason,
-        }
-      )
+      const { data, error } = isPHLException(targetRecord)
+        ? await supabase.rpc('hr_cancel_phl_claim_exception_v1', {
+            p_claim_record_id: targetRecord.id,
+            p_reason: reason,
+          })
+        : await supabase.rpc('hr_cancel_approved_phl_claim_atomic', {
+            p_claim_record_id: targetRecord.id,
+            p_cancelled_by: cancelledBy,
+            p_note: reason,
+          })
 
       if (error) throw error
 
@@ -1945,6 +2000,10 @@ export default function HRLeavePage() {
                 onDeleteLeave={requestDeleteLeave}
                 onLeaveDetail={setSelectedLeaveRequest}
                 onApprovePHL={approvePHLClaim}
+                onExceptionPHL={(record) => {
+                  setExceptionPHLRecord(record)
+                  setExceptionPHLReason('')
+                }}
                 onRejectPHL={(record) => {
                   setRejectPHLRecord(record)
                   setRejectPHLReason('')
@@ -2034,6 +2093,17 @@ export default function HRLeavePage() {
           <PHLDetailModal
             record={selectedPHLRecord}
             onClose={() => setSelectedPHLRecord(null)}
+          />
+        )}
+
+        {exceptionPHLRecord && (
+          <PHLExceptionModal
+            record={exceptionPHLRecord}
+            reason={exceptionPHLReason}
+            processing={processingId === exceptionPHLRecord.id}
+            onReasonChange={setExceptionPHLReason}
+            onClose={() => { setExceptionPHLRecord(null); setExceptionPHLReason('') }}
+            onSubmit={approvePHLException}
           />
         )}
 
@@ -2149,6 +2219,7 @@ function UnifiedApprovalQueue({
   onDeleteLeave,
   onLeaveDetail,
   onApprovePHL,
+  onExceptionPHL,
   onRejectPHL,
   onDeletePHL,
   onPHLDetail,
@@ -2161,6 +2232,7 @@ function UnifiedApprovalQueue({
   onDeleteLeave: (item: LeaveRequest) => void
   onLeaveDetail: (item: LeaveRequest) => void
   onApprovePHL: (record: PHLRecord) => void
+  onExceptionPHL: (record: PHLRecord) => void
   onRejectPHL: (record: PHLRecord) => void
   onDeletePHL: (record: PHLRecord) => void
   onPHLDetail: (record: PHLRecord) => void
@@ -2361,7 +2433,7 @@ function UnifiedApprovalQueue({
                     <span className="inline-flex rounded-full bg-orange-50 px-3 py-1 text-[11px] font-bold text-orange-700">
                       KLAIM PHL
                     </span>
-                    <p className="text-xs font-semibold text-[#6e6e73]">FIFO saldo aktif</p>
+                    <p className="text-xs font-semibold text-[#6e6e73]">Approve normal: saldo FIFO aktif · Pengecualian: tanpa debit</p>
                   </div>
                 </td>
                 <td className="px-5 py-4 text-sm font-semibold text-[#1d1d1f]">
@@ -2400,11 +2472,18 @@ function UnifiedApprovalQueue({
                     {canProcess ? (
                       <>
                         <SmallActionButton
-                          label="Approve"
+                          label="Approve Normal"
                           icon={<CheckCircle2 size={14} />}
                           tone="green"
                           disabled={processingId === record.id}
                           onClick={() => onApprovePHL(record)}
+                        />
+                        <SmallActionButton
+                          label="Approve Pengecualian"
+                          icon={<ShieldCheck size={14} />}
+                          tone="blue"
+                          disabled={processingId === record.id}
+                          onClick={() => onExceptionPHL(record)}
                         />
                         <SmallActionButton
                           label="Reject"
@@ -3350,6 +3429,9 @@ function HistoryTab({
 
             <td className="px-5 py-4">
               <StatusBadge status={item.status || 'pending'} />
+              {isPHLException(item) && (
+                <span className="ml-2 inline-flex rounded-full bg-blue-50 px-2 py-1 text-[11px] font-bold text-blue-700">Pengecualian HR · tanpa debit</span>
+              )}
             </td>
 
             <td className="px-5 py-4">
@@ -3486,6 +3568,7 @@ function PHLDetailModal({
         <InfoBox label="Sisa" value={`${record.remaining_days || 0} hari`} />
         <InfoBox label="Status Atasan" value={formatStatus(normalizeStatus(record.supervisor_status))} />
         <InfoBox label="Status HR" value={formatStatus(normalizeStatus(record.hr_status || record.status))} />
+        {isPHLException(record) && <InfoBox label="Metode Approval" value="Pengecualian HR (tanpa debit saldo)" />}
         {(normalizeStatus(record.hr_status || record.status) === 'cancelled' ||
           normalizeStatus(record.hr_status || record.status) === 'canceled') && (
           <>
@@ -3500,6 +3583,7 @@ function PHLDetailModal({
         )}
       </div>
 
+      {isPHLException(record) && <ContentBox title="Alasan Pengecualian HR" content={record.hr_note || '-'} />}
       <ContentBox
         title={record.source === 'employee_phl_claim' ? 'Alasan Klaim PHL' : 'Alasan / Catatan'}
         content={record.reason || record.notes || '-'}
@@ -3621,6 +3705,58 @@ function DeleteConfirmModal({
         </div>
       </div>
     </div>
+  )
+}
+
+function PHLExceptionModal({
+  record,
+  reason,
+  processing,
+  onReasonChange,
+  onClose,
+  onSubmit,
+}: {
+  record: PHLRecord
+  reason: string
+  processing: boolean
+  onReasonChange: (value: string) => void
+  onClose: () => void
+  onSubmit: () => void
+}) {
+  return (
+    <ModalShell
+      title="Approve PHL — Pengecualian HR"
+      description={`${record.full_name || '-'} · ${formatDisplayDate(record.phl_date || '')}`}
+      onClose={onClose}
+    >
+      <div className="rounded-[20px] border border-amber-200 bg-amber-50/90 p-4 text-sm leading-6 text-amber-900">
+        Keputusan administratif ini dapat dilakukan walaupun saldo sudah expired atau tidak mencukupi.
+        <strong> Tidak ada saldo yang dibuat, dipotong, atau diaktifkan kembali.</strong>
+        Approval atasan tetap wajib dan keputusan tersimpan dalam ledger pengecualian HR.
+      </div>
+      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+        <InfoBox label="Klaim" value={`${record.used_days || record.balance_days || 0} hari`} />
+        <InfoBox label="Status Atasan" value={formatStatus(normalizeStatus(record.supervisor_status))} />
+      </div>
+      <label className="mt-5 block">
+        <span className="harmony-label">Alasan pengecualian (wajib, minimal 15 karakter)</span>
+        <textarea
+          className="harmony-textarea"
+          rows={4}
+          value={reason}
+          onChange={(event) => onReasonChange(event.target.value)}
+          placeholder="Contoh: Disetujui berdasarkan verifikasi penugasan atasan, meskipun saldo telah kedaluwarsa saat HR memproses."
+        />
+      </label>
+      <div className="mt-5 flex flex-wrap justify-end gap-3">
+        <button type="button" className="harmony-button-secondary" disabled={processing} onClick={onClose}>Batal</button>
+        <button type="button" className="inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl bg-blue-700 px-5 text-sm font-bold text-white disabled:opacity-50"
+          disabled={processing || reason.trim().length < 15 || normalizeStatus(record.supervisor_status) !== 'approved'} onClick={onSubmit}>
+          {processing ? <Loader2 size={16} className="animate-spin" /> : <ShieldCheck size={16} />}
+          {processing ? 'Memproses...' : 'Konfirmasi Approve Pengecualian'}
+        </button>
+      </div>
+    </ModalShell>
   )
 }
 
@@ -3895,7 +4031,9 @@ function CancelPHLModal({
       onClose={onClose}
     >
       <div className="rounded-[24px] border border-orange-200 bg-orange-50 p-4 text-sm leading-6 text-orange-800">
-        Sistem akan mengembalikan saldo ke record PHL sumber yang dahulu dipotong saat approval. Tanggal kedaluwarsa saldo sumber tidak akan diperpanjang.
+        {isPHLException(record)
+          ? 'Klaim ini merupakan pengecualian HR tanpa pemotongan saldo. Pembatalan juga tidak akan menambah/mengembalikan saldo.'
+          : 'Sistem akan mengembalikan saldo ke record PHL sumber yang dahulu dipotong saat approval. Tanggal kedaluwarsa saldo sumber tidak akan diperpanjang.'}
       </div>
 
       <div className="mt-4 grid gap-4 md:grid-cols-3">
@@ -3944,7 +4082,7 @@ function CancelPHLModal({
           ) : (
             <RotateCcw size={17} />
           )}
-          {processing ? 'Mengembalikan Saldo...' : 'Batalkan & Reversal Saldo'}
+          {processing ? 'Memproses pembatalan...' : isPHLException(record) ? 'Batalkan Tanpa Reversal' : 'Batalkan & Reversal Saldo'}
         </button>
       </div>
     </ModalShell>
