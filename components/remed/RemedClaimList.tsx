@@ -106,9 +106,15 @@ export function RemedClaimList({
               <div className="mt-3 grid gap-2 rounded-[17px] bg-[#f7f8fa] p-3.5 text-sm text-[#747982] sm:grid-cols-2 lg:grid-cols-4">
                 <p><span className="font-semibold text-[#25272c]">Jenis:</span> {claim.claim_type?.name || '-'}</p>
                 <p><span className="font-semibold text-[#25272c]">Tanggal:</span> {formatRemedDate(claim.treatment_date)}</p>
-                <p><span className="font-semibold text-[#25272c]">Diajukan:</span> {formatRupiah(claim.submitted_amount)}</p>
+                <p><span className="font-semibold text-[#25272c]">Nilai diproses:</span> {formatRupiah(claim.submitted_amount)}</p>
                 <p><span className="font-semibold text-[#25272c]">Disetujui:</span> {claim.approved_amount ? formatRupiah(claim.approved_amount) : '-'}</p>
               </div>
+
+              {claim.receipt_amount != null && Number(claim.receipt_amount) > Number(claim.submitted_amount) ? (
+                <p className="mt-2 rounded-[14px] border border-amber-200/70 bg-amber-50/70 px-3 py-2 text-xs text-amber-800">
+                  Nilai kuitansi asli: <strong>{formatRupiah(claim.receipt_amount)}</strong> · Diproses sesuai sisa plafond: <strong>{formatRupiah(claim.submitted_amount)}</strong> · Tidak ditanggung: <strong>{formatRupiah(Number(claim.receipt_amount) - Number(claim.submitted_amount))}</strong>.
+                </p>
+              ) : null}
 
               {showBalanceImpact ? <ClaimBalanceImpact claim={claim} /> : null}
 

@@ -8,6 +8,7 @@ function safeStatus(value: string | null | undefined) { return value ? value.rep
 
 export function downloadRemedClaimsXlsx(claims: RemedClaim[], context: string) {
   const totalSubmitted = claims.reduce((sum, item) => sum + Number(item.submitted_amount || 0), 0)
+  const totalReceipts = claims.reduce((sum, item) => sum + Number(item.receipt_amount ?? item.submitted_amount ?? 0), 0)
   const totalApproved = claims.reduce((sum, item) => sum + Number(item.approved_amount || 0), 0)
   const rows = claims.map((item, index) => ({
     No: index + 1,
@@ -18,7 +19,9 @@ export function downloadRemedClaimsXlsx(claims: RemedClaim[], context: string) {
     'Jenis Klaim': item.claim_type?.name || '',
     'Tanggal Perawatan': item.treatment_date || '',
     'Provider / Rumah Sakit': item.provider_name || '',
-    'Nominal Diajukan': Number(item.submitted_amount || 0),
+    'Nilai Kuitansi Asli': Number(item.receipt_amount ?? item.submitted_amount ?? 0),
+    'Nominal Diproses (Batas Plafond)': Number(item.submitted_amount || 0),
+    'Selisih Di Luar Plafond': Math.max(0, Number(item.receipt_amount ?? item.submitted_amount ?? 0) - Number(item.submitted_amount || 0)),
     'Nominal Disetujui': item.approved_amount == null ? '' : Number(item.approved_amount),
     'Status Klaim': safeStatus(item.status),
     'Status HR': item.hr_reviewed_at ? 'Disetujui / Ditinjau' : 'Belum',
@@ -48,7 +51,8 @@ export function downloadRemedClaimsXlsx(claims: RemedClaim[], context: string) {
       { Komponen: 'Menunggu Finance', Nilai: claims.filter((item) => item.status === 'pending_finance').length },
       { Komponen: 'Menunggu Pembayaran', Nilai: claims.filter((item) => item.status === 'waiting_payment').length },
       { Komponen: 'Dibayar', Nilai: claims.filter((item) => item.status === 'paid').length },
-      { Komponen: 'Total Diajukan', Nilai: totalSubmitted },
+      { Komponen: 'Total Kuitansi Asli', Nilai: totalReceipts },
+      { Komponen: 'Total Diproses', Nilai: totalSubmitted },
       { Komponen: 'Total Disetujui', Nilai: totalApproved },
     ] },
     { name: 'Daftar Klaim', rows },

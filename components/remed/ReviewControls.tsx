@@ -25,7 +25,7 @@ export function HrReviewControls({ claim, onDone }: { claim: RemedClaim; onDone:
   const [loading, setLoading] = useState(false)
 
   async function decide(decision: 'approve' | 'reject') {
-    const amountText = decision === 'approve' ? window.prompt('Nominal yang disetujui HR:', String(claim.submitted_amount)) : null
+    const amountText = decision === 'approve' ? window.prompt(`Nominal maksimal yang dapat disetujui HR: ${claim.submitted_amount} (nilai kuitansi asli: ${claim.receipt_amount ?? claim.submitted_amount}).`, String(claim.submitted_amount)) : null
     if (decision === 'approve' && amountText === null) return
     const note = window.prompt(decision === 'approve' ? 'Catatan HR (opsional):' : 'Alasan penolakan HR:', '')
     if (decision === 'reject' && note === null) return

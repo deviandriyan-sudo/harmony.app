@@ -35,7 +35,7 @@ const employeeItems: NavigationItem[] = [
   { title: 'Pengajuan', href: '/employee/leave', icon: CalendarDays, activePrefixes: ['/employee/leave', '/employee/phl', '/employee/requests'] },
   { title: 'Approval Tim', href: '/employee/approvals', icon: UserCheck, activePrefixes: ['/employee/approvals'] },
   { title: 'Re-Med', href: '/remed/employee/dashboard', icon: HeartPulse, remed: true, activePrefixes: ['/remed/employee'] },
-  { title: 'Akun', href: '/employee/settings', icon: Settings, activePrefixes: ['/employee/settings', '/employee/account'] },
+  { title: 'Akun', href: '/employee/account', icon: Settings, activePrefixes: ['/employee/settings', '/employee/account'] },
 ]
 const financeItems: NavigationItem[] = [
   { title: 'Beranda', href: '/remed/finance/dashboard', icon: LayoutDashboard, remed: true },
@@ -87,6 +87,10 @@ const modules: Record<'hr' | 'employee', ModuleNavigation[]> = {
     ] },
   ],
   employee: [
+    { title: 'Akun', prefixes: ['/employee/account', '/employee/settings'], tabs: [
+      { title: 'Biodata Lengkap', href: '/employee/account' },
+      { title: 'Pengaturan & Password', href: '/employee/settings' },
+    ] },
     { title: 'Pengajuan', prefixes: ['/employee/leave', '/employee/phl', '/employee/requests'], tabs: [
       { title: 'Cuti & Izin', href: '/employee/leave' },
       { title: 'Saldo PHL', href: '/employee/phl' },

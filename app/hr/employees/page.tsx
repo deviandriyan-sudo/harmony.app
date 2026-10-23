@@ -2547,6 +2547,7 @@ function EmployeeDetailModal({ employee, assignments, employees, onClose, onEdit
           </button>
         </div>
 
+        <div className="border-b border-white/75 px-6 py-3"><a href={`/hr/employees/profile/${employee.id}`} className="inline-flex items-center rounded-xl border border-blue-200 bg-blue-50/75 px-4 py-2 text-sm font-semibold text-blue-700">Lihat Biodata Lengkap & Dokumen →</a></div>
         <div className="min-w-0 overflow-y-auto p-6">
           <div className="grid min-w-0 gap-5 xl:grid-cols-2 2xl:grid-cols-3">
             <DetailSection title="Identitas" icon={<UserRound size={18} />}>

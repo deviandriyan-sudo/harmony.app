@@ -140,7 +140,7 @@ export async function POST(request: NextRequest) {
       throw Object.assign(new Error('Data rekening pembayaran wajib diisi.'), { status: 400 })
     }
 
-    const { data: rpcData, error: rpcError } = await ctx.admin.rpc('remed_submit_claim_v1', {
+    const { data: rpcData, error: rpcError } = await ctx.admin.rpc('remed_submit_claim_capped_v1', {
       p_employee_id: ctx.access.employee_id,
       p_claim_type_id: claimTypeId,
       p_treatment_date: treatmentDate,
@@ -158,6 +158,8 @@ export async function POST(request: NextRequest) {
     const result = Array.isArray(rpcData) ? rpcData[0] : rpcData
     createdClaimId = String(result?.claim_id || result?.id || '')
     const claimNumber = String(result?.claim_number || '')
+    const reimbursableAmount = Number(result?.reimbursable_amount || 0)
+    const receiptAmount = Number(result?.receipt_amount || amount)
     if (!createdClaimId) throw new Error('Claim berhasil dibuat tetapi ID tidak diterima dari database.')
 
     let attachmentIndex = 0
@@ -229,7 +231,7 @@ export async function POST(request: NextRequest) {
       console.warn('Re-Med submit email notification warning:', notificationError)
     }
 
-    return NextResponse.json({ claimId: createdClaimId, claimNumber, notification }, { status: 201 })
+    return NextResponse.json({ claimId: createdClaimId, claimNumber, reimbursableAmount, receiptAmount, notification }, { status: 201 })
   } catch (error) {
     try {
       const url = process.env.NEXT_PUBLIC_SUPABASE_URL

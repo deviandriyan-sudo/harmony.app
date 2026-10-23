@@ -69,6 +69,8 @@ export type RemedClaim = {
   treatment_date: string
   provider_name: string | null
   submitted_amount: number
+  /** Original receipt total; null for legacy claims. */
+  receipt_amount?: number | null
   approved_amount: number | null
   employee_note: string | null
   status: RemedClaimStatus

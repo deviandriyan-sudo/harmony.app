@@ -6,8 +6,8 @@ import { FilePlus2, Loader2, Paperclip, Send, X } from 'lucide-react'
 import { RemedPageHeader } from '@/components/remed/RemedPageHeader'
 import { remedFetch } from '@/lib/remed-client'
 import { supabase } from '@/lib/supabase'
-import { REMED_BUCKET } from '@/lib/remed'
-import type { RemedClaimType, RemedSession } from '@/types/remed'
+import { REMED_BUCKET, formatRupiah } from '@/lib/remed'
+import type { RemedClaimType, RemedSession, RemedEntitlement } from '@/types/remed'
 
 export default function NewRemedClaimPage() {
   const router = useRouter()
@@ -21,13 +21,18 @@ export default function NewRemedClaimPage() {
   const [bankAccountNumber, setBankAccountNumber] = useState('')
   const [bankAccountName, setBankAccountName] = useState('')
   const [bankFromMaster, setBankFromMaster] = useState(false)
+  const [treatmentDate, setTreatmentDate] = useState('')
+  const [receiptAmount, setReceiptAmount] = useState('')
+  const [entitlement, setEntitlement] = useState<RemedEntitlement | null>(null)
 
   useEffect(() => {
     Promise.all([
       remedFetch<{ claimTypes: RemedClaimType[] }>('/api/remed/claim-types'),
       remedFetch<{ session: RemedSession }>('/api/remed/session'),
+      remedFetch<{ entitlement: RemedEntitlement | null }>('/api/remed/dashboard'),
     ])
-      .then(([claimTypePayload, sessionPayload]) => {
+      .then(([claimTypePayload, sessionPayload, dashboardPayload]) => {
+        setEntitlement(dashboardPayload.entitlement)
         setTypes(claimTypePayload.claimTypes || [])
         const session = sessionPayload.session
         const savedNumber = String(session.bankAccountNumber || '').trim()
@@ -39,6 +44,15 @@ export default function NewRemedClaimPage() {
       })
       .catch((error) => setMessage(error?.message || 'Gagal memuat data Re-Med.'))
   }, [])
+
+  // Client preview is informational. The PostgreSQL RPC recomputes the cap
+  // under an entitlement row lock to prevent concurrent overspending.
+  const currentYear = new Date().getFullYear()
+  const claimYear = Number(treatmentDate.slice(0, 4))
+  const previewAvailable = entitlement && claimYear === entitlement.period_year
+    ? Math.max(0, Number(entitlement.available_amount || 0)) : null
+  const receiptNumeric = Number(receiptAmount || 0)
+  const previewEligible = previewAvailable == null ? null : Math.min(receiptNumeric, previewAvailable)
 
   function onFiles(input: FileList | null) {
     // FileList is a live browser object. Snapshot it before the native input is
@@ -125,11 +139,11 @@ export default function NewRemedClaimPage() {
 
         setUploadLabel('Menyimpan pengajuan...')
         formData.append('staged_receipts', JSON.stringify(tickets.map(({ path, fileName, mimeType, fileSize }) => ({ path, fileName, mimeType, fileSize }))))
-        const result = await remedFetch<{ claimId: string; claimNumber: string; notification?: { ok?: boolean; message?: string } | null }>('/api/remed/claims', { method: 'POST', body: formData })
+        const result = await remedFetch<{ claimId: string; claimNumber: string; reimbursableAmount: number; receiptAmount: number; notification?: { ok?: boolean; message?: string } | null }>('/api/remed/claims', { method: 'POST', body: formData })
         const notificationWarning = result.notification?.ok === false
           ? `\n\nCatatan: klaim tersimpan, tetapi email notifikasi belum terkirim lengkap: ${result.notification.message || 'cek konfigurasi notifikasi.'}`
           : ''
-        window.alert(`Klaim ${result.claimNumber} berhasil diajukan.${notificationWarning}`)
+        window.alert(`Klaim ${result.claimNumber} berhasil diajukan. Nilai kuitansi ${formatRupiah(result.receiptAmount)}; nominal diproses maksimal ${formatRupiah(result.reimbursableAmount)}.${notificationWarning}`)
         router.push('/remed/employee/claims')
       } catch (uploadError) {
         await remedFetch('/api/remed/uploads/receipts', {
@@ -171,17 +185,34 @@ export default function NewRemedClaimPage() {
             </label>
             <label className="block">
               <span className="harmony-label">Tanggal Pengobatan</span>
-              <input name="treatment_date" type="date" required className="harmony-input" />
+              <input name="treatment_date" type="date" required className="harmony-input" value={treatmentDate} onChange={(event) => setTreatmentDate(event.target.value)} />
             </label>
             <label className="block">
               <span className="harmony-label">Provider / Rumah Sakit / Toko</span>
               <input name="provider_name" className="harmony-input" placeholder="Opsional" />
             </label>
             <label className="block">
-              <span className="harmony-label">Nominal</span>
-              <input name="submitted_amount" type="number" min="1" step="1" required className="harmony-input" placeholder="250000" />
+              <span className="harmony-label">Nilai Kuitansi Asli</span>
+              <input name="submitted_amount" type="number" min="1" step="1" required className="harmony-input" placeholder="250000" value={receiptAmount} onChange={(event) => setReceiptAmount(event.target.value)} />
             </label>
           </div>
+          {receiptNumeric > 0 ? (
+            <div className="mt-3 rounded-[18px] border border-sky-200/70 bg-sky-50/60 p-4 text-sm text-slate-700">
+              <p className="font-bold text-sky-900">Perhitungan otomatis plafond</p>
+              {previewEligible != null ? (
+                <div className="mt-2 space-y-1">
+                  <p>Nilai kuitansi: <strong>{formatRupiah(receiptNumeric)}</strong></p>
+                  <p>Sisa plafond saat ini: <strong>{formatRupiah(previewAvailable)}</strong></p>
+                  <p>Dapat diproses: <strong className="text-emerald-700">{formatRupiah(previewEligible)}</strong></p>
+                  <p>Di luar plafond: <strong className="text-amber-700">{formatRupiah(Math.max(0, receiptNumeric - previewEligible))}</strong></p>
+                  {previewEligible === 0 ? <p className="font-semibold text-red-700">Saldo tidak tersedia. Pengajuan belum dapat diproses.</p> : null}
+                </div>
+              ) : (
+                <p className="mt-2 text-slate-600">Plafond untuk tahun perawatan {claimYear || currentYear} akan ditentukan ulang secara aman oleh server saat submit.</p>
+              )}
+              <p className="mt-2 text-xs text-slate-500">Angka ini perkiraan. Nilai final mengikuti saldo tersedia ketika pengajuan dikunci oleh database.</p>
+            </div>
+          ) : null}
           <label className="mt-4 block">
             <span className="harmony-label">Catatan</span>
             <textarea name="employee_note" rows={3} className="harmony-textarea" placeholder="Keterangan singkat reimbursement" />
