@@ -27,6 +27,8 @@ import type {
 
 type TopbarProps = {
   title: string
+  /** Optional compact chrome when the page itself renders a glass hero. */
+  compact?: boolean
   description?: string
   badge?: string
 }
@@ -85,6 +87,7 @@ function loadTaskReadState(userId: string): Record<string, string> {
 
 export function Topbar({
   title,
+  compact = false,
   description,
   badge = 'HARMONY System',
 }: TopbarProps) {
@@ -494,8 +497,8 @@ export function Topbar({
 
   return (
     <header className="harmony-topbar sticky top-0 z-30 border-b">
-      <div className="flex min-h-[108px] flex-col gap-4 px-5 py-4 sm:px-6 xl:flex-row xl:items-center xl:justify-between">
-        <div className="min-w-0">
+      <div className={`flex flex-col gap-4 px-5 py-4 sm:px-6 xl:flex-row xl:items-center xl:justify-between ${compact ? "min-h-[72px]" : "min-h-[108px]"}`}>
+        <div className={compact ? "sr-only" : "min-w-0"}>
           <div className="harmony-topbar-badge mb-2.5 inline-flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-[11px] font-bold text-[#747982]">
             <Sparkles size={14} className="text-[#007aff]" />
             {badge}
@@ -518,7 +521,7 @@ export function Topbar({
 
             <input
               type="text"
-              placeholder="Search anything..."
+              placeholder="Cari nama, NIP, unit kerja, atau menu..."
               className="w-full rounded-full border-0 bg-transparent text-sm text-[#1d1d1f] shadow-none outline-none ring-0 placeholder:text-[#86868b] focus:border-0 focus:outline-none focus:ring-0"
             />
           </div>

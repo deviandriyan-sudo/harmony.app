@@ -9,6 +9,7 @@ export function CompactMetric({ label, value, icon: Icon, href, accent = 'blue' 
     <div className="min-w-0"><p className="truncate text-[11px] font-semibold text-slate-500">{label}</p><p className="mt-1 truncate text-[23px] font-bold leading-7 tracking-tight text-slate-900">{value}</p></div>
     <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-[13px] ${colors}`}><Icon size={19} /></span>
   </div>
-  const cls = 'harmony-metric-card block min-w-0 rounded-[20px] border p-3.5 shadow-sm transition-shadow hover:shadow-md'
-  return href ? <Link href={href} className={cls}>{content}</Link> : <div className={cls}>{content}</div>
+  const cls = 'harmony-metric-card harmony-reference-metric block min-w-0 rounded-[20px] border p-3.5 shadow-sm transition-shadow hover:shadow-md'
+  const tone = accent === 'amber' ? 'orange' : accent
+  return href ? <Link href={href} className={cls} data-tone={tone}>{content}</Link> : <div className={cls} data-tone={tone}>{content}</div>
 }

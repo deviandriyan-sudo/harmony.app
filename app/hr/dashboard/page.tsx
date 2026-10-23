@@ -61,11 +61,21 @@ export default function HRDashboardPage() {
     { label: 'Pengajuan cuti/izin diproses', value: metrics.leave, href: '/hr/leave' },
   ]
   return <>
-    <Topbar title="Beranda HR" />
+    <Topbar title="Beranda HR" compact />
     <section className="harmony-page-bg mx-auto min-h-screen max-w-[1500px] space-y-4 p-4 sm:p-5 lg:p-6">
-      <header className="flex flex-wrap items-center justify-between gap-3">
-        <div><h1 className="text-xl font-bold tracking-tight text-slate-900">Ringkasan HR</h1><p className="mt-0.5 text-xs text-slate-500">Periode {range.label}</p></div>
-        <button type="button" onClick={() => { setRefreshing(true); void load() }} disabled={refreshing} className="harmony-button-secondary inline-flex min-h-10 items-center gap-2 px-3 text-xs" aria-label="Perbarui ringkasan"><RefreshCcw size={15} className={refreshing ? 'animate-spin' : ''} /> Refresh</button>
+      <header className="harmony-reference-hero flex min-h-[155px] flex-wrap items-center justify-between gap-5 rounded-[25px] p-5 sm:px-7 sm:py-6">
+        <div className="min-w-0 max-w-2xl">
+          <p className="text-xs font-semibold text-white/85">Selamat datang di HARMONY</p>
+          <h1 className="mt-1 text-3xl font-bold tracking-[-.04em] text-white sm:text-[38px]">Dashboard HR</h1>
+          <p className="mt-2 text-sm leading-6 text-white/85">Kelola kehadiran, cuti, PHL, dan aktivitas SDM melalui satu sistem terintegrasi.</p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="harmony-reference-hero-meta flex min-h-14 items-center gap-3 px-4 py-2.5">
+            <CalendarDays size={20} className="shrink-0 text-white" />
+            <div><p className="text-xs font-bold text-white">Periode berjalan</p><p className="mt-0.5 text-[11px] text-white/85">{range.label}</p></div>
+          </div>
+          <button type="button" onClick={() => { setRefreshing(true); void load() }} disabled={refreshing} className="harmony-reference-hero-meta inline-flex min-h-12 items-center gap-2 px-4 text-xs font-semibold text-white disabled:opacity-60" aria-label="Perbarui ringkasan"><RefreshCcw size={15} className={refreshing ? 'animate-spin' : ''} /> Refresh</button>
+        </div>
       </header>
       {error && <p role="alert" className="flex gap-2 rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-700"><AlertTriangle size={16} />{error}</p>}
       <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">

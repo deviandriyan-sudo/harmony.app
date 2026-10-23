@@ -74,7 +74,7 @@ export default function HRAttendanceApprovalQueuePage() {
           <AlertBox key={warning} message={warning} />
         ))}
 
-        <section className="relative overflow-hidden rounded-[32px] bg-[#1d1d1f] p-6 text-white shadow-[0_24px_80px_rgba(0,0,0,0.16)]">
+        <section className="harmony-review-hero relative overflow-hidden rounded-[32px] bg-[#1d1d1f] p-6 text-white shadow-[0_24px_80px_rgba(0,0,0,0.16)]">
           <div className="grid gap-6 xl:grid-cols-[1fr_auto] xl:items-end">
             <div>
               <Link
@@ -419,7 +419,7 @@ function Metric({
   }[tone]
 
   return (
-    <div className={`rounded-[22px] p-5 ${cls}`}>
+    <div className={`harmony-review-metric rounded-[22px] p-5 ${cls}`} data-tone={tone}>
       <p className="text-[10px] font-bold uppercase tracking-wide opacity-70">
         {label}
       </p>

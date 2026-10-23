@@ -1898,6 +1898,31 @@ export default function HREmployeesPage() {
       />
 
       <section className="harmony-page-bg min-h-screen space-y-6 overflow-x-hidden p-4 sm:p-6">
+        <div className="harmony-employee-hero relative isolate overflow-hidden rounded-[30px] px-5 py-6 sm:px-8 sm:py-8">
+          <div className="relative z-10 flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+            <div className="max-w-2xl">
+              <span className="harmony-employee-hero-eyebrow mb-3 inline-flex rounded-full px-3 py-1.5 text-[11px] font-bold tracking-wide">
+                HR Workspace · Master Data
+              </span>
+              <h2 className="text-2xl font-semibold tracking-tight text-white sm:text-3xl">Direktori Karyawan</h2>
+              <p className="mt-2 max-w-xl text-sm leading-6 text-blue-50/90">
+                Data karyawan, jabatan, homebase, dan pengelolaan organisasi dalam satu ruang kerja.
+              </p>
+            </div>
+            <div className="harmony-employee-hero-summary flex min-w-0 flex-wrap items-center gap-4 rounded-[22px] p-4 sm:gap-6">
+              <div>
+                <p className="text-xs text-blue-50/85">Total karyawan</p>
+                <p className="mt-1 text-2xl font-semibold text-white">{totalEmployees}</p>
+              </div>
+              <span aria-hidden="true" className="h-10 w-px bg-white/25" />
+              <div>
+                <p className="text-xs text-blue-50/85">Karyawan aktif</p>
+                <p className="mt-1 text-2xl font-semibold text-white">{activeEmployees}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
           <SummaryCard title="Total Employee" value={String(totalEmployees)} description="Seluruh data" icon={<Users size={20} />} tone="blue" />
           <SummaryCard title="Active" value={String(activeEmployees)} description="Karyawan aktif" icon={<BadgeCheck size={20} />} tone="green" />
@@ -2130,7 +2155,7 @@ function MasterOptionsLauncher({
           <button
             type="button"
             onClick={onOpen}
-            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-[18px] bg-[#1d1d1f] px-5 text-sm font-bold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-black"
+            className="harmony-employee-action inline-flex min-h-11 items-center justify-center gap-2 rounded-[18px] bg-[#1d1d1f] px-5 text-sm font-bold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-black"
           >
             <Pencil size={17} />
             Kelola Dropdown
@@ -2416,7 +2441,7 @@ function OptionPanel({
 
 function MiniStat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-2xl bg-[#f5f5f7] px-4 py-3">
+    <div className="harmony-employee-mini-stat rounded-2xl bg-[#f5f5f7] px-4 py-3">
       <p className="text-[11px] font-bold uppercase tracking-wide text-[#86868b]">
         {label}
       </p>
@@ -3863,7 +3888,7 @@ function SummaryCard({ title, value, description, icon, tone }: { title: string;
   }[tone]
 
   return (
-    <div className="harmony-metric-card harmony-slide-up min-w-0 p-5">
+    <div data-tone={tone} className="harmony-metric-card harmony-slide-up min-w-0 p-5">
       <div className="flex min-w-0 items-start justify-between gap-4">
         <div className="min-w-0 flex-1">
           <p className="break-words text-sm font-semibold leading-5 text-[#6e6e73]">
