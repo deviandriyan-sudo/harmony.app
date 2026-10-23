@@ -626,7 +626,7 @@ export function Topbar({
                     </div>
                   ) : (
                     <>
-                      <section className="border-b border-black/5 bg-[#fffaf0]">
+                      <section className="harmony-notification-tasks border-b border-black/5 bg-[#fffaf0]">
                         <div className="flex items-center justify-between gap-3 px-5 pb-2 pt-4">
                           <div className="flex items-center gap-2">
                             <AlertTriangle size={15} className="text-amber-600" />
@@ -679,7 +679,7 @@ export function Topbar({
                             {visibleTasks.map((item) => (
                               <div
                                 key={item.id}
-                                className={`rounded-2xl border p-4 shadow-sm transition ${readTaskKeys[taskFingerprint(item)] ? 'border-slate-200 bg-slate-50' : 'border-amber-100 bg-white'}`}
+                                className={`harmony-notification-task-card rounded-2xl border p-4 shadow-sm transition ${readTaskKeys[taskFingerprint(item)] ? 'border-slate-200 bg-slate-50' : 'border-amber-100 bg-white'}`}
                               >
                                 <div className="flex items-start gap-3">
                                   <div

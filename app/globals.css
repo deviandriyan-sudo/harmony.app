@@ -3291,3 +3291,291 @@ body > .harmony-sidebar-shell:not(.harmony-sidebar-mobile):is(:hover,:focus-with
   box-shadow:inset 0 1px 0 rgba(255,255,255,.77),0 5px 15px rgba(45,92,158,.07) !important;
   backdrop-filter:blur(18px) !important;
 }
+
+
+/* V3.7.4 UI polish — screenshot-derived fixes, no workflow changes. */
+/* Modals are now portaled under <body> to escape sticky/backdrop stacking contexts. */
+body > .harmony-modal-surface {
+  position:fixed !important;
+  inset:0 !important;
+  z-index:2140 !important;
+  isolation:isolate;
+  overflow-y:auto;
+  padding:clamp(10px,2.6vw,24px);
+  background:rgba(31,62,111,.27) !important;
+  -webkit-backdrop-filter:blur(12px) !important;
+  backdrop-filter:blur(12px) !important;
+}
+body > .harmony-modal-surface > :first-child {
+  position:relative;
+  z-index:1;
+  width:min(100%,1152px);
+  max-height:min(92dvh,960px);
+  color:#17345a;
+  background:linear-gradient(145deg,rgba(238,248,255,.92),rgba(204,227,252,.88)) !important;
+  border:1.5px solid rgba(255,255,255,.92) !important;
+  box-shadow:inset 0 2px 0 rgba(255,255,255,.67),inset 0 -1px 0 rgba(128,177,226,.26),0 28px 68px rgba(24,48,90,.23) !important;
+  -webkit-backdrop-filter:blur(29px) saturate(116%) !important;
+  backdrop-filter:blur(29px) saturate(116%) !important;
+}
+body:has(> .harmony-modal-surface) > .harmony-notification-portal,
+body:has(> .harmony-modal-surface) > .harmony-sidebar-shell {visibility:hidden !important;pointer-events:none !important;}
+/* Notification cards share the same transparent matte glass while status colors remain meaningful. */
+body > .harmony-notification-portal {z-index:1300 !important;}
+.harmony-notification-portal .harmony-notification-tasks {
+  background:rgba(255,246,225,.43) !important;
+  border-color:rgba(255,255,255,.57) !important;
+}
+.harmony-notification-portal .harmony-notification-task-card {
+  background:linear-gradient(140deg,rgba(247,251,255,.76),rgba(223,237,255,.62)) !important;
+  border-color:rgba(255,255,255,.83) !important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.66),0 6px 14px rgba(39,81,133,.09) !important;
+  -webkit-backdrop-filter:blur(18px) !important;
+  backdrop-filter:blur(18px) !important;
+}
+.harmony-notification-portal .harmony-notification-task-card p {color:#4a607c;}
+/* Four-step attendance navigator must remain readable when dark banners become glass. */
+.harmony-workspace .harmony-attendance-stepper {
+  color:#14345f !important;
+  background:linear-gradient(120deg,rgba(66,132,224,.35),rgba(205,229,255,.67)) !important;
+  border:1.5px solid rgba(255,255,255,.86) !important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.71),0 9px 22px rgba(42,86,144,.12) !important;
+  -webkit-backdrop-filter:blur(25px) saturate(116%) !important;
+  backdrop-filter:blur(25px) saturate(116%) !important;
+}
+.harmony-workspace .harmony-attendance-step-pill {
+  background:rgba(238,248,255,.39) !important;
+  border:1px solid rgba(255,255,255,.82) !important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.55) !important;
+}
+.harmony-workspace .harmony-attendance-step-label {color:#173b6f !important;}
+.harmony-workspace .harmony-attendance-step-number {background:rgba(228,240,255,.83) !important;color:#125fc1 !important;}
+.harmony-workspace .harmony-attendance-stepper > div > svg {color:#396ea9 !important;}
+@media (max-width:767px) {
+  body > .harmony-modal-surface {align-items:flex-start;padding:12px;}
+  body > .harmony-modal-surface > :first-child {max-height:calc(100dvh - 24px);border-radius:22px !important;}
+}
+
+/* Attendance CTA tint retains matte translucency and consistent alignment. */
+.harmony-workspace .harmony-attendance-step-primary {
+  border:1px solid rgba(249,252,255,.68) !important;
+  color:#fff !important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.3),0 5px 10px rgba(31,68,122,.12) !important;
+  -webkit-backdrop-filter:blur(15px) !important;
+  backdrop-filter:blur(15px) !important;
+}
+.harmony-workspace .harmony-attendance-step-primary[data-tone='blue'] {background:linear-gradient(135deg,rgba(41,129,245,.88),rgba(20,104,222,.85)) !important;}
+.harmony-workspace .harmony-attendance-step-primary[data-tone='orange'] {background:linear-gradient(135deg,rgba(191,105,26,.88),rgba(157,81,14,.84)) !important;}
+.harmony-workspace .harmony-attendance-step-primary[data-tone='purple'] {background:linear-gradient(135deg,rgba(143,63,206,.88),rgba(111,46,177,.84)) !important;}
+.harmony-workspace .harmony-attendance-step-primary[data-tone='green'] {background:linear-gradient(135deg,rgba(29,146,88,.9),rgba(20,113,69,.85)) !important;}
+.harmony-workspace .harmony-attendance-step-secondary {
+  background:rgba(242,250,255,.54) !important;
+  color:#1b416d !important;
+  border:1px solid rgba(255,255,255,.81) !important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.7) !important;
+}
+
+/* ============================================================================
+   HARMONY OPTICAL GLASS — 2026-10-23
+   Matte Apple glass WITH restrained optical reflections. CSS presentation only.
+   All controls/links/roles/workflow keep their original JavaScript behavior.
+   This layer deliberately follows old design layers to prevent cascade conflicts.
+   ============================================================================ */
+:root {
+  /* A narrow specular band, a soft corner bounce, and a faint bottom refraction.
+     Less glare than the older "ultra glossy" visual; translucency stays visible. */
+  --harmony-optic-reflection:
+    linear-gradient(112deg,
+      transparent 3%,rgba(255,255,255,.07) 13%,rgba(255,255,255,.23) 19%,
+      rgba(255,255,255,.075) 25%,transparent 37%),
+    radial-gradient(ellipse 65% 52% at 2% -16%,rgba(255,255,255,.27),transparent 74%),
+    radial-gradient(ellipse 58% 34% at 98% 111%,rgba(156,206,255,.13),transparent 76%);
+  --harmony-optic-edge:
+    inset 0 2px 0 rgba(255,255,255,.78),
+    inset 0 3px 2px rgba(255,255,255,.19),
+    inset 0 -2px 0 rgba(116,163,218,.23),
+    inset 2px 0 1px rgba(255,255,255,.48),
+    inset -1px 0 1px rgba(117,160,217,.14),
+    0 0 0 1px rgba(210,232,255,.38);
+  --harmony-optic-depth:
+    var(--harmony-optic-edge),0 11px 28px rgba(40,88,153,.10),
+    0 3px 9px rgba(37,79,134,.055);
+  --harmony-optic-blur: blur(25px) saturate(118%);
+}
+
+/* The backdrop has directionality but no busy patterns, stripes or glows. */
+body, .harmony-shell {
+  background:
+    radial-gradient(ellipse 59% 42% at 15% 18%,rgba(240,248,255,.56),transparent 84%),
+    radial-gradient(ellipse 57% 48% at 90% 87%,rgba(130,178,230,.16),transparent 84%),
+    linear-gradient(127deg,#cbdef6 0%,#e4effd 47%,#cfdff5 100%) fixed !important;
+}
+
+/* Named large surfaces: light is visible *inside* the pane as well as on its rim.
+   Keep separate tone-colored overlays for the metric cards below. */
+.harmony-workspace :is(
+ .harmony-card,.harmony-card-solid,.harmony-card-soft,.harmony-metric-card,
+ .harmony-review-metric,.harmony-unified-surface,.harmony-unified-toolbar,
+ .harmony-subtle-panel,.harmony-glass,.harmony-glass-panel,
+ .harmony-reference-surface,.harmony-review-tabs,.harmony-employee-mini-stat
+) {
+  background:var(--harmony-optic-reflection),linear-gradient(147deg,rgba(245,251,255,.62),rgba(200,224,252,.45)) !important;
+  border:1px solid rgba(245,251,255,.84) !important;
+  box-shadow:var(--harmony-optic-depth) !important;
+  -webkit-backdrop-filter:var(--harmony-optic-blur) !important;
+  backdrop-filter:var(--harmony-optic-blur) !important;
+  background-clip:padding-box !important;
+}
+/* Colored panes refract their own tint instead of opaque background paint. */
+.harmony-workspace :is(.harmony-metric-card,.harmony-review-metric)[data-tone='blue'],
+.harmony-workspace .harmony-metric-card:nth-child(4n+1) {
+  background:var(--harmony-optic-reflection),linear-gradient(145deg,rgba(247,252,255,.69),rgba(176,212,255,.48)) !important;
+}
+.harmony-workspace :is(.harmony-metric-card,.harmony-review-metric)[data-tone='green'],
+.harmony-workspace .harmony-metric-card:nth-child(4n+2) {
+  background:var(--harmony-optic-reflection),linear-gradient(145deg,rgba(248,253,255,.69),rgba(173,233,215,.45)) !important;
+}
+.harmony-workspace :is(.harmony-metric-card,.harmony-review-metric)[data-tone='purple'],
+.harmony-workspace .harmony-metric-card[data-tone='indigo'],
+.harmony-workspace .harmony-metric-card:nth-child(4n+3) {
+  background:var(--harmony-optic-reflection),linear-gradient(145deg,rgba(250,252,255,.67),rgba(216,203,252,.48)) !important;
+}
+.harmony-workspace :is(.harmony-metric-card,.harmony-review-metric)[data-tone='orange'],
+.harmony-workspace .harmony-metric-card:nth-child(4n+4) {
+  background:var(--harmony-optic-reflection),linear-gradient(145deg,rgba(253,253,255,.68),rgba(251,226,196,.46)) !important;
+}
+.harmony-workspace .harmony-metric-card[data-tone='red'] {
+  background:var(--harmony-optic-reflection),linear-gradient(145deg,rgba(255,251,254,.69),rgba(253,210,218,.45)) !important;
+}
+.harmony-workspace :is(.harmony-card,.harmony-card-solid,.harmony-metric-card,.harmony-review-metric,.harmony-unified-surface,.harmony-reference-surface):hover {
+  box-shadow:var(--harmony-optic-edge),0 14px 30px rgba(42,88,157,.13) !important;
+}
+
+/* Large blue banners retain white readable type but acquire a restrained
+   reflected light path and the crisp double-refracted rim. */
+.harmony-workspace :is(
+ .harmony-reference-hero,.harmony-review-hero,.harmony-employee-hero,
+ .harmony-hero-v25,.harmony-glass-dark
+) {
+  background:
+    linear-gradient(114deg,transparent 11%,rgba(245,251,255,.10) 23%,transparent 38%),
+    radial-gradient(ellipse 45% 88% at 103% 4%,rgba(223,242,255,.23),transparent 79%),
+    linear-gradient(108deg,rgba(27,81,156,.86),rgba(57,125,208,.79) 55%,rgba(126,184,235,.66)) !important;
+  border:1px solid rgba(223,242,255,.82) !important;
+  box-shadow:
+    inset 0 2px 0 rgba(255,255,255,.58),
+    inset 0 4px 2px rgba(255,255,255,.095),
+    inset 0 -2px 0 rgba(17,71,156,.23),
+    inset 2px 0 0 rgba(222,240,255,.29),
+    inset -1px 0 0 rgba(238,248,255,.30),
+    0 0 0 1px rgba(140,191,247,.33),0 17px 35px rgba(29,78,150,.16) !important;
+  -webkit-backdrop-filter:blur(25px) saturate(120%) !important;
+  backdrop-filter:blur(25px) saturate(120%) !important;
+}
+.harmony-workspace :is(.harmony-reference-hero,.harmony-review-hero,.harmony-employee-hero,.harmony-hero-v25,.harmony-glass-dark)::before {
+  background:
+    linear-gradient(155deg,rgba(255,255,255,.17),rgba(255,255,255,.01) 31%,transparent 62%),
+    linear-gradient(114deg,transparent 12%,rgba(255,255,255,.11) 22%,transparent 32%) !important;
+}
+
+/* Sidebar, top bars, search and notification portal should look as though made
+   from the same material, not as independent opaque white rectangles. */
+body > .harmony-sidebar-shell .harmony-sidebar-panel,
+.harmony-sidebar-mobile .harmony-sidebar-panel,
+.harmony-topbar,.harmony-module-subnav,.harmony-mobile-topbar,
+.harmony-notification-portal,.harmony-popover-glass {
+  background:var(--harmony-optic-reflection),linear-gradient(147deg,rgba(243,250,255,.65),rgba(201,224,252,.48)) !important;
+  border-color:rgba(249,253,255,.84) !important;
+  box-shadow:var(--harmony-optic-depth) !important;
+  -webkit-backdrop-filter:blur(28px) saturate(116%) !important;
+  backdrop-filter:blur(28px) saturate(116%) !important;
+}
+.harmony-topbar-search,.harmony-topbar-action,.harmony-topbar-badge,
+.harmony-mobile-glass,.harmony-mobile-brand,
+.harmony-sidebar-panel :is(.harmony-logo-glass,.harmony-sidebar-user,.harmony-logout) {
+  background:var(--harmony-optic-reflection),linear-gradient(148deg,rgba(253,254,255,.64),rgba(220,236,255,.52)) !important;
+  border-color:rgba(255,255,255,.85) !important;
+  box-shadow:var(--harmony-optic-edge),0 5px 12px rgba(44,92,155,.045) !important;
+  -webkit-backdrop-filter:blur(19px) saturate(112%) !important;
+  backdrop-filter:blur(19px) saturate(112%) !important;
+}
+.harmony-sidebar-panel .harmony-nav-active:not(.harmony-nav-remed) {
+  background:var(--harmony-optic-reflection),linear-gradient(133deg,rgba(244,251,255,.63),rgba(174,209,255,.60)) !important;
+  box-shadow:var(--harmony-optic-edge),0 6px 15px rgba(38,103,213,.10) !important;
+}
+
+/* Inputs and secondary controls have small clear-glass reflections.  Primary
+   actions stay richly colored, but the top edge catches a soft white bounce. */
+.harmony-workspace :is(.harmony-button-secondary,.harmony-action-soft,.harmony-button-native-secondary,.harmony-button-native-outline),
+.harmony-notification-portal button[class*='bg-[#f5f5f7]'] {
+  background:var(--harmony-optic-reflection),linear-gradient(142deg,rgba(250,254,255,.71),rgba(214,232,255,.53)) !important;
+  box-shadow:var(--harmony-optic-edge),0 5px 13px rgba(39,85,145,.07) !important;
+  border:1px solid rgba(251,253,255,.86) !important;
+}
+.harmony-workspace :is(.harmony-button-primary,.harmony-button-blue,.harmony-action-primary,.harmony-employee-action),
+.harmony-workspace :is(a,button)[class*='bg-blue-600']:not(:disabled) {
+  background:
+    linear-gradient(115deg,transparent 9%,rgba(255,255,255,.12) 24%,transparent 42%),
+    linear-gradient(145deg,rgba(78,154,246,.94),rgba(15,105,227,.94)) !important;
+  box-shadow:inset 0 2px 0 rgba(255,255,255,.48),inset 0 -2px 0 rgba(4,64,153,.22),0 7px 15px rgba(21,101,216,.16) !important;
+}
+.harmony-workspace :is(input:not([type='checkbox']):not([type='radio']):not([type='file']),select,textarea),
+.harmony-modal-surface :is(input:not([type='checkbox']):not([type='radio']):not([type='file']),select,textarea),
+.harmony-input,.harmony-select,.harmony-textarea {
+  background:linear-gradient(115deg,rgba(255,255,255,.19),transparent 47%),rgba(230,243,255,.55) !important;
+  border:1px solid rgba(250,253,255,.85) !important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.82),inset 0 -1px 0 rgba(129,170,220,.11),0 2px 8px rgba(43,84,142,.06) !important;
+}
+/* Keep the search field invisible within its surrounding glass capsule. */
+.harmony-topbar-search :is(input,input:focus) {background:transparent !important;border:0 !important;box-shadow:none !important;}
+
+/* Portaled employee modals, ordinary dialogs and task cards all refract the
+   same amount of light. These overrides are after the portal z-index fix. */
+body > .harmony-modal-surface > :first-child,
+.harmony-modal-surface:is(.flex.items-center.justify-center) > :first-child {
+  background:var(--harmony-optic-reflection),linear-gradient(145deg,rgba(240,249,255,.83),rgba(195,223,253,.76)) !important;
+  border:1.5px solid rgba(250,253,255,.88) !important;
+  box-shadow:var(--harmony-optic-edge),0 25px 60px rgba(21,54,102,.20) !important;
+  -webkit-backdrop-filter:blur(29px) saturate(117%) !important;
+  backdrop-filter:blur(29px) saturate(117%) !important;
+}
+.harmony-notification-portal .harmony-notification-task-card {
+  background:var(--harmony-optic-reflection),linear-gradient(145deg,rgba(248,253,255,.70),rgba(216,234,254,.57)) !important;
+  border-color:rgba(249,252,255,.83) !important;
+  box-shadow:var(--harmony-optic-edge),0 7px 16px rgba(44,85,139,.065) !important;
+}
+/* Step navigation previously had pale-on-pale labels and flat buttons. */
+.harmony-workspace .harmony-attendance-stepper {
+  background:var(--harmony-optic-reflection),linear-gradient(112deg,rgba(96,150,220,.39),rgba(213,233,255,.63)) !important;
+  box-shadow:var(--harmony-optic-edge),0 11px 22px rgba(40,85,147,.10) !important;
+}
+.harmony-workspace .harmony-attendance-step-pill {
+  background:var(--harmony-optic-reflection),rgba(236,247,255,.44) !important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.67),inset 0 -1px 0 rgba(111,167,226,.17) !important;
+}
+
+@media (max-width:767px) {
+  .harmony-workspace :is(.harmony-card,.harmony-metric-card,.harmony-unified-surface,.harmony-glass),
+  .harmony-sidebar-panel,.harmony-notification-portal,body > .harmony-modal-surface > :first-child {
+    -webkit-backdrop-filter:blur(17px) saturate(112%) !important;
+    backdrop-filter:blur(17px) saturate(112%) !important;
+  }
+}
+@media (prefers-reduced-transparency:reduce) {
+  .harmony-workspace :is(.harmony-card,.harmony-metric-card,.harmony-unified-surface,.harmony-glass),
+  .harmony-sidebar-panel,.harmony-notification-portal,.harmony-modal-surface > :first-child {
+    background:linear-gradient(145deg,rgba(249,252,255,.96),rgba(226,238,252,.95)) !important;
+    -webkit-backdrop-filter:none !important;backdrop-filter:none !important;
+  }
+}
+@media print {
+  .harmony-workspace :is(.harmony-card,.harmony-metric-card,.harmony-unified-surface,.harmony-glass),
+  .harmony-sidebar-panel,.harmony-notification-portal {
+    background:#fff !important;box-shadow:none !important;
+    -webkit-backdrop-filter:none !important;backdrop-filter:none !important;
+  }
+}
+/* Selected text stays legible inside pale reflective navigation panes. */
+.harmony-sidebar-panel .harmony-nav-active:not(.harmony-nav-remed) {color:#1555be !important;}
+.harmony-sidebar-panel .harmony-nav-active:not(.harmony-nav-remed) :is(.harmony-nav-title,.harmony-side-detail) {color:#1555be !important;}
+.harmony-sidebar-panel .harmony-nav-active .harmony-nav-icon {color:#fff !important;}

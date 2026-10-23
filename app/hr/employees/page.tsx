@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import type { FormEvent, ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import {
   BadgeCheck,
   Briefcase,
@@ -1356,6 +1357,13 @@ export default function HREmployeesPage() {
     ])
   }
 
+  useEffect(() => {
+    if (!masterOptionsModalOpen && !selectedEmployee && !editModalOpen) return
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => { document.body.style.overflow = previousOverflow }
+  }, [masterOptionsModalOpen, selectedEmployee, editModalOpen])
+
   const activeMasterOptions = useMemo(() => {
     return masterOptions.filter((option) => option.is_active !== false)
   }, [masterOptions])
@@ -1941,6 +1949,7 @@ export default function HREmployeesPage() {
         />
 
         {masterOptionsModalOpen && (
+          <EmployeeModalPortal>
           <MasterOptionsModal
             departmentOptions={activeMasterOptions.filter((option) => option.option_type === 'department')}
             positionOptions={activeMasterOptions.filter((option) => option.option_type === 'position')}
@@ -1959,6 +1968,7 @@ export default function HREmployeesPage() {
             onToggleAll={toggleAllMasterOptionSelection}
             onClose={() => setMasterOptionsModalOpen(false)}
           />
+          </EmployeeModalPortal>
         )}
 
         {profileLogs.length > 0 && (
@@ -2061,6 +2071,7 @@ export default function HREmployeesPage() {
         </div>
 
         {selectedEmployee && (
+          <EmployeeModalPortal>
           <EmployeeDetailModal
             employee={selectedEmployee}
             assignments={selectedEmployeeAssignments}
@@ -2068,9 +2079,11 @@ export default function HREmployeesPage() {
             onClose={() => setSelectedEmployee(null)}
             onEdit={() => openEditModal(selectedEmployee)}
           />
+          </EmployeeModalPortal>
         )}
 
         {editModalOpen && (
+          <EmployeeModalPortal>
           <EmployeeFormModal
             form={form}
             saving={saving}
@@ -2112,12 +2125,18 @@ export default function HREmployeesPage() {
             onAddAssignment={handleAddAssignment}
             onDeleteAssignment={handleDeleteAssignment}
           />
+          </EmployeeModalPortal>
         )}
       </section>
     </>
   )
 }
 
+
+// Portals escape sticky headers and backdrop-filter stacking contexts.
+function EmployeeModalPortal({ children }: { children: ReactNode }) {
+  return createPortal(children, document.body)
+}
 
 function MasterOptionsLauncher({
   departmentCount,
@@ -2209,7 +2228,7 @@ function MasterOptionsModal({
   const totalSelected = selectedOptionIds.length
 
   return (
-    <div className="harmony-modal-surface fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4 backdrop-blur-sm">
+    <div role="dialog" aria-modal="true" aria-label="Panel data karyawan" className="harmony-modal-surface fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4 backdrop-blur-sm">
       <div className="flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-[34px] bg-white shadow-[0_30px_90px_rgba(0,0,0,0.24)]">
         <div className="flex min-w-0 items-start justify-between gap-4 border-b border-black/5 p-6">
           <div className="min-w-0">
@@ -2511,7 +2530,7 @@ function EmployeeCompactCard({ employee, assignmentCount, onDetail, onEdit, onTo
 
 function EmployeeDetailModal({ employee, assignments, employees, onClose, onEdit }: { employee: Employee; assignments: EmployeeAssignment[]; employees: Employee[]; onClose: () => void; onEdit: () => void }) {
   return (
-    <div className="harmony-modal-surface fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4 backdrop-blur-sm">
+    <div role="dialog" aria-modal="true" aria-label="Panel data karyawan" className="harmony-modal-surface fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4 backdrop-blur-sm">
       <div className="flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-[34px] bg-white shadow-[0_30px_90px_rgba(0,0,0,0.24)]">
         <div className="flex min-w-0 items-start justify-between gap-4 border-b border-black/5 p-6">
           <div className="flex min-w-0 items-center gap-4">
@@ -2692,7 +2711,7 @@ function EmployeeFormModal({
   onDeleteAssignment: (assignment: EmployeeAssignment) => void
 }) {
   return (
-    <div className="harmony-modal-surface fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4 backdrop-blur-sm">
+    <div role="dialog" aria-modal="true" aria-label="Panel data karyawan" className="harmony-modal-surface fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4 backdrop-blur-sm">
       <div className="flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-[34px] bg-white shadow-[0_30px_90px_rgba(0,0,0,0.24)]">
         <div className="flex min-w-0 items-start justify-between gap-4 border-b border-black/5 p-6">
           <div className="min-w-0">

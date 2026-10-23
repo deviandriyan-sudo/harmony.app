@@ -167,7 +167,7 @@ export default function HRAttendanceHomePage() {
           </div>
         </section>
 
-        <section className="overflow-hidden rounded-[28px] border border-black/5 bg-[#1d1d1f] p-4 text-white shadow-sm sm:p-5">
+        <section className="harmony-attendance-stepper overflow-hidden rounded-[28px] border border-black/5 bg-[#1d1d1f] p-4 text-white shadow-sm sm:p-5">
           <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-[1fr_auto_1fr_auto_1fr_auto_1fr] xl:items-center">
             <FlowPill number="01" label="Input" tone="blue" />
             <ArrowRight size={15} className="hidden text-white/25 xl:block" />
@@ -297,10 +297,11 @@ function AttendanceStepCard({
         </div>
       </div>
 
-      <div className="mt-5 space-y-2">
+      <div className="mt-5 flex min-h-[94px] flex-col gap-2">
         <Link
           href={primaryHref}
-          className={`flex min-h-11 items-center justify-between rounded-2xl px-4 text-xs font-bold transition ${tones.button}`}
+          data-tone={step.tone}
+          className={`harmony-attendance-step-primary flex min-h-11 items-center justify-between rounded-2xl px-4 text-xs font-bold transition ${tones.button}`}
         >
           {step.primary.label}
           <ArrowUpRight size={15} />
@@ -310,7 +311,7 @@ function AttendanceStepCard({
           <Link
             key={`${step.step}-${action.href}`}
             href={action.href}
-            className="flex min-h-10 items-center justify-between rounded-2xl border border-black/5 bg-white/75 px-4 text-xs font-bold text-[#1d1d1f] transition hover:bg-white"
+            className="harmony-attendance-step-secondary flex min-h-10 items-center justify-between rounded-2xl border border-black/5 bg-white/75 px-4 text-xs font-bold text-[#1d1d1f] transition hover:bg-white"
           >
             {action.label}
             <ArrowRight size={14} className="text-[#86868b]" />
@@ -338,11 +339,11 @@ function FlowPill({
   }[tone]
 
   return (
-    <div className="flex items-center gap-3 rounded-2xl border border-white/8 bg-white/[0.06] px-3 py-2.5">
-      <span className={`flex h-8 w-8 items-center justify-center rounded-xl text-[10px] font-bold ${toneClass}`}>
+    <div className="harmony-attendance-step-pill flex items-center gap-3 rounded-2xl border border-white/8 bg-white/[0.06] px-3 py-2.5">
+      <span className={`harmony-attendance-step-number flex h-8 w-8 items-center justify-center rounded-xl text-[10px] font-bold ${toneClass}`}>
         {number}
       </span>
-      <span className="text-xs font-bold text-white/80">{label}</span>
+      <span className="harmony-attendance-step-label text-xs font-bold text-white/80">{label}</span>
     </div>
   )
 }
