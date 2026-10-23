@@ -741,6 +741,22 @@ async function notifyPostponeDecisionByEmail({
   }
 }
 
+/**
+ * The database owns postpone date arithmetic.  Do not coerce or recompute
+ * expiry dates in the browser when PostgreSQL rejects mixed column types.
+ */
+function explainPostponeError(error: unknown, fallback: string): string {
+  const detail = error instanceof Error
+    ? error.message
+    : typeof error === 'object' && error !== null && 'message' in error
+      ? String((error as { message?: unknown }).message || '')
+      : ''
+  if (/COALESCE types text and date cannot be matched/i.test(detail)) {
+    return 'Konfigurasi tanggal pada fungsi PostgreSQL Postpone Cuti belum sesuai (COALESCE: text vs date). Persetujuan belum diproses. Hubungi administrator untuk memperbaiki tipe tanggal di RPC Supabase; jangan mengubah saldo secara manual.'
+  }
+  return detail || fallback
+}
+
 export default function HRLeavePostponePage() {
   const [
     postpones,
@@ -1001,8 +1017,7 @@ export default function HRLeavePostponePage() {
           'error',
 
         text:
-          error?.message ||
-          'Gagal mengambil data postpone cuti.',
+          explainPostponeError(error, 'Gagal mengambil data postpone cuti.'),
       })
     } finally {
       setLoading(false)
@@ -1129,8 +1144,7 @@ export default function HRLeavePostponePage() {
           'error',
 
         text:
-          error?.message ||
-          'Gagal approve postpone oleh HR.',
+          explainPostponeError(error, 'Gagal approve postpone oleh HR.'),
       })
     } finally {
       setSavingId(null)
@@ -1264,8 +1278,7 @@ export default function HRLeavePostponePage() {
           'error',
 
         text:
-          error?.message ||
-          'Gagal reject postpone oleh HR.',
+          explainPostponeError(error, 'Gagal reject postpone oleh HR.'),
       })
     } finally {
       setSavingId(null)
@@ -1395,8 +1408,7 @@ export default function HRLeavePostponePage() {
           'error',
 
         text:
-          error?.message ||
-          'Gagal cancel postpone.',
+          explainPostponeError(error, 'Gagal cancel postpone.'),
       })
     } finally {
       setSavingId(null)
@@ -1405,10 +1417,12 @@ export default function HRLeavePostponePage() {
 
   return (
     <>
-      <Topbar
-        title="Postpone Cuti"
-        description="Final approval HR untuk postpone/carry forward. Expiry dihitung otomatis 6 bulan setelah anniversary cuti berikutnya."
-      />
+      <div className="harmony-postpone-page-header">
+        <Topbar
+          title="Postpone Cuti"
+          description="Final approval HR untuk postpone/carry forward. Expiry dihitung otomatis 6 bulan setelah anniversary cuti berikutnya."
+        />
+      </div>
 
       <main className="space-y-6 p-4 sm:p-6">
         <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
