@@ -75,6 +75,7 @@ export function AppSidebar({ menu, title = 'HARMONY', userName = 'HARMONY User',
       </header>
 
       <div className="harmony-sidebar-nav min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-[9px] py-3">
+        <p className="harmony-side-detail mb-2 px-3 text-[10px] font-bold uppercase tracking-[.12em] text-slate-500">{userRole.toLowerCase().includes('finance') ? 'Finance' : userRole.toLowerCase().includes('hr') ? 'HR Workspace' : 'Karyawan'}</p>
         <nav className="flex flex-col gap-1" aria-label="Menu utama">
           {menu.map(item => {
             const active = isNavigationActive(pathname, item)
@@ -98,7 +99,7 @@ export function AppSidebar({ menu, title = 'HARMONY', userName = 'HARMONY User',
           {loggingOut ? <Loader2 size={19} className="shrink-0 animate-spin" /> : <LogOut size={19} className="shrink-0" />}
           <span className="harmony-side-detail text-xs font-semibold">{loggingOut ? 'Keluar...' : 'Keluar'}</span>
         </button>
-        <p className="harmony-side-detail mt-2 truncate text-center text-[10px] text-slate-400">Developed by <strong>Devan</strong></p>
+
       </footer>
     </div>
   </aside>

@@ -21,6 +21,7 @@ import {
 import { TodayTeamAvailability } from '@/components/employee/TodayTeamAvailability'
 import { Topbar } from '@/components/layout/Topbar'
 import { CompactMetric } from '@/components/dashboard/CompactMetric'
+import { WorkspaceActions } from '@/components/dashboard/WorkspaceActions'
 import { getCurrentPeriodMonthWita, getCutoffRange } from '@/lib/attendance-reporting'
 import { supabase } from '@/lib/supabase'
 import { harmonyFetch } from '@/lib/harmony-client'
@@ -335,11 +336,11 @@ export default function EmployeeDashboardPage() {
           <CompactMetric label="Pengajuan Pending" value={loading ? '…' : pendingRequestCount} icon={Clock3} href="/employee/leave" accent="amber" />
           <CompactMetric label="Hari Tercatat" value={loading ? '…' : recordedAttendance} icon={CheckCircle2} href="/employee/attendance" />
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Link href="/employee/leave" className="harmony-button-primary inline-flex min-h-10 items-center gap-2 px-4 text-xs"><CalendarDays size={15}/> Ajukan Cuti/Izin</Link>
-          <Link href="/employee/phl" className="harmony-button-secondary inline-flex min-h-10 items-center gap-2 px-4 text-xs"><WalletCards size={15}/> Ajukan Saldo PHL</Link>
-          <Link href="/employee/attendance" className="harmony-button-secondary inline-flex min-h-10 items-center gap-2 px-4 text-xs"><Fingerprint size={15}/> Absensi</Link>
-        </div>
+        <WorkspaceActions title="Akses cepat karyawan" actions={[
+          {label:'Ajukan Cuti / Izin',description:'Buat pengajuan baru',href:'/employee/leave',icon:CalendarDays,emphasis:true},
+          {label:'Ajukan Saldo PHL',description:'Lihat saldo & pengajuan',href:'/employee/phl',icon:WalletCards},
+          {label:'Biodata & Dokumen',description:'Perbarui profil pribadi',href:'/employee/account',icon:Fingerprint},
+        ]} />
         <div className="grid gap-4 xl:grid-cols-[1.25fr_0.75fr]">
           <section className="harmony-unified-surface overflow-hidden rounded-[22px]">
             <div className="flex items-center justify-between gap-2 border-b border-slate-200/50 px-4 py-3"><h2 className="text-sm font-bold text-slate-900">Aktivitas Terbaru</h2><Link href="/employee/leave" className="text-xs font-semibold text-blue-700">Lihat pengajuan</Link></div>
@@ -349,8 +350,8 @@ export default function EmployeeDashboardPage() {
               </div>)}
             </div>
           </section>
-          <section className="harmony-unified-surface overflow-hidden rounded-[22px]">
-            <h2 className="border-b border-slate-200/50 px-4 py-3 text-sm font-bold text-slate-900">Detail Saldo</h2>
+          <details className="harmony-unified-surface overflow-hidden rounded-[22px]" open={false}>
+            <summary className="flex cursor-pointer items-center justify-between border-b border-slate-200/50 px-4 py-3 text-sm font-bold text-slate-900 focus-visible:outline-2 focus-visible:outline-blue-500">Detail Saldo <span className="text-xs font-medium text-blue-700">Buka detail ↓</span></summary>
             <div className="space-y-1.5 p-3">
               <InfoRow label="Postpone aktif" value={`${Number(balance?.postpone_active_days || 0)} hari`} />
               {debtOutstandingDays > 0 && <InfoRow label="Hutang cuti" value={`${debtOutstandingDays} hari`}/>}
@@ -358,7 +359,7 @@ export default function EmployeeDashboardPage() {
               <InfoRow label="Masa berlaku Postpone" value={formatDate(balance?.next_postpone_expiry)}/>
               <InfoRow label="Masa berlaku PHL" value={formatDate(balance?.next_phl_expiry)}/>
             </div>
-          </section>
+          </details>
         </div>
         <TodayTeamAvailability />
       </section>

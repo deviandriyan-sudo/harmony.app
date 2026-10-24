@@ -1,6 +1,6 @@
 {
   "name": "harmony",
-  "version": "3.7.7",
+  "version": "3.7.8",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "test:smoke": "node scripts/smoke-check.mjs",
-    "test:ptkp": "node scripts/test-ptkp.cjs"
+    "test:ptkp": "node scripts/test-ptkp.cjs",
+    "test:ui": "node scripts/test-ui-integrity.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.107.0",

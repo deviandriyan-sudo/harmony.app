@@ -3,8 +3,9 @@
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
 import { useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, ArrowUpRight, CalendarDays, Clock3, RefreshCcw, Upload, UserCheck, Users } from 'lucide-react'
+import { AlertTriangle, ArrowUpRight, CalendarDays, ChevronDown, Clock3, RefreshCcw, Settings, Upload, UserCheck, Users, WalletCards } from 'lucide-react'
 import { CompactMetric } from '@/components/dashboard/CompactMetric'
+import { WorkspaceActions } from '@/components/dashboard/WorkspaceActions'
 import { Topbar } from '@/components/layout/Topbar'
 import { getCurrentPeriodMonthWita, getCutoffRange } from '@/lib/attendance-reporting'
 import { supabase } from '@/lib/supabase'
@@ -63,11 +64,11 @@ export default function HRDashboardPage() {
   return <>
     <Topbar title="Beranda HR" compact />
     <section className="harmony-page-bg mx-auto min-h-screen max-w-[1500px] space-y-4 p-4 sm:p-5 lg:p-6">
-      <header className="harmony-reference-hero flex min-h-[155px] flex-wrap items-center justify-between gap-5 rounded-[25px] p-5 sm:px-7 sm:py-6">
+      <header className="harmony-reference-hero flex min-h-[125px] flex-wrap items-center justify-between gap-5 rounded-[25px] p-5 sm:px-7 sm:py-6">
         <div className="min-w-0 max-w-2xl">
           <p className="text-xs font-semibold text-white/85">Selamat datang di HARMONY</p>
-          <h1 className="mt-1 text-3xl font-bold tracking-[-.04em] text-white sm:text-[38px]">Dashboard HR</h1>
-          <p className="mt-2 text-sm leading-6 text-white/85">Kelola kehadiran, cuti, PHL, dan aktivitas SDM melalui satu sistem terintegrasi.</p>
+          <h1 className="mt-1 text-2xl font-bold tracking-[-.04em] text-white sm:text-[30px]">Dashboard HR</h1>
+          <p className="mt-2 text-sm leading-6 text-white/85">Fokus pada pekerjaan yang perlu diselesaikan hari ini.</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <div className="harmony-reference-hero-meta flex min-h-14 items-center gap-3 px-4 py-2.5">
@@ -84,31 +85,36 @@ export default function HRDashboardPage() {
         <CompactMetric label="Belum Submit" value={loading ? '…' : metrics.notSubmitted} icon={Clock3} href="/hr/attendance/data" accent="amber" />
         <CompactMetric label="Cuti/Izin Diproses" value={loading ? '…' : metrics.leave} icon={CalendarDays} href="/hr/leave" accent="green" />
       </div>
-      <div className="flex flex-wrap gap-2">
-        <Link href="/hr/attendance/upload" className="harmony-button-primary inline-flex min-h-10 items-center gap-2 px-4 text-xs"><Upload size={15} /> Upload Absensi</Link>
-        <Link href="/hr/attendance/approvals" className="harmony-button-secondary inline-flex min-h-10 items-center gap-2 px-4 text-xs"><UserCheck size={15} /> Review Approval</Link>
-        <Link href="/hr/employees" className="harmony-button-secondary inline-flex min-h-10 items-center gap-2 px-4 text-xs"><Users size={15} /> Data Karyawan</Link>
-      </div>
-      <div className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
-        <section className="harmony-unified-surface overflow-hidden rounded-[22px]">
-          <h2 className="border-b border-slate-200/50 px-4 py-3 text-sm font-bold text-slate-900">Perlu Tindakan</h2>
-          <div className="divide-y divide-slate-200/40">
-            {alertItems.map(item => <Link key={item.label} href={item.href} className="flex min-h-[53px] items-center justify-between gap-3 px-4 py-2 text-xs text-slate-700 hover:bg-white/55">
-              <span className="font-medium">{item.label}</span><span className="flex shrink-0 items-center gap-2"><strong className="rounded-lg bg-blue-50 px-2 py-1 text-blue-700">{loading ? '…' : item.value}</strong><ArrowUpRight size={15} /></span>
-            </Link>)}
-          </div>
-        </section>
-        <section className="harmony-unified-surface overflow-hidden rounded-[22px]">
-          <h2 className="border-b border-slate-200/50 px-4 py-3 text-sm font-bold text-slate-900">Modul</h2>
-          <div className="grid grid-cols-2 gap-2 p-3">
-            {[{name:'SDM',href:'/hr/employees'},{name:'Absensi',href:'/hr/attendance'},{name:'Cuti & Izin',href:'/hr/leave'},{name:'Saldo PHL',href:'/hr/phl'},{name:'Kalender',href:'/hr/holidays'},{name:'Sistem',href:'/hr/settings'}].map(item =>
-              <Link key={item.href} href={item.href} className="flex min-h-11 items-center justify-between rounded-xl border border-white/80 bg-white/60 px-3 text-xs font-semibold text-slate-700 transition hover:bg-blue-50">{item.name}<ArrowUpRight size={14} /></Link>
-            )}
-          </div>
-        </section>
-      </div>
+      <WorkspaceActions title="Tindakan HR" actions={[
+        {label:'Upload Absensi',description:'Proses periode kehadiran',href:'/hr/attendance/upload',icon:Upload,emphasis:true},
+        {label:'Review Approval',description:'Persetujuan dan verifikasi',href:'/hr/attendance/approvals',icon:UserCheck},
+        {label:'Data Karyawan',description:'Direktori dan profil SDM',href:'/hr/employees',icon:Users},
+      ]} />
+      <section className="harmony-unified-surface overflow-hidden rounded-[20px]">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200/50 px-4 py-3">
+          <h2 className="text-sm font-bold text-slate-900">Perlu Tindakan</h2>
+          <span className="text-[11px] text-slate-500">Ringkasan periode aktif</span>
+        </div>
+        <div className="grid divide-y divide-slate-200/40 sm:grid-cols-2 sm:divide-y-0">
+          {alertItems.map(item => <Link key={item.label} href={item.href} className="flex min-h-[52px] items-center justify-between gap-3 border-slate-200/40 px-4 py-2 text-xs text-slate-700 hover:bg-white/55 sm:border-b">
+            <span className="font-medium">{item.label}</span><span className="flex shrink-0 items-center gap-2"><strong className="rounded-lg bg-blue-50 px-2 py-1 text-blue-700">{loading ? '…' : item.value}</strong><ArrowUpRight size={15}/></span>
+          </Link>)}
+        </div>
+      </section>
+      <details className="harmony-unified-surface overflow-hidden rounded-[20px]">
+        <summary className="flex min-h-11 cursor-pointer items-center justify-between px-4 text-xs font-semibold text-slate-700 hover:bg-white/60 focus-visible:outline-2 focus-visible:outline-blue-500"><span>Modul HR lainnya</span><ChevronDown size={16}/></summary>
+        <div className="grid gap-2 border-t border-slate-200/50 p-3 sm:grid-cols-3">
+          {[
+            {name:'Cuti & Izin',href:'/hr/leave',icon:CalendarDays},
+            {name:'Saldo PHL',href:'/hr/phl',icon:WalletCards},
+            {name:'Kalender',href:'/hr/holidays',icon:CalendarDays},
+            {name:'Pengaturan',href:'/hr/settings',icon:Settings},
+            {name:'Data Absensi',href:'/hr/attendance',icon:Clock3},
+          ].map(item => {const Icon=item.icon;return <Link key={item.href} href={item.href} className="flex min-h-10 items-center gap-2 rounded-xl border border-white/80 bg-white/60 px-3 text-xs font-semibold text-slate-700 transition hover:bg-blue-50"><Icon size={15}/><span className="flex-1">{item.name}</span><ArrowUpRight size={14}/></Link>})}
+        </div>
+      </details>
       <div className="harmony-unified-surface overflow-hidden rounded-[20px]">
-        <button type="button" onClick={() => setShowOrg(value => !value)} aria-expanded={showOrg} className="flex min-h-11 w-full items-center justify-between px-4 text-xs font-semibold text-slate-700 hover:bg-white/60"><span>Struktur Organisasi</span><span>{showOrg ? 'Tutup −' : 'Lihat +'}</span></button>
+        <button type="button" onClick={() => setShowOrg(value => !value)} aria-expanded={showOrg} className="flex min-h-11 w-full items-center justify-between px-4 text-xs font-semibold text-slate-700 hover:bg-white/60"><span className="inline-flex items-center gap-2"><Users size={15}/> Struktur Organisasi</span><span className="inline-flex items-center gap-1">{showOrg ? 'Tutup' : 'Lihat'} <ChevronDown size={15} className={showOrg ? 'rotate-180' : ''}/></span></button>
         {showOrg && <div className="border-t border-slate-200/50 p-3"><OrganizationChart /></div>}
       </div>
     </section>

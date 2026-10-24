@@ -45,9 +45,9 @@ function Repeat({field,value,onChange,readOnly}:{field:string;value:string;onCha
  {rows.map((row,index)=><div key={`${field}-${index}`} className="mb-2 rounded-2xl border border-white/80 bg-white/50 p-3"><div className="mb-3 flex items-center justify-between"><span className="text-xs font-bold text-slate-700">Data {index+1}</span>{!readOnly&&<button type="button" onClick={()=>save(rows.filter((_,i)=>index!==i))} className="inline-flex items-center gap-1 text-xs font-semibold text-rose-600"><Trash2 size={14}/>Hapus</button>}</div><div className="grid gap-3 sm:grid-cols-2">{Object.entries(meta.fields).map(([k,label])=><GenericInput key={k} field={k} label={label} value={row[k]||''} onChange={v=>save(rows.map((x,i)=>i===index?{...x,[k]:v}:x))} disabled={readOnly}/>)}</div></div>)}
  </div>
 }
-export function ProfileWorkspace({employeeId,readOnly=false}:{employeeId?:string;readOnly?:boolean}){
+export function ProfileWorkspace({employeeId,readOnly=false,initialSection='identity'}:{employeeId?:string;readOnly?:boolean;initialSection?:WorkspaceSection}){
  const [data,setData]=useState<Data|null>(null)
- const [active,setActive]=useState<WorkspaceSection>('identity')
+ const [active,setActive]=useState<WorkspaceSection>(initialSection)
  const [values,setValues]=useState<Record<string,string>>({})
  const [loading,setLoading]=useState(true),[busy,setBusy]=useState(false)
  const [dirty,setDirty]=useState(false),[message,setMessage]=useState('')
