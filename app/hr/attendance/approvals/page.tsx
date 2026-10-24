@@ -66,7 +66,7 @@ export default function HRAttendanceApprovalQueuePage() {
         description="Antrean review dan persetujuan HR per periode."
       />
 
-      <section className="harmony-page-bg min-h-screen space-y-5 overflow-x-hidden p-4 sm:p-6">
+      <section className="harmony-glass-showcase harmony-glass-showcase-hr harmony-page-bg min-h-screen space-y-5 overflow-x-hidden p-4 sm:p-6">
         <AttendanceWorkspaceTabs current="review" period={periodMonth} />
         {errorMessage && <AlertBox message={errorMessage} />}
 

@@ -3721,3 +3721,174 @@ body > .harmony-modal-surface > :first-child,
 @media print {
   .harmony-action-tray,.harmony-module-subnav {display:none !important}
 }
+
+
+/* ===============================================================
+   HARMONY V3.7.9 — AURORA GLASS EXPERIENCE (PRESENTATION ONLY)
+   Fully decorative: no route, role, database or workflow modifications.
+   Applies only to explicitly opted-in HR / Employee / Finance surfaces.
+   =============================================================== */
+.harmony-glass-showcase {
+  --harmony-showcase-ink:#17365e;
+  --harmony-showcase-rim:rgba(255,255,255,.89);
+  --harmony-showcase-blue:#1267d8;
+  min-width:0;
+  isolation:isolate;
+  background:
+    radial-gradient(ellipse 48% 29% at 99% 2%,rgba(137,183,255,.32),transparent 82%),
+    radial-gradient(ellipse 45% 28% at 0% 11%,rgba(173,210,255,.34),transparent 85%),
+    radial-gradient(ellipse 52% 45% at 57% 96%,rgba(200,221,253,.25),transparent 84%),
+    linear-gradient(164deg,#e9f3ff 0%,#f4f9ff 46%,#e7f0ff 100%);
+}
+.harmony-glass-showcase :is(.harmony-metric-card,.harmony-unified-surface,.harmony-card,.harmony-glass-activity-panel,.harmony-remed-workspace-header) {
+  border:1px solid var(--harmony-showcase-rim) !important;
+  background:
+    linear-gradient(114deg,rgba(255,255,255,.5) 0%,rgba(255,255,255,.10) 32%,transparent 53%),
+    linear-gradient(151deg,rgba(255,255,255,.74),rgba(212,232,255,.62)) !important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.96),inset 1px 0 0 rgba(255,255,255,.53),inset 0 -1px 0 rgba(116,170,238,.12),0 7px 22px rgba(43,102,178,.075),0 1px 3px rgba(27,78,152,.055) !important;
+  -webkit-backdrop-filter:blur(24px) saturate(143%);
+  backdrop-filter:blur(24px) saturate(143%);
+}
+.harmony-glass-showcase :is(.harmony-metric-card,.harmony-unified-surface,.harmony-card) {border-radius:19px !important}
+.harmony-glass-showcase .harmony-glass-showcase-metric {
+  position:relative;
+  overflow:hidden;
+  min-height:108px;
+  padding:19px 20px !important;
+  transition:transform .2s ease,box-shadow .2s ease;
+}
+.harmony-glass-showcase .harmony-glass-showcase-metric::before {
+  content:"";position:absolute;inset:0 auto auto 0;width:100%;height:2px;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,.98),transparent);
+  pointer-events:none;
+}
+.harmony-glass-showcase a.harmony-glass-showcase-metric:hover {
+  transform:translateY(-2px);
+  box-shadow:inset 0 2px 0 #fff,0 15px 30px rgba(34,96,178,.15) !important;
+}
+.harmony-glass-showcase .harmony-glass-metric-icon {
+  border:1px solid rgba(255,255,255,.93);
+  background:linear-gradient(142deg,rgba(226,242,255,.92),rgba(149,198,255,.44));
+  box-shadow:inset 0 2px 1px rgba(255,255,255,.94),inset 0 -1px 1px rgba(86,135,203,.13),0 5px 13px rgba(40,112,191,.11);
+  color:#1469ce;
+}
+.harmony-glass-showcase .harmony-metric-card[data-tone='green'] .harmony-glass-metric-icon {background:linear-gradient(145deg,#ebfff4,#abead1);color:#08764f}
+.harmony-glass-showcase .harmony-metric-card[data-tone='orange'] .harmony-glass-metric-icon {background:linear-gradient(145deg,#fff8e9,#ffdbb3);color:#ba5b05}
+.harmony-glass-showcase .harmony-metric-card[data-tone='red'] .harmony-glass-metric-icon {background:linear-gradient(145deg,#fff4f7,#ffd0d9);color:#c92252}
+.harmony-glass-showcase .harmony-glass-showcase-metric p:first-child {color:#557497 !important;letter-spacing:.01em}
+.harmony-glass-showcase .harmony-glass-showcase-metric p:nth-child(2) {color:#18365c !important;letter-spacing:-.035em}
+.harmony-glass-showcase .harmony-action-tray {
+  padding:13px 15px 15px;
+  border:1px solid rgba(255,255,255,.93);
+  border-radius:20px;
+  background:linear-gradient(141deg,rgba(253,255,255,.74),rgba(207,231,255,.57));
+  box-shadow:inset 0 1px 0 #fff,0 8px 24px rgba(34,96,170,.07);
+  -webkit-backdrop-filter:blur(24px);backdrop-filter:blur(24px);
+}
+.harmony-glass-showcase .harmony-glass-showcase-action {
+  border:1px solid rgba(255,255,255,.92) !important;
+  background:linear-gradient(134deg,rgba(255,255,255,.76),rgba(205,226,253,.56)) !important;
+  box-shadow:inset 0 1px 1px rgba(255,255,255,.98),0 5px 14px rgba(40,98,176,.055);
+  color:#25476c;
+  min-height:66px;
+}
+.harmony-glass-showcase .harmony-glass-showcase-action:hover {transform:translateY(-2px);box-shadow:inset 0 1px 1px #fff,0 10px 20px rgba(33,91,167,.13)}
+.harmony-glass-showcase .harmony-glass-showcase-action .harmony-action-glyph {background:linear-gradient(145deg,#e2f3ff,#b5dcff);color:#1765c6;border:1px solid rgba(255,255,255,.92);box-shadow:inset 0 2px 0 #fff,0 3px 8px rgba(21,81,162,.08)}
+.harmony-glass-showcase .harmony-workspace-action-primary .harmony-action-glyph {background:linear-gradient(142deg,#4497f3,#1466d4);color:#fff}
+.harmony-glass-showcase :is(.harmony-reference-hero,.harmony-glass-dark,.harmony-review-hero,.harmony-glass-role-hero) {
+  color:white;
+  background:
+    radial-gradient(ellipse 56% 130% at 96% 3%,rgba(230,246,255,.34),transparent 66%),
+    radial-gradient(ellipse 35% 110% at 59% 102%,rgba(65,141,255,.57),transparent 70%),
+    linear-gradient(120deg,rgba(27,87,175,.94),rgba(49,126,215,.86) 54%,rgba(135,194,249,.82)) !important;
+  border:1px solid rgba(234,247,255,.86) !important;
+  box-shadow:inset 0 2px 0 rgba(255,255,255,.6),inset 0 -2px 0 rgba(26,81,164,.29),0 12px 35px rgba(25,89,167,.19),0 1px 3px rgba(25,78,155,.12) !important;
+}
+.harmony-glass-showcase .harmony-glass-role-hero {
+  position:relative;
+  isolation:isolate;
+  overflow:hidden;
+  min-height:160px;
+  padding:23px 26px !important;
+  border-radius:24px !important;
+}
+.harmony-glass-showcase .harmony-glass-role-hero::before {
+  content:"";position:absolute;z-index:0;inset:0;
+  background:linear-gradient(112deg,rgba(255,255,255,.15),transparent 31%),radial-gradient(ellipse at 65% 135%,rgba(255,255,255,.31),transparent 48%);
+  pointer-events:none;
+}
+.harmony-glass-showcase .harmony-glass-role-hero::after {
+  content:"";position:absolute;z-index:0;inset:auto -10% -72% 24%;height:140%;border-radius:50%;border:1px solid rgba(255,255,255,.24);transform:rotate(-15deg);box-shadow:0 0 0 29px rgba(255,255,255,.045),0 0 0 62px rgba(255,255,255,.036);pointer-events:none;
+}
+.harmony-glass-showcase .harmony-glass-role-hero > :not(.harmony-glass-scene) {position:relative;z-index:2}
+.harmony-glass-showcase .harmony-glass-role-hero :is(h1,h2,h3) {color:#fff !important;letter-spacing:-.035em;text-shadow:0 1px 1px rgba(14,65,128,.08)}
+.harmony-glass-showcase .harmony-glass-role-hero :is(p,span) {color:rgba(248,252,255,.92)}
+.harmony-glass-showcase .harmony-glass-role-hero .harmony-reference-hero-meta,
+.harmony-glass-showcase .harmony-glass-role-hero .harmony-button-secondary,
+.harmony-glass-showcase .harmony-glass-role-hero :is(button,a) {
+  background:linear-gradient(145deg,rgba(241,250,255,.24),rgba(183,220,255,.13)) !important;
+  border:1px solid rgba(255,255,255,.56) !important;
+  box-shadow:inset 0 1px 1px rgba(255,255,255,.53),0 5px 16px rgba(23,80,152,.1) !important;
+  color:#fff !important;
+  -webkit-backdrop-filter:blur(13px);backdrop-filter:blur(13px);
+}
+.harmony-glass-showcase .harmony-glass-role-hero .harmony-reference-hero-meta :is(p,span,svg),
+.harmony-glass-showcase .harmony-glass-role-hero button :is(span,svg) {color:#fff !important}
+.harmony-glass-scene {
+  position:absolute !important;z-index:1 !important;
+  width:310px;height:188px;right:14%;top:-8px;pointer-events:none;
+  transform:rotate(-7deg);
+  opacity:.85;
+  filter:drop-shadow(0 18px 18px rgba(13,66,145,.14));
+}
+.harmony-glass-scene .harmony-scene-halo {position:absolute;inset:3px 21px 0;background:radial-gradient(ellipse,#c7ebff88,transparent 70%);filter:blur(10px)}
+.harmony-glass-scene .harmony-scene-disc {position:absolute;width:200px;height:95px;left:60px;top:68px;border-radius:50%;background:linear-gradient(145deg,rgba(221,247,255,.39),rgba(100,166,245,.11));border:1px solid rgba(255,255,255,.28);transform:rotate(14deg) skewX(-12deg)}
+.harmony-glass-scene .harmony-scene-disc-front {top:87px;left:36px;opacity:.48}
+.harmony-glass-scene .harmony-scene-card {position:absolute;display:flex;align-items:center;justify-content:center;border:1px solid rgba(250,254,255,.77);background:linear-gradient(140deg,rgba(238,249,255,.7),rgba(143,192,255,.32));box-shadow:inset 0 2px 1px rgba(255,255,255,.78),inset 1px 0 1px rgba(255,255,255,.5),0 13px 27px rgba(34,85,172,.17);color:#fff;-webkit-backdrop-filter:blur(9px);backdrop-filter:blur(9px)}
+.harmony-glass-scene .harmony-scene-card-back {width:100px;height:103px;top:47px;left:170px;transform:rotate(19deg);border-radius:18px;color:rgba(255,255,255,.68)}
+.harmony-glass-scene .harmony-scene-card-front {width:116px;height:124px;top:23px;left:96px;flex-direction:column;transform:rotate(11deg);border-radius:22px}
+.harmony-scene-card-top {position:absolute;top:15px;left:17px;right:17px;display:flex;gap:7px}
+.harmony-scene-card-top span {width:6px;height:6px;background:#fff9;border-radius:50%}
+.harmony-scene-card-foot {position:absolute;bottom:12px;display:flex;gap:8px}
+.harmony-scene-card-foot i {width:13px;height:6px;border-radius:9px;background:#fff8}
+.harmony-scene-orb {position:absolute;border-radius:50%;box-shadow:inset 3px 4px 6px rgba(255,255,255,.75),inset -5px -6px 8px rgba(58,137,230,.26),0 8px 11px rgba(24,80,144,.14);background:linear-gradient(140deg,#d9faffb3,#74aff4aa)}
+.harmony-scene-orb-a {width:39px;height:39px;top:117px;left:67px}
+.harmony-scene-orb-b {width:24px;height:24px;top:24px;left:215px}
+.harmony-glass-showcase .harmony-unified-surface > :is(header,div):first-child:not(.grid),
+.harmony-glass-showcase .harmony-card > :is(header,div):first-child:not(.grid) {border-bottom-color:rgba(165,202,239,.32)}
+.harmony-glass-showcase :is(.harmony-unified-surface,.harmony-card) :is(a,button):focus-visible {outline:2px solid #1771e0;outline-offset:2px}
+.harmony-glass-showcase :is(.harmony-unified-surface,.harmony-card) a:not(.harmony-button-primary):hover {color:#1456b1}
+.harmony-glass-showcase :is(.harmony-unified-surface,.harmony-card) table {border-collapse:separate;border-spacing:0 2px}
+.harmony-glass-showcase :is(.harmony-unified-surface,.harmony-card) table thead {background:rgba(199,221,251,.42)}
+.harmony-glass-showcase :is(.harmony-unified-surface,.harmony-card) table tbody tr {transition:background-color .14s ease}
+.harmony-glass-showcase :is(.harmony-unified-surface,.harmony-card) table tbody tr:hover {background:rgba(235,246,255,.85)}
+.harmony-glass-showcase :is(.harmony-unified-surface,.harmony-card) :is(input,select,textarea):not([type='checkbox']):not([type='radio']) {
+  border-radius:12px;
+  min-height:38px;
+}
+.harmony-glass-showcase details > summary {list-style:none;user-select:none}
+.harmony-glass-showcase details > summary::-webkit-details-marker {display:none}
+.harmony-glass-showcase details[open] > summary {background:linear-gradient(90deg,rgba(222,240,255,.58),rgba(255,255,255,.36))}
+@media (max-width:1199px) {
+  .harmony-glass-scene {right:18%;opacity:.55;transform:scale(.88) rotate(-7deg);transform-origin:center right}
+}
+@media (max-width:767px) {
+  .harmony-glass-showcase {background:linear-gradient(166deg,#eaf4ff,#f7faff 54%,#e8f3ff)}
+  .harmony-glass-showcase .harmony-glass-role-hero {min-height:132px;padding:19px !important}
+  .harmony-glass-scene {right:-90px;top:2px;opacity:.18;transform:scale(.8) rotate(-7deg)}
+  .harmony-glass-showcase .harmony-glass-showcase-metric {min-height:94px;padding:13px !important}
+  .harmony-glass-showcase .harmony-glass-showcase-action {min-height:60px}
+}
+@media (prefers-reduced-motion:reduce) {
+  .harmony-glass-showcase .harmony-glass-showcase-metric,.harmony-glass-showcase .harmony-glass-showcase-action {transition:none !important;transform:none !important}
+}
+@media (prefers-reduced-transparency:reduce) {
+  .harmony-glass-showcase :is(.harmony-metric-card,.harmony-unified-surface,.harmony-card,.harmony-action-tray,.harmony-glass-showcase-action) {background:#edf5ff !important;-webkit-backdrop-filter:none !important;backdrop-filter:none !important}
+}
+@media print {
+  .harmony-glass-scene {display:none !important}
+  .harmony-glass-showcase {background:#fff !important}
+  .harmony-glass-showcase :is(.harmony-metric-card,.harmony-unified-surface,.harmony-card,.harmony-action-tray) {background:#fff !important;box-shadow:none !important;border:1px solid #d8e1e9 !important;-webkit-backdrop-filter:none !important;backdrop-filter:none !important}
+}
+
+.harmony-glass-showcase .harmony-metric-card[data-tone='purple'] .harmony-glass-metric-icon {background:linear-gradient(145deg,#f7f0ff,#d5c3ff);color:#7445bf}

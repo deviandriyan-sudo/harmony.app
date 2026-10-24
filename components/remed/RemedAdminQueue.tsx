@@ -40,7 +40,7 @@ export function RemedAdminQueue({ mode }: { mode: QueueMode }) {
     }
   }, [config.status])
   useEffect(() => { void load() }, [load])
-  return <section className="mx-auto max-w-[1540px] space-y-6 p-4 sm:p-6 lg:p-8">
+  return <section className={`harmony-glass-showcase harmony-glass-showcase-${config.role.toLowerCase()} mx-auto max-w-[1540px] space-y-6 p-4 sm:p-6 lg:p-8`}>
     <RemedPageHeader eyebrow={`Re-Med · ${config.role}`} title={config.title}
       description={config.description} icon={mode === 'payment' ? Banknote : ClipboardCheck}
       actions={<div className="flex flex-wrap gap-2">

@@ -5,6 +5,7 @@ import dynamic from 'next/dynamic'
 import { useEffect, useMemo, useState } from 'react'
 import { AlertTriangle, ArrowUpRight, CalendarDays, ChevronDown, Clock3, RefreshCcw, Settings, Upload, UserCheck, Users, WalletCards } from 'lucide-react'
 import { CompactMetric } from '@/components/dashboard/CompactMetric'
+import { GlassHeroVisual } from '@/components/dashboard/GlassHeroVisual'
 import { WorkspaceActions } from '@/components/dashboard/WorkspaceActions'
 import { Topbar } from '@/components/layout/Topbar'
 import { getCurrentPeriodMonthWita, getCutoffRange } from '@/lib/attendance-reporting'
@@ -63,12 +64,13 @@ export default function HRDashboardPage() {
   ]
   return <>
     <Topbar title="Beranda HR" compact />
-    <section className="harmony-page-bg mx-auto min-h-screen max-w-[1500px] space-y-4 p-4 sm:p-5 lg:p-6">
-      <header className="harmony-reference-hero flex min-h-[125px] flex-wrap items-center justify-between gap-5 rounded-[25px] p-5 sm:px-7 sm:py-6">
+    <section className="harmony-glass-showcase harmony-glass-showcase-hr harmony-page-bg mx-auto min-h-screen max-w-[1500px] space-y-4 p-4 sm:p-5 lg:p-6">
+      <header className="harmony-reference-hero harmony-glass-role-hero harmony-glass-role-hr flex min-h-[125px] flex-wrap items-center justify-between gap-5 rounded-[25px] p-5 sm:px-7 sm:py-6">
+        <GlassHeroVisual role="hr" />
         <div className="min-w-0 max-w-2xl">
           <p className="text-xs font-semibold text-white/85">Selamat datang di HARMONY</p>
           <h1 className="mt-1 text-2xl font-bold tracking-[-.04em] text-white sm:text-[30px]">Dashboard HR</h1>
-          <p className="mt-2 text-sm leading-6 text-white/85">Fokus pada pekerjaan yang perlu diselesaikan hari ini.</p>
+          <p className="mt-2 text-sm leading-6 text-white/85">Kehadiran, pengajuan, dan pekerjaan penting dalam satu tempat.</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <div className="harmony-reference-hero-meta flex min-h-14 items-center gap-3 px-4 py-2.5">
@@ -92,7 +94,7 @@ export default function HRDashboardPage() {
       ]} />
       <section className="harmony-unified-surface overflow-hidden rounded-[20px]">
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200/50 px-4 py-3">
-          <h2 className="text-sm font-bold text-slate-900">Perlu Tindakan</h2>
+          <h2 className="inline-flex items-center gap-2 text-sm font-bold text-slate-900"><AlertTriangle size={16} className="text-amber-600"/> Perlu Tindakan</h2>
           <span className="text-[11px] text-slate-500">Ringkasan periode aktif</span>
         </div>
         <div className="grid divide-y divide-slate-200/40 sm:grid-cols-2 sm:divide-y-0">

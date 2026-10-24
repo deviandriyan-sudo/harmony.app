@@ -21,6 +21,7 @@ import {
 import { TodayTeamAvailability } from '@/components/employee/TodayTeamAvailability'
 import { Topbar } from '@/components/layout/Topbar'
 import { CompactMetric } from '@/components/dashboard/CompactMetric'
+import { GlassHeroVisual } from '@/components/dashboard/GlassHeroVisual'
 import { WorkspaceActions } from '@/components/dashboard/WorkspaceActions'
 import { getCurrentPeriodMonthWita, getCutoffRange } from '@/lib/attendance-reporting'
 import { supabase } from '@/lib/supabase'
@@ -324,10 +325,10 @@ export default function EmployeeDashboardPage() {
   return (
     <>
       <Topbar title="Beranda" />
-      <section className="harmony-page-bg mx-auto min-h-screen max-w-[1500px] space-y-4 p-4 sm:p-5 lg:p-6">
+      <section className="harmony-glass-showcase harmony-glass-showcase-employee harmony-page-bg mx-auto min-h-screen max-w-[1500px] space-y-4 p-4 sm:p-5 lg:p-6">
         {message && <div role="alert" className="flex gap-2 rounded-xl border border-orange-200 bg-orange-50 p-3 text-xs text-orange-700"><AlertTriangle size={16}/>{message}</div>}
-        <div className="harmony-glass-dark flex flex-wrap items-center justify-between gap-3 rounded-[22px] px-4 py-4 text-white sm:px-5">
-          <div className="min-w-0"><p className="text-[11px] text-white/60">Selamat datang</p><h1 className="truncate text-lg font-bold sm:text-xl">{employee?.full_name || appUser?.email || 'Karyawan'}</h1><p className="mt-1 text-[11px] text-white/60">{employee?.employee_number || '—'} · {employee?.department || '—'} · {periodRange.label}</p></div>
+        <div className="harmony-glass-dark harmony-glass-role-hero harmony-glass-role-employee flex flex-wrap items-center justify-between gap-3 rounded-[22px] px-4 py-4 text-white sm:px-5">
+          <GlassHeroVisual role="employee" /><div className="min-w-0"><p className="text-[11px] text-white/60">Selamat datang kembali</p><h1 className="truncate text-lg font-bold sm:text-xl">{employee?.full_name || appUser?.email || 'Karyawan'}</h1><p className="mt-1 text-[11px] text-white/60">{employee?.employee_number || '—'} · {employee?.department || '—'} · {periodRange.label}</p></div>
           <button type="button" onClick={fetchDashboardData} disabled={refreshing} title="Perbarui" aria-label="Perbarui dashboard" className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/20 bg-white/10 text-white"><RefreshCcw size={17} className={refreshing ? 'animate-spin' : ''} /></button>
         </div>
         <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
@@ -342,8 +343,8 @@ export default function EmployeeDashboardPage() {
           {label:'Biodata & Dokumen',description:'Perbarui profil pribadi',href:'/employee/account',icon:Fingerprint},
         ]} />
         <div className="grid gap-4 xl:grid-cols-[1.25fr_0.75fr]">
-          <section className="harmony-unified-surface overflow-hidden rounded-[22px]">
-            <div className="flex items-center justify-between gap-2 border-b border-slate-200/50 px-4 py-3"><h2 className="text-sm font-bold text-slate-900">Aktivitas Terbaru</h2><Link href="/employee/leave" className="text-xs font-semibold text-blue-700">Lihat pengajuan</Link></div>
+          <section className="harmony-unified-surface harmony-glass-activity-panel overflow-hidden rounded-[22px]">
+            <div className="flex items-center justify-between gap-2 border-b border-slate-200/50 px-4 py-3"><h2 className="inline-flex items-center gap-2 text-sm font-bold text-slate-900"><History size={16} className="text-blue-600" /> Aktivitas Terbaru</h2><Link href="/employee/leave" className="text-xs font-semibold text-blue-700">Lihat pengajuan</Link></div>
             <div className="divide-y divide-slate-200/40">
               {loading ? <EmptyRow text="Memuat..."/> : requests.length === 0 ? <EmptyRow text="Belum ada aktivitas."/> : requests.slice(0, 5).map(item => <div key={`${item.type}-${item.id}`} className="flex min-h-[58px] items-center gap-3 px-4 py-2.5">
                 <div className="min-w-0 flex-1"><p className="truncate text-xs font-semibold text-slate-900">{item.label}</p><p className="mt-0.5 truncate text-[11px] text-slate-500">{item.date}</p></div><Status status={item.status}/>
