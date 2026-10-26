@@ -42,6 +42,7 @@ import {
 } from '@/components/attachments/HarmonyAttachments'
 import { supabase } from '@/lib/supabase'
 import { harmonyFetch } from '@/lib/harmony-client'
+import { AnnualLeaveCorrection } from '@/components/employee/AnnualLeaveCorrection'
 
 type Employee = {
   id: string
@@ -2111,6 +2112,10 @@ export default function HREmployeesPage() {
             annualLeaveDebtForm={annualLeaveDebtForm}
             loadingAnnualLeaveDebt={loadingAnnualLeaveDebt}
             savingAnnualLeaveDebt={savingAnnualLeaveDebt}
+            onLeaveCorrected={async () => {
+              if (editingEmployeeId) await fetchEmployeePostponeDetail(editingEmployeeId)
+              await fetchEmployees()
+            }}
             onSubmit={handleSubmit}
             onClose={resetForm}
             onUpdate={updateForm}
@@ -2228,8 +2233,8 @@ function MasterOptionsModal({
   const totalSelected = selectedOptionIds.length
 
   return (
-    <div role="dialog" aria-modal="true" aria-label="Panel data karyawan" className="harmony-modal-surface fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4 backdrop-blur-sm">
-      <div className="flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-[34px] bg-white shadow-[0_30px_90px_rgba(0,0,0,0.24)]">
+    <div role="dialog" aria-modal="true" aria-label="Panel data karyawan" className="harmony-modal-surface fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-3 backdrop-blur-sm sm:p-4">
+      <div className="harmony-hr-edit-modal flex max-h-[94dvh] w-full max-w-[1050px] flex-col overflow-hidden rounded-[26px] border border-white/85 shadow-[0_30px_90px_rgba(23,54,103,0.22)]">
         <div className="flex min-w-0 items-start justify-between gap-4 border-b border-black/5 p-6">
           <div className="min-w-0">
             <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-[#e8f2ff] px-3 py-1.5 text-xs font-bold text-[#0059b8]">
@@ -2530,8 +2535,8 @@ function EmployeeCompactCard({ employee, assignmentCount, onDetail, onEdit, onTo
 
 function EmployeeDetailModal({ employee, assignments, employees, onClose, onEdit }: { employee: Employee; assignments: EmployeeAssignment[]; employees: Employee[]; onClose: () => void; onEdit: () => void }) {
   return (
-    <div role="dialog" aria-modal="true" aria-label="Panel data karyawan" className="harmony-modal-surface fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4 backdrop-blur-sm">
-      <div className="flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-[34px] bg-white shadow-[0_30px_90px_rgba(0,0,0,0.24)]">
+    <div role="dialog" aria-modal="true" aria-label="Panel data karyawan" className="harmony-modal-surface fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-3 backdrop-blur-sm sm:p-4">
+      <div className="harmony-hr-edit-modal flex max-h-[94dvh] w-full max-w-[1050px] flex-col overflow-hidden rounded-[26px] border border-white/85 shadow-[0_30px_90px_rgba(23,54,103,0.22)]">
         <div className="flex min-w-0 items-start justify-between gap-4 border-b border-black/5 p-6">
           <div className="flex min-w-0 items-center gap-4">
             <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-3xl bg-[#1d1d1f] text-base font-bold text-white">
@@ -2648,6 +2653,7 @@ function EmployeeFormModal({
   annualLeaveDebtForm,
   loadingAnnualLeaveDebt,
   savingAnnualLeaveDebt,
+  onLeaveCorrected,
   onSubmit,
   onClose,
   onUpdate,
@@ -2688,6 +2694,7 @@ function EmployeeFormModal({
   annualLeaveDebtForm: AnnualLeaveDebtForm
   loadingAnnualLeaveDebt: boolean
   savingAnnualLeaveDebt: boolean
+  onLeaveCorrected: () => Promise<void>
   onSubmit: (event: FormEvent<HTMLFormElement>) => void
   onClose: () => void
   onUpdate: (field: keyof EmployeeForm, value: string | number | boolean) => void
@@ -2712,16 +2719,16 @@ function EmployeeFormModal({
   onDeleteAssignment: (assignment: EmployeeAssignment) => void
 }) {
   return (
-    <div role="dialog" aria-modal="true" aria-label="Panel data karyawan" className="harmony-modal-surface fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4 backdrop-blur-sm">
-      <div className="flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-[34px] bg-white shadow-[0_30px_90px_rgba(0,0,0,0.24)]">
+    <div role="dialog" aria-modal="true" aria-label="Panel data karyawan" className="harmony-modal-surface fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-3 backdrop-blur-sm sm:p-4">
+      <div className="harmony-hr-edit-modal flex max-h-[94dvh] w-full max-w-[1050px] flex-col overflow-hidden rounded-[26px] border border-white/85 shadow-[0_30px_90px_rgba(23,54,103,0.22)]">
         <div className="flex min-w-0 items-start justify-between gap-4 border-b border-black/5 p-6">
           <div className="min-w-0">
             <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-[#e8f2ff] px-3 py-1.5 text-xs font-bold text-[#0059b8]">
               <Sparkles size={14} />
               Employee Master
             </div>
-            <h2 className="truncate text-xl font-semibold text-[#1d1d1f]">{editingEmployeeId ? 'Edit Data Karyawan' : 'Tambah Karyawan Baru'}</h2>
-            <p className="mt-1 text-sm text-[#6e6e73]">Homebase utama dipisahkan dari jabatan rangkap agar struktur organisasi tetap rapi.</p>
+            <h2 className="truncate text-xl font-semibold text-[#1d1d1f]">{editingEmployeeId ? 'Edit Karyawan' : 'Tambah Karyawan'}</h2>
+            <p className="mt-1 text-xs text-[#52657f]">Buka kategori yang perlu diubah, lalu simpan.</p>
           </div>
           <button type="button" onClick={onClose} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#f5f5f7] text-[#1d1d1f]">
             <X size={18} />
@@ -2736,7 +2743,7 @@ function EmployeeFormModal({
               </div>
             ) : null}
 
-            <FormSection title="Identitas Karyawan" description="Data utama untuk pencarian, user account, dan mapping employee." icon={<Users size={18} />}>
+            <FormSection title="Identitas Karyawan" description="Nomor, nama, email, dan informasi dasar" icon={<Users size={18} />} openByDefault>
               <InputField label="Employee Number" value={form.employee_number} onChange={(value) => onUpdate('employee_number', value)} placeholder="Contoh: EMP001" required />
               <InputField label="Machine PIN" value={form.machine_pin} onChange={(value) => onUpdate('machine_pin', value)} placeholder="PIN dari mesin fingerprint" required />
               <InputField label="Nama Lengkap" value={form.full_name} onChange={(value) => onUpdate('full_name', value)} placeholder="Nama karyawan" required />
@@ -2745,7 +2752,7 @@ function EmployeeFormModal({
               <SelectField label="Gender" value={form.gender} onChange={(value) => onUpdate('gender', value)} options={[{ label: 'Semua / Tidak diset', value: 'all' }, { label: 'Laki-laki', value: 'male' }, { label: 'Perempuan', value: 'female' }]} />
             </FormSection>
 
-            <FormSection title="Homebase Utama & Status" description="Departemen dan jabatan utama dipakai untuk identitas HR, absensi, cuti, dan pelaporan utama." icon={<Building2 size={18} />}>
+            <FormSection title="Homebase Utama & Status" description="Departemen, jabatan, dan atasan" icon={<Building2 size={18} />} openByDefault>
               <OrganizationOptionField
                 label="Departemen Utama"
                 value={form.department}
@@ -2780,18 +2787,18 @@ function EmployeeFormModal({
               onDelete={onDeleteAssignment}
             />
 
-            <FormSection title="Data Pribadi Tersinkron" description="Data ini dapat diperbarui oleh employee dari Employee Settings, dan juga dapat dikoreksi oleh HR." icon={<HeartHandshake size={18} />}>
+            <FormSection title="Data Pribadi Tersinkron" description="Kontak dan alamat tambahan" icon={<HeartHandshake size={18} />}>
               <InputField label="No. HP Pribadi" value={form.personal_phone} onChange={(value) => onUpdate('personal_phone', value)} placeholder="No. HP pribadi" />
               <InputField label="Nama Kontak Darurat" value={form.emergency_contact_name} onChange={(value) => onUpdate('emergency_contact_name', value)} placeholder="Nama keluarga / wali" />
               <InputField label="No. Kontak Darurat" value={form.emergency_contact_phone} onChange={(value) => onUpdate('emergency_contact_phone', value)} placeholder="No. kontak darurat" />
               <TextareaField label="Alamat Domisili" value={form.address} onChange={(value) => onUpdate('address', value)} placeholder="Alamat domisili karyawan" />
             </FormSection>
 
-            <FormSection title="Saldo & Status Data" description="Saldo cuti dan postpone dikelola melalui lifecycle agar tidak terjadi double count. Saldo PHL dikelola melalui ledger bertanggal." icon={<WalletCards size={18} />}>
+            <FormSection title="Saldo & Status Data" description="Ringkasan cuti, PHL, dan status karyawan" icon={<WalletCards size={18} />}>
               <ReadOnlyBalanceField
                 label="Saldo Cuti Aktif"
                 value={`${Number(leaveBalanceSummary?.annual_total_available_days ?? form.annual_leave_balance ?? 0)} hari`}
-                description="Tidak diedit dari profil karyawan. Gunakan Administrasi Cuti/Postpone atau Hutang Cuti agar histori dan lifecycle tetap konsisten."
+                description="Saldo efektif dari lifecycle cuti."
               />
               <ReadOnlyBalanceField
                 label="Saldo PHL Aktif"
@@ -2800,11 +2807,21 @@ function EmployeeFormModal({
                     ? 'Memuat...'
                     : `${Number(phlBalanceDetail?.active_balance ?? form.phl_balance ?? 0)} hari`
                 }
-                description="Tidak dapat diedit langsung. Gunakan Penyesuaian Saldo PHL agar tanggal dan audit tersimpan."
+                description="Dikelola melalui jurnal PHL."
               />
               <SelectField label="Status Data" value={form.is_active ? 'active' : 'inactive'} onChange={(value) => onUpdate('is_active', value === 'active')} options={[{ label: 'Active', value: 'active' }, { label: 'Inactive', value: 'inactive' }]} />
             </FormSection>
 
+            <AnnualLeaveCorrection
+              key={editingEmployeeId || 'new'}
+              employeeId={editingEmployeeId}
+              summary={leaveBalanceSummary}
+              onSaved={onLeaveCorrected}
+            />
+
+            <details className="harmony-hr-form-disclosure">
+              <summary className="harmony-hr-form-summary"><span className="harmony-hr-form-icon"><CalendarClock size={18}/></span><span className="flex-1"><strong>Hutang Cuti</strong><small>Kelola catatan hutang cuti (opsional)</small></span><span className="harmony-hr-disclosure-indicator">Buka</span></summary>
+              <div className="harmony-hr-form-body">
             <AnnualLeaveDebtSection
               editingEmployeeId={editingEmployeeId}
               detail={annualLeaveDebtDetail}
@@ -2815,6 +2832,12 @@ function EmployeeFormModal({
               onAdjust={onAnnualLeaveDebtAdjust}
             />
 
+              </div>
+            </details>
+
+            <details className="harmony-hr-form-disclosure">
+              <summary className="harmony-hr-form-summary"><span className="harmony-hr-form-icon"><History size={18}/></span><span className="flex-1"><strong>Postpone Cuti</strong><small>Riwayat dan pengaturan masa berlaku</small></span><span className="harmony-hr-disclosure-indicator">Buka</span></summary>
+              <div className="harmony-hr-form-body">
             <PostponeAdjustmentSection
               editingEmployeeId={editingEmployeeId}
               summary={leaveBalanceSummary}
@@ -2827,6 +2850,11 @@ function EmployeeFormModal({
               onAdjust={onPostponeAdjust}
             />
 
+              </div>
+            </details>
+            <details className="harmony-hr-form-disclosure">
+              <summary className="harmony-hr-form-summary"><span className="harmony-hr-form-icon"><WalletCards size={18}/></span><span className="flex-1"><strong>Penyesuaian PHL</strong><small>Koreksi PHL dan bukti pendukung</small></span><span className="harmony-hr-disclosure-indicator">Buka</span></summary>
+              <div className="harmony-hr-form-body">
             <PHLBalanceAdjustmentSection
               editingEmployeeId={editingEmployeeId}
               detail={phlBalanceDetail}
@@ -2839,6 +2867,8 @@ function EmployeeFormModal({
               onFilesChange={onPHLAdjustmentFilesChange}
               onAdjust={onPHLAdjust}
             />
+              </div>
+            </details>
           </div>
 
           <div className="flex flex-col gap-3 border-t border-black/5 p-6 md:flex-row md:justify-end">
@@ -3855,18 +3885,16 @@ function ProfileUpdateCard({ log }: { log: ProfileUpdateLog }) {
   )
 }
 
-function FormSection({ title, description, icon, children }: { title: string; description: string; icon: ReactNode; children: ReactNode }) {
+function FormSection({ title, description, icon, children, openByDefault = false }: { title: string; description: string; icon: ReactNode; children: ReactNode; openByDefault?: boolean }) {
   return (
-    <div className="rounded-[26px] border border-black/5 bg-white/60 p-5 shadow-sm">
-      <div className="mb-5 flex items-start gap-3">
-        <div className="rounded-2xl bg-[#e8f2ff] p-3 text-[#007aff]">{icon}</div>
-        <div className="min-w-0">
-          <h3 className="font-semibold text-[#1d1d1f]">{title}</h3>
-          <p className="mt-1 text-sm leading-6 text-[#6e6e73]">{description}</p>
-        </div>
-      </div>
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{children}</div>
-    </div>
+    <details className="harmony-hr-form-disclosure" open={openByDefault}>
+      <summary className="harmony-hr-form-summary">
+        <span className="harmony-hr-form-icon">{icon}</span>
+        <span className="min-w-0 flex-1"><strong>{title}</strong><small>{description}</small></span>
+        <span className="harmony-hr-disclosure-indicator">Buka</span>
+      </summary>
+      <div className="harmony-hr-form-body grid gap-4 md:grid-cols-2 xl:grid-cols-3">{children}</div>
+    </details>
   )
 }
 

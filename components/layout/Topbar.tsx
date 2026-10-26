@@ -189,6 +189,12 @@ export function Topbar({
   }, [])
 
   useEffect(() => {
+    const closeOtherPopover = () => setIsOpen(false)
+    window.addEventListener('harmony:close-popovers', closeOtherPopover)
+    return () => window.removeEventListener('harmony:close-popovers', closeOtherPopover)
+  }, [])
+
+  useEffect(() => {
     if (!isOpen) return
 
     updatePopoverPosition()
@@ -376,7 +382,10 @@ export function Topbar({
 
   async function handleToggleNotification() {
     const nextOpen = !isOpen
-    if (nextOpen) updatePopoverPosition()
+    if (nextOpen) {
+      window.dispatchEvent(new Event('harmony:close-popovers'))
+      updatePopoverPosition()
+    }
     setIsOpen(nextOpen)
 
     if (nextOpen) {
