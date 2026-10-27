@@ -1,6 +1,6 @@
 {
   "name": "harmony",
-  "version": "3.8.2",
+  "version": "3.8.3",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -14,7 +14,8 @@
     "test:avatar": "node scripts/test-avatar-profile-ui.mjs",
     "test:motion": "node scripts/test-motion-design.mjs",
     "test:modal": "node scripts/test-leave-modal-portal.mjs",
-    "test:hr-modal": "node scripts/test-hr-employee-modal.mjs"
+    "test:hr-modal": "node scripts/test-hr-employee-modal.mjs",
+    "test:login-motion": "node scripts/test-login-motion.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.107.0",

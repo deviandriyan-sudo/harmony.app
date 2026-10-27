@@ -4294,3 +4294,227 @@ body > .harmony-leave-request-modal .harmony-leave-submit:focus-visible {outline
 @media (prefers-reduced-motion:reduce) {
  .harmony-employee-leave-page .harmony-leave-hero-action:hover {transform:none;}
 }
+
+/* HARMONY V3.8.3 — Unfolding Liquid Glass Login
+   Login-only visual system. No changes to authentication or workspace CSS. */
+.harmony-login-v383 {
+  --login-ink: #eef9ff;
+  --login-muted: #99b2cd;
+  --login-cyan: #49c9ff;
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  min-height: 100vh;
+  min-height: 100dvh;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  padding: 34px 22px;
+  color: var(--login-ink);
+  background:
+    radial-gradient(ellipse at 68% 12%, rgba(0,139,217,.24), transparent 33%),
+    radial-gradient(ellipse at 6% 94%, rgba(20,82,168,.34), transparent 34%),
+    linear-gradient(131deg,#020913 0%,#061629 41%,#020b17 100%);
+}
+.harmony-login-background-lines {
+  position: absolute;
+  z-index: -1;
+  inset: -20%;
+  pointer-events: none;
+  opacity: .62;
+  background:
+    repeating-linear-gradient(146deg,transparent 0,transparent 95px,rgba(96,170,224,.065) 96px,transparent 98px,transparent 158px),
+    linear-gradient(155deg, transparent 0 18%,rgba(19,147,225,.18) 18.1%,transparent 19.8%,transparent 48%,rgba(66,157,251,.11) 48.2%,transparent 51%);
+  transform: rotate(-4deg) scale(1.15);
+}
+.harmony-login-atmosphere {position:absolute;z-index:-1;pointer-events:none;border-radius:50%;filter:blur(100px)}
+.harmony-login-atmosphere--one {width:440px;height:360px;top:-170px;right:5%;background:rgba(0,151,220,.24)}
+.harmony-login-atmosphere--two {width:520px;height:350px;bottom:-230px;left:2%;background:rgba(28,73,181,.34)}
+.harmony-login-stage {width:min(1110px,100%);perspective:1800px}
+.harmony-login-shell {
+  position:relative;
+  isolation:isolate;
+  display:grid;
+  grid-template-columns:minmax(0,1.01fr) minmax(0,.99fr);
+  min-height:640px;
+  overflow:hidden;
+  border:1px solid rgba(178,223,255,.37);
+  border-radius:34px;
+  background:rgba(6,25,45,.77);
+  box-shadow:0 1px 0 rgba(242,253,255,.26) inset,0 0 0 1px rgba(77,156,219,.13),0 32px 115px rgba(0,4,15,.66),0 0 75px rgba(5,133,218,.13);
+  animation:harmony-login-shell-arrive .78s cubic-bezier(.18,.75,.21,1) both;
+}
+.harmony-login-shell::before {content:"";position:absolute;inset:1px;z-index:4;border-radius:inherit;pointer-events:none;border:1px solid rgba(225,248,255,.10)}
+.harmony-login-shell-glint {position:absolute;z-index:5;top:0;left:0;right:0;height:1px;pointer-events:none;background:linear-gradient(90deg,transparent 2%,rgba(220,247,255,.7) 30%,#42bfff 57%,rgba(189,236,255,.44) 83%,transparent)}
+.harmony-login-brand, .harmony-login-form-panel {min-width:0;position:relative;overflow:hidden}
+.harmony-login-brand {
+  background:
+    radial-gradient(circle at 53% 39%,rgba(25,133,201,.25),transparent 38%),
+    radial-gradient(circle at 0 98%,rgba(32,92,173,.27),transparent 43%),
+    linear-gradient(157deg,rgba(15,56,93,.90),rgba(4,24,46,.97) 52%,rgba(5,37,69,.96));
+  border-right:1px solid rgba(172,222,255,.2);
+}
+.harmony-login-brand::before {content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(123deg,rgba(225,246,255,.13),transparent 25%,transparent 74%,rgba(42,196,255,.05));}
+.harmony-login-brand-rings {
+  position:absolute;top:49%;left:50%;width:400px;height:400px;transform:translate(-50%,-50%) rotate(-20deg);
+  border:1px solid rgba(85,181,248,.14);border-radius:50%;box-shadow:0 0 0 54px rgba(40,138,220,.025),0 0 0 110px rgba(109,178,251,.025);
+  pointer-events:none;
+}
+.harmony-login-brand-rings::before {content:"";position:absolute;inset:65px;border-radius:50%;border:1px dashed rgba(88,184,242,.22)}
+.harmony-login-brand-rings::after {content:"";position:absolute;inset:-80px;border:1px solid rgba(76,168,239,.10);border-radius:50%}
+.harmony-login-brand-content {position:relative;display:flex;flex-direction:column;justify-content:space-between;min-height:100%;gap:26px;padding:34px}
+.harmony-login-eyebrow,.harmony-login-secure {display:inline-flex;align-items:center;gap:8px;width:max-content;max-width:100%;border:1px solid rgba(148,209,252,.28);border-radius:999px;background:rgba(151,211,255,.085);box-shadow:0 1px 0 rgba(255,255,255,.12) inset;color:#bde6ff;padding:9px 13px;font-size:10px;letter-spacing:.115em;font-weight:750}
+.harmony-login-eyebrow svg {color:#55c5ff}
+.harmony-login-brand-center {display:flex;flex-direction:column;align-items:center;text-align:center;margin:auto 0}
+.harmony-login-logo-plate {
+  position:relative;display:flex;align-items:center;justify-content:center;width:136px;height:136px;margin-bottom:24px;
+  border:1px solid rgba(211,239,255,.42);border-radius:31px;
+  background:linear-gradient(138deg,rgba(233,248,255,.95),rgba(171,219,253,.75));
+  box-shadow:0 1px 2px #fff inset,0 0 0 9px rgba(133,196,240,.055),0 16px 50px rgba(0,1,18,.42),0 0 60px rgba(24,155,236,.13);
+  transform:rotate(-4deg);
+}
+.harmony-login-logo-plate::after {content:"";position:absolute;inset:1px;border-radius:29px;pointer-events:none;background:linear-gradient(135deg,rgba(255,255,255,.55),transparent 42%)}
+.harmony-login-logo {object-fit:contain;width:105px;height:auto;transform:rotate(4deg)}
+.harmony-login-brand-kicker {font-size:10px;font-weight:700;letter-spacing:.31em;color:#83bddf}
+.harmony-login-brand-center h1 {font-size:clamp(35px,4.1vw,56px);line-height:1.17;font-weight:800;letter-spacing:.145em;color:#f8fcff;text-shadow:0 7px 34px rgba(34,173,237,.15)}
+.harmony-login-brand-center h1 span {color:var(--login-cyan)}
+.harmony-login-brand-description {max-width:355px;margin-top:11px;color:#a1bdd4;font-size:13px;line-height:1.85}
+.harmony-login-brand-rule {display:flex;align-items:center;gap:10px;margin-top:23px}
+.harmony-login-brand-rule i {width:48px;height:1px;background:linear-gradient(90deg,transparent,#58c2f7)}
+.harmony-login-brand-rule i:last-child {transform:rotate(180deg)}
+.harmony-login-brand-rule span {width:6px;height:6px;border:1px solid #74d8ff;transform:rotate(45deg)}
+.harmony-login-brand-features {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px}
+.harmony-login-feature {display:flex;gap:9px;align-items:center;min-width:0;border:1px solid rgba(130,203,253,.19);border-radius:13px;padding:11px 9px;background:rgba(136,205,250,.058);box-shadow:0 1px 0 rgba(255,255,255,.08) inset;transition:background-color .18s ease,transform .18s ease}
+.harmony-login-feature:hover {background:rgba(118,204,255,.11);transform:translateY(-2px)}
+.harmony-login-feature-icon {display:flex;align-items:center;justify-content:center;flex-shrink:0;width:30px;height:30px;color:#79d6ff;border-radius:9px;background:rgba(67,167,240,.13)}
+.harmony-login-feature-copy {display:flex;flex-direction:column;min-width:0;gap:3px}
+.harmony-login-feature strong {font-size:10px;line-height:1.3;font-weight:700;color:#e9f7ff}
+.harmony-login-feature small {font-size:9px;line-height:1.35;color:#8faac4}
+.harmony-login-form-panel {
+  background:
+    radial-gradient(ellipse at 100% 0%,rgba(20,139,206,.15),transparent 43%),
+    linear-gradient(153deg,rgba(13,35,56,.93),rgba(4,16,30,.97));
+  backdrop-filter:blur(20px) saturate(136%);
+  -webkit-backdrop-filter:blur(20px) saturate(136%);
+}
+.harmony-login-form-panel::before {content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(130deg,rgba(207,248,255,.12),transparent 31%)}
+.harmony-login-panel-glow {position:absolute;top:-160px;right:-140px;width:390px;height:390px;border-radius:50%;background:rgba(30,142,222,.11);filter:blur(75px);pointer-events:none}
+.harmony-login-panel-corner {position:absolute;z-index:1;width:72px;height:72px;border:1px solid rgba(176,227,255,.31);border-radius:16px;pointer-events:none;transform:rotate(43deg);background:linear-gradient(140deg,rgba(181,226,255,.14),rgba(12,54,96,.08));box-shadow:0 1px 0 rgba(255,255,255,.1) inset}
+.harmony-login-panel-corner--top {top:-42px;right:-39px}
+.harmony-login-panel-corner--bottom {bottom:-44px;left:-39px}
+.harmony-login-form-inner {position:relative;z-index:2;display:flex;flex-direction:column;justify-content:center;width:min(100%,438px);min-height:100%;margin:0 auto;padding:50px 38px 34px}
+.harmony-login-secure {font-size:10px;letter-spacing:.10em;padding:8px 12px}
+.harmony-login-secure-dot {display:inline-block;width:6px;height:6px;border-radius:50%;background:#5ce4d2;box-shadow:0 0 10px rgba(92,228,210,.35)}
+.harmony-login-overline {margin-top:27px;color:#74a4c5;font-size:10px;font-weight:700;letter-spacing:.22em}
+.harmony-login-intro h2 {margin-top:7px;font-size:clamp(31px,3.3vw,43px);font-weight:750;line-height:1.19;letter-spacing:-.045em;color:#f1f9ff}
+.harmony-login-intro h2 span {color:#6bd5ff}
+.harmony-login-subtitle {margin-top:12px;font-size:13px;color:#a0b6cb;line-height:1.65}
+.harmony-login-notice {position:relative;border-radius:13px;margin-top:18px;padding:11px 13px;font-size:12px;line-height:1.6;border:1px solid}
+.harmony-login-notice--warning {background:rgba(182,119,11,.16);border-color:rgba(255,188,76,.38);color:#ffddaa}
+.harmony-login-notice--error {background:rgba(175,42,62,.16);border-color:rgba(255,113,139,.4);color:#ffc6d1}
+.harmony-login-notice--info {background:rgba(53,134,229,.15);border-color:rgba(104,196,255,.38);color:#caeaff}
+.harmony-login-form {display:grid;gap:17px;margin-top:29px}
+.harmony-login-field-group {min-width:0}
+.harmony-login-field-group>label {display:block;margin-bottom:9px;font-size:12px;font-weight:650;color:#d6e9fa}
+.harmony-login-field {display:flex;align-items:center;gap:11px;min-height:51px;border:1px solid rgba(127,179,221,.22);border-radius:12px;background:rgba(185,218,251,.075);box-shadow:0 1px 0 rgba(255,255,255,.055) inset,0 8px 22px rgba(0,0,0,.055);padding:0 14px;transition:border-color .2s ease,background-color .2s ease,box-shadow .2s ease}
+.harmony-login-field:hover {border-color:rgba(139,216,255,.38);background:rgba(181,218,255,.095)}
+.harmony-login-field:focus-within {border-color:#62c8fc;background:rgba(114,194,241,.11);box-shadow:0 0 0 3px rgba(62,180,249,.15),0 1px 0 rgba(255,255,255,.12) inset}
+.harmony-login-field-icon {display:flex;align-items:center;color:#81a9c4;flex-shrink:0}
+.harmony-login-field:focus-within .harmony-login-field-icon {color:#78dbff}
+.harmony-login-field input {display:block;min-width:0;width:100%;height:49px;border:0;background:transparent!important;box-shadow:none!important;padding:0;outline:none;color:#f4fbff!important;font-size:13px;line-height:1.5;caret-color:#72d9ff}
+.harmony-login-field input::placeholder {color:#728ba5;opacity:1}
+.harmony-login-field input:-webkit-autofill {-webkit-text-fill-color:#f4fbff;box-shadow:0 0 0 100px #112a41 inset!important;transition:background-color 9999s ease-out}
+.harmony-login-toggle-password {display:flex;flex-shrink:0;align-items:center;justify-content:center;width:32px;height:32px;border-radius:8px;color:#96b2c8;transition:background-color .17s ease,color .17s ease}
+.harmony-login-toggle-password:hover {background:rgba(138,213,255,.11);color:#d5f2ff}
+.harmony-login-form-options {display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:-3px}
+.harmony-login-form-options span {display:inline-flex;align-items:center;gap:5px;font-size:10px;color:#7198b5}
+.harmony-login-form-options button {font-size:11px;font-weight:650;color:#87d5ff;text-decoration:underline;text-decoration-color:transparent;text-underline-offset:3px;transition:color .18s ease,text-decoration-color .18s ease}
+.harmony-login-form-options button:hover {color:#c2eeff;text-decoration-color:currentColor}
+.harmony-login-submit {position:relative;display:flex;align-items:center;justify-content:center;gap:10px;min-height:51px;margin-top:2px;overflow:hidden;border:1px solid rgba(155,227,255,.72);border-radius:11px;background:linear-gradient(110deg,#32b6f5,#1683e8 58%,#2074db);box-shadow:0 1px 0 rgba(242,254,255,.56) inset,0 7px 28px rgba(17,145,244,.33),0 0 18px rgba(24,137,223,.16);color:#f9fdff;font-size:14px;font-weight:800;transition:transform .2s ease,box-shadow .2s ease,filter .2s ease}
+.harmony-login-submit::before {content:"";position:absolute;top:-140%;left:-60%;width:34%;height:380%;pointer-events:none;transform:rotate(28deg);background:linear-gradient(90deg,transparent,rgba(255,255,255,.24),transparent);transition:left .56s ease}
+.harmony-login-submit:hover:not(:disabled) {transform:translateY(-2px);box-shadow:0 1px 0 rgba(242,254,255,.62) inset,0 12px 36px rgba(17,145,244,.43);filter:brightness(1.09)}
+.harmony-login-submit:hover:not(:disabled)::before {left:130%}
+.harmony-login-submit:active:not(:disabled) {transform:translateY(0) scale(.993)}
+.harmony-login-submit:disabled,.harmony-login-google:disabled {opacity:.63;cursor:not-allowed}
+.harmony-login-alternative {margin-top:25px}
+.harmony-login-divider {display:flex;align-items:center;gap:12px;margin-bottom:17px;color:#7894aa;font-size:9px;font-weight:750;letter-spacing:.13em;white-space:nowrap}
+.harmony-login-divider::before,.harmony-login-divider::after {content:"";flex:1;height:1px;background:linear-gradient(90deg,transparent,rgba(142,187,223,.21))}
+.harmony-login-divider::after {transform:rotate(180deg)}
+.harmony-login-google {display:flex;align-items:center;justify-content:center;gap:10px;width:100%;min-height:48px;border:1px solid rgba(148,208,246,.24);border-radius:11px;background:rgba(176,214,248,.065);color:#edf8ff;font-size:13px;font-weight:650;box-shadow:0 1px 0 rgba(255,255,255,.06) inset;transition:background-color .2s ease,border-color .2s ease,transform .2s ease}
+.harmony-login-google:hover:not(:disabled) {background:rgba(119,197,253,.13);border-color:rgba(139,217,255,.48);transform:translateY(-1px)}
+.harmony-login-footer {display:flex;flex-direction:column;align-items:center;gap:7px;margin-top:31px;color:#6f8ba5;text-align:center;font-size:10px;line-height:1.6}
+.harmony-login-footer div {display:flex;align-items:center;justify-content:center;gap:6px}
+.harmony-login-footer>span {font-size:9px;letter-spacing:.07em;color:#6785a1}
+.harmony-login-v383 button:focus-visible {outline:2px solid #74d8ff;outline-offset:3px}
+.harmony-login-shutter {position:absolute;z-index:9;top:0;bottom:0;width:50.08%;pointer-events:none;backface-visibility:hidden;border:1px solid rgba(168,222,255,.28);background:linear-gradient(143deg,rgba(77,159,220,.38),rgba(8,36,67,.97) 45%,rgba(4,21,41,.93));box-shadow:0 0 40px rgba(9,143,221,.23) inset;transform-origin:center;animation-duration:1.18s;animation-delay:.11s;animation-timing-function:cubic-bezier(.56,.08,.23,1);animation-fill-mode:both}
+.harmony-login-shutter--left {left:0;border-radius:33px 0 0 33px;border-right:1px solid rgba(135,219,255,.65);transform-origin:left center;animation-name:harmony-login-open-left}
+.harmony-login-shutter--right {right:0;border-radius:0 33px 33px 0;border-left:1px solid rgba(135,219,255,.65);transform-origin:right center;animation-name:harmony-login-open-right}
+.harmony-login-shutter--left::after,.harmony-login-shutter--right::after {content:"";position:absolute;top:7%;bottom:7%;width:2px;filter:blur(1px);background:linear-gradient(transparent,rgba(114,224,255,.87),transparent);box-shadow:0 0 20px rgba(74,199,255,.85)}
+.harmony-login-shutter--left::after {right:0}
+.harmony-login-shutter--right::after {left:0}
+.harmony-login-reveal {animation:harmony-login-rise .74s cubic-bezier(.21,.75,.18,1) both}
+.harmony-login-reveal--1 {animation-delay:.40s}
+.harmony-login-reveal--2 {animation-delay:.54s}
+.harmony-login-reveal--3 {animation-delay:.70s}
+.harmony-login-reveal--4 {animation-delay:.83s}
+.harmony-login-checking-card {display:flex;align-items:center;gap:12px;border:1px solid rgba(169,221,255,.28);border-radius:16px;background:rgba(47,94,136,.16);padding:18px 22px;color:#cceeff;box-shadow:0 20px 65px rgba(1,14,33,.37);font-size:13px}
+.harmony-login-checking-card svg {color:#6fd7ff}
+@keyframes harmony-login-shell-arrive {from {opacity:0;transform:translateY(22px) scale(.966)}to {opacity:1;transform:translateY(0) scale(1)}}
+@keyframes harmony-login-open-left {0%,14% {opacity:1;transform:translateX(0) rotateY(0)}75% {opacity:.8}100% {opacity:0;transform:translateX(-112%) rotateY(-26deg)}}
+@keyframes harmony-login-open-right {0%,14% {opacity:1;transform:translateX(0) rotateY(0)}75% {opacity:.8}100% {opacity:0;transform:translateX(112%) rotateY(26deg)}}
+@keyframes harmony-login-rise {from {opacity:0;transform:translateY(16px)}to {opacity:1;transform:translateY(0)}}
+@media (max-width:1050px) {
+  .harmony-login-stage {width:min(920px,100%)}
+  .harmony-login-brand-content {padding:27px}
+  .harmony-login-form-inner {padding:48px 31px 35px}
+  .harmony-login-brand-features {grid-template-columns:1fr}
+  .harmony-login-feature {padding:8px 10px}
+}
+@media (max-width:760px) {
+  .harmony-login-v383 {align-items:flex-start;padding:16px 12px 30px}
+  .harmony-login-stage {max-width:510px}
+  .harmony-login-shell {grid-template-columns:1fr;min-height:0;border-radius:25px}
+  .harmony-login-brand {border-right:none;border-bottom:1px solid rgba(172,222,255,.2)}
+  .harmony-login-brand-content {gap:14px;padding:20px 24px 22px}
+  .harmony-login-brand-center {flex-direction:row;flex-wrap:wrap;justify-content:center;column-gap:20px;row-gap:3px;margin:4px 0 0;text-align:left}
+  .harmony-login-logo-plate {flex:0 0 68px;width:68px;height:68px;border-radius:17px;margin:0}
+  .harmony-login-logo-plate::after {border-radius:16px}
+  .harmony-login-logo {width:55px}
+  .harmony-login-brand-kicker {align-self:flex-end;width:calc(100% - 95px);max-width:230px;margin-left:0;font-size:8px}
+  .harmony-login-brand-center h1 {width:calc(100% - 96px);margin-left:0;line-height:1.1;font-size:clamp(24px,7vw,36px)}
+  .harmony-login-brand-description,.harmony-login-brand-rule,.harmony-login-brand-features,.harmony-login-brand-rings {display:none}
+  .harmony-login-form-inner {min-height:0;padding:26px 25px 28px}
+  .harmony-login-overline {margin-top:19px}
+  .harmony-login-intro h2 {font-size:35px}
+  .harmony-login-shutter--left {border-radius:24px 0 0 24px}
+  .harmony-login-shutter--right {border-radius:0 24px 24px 0}
+}
+@media (max-width:380px) {
+  .harmony-login-brand-content {padding:17px}
+  .harmony-login-form-inner {padding:24px 18px 25px}
+  .harmony-login-brand-center {gap:12px}
+  .harmony-login-brand-center h1 {font-size:25px}
+  .harmony-login-field {padding:0 11px}
+}
+@media (prefers-reduced-motion:reduce) {
+  .harmony-login-v383 .harmony-login-shell,.harmony-login-v383 .harmony-login-reveal {animation:none!important;opacity:1!important;transform:none!important}
+  .harmony-login-v383 .harmony-login-shutter {display:none!important}
+  .harmony-login-v383 .harmony-login-submit,.harmony-login-v383 .harmony-login-google,.harmony-login-v383 .harmony-login-feature {transition:none!important;transform:none!important}
+}
+@media (prefers-reduced-transparency:reduce) {
+  .harmony-login-v383 .harmony-login-form-panel {background:#0b2137!important;backdrop-filter:none;-webkit-backdrop-filter:none}
+  .harmony-login-v383 .harmony-login-brand {background:#0c3153!important}
+  .harmony-login-v383 .harmony-login-field {background:#193349}
+}
+
+/* Small-screen logo/title align on one row; prevent iOS focus zoom. */
+@media (max-width:760px) {
+  .harmony-login-v383 .harmony-login-brand-center {
+    display:grid;grid-template-columns:68px minmax(0,1fr);grid-template-rows:24px 44px;
+    align-items:center;justify-content:start;column-gap:14px;row-gap:0;text-align:left;
+  }
+  .harmony-login-v383 .harmony-login-logo-plate {grid-row:1 / span 2;grid-column:1}
+  .harmony-login-v383 .harmony-login-brand-kicker {grid-column:2;grid-row:1;width:auto;align-self:end}
+  .harmony-login-v383 .harmony-login-brand-center h1 {grid-column:2;grid-row:2;width:auto;font-size:clamp(23px,7vw,34px);margin:0;align-self:start}
+  .harmony-login-v383 .harmony-login-field input {font-size:16px}
+}

@@ -190,150 +190,163 @@ export default function LoginPage() {
 
   if (checkingSession) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-[#eef4fb]">
-        <Loader2 className="animate-spin text-[#1d5fd0]" size={28} />
+      <main className="harmony-login-v383 harmony-login-checking" aria-label="Memeriksa sesi HARMONY">
+        <div className="harmony-login-checking-card" role="status">
+          <Loader2 size={26} className="animate-spin" aria-hidden="true" />
+          <span>Memeriksa sesi aman...</span>
+        </div>
       </main>
     )
   }
 
   return (
-    <main className="harmony-reference-login-bg relative min-h-screen overflow-hidden px-4 py-5 text-[#101828] sm:px-6 sm:py-7 lg:px-8 lg:py-10">
-      <div className="harmony-reference-orb harmony-reference-orb-one" />
-      <div className="harmony-reference-orb harmony-reference-orb-two" />
-      <div className="harmony-reference-orb harmony-reference-orb-three" />
+    <main className="harmony-login-v383">
+      <div className="harmony-login-background-lines" aria-hidden="true" />
+      <div className="harmony-login-atmosphere harmony-login-atmosphere--one" aria-hidden="true" />
+      <div className="harmony-login-atmosphere harmony-login-atmosphere--two" aria-hidden="true" />
 
-      <section className="relative mx-auto flex min-h-[calc(100vh-40px)] w-full max-w-[1180px] items-center justify-center sm:min-h-[calc(100vh-56px)] lg:min-h-[calc(100vh-80px)]">
-        <div className="harmony-reference-shell grid w-full overflow-hidden rounded-[34px] border lg:grid-cols-2 lg:rounded-[38px]">
-          <section className="harmony-reference-brand relative overflow-hidden px-5 py-6 text-white sm:px-7 sm:py-7 lg:min-h-[700px] lg:px-8 lg:py-8">
-            <div className="harmony-reference-brand-glow harmony-reference-brand-glow-one" />
-            <div className="harmony-reference-brand-glow harmony-reference-brand-glow-two" />
+      <div className="harmony-login-stage">
+        <div className="harmony-login-shell">
+          <div className="harmony-login-shell-glint" aria-hidden="true" />
 
-            <div className="relative flex h-full flex-col gap-5 lg:justify-between">
-              <div>
-                <div className="harmony-reference-chip inline-flex items-center gap-2 rounded-full border px-4 py-2 text-xs font-semibold text-white/86">
-                  <Sparkles size={14} /> Integrated HR Platform
-                </div>
-
-                <div className="harmony-reference-brand-card mt-6 flex flex-col items-center rounded-[32px] border px-6 py-7 text-center sm:px-8 sm:py-8 lg:mt-7 lg:min-h-[376px] lg:justify-center">
-                  <h1 className="text-[28px] font-semibold tracking-[0.24em] text-white sm:text-[34px]">HARMONY</h1>
-                  <p className="mt-3 max-w-[420px] text-[14px] leading-6 text-white/68 sm:text-[15px]">
-                    Human Resources Attendance, Requests &amp;<br className="hidden sm:block" /> Medical Operations System
-                  </p>
-
-                  <div className="harmony-reference-logo-wrap mt-6 flex h-[154px] w-[154px] items-center justify-center rounded-[34px] border sm:h-[170px] sm:w-[170px] lg:h-[172px] lg:w-[172px]">
-                    <Image src="/logo.png" alt="Poltek Sinar Mas Berau" width={126} height={126} className="h-auto w-[112px] object-contain sm:w-[124px]" priority />
-                  </div>
-
-                  <div className="mt-6 flex w-full max-w-[430px] items-center gap-4 text-[13px] leading-5 text-white/64 sm:text-sm">
-                    <span className="h-px flex-1 bg-gradient-to-r from-transparent to-white/45" />
-                    <span className="max-w-[300px]">Integrated Attendance, Leave &amp; Medical Claim Management System</span>
-                    <span className="h-px flex-1 bg-gradient-to-l from-transparent to-white/45" />
-                  </div>
-                </div>
+          <section className="harmony-login-brand" aria-label="Tentang HARMONY">
+            <div className="harmony-login-brand-rings" aria-hidden="true" />
+            <div className="harmony-login-brand-content">
+              <div className="harmony-login-reveal harmony-login-reveal--1">
+                <div className="harmony-login-eyebrow"><Sparkles size={14} aria-hidden="true" /> INTEGRATED HR PLATFORM</div>
               </div>
 
-              <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
-                <Feature icon={<Fingerprint size={19} />} tone="blue" title="Attendance & Leave" text="Absensi, cuti, izin, PHL, dan approval dalam satu workspace." />
-                <Feature icon={<HeartPulse size={19} />} tone="violet" title="Re-Med" text="Medical reimbursement kini menjadi modul langsung di HARMONY." />
-                <Feature icon={<ShieldCheck size={19} />} tone="green" title="Role Access" text="Menu otomatis mengikuti akses Employee, HR, atau Finance." />
+              <div className="harmony-login-brand-center harmony-login-reveal harmony-login-reveal--2">
+                <div className="harmony-login-logo-plate">
+                  <Image src="/logo.png" alt="Logo Politeknik Sinar Mas Berau Coal" width={110} height={110} priority className="harmony-login-logo" />
+                </div>
+                <p className="harmony-login-brand-kicker">WELCOME TO</p>
+                <h1>HARMONY<span>.</span></h1>
+                <p className="harmony-login-brand-description">
+                  A smarter way to manage your people, attendance, leave, and employee services.
+                </p>
+                <div className="harmony-login-brand-rule" aria-hidden="true"><i /><span /><i /></div>
+              </div>
+
+              <div className="harmony-login-brand-features harmony-login-reveal harmony-login-reveal--3">
+                <Feature icon={<Fingerprint size={18} />} title="Attendance & Leave" text="Kehadiran dan pengajuan" />
+                <Feature icon={<HeartPulse size={18} />} title="Re-Med" text="Medical reimbursement" />
+                <Feature icon={<ShieldCheck size={18} />} title="Secure by Role" text="Akses HR, Employee, Finance" />
               </div>
             </div>
           </section>
 
-          <section className="harmony-reference-form-panel relative px-5 py-8 sm:px-8 sm:py-10 lg:min-h-[700px] lg:px-12 lg:py-12">
-            <div className="harmony-reference-form-glow harmony-reference-form-glow-one" />
-            <div className="harmony-reference-form-glow harmony-reference-form-glow-two" />
+          <section className="harmony-login-form-panel" aria-label="Login akun HARMONY">
+            <div className="harmony-login-panel-glow" aria-hidden="true" />
+            <div className="harmony-login-panel-corner harmony-login-panel-corner--top" aria-hidden="true" />
+            <div className="harmony-login-panel-corner harmony-login-panel-corner--bottom" aria-hidden="true" />
 
-            <div className="relative mx-auto flex h-full max-w-[480px] flex-col justify-center">
-              <div className="mb-7">
-                <div className="harmony-reference-secure inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-bold text-[#0876db]">
-                  <Lock size={13} /> Secure Login
-                </div>
-                <h2 className="mt-5 text-[34px] font-semibold tracking-[-0.035em] text-[#101828] sm:text-[40px]">Masuk ke HARMONY</h2>
-              </div>
+            <div className="harmony-login-form-inner">
+              <header className="harmony-login-intro harmony-login-reveal harmony-login-reveal--2">
+                <span className="harmony-login-secure"><Lock size={13} aria-hidden="true" /> SECURE LOGIN <span className="harmony-login-secure-dot" /></span>
+                <p className="harmony-login-overline">YOUR WORKSPACE AWAITS</p>
+                <h2>Welcome <span>Back.</span></h2>
+                <p className="harmony-login-subtitle">Masuk untuk mengakses workspace HARMONY Anda.</p>
+              </header>
 
               {!systemEnabled && (
-                <div className="mb-5 rounded-[22px] border border-amber-200/80 bg-amber-50/85 px-4 py-3 text-sm leading-6 text-amber-800">
+                <div className="harmony-login-notice harmony-login-notice--warning" role="status">
                   <strong>Maintenance aktif.</strong> {maintenanceMessage || 'Akses Employee dan Finance dihentikan sementara. HR Administrator tetap dapat masuk untuk menyelesaikan pembaruan.'}
                 </div>
               )}
 
               {message && (
-                <div className={`mb-5 rounded-[22px] border px-4 py-3 text-sm ${messageType === 'info' ? 'border-blue-100/80 bg-blue-50/75 text-blue-700' : 'border-red-100/80 bg-red-50/75 text-red-700'}`}>
+                <div className={`harmony-login-notice ${messageType === 'info' ? 'harmony-login-notice--info' : 'harmony-login-notice--error'}`} role={messageType === 'error' ? 'alert' : 'status'}>
                   {message}
                 </div>
               )}
 
-              <form onSubmit={handleLogin} className="space-y-5">
-                <Field icon={<Mail size={19} />} label="Email">
-                  <input type="email" value={email} onChange={(event) => setEmail(event.target.value)} className="min-h-13 w-full bg-transparent text-[15px] text-[#101828] outline-none placeholder:text-[#98a2b3]" autoComplete="email" />
-                </Field>
+              <form onSubmit={handleLogin} className="harmony-login-form harmony-login-reveal harmony-login-reveal--3">
+                <LoginField icon={<Mail size={19} />} label="Email Address" id="harmony-login-email">
+                  <input
+                    id="harmony-login-email"
+                    type="email"
+                    value={email}
+                    onChange={(event) => setEmail(event.target.value)}
+                    placeholder="nama@domain.com"
+                    autoComplete="email"
+                    autoCapitalize="none"
+                    spellCheck={false}
+                  />
+                </LoginField>
 
-                <Field icon={<Lock size={19} />} label="Password">
-                  <input type={showPassword ? 'text' : 'password'} value={password} onChange={(event) => setPassword(event.target.value)} className="min-h-13 w-full bg-transparent text-[15px] text-[#101828] outline-none placeholder:text-[#98a2b3]" autoComplete="current-password" />
-                  <button type="button" onClick={() => setShowPassword((current) => !current)} className="rounded-full p-1 text-[#6f7f9b] transition hover:bg-white/45" aria-label={showPassword ? 'Sembunyikan password' : 'Tampilkan password'}>
-                    {showPassword ? <EyeOff size={19} /> : <Eye size={19} />}
+                <LoginField icon={<Lock size={19} />} label="Password" id="harmony-login-password">
+                  <input
+                    id="harmony-login-password"
+                    type={showPassword ? 'text' : 'password'}
+                    value={password}
+                    onChange={(event) => setPassword(event.target.value)}
+                    placeholder="Masukkan password"
+                    autoComplete="current-password"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((current) => !current)}
+                    className="harmony-login-toggle-password"
+                    aria-label={showPassword ? 'Sembunyikan password' : 'Tampilkan password'}
+                    aria-pressed={showPassword}
+                  >
+                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                   </button>
-                </Field>
+                </LoginField>
 
-                <div className="text-right">
-                  <button type="button" onClick={handleForgotPassword} className="text-sm font-semibold text-[#0876db] transition hover:text-[#005eb8]">Lupa password?</button>
+                <div className="harmony-login-form-options">
+                  <span><ShieldCheck size={13} aria-hidden="true" /> Encrypted session</span>
+                  <button type="button" onClick={handleForgotPassword} disabled={loading || googleLoading}>Lupa password?</button>
                 </div>
 
-                <button type="submit" disabled={loading || googleLoading} className="harmony-reference-primary flex min-h-[54px] w-full items-center justify-center gap-3 rounded-full px-5 text-[15px] font-bold text-white transition disabled:opacity-60">
-                  {loading ? <Loader2 size={18} className="animate-spin" /> : <ArrowRight size={20} />}
-                  {loading ? 'Memproses...' : 'Masuk'}
+                <button type="submit" disabled={loading || googleLoading} className="harmony-login-submit">
+                  {loading ? <Loader2 size={19} className="animate-spin" aria-hidden="true" /> : null}
+                  <span>{loading ? 'Memproses...' : 'Sign In'}</span>
+                  {!loading && <ArrowRight size={19} aria-hidden="true" />}
                 </button>
               </form>
 
-              <div className="my-6 flex items-center gap-4">
-                <div className="h-px flex-1 bg-[#c9d4e3]/70" />
-                <span className="text-xs font-medium tracking-wide text-[#8492a6]">ATAU</span>
-                <div className="h-px flex-1 bg-[#c9d4e3]/70" />
+              <div className="harmony-login-alternative harmony-login-reveal harmony-login-reveal--4">
+                <div className="harmony-login-divider"><span>OR CONTINUE WITH</span></div>
+                <button type="button" onClick={handleGoogleLogin} disabled={loading || googleLoading} className="harmony-login-google">
+                  {googleLoading ? <Loader2 size={19} className="animate-spin" aria-hidden="true" /> : <GoogleIcon />}
+                  <span>{googleLoading ? 'Menghubungkan Google...' : 'Google'}</span>
+                </button>
               </div>
 
-              <button type="button" onClick={handleGoogleLogin} disabled={loading || googleLoading} className="harmony-reference-google flex min-h-[54px] w-full items-center justify-center gap-3 rounded-full border px-5 text-[15px] font-semibold text-[#101828] transition disabled:opacity-60">
-                {googleLoading ? <Loader2 size={18} className="animate-spin" /> : <GoogleIcon />}
-                {googleLoading ? 'Menghubungkan Google...' : 'Masuk dengan Google'}
-              </button>
-
-              <div className="mt-7 flex flex-col items-center justify-center gap-1.5 text-center text-xs text-[#7c8ca4]">
-                <div className="flex items-center justify-center gap-2">
-                  <UserRound size={14} />
-                  <span>© {new Date().getFullYear()} HARMONY · Poltek Sinar Mas Berau Coal</span>
-                </div>
-                <span className="text-[10px] font-semibold tracking-[0.1em] text-[#98a4b6]">Developed by Devan</span>
-              </div>
+              <footer className="harmony-login-footer harmony-login-reveal harmony-login-reveal--4">
+                <div><UserRound size={13} aria-hidden="true" /> © {new Date().getFullYear()} HARMONY · Poltek Sinar Mas Berau Coal</div>
+                <span>Developed by Devan</span>
+              </footer>
             </div>
           </section>
+
+          <div className="harmony-login-shutter harmony-login-shutter--left" aria-hidden="true" />
+          <div className="harmony-login-shutter harmony-login-shutter--right" aria-hidden="true" />
         </div>
-      </section>
+      </div>
     </main>
   )
 }
 
-function Field({ icon, label, children }: { icon: React.ReactNode; label: string; children: React.ReactNode }) {
+function LoginField({ icon, label, id, children }: { icon: React.ReactNode; label: string; id: string; children: React.ReactNode }) {
   return (
-    <label className="block">
-      <span className="text-[14px] font-semibold text-[#101828]">{label}</span>
-      <div className="harmony-reference-field mt-2 flex min-h-[56px] items-center gap-3 rounded-full border px-5 text-[#72809b]">
-        {icon}
+    <div className="harmony-login-field-group">
+      <label htmlFor={id}>{label}</label>
+      <div className="harmony-login-field">
+        <span className="harmony-login-field-icon" aria-hidden="true">{icon}</span>
         {children}
       </div>
-    </label>
+    </div>
   )
 }
 
-function Feature({ icon, tone, title, text }: { icon: React.ReactNode; tone: 'blue' | 'violet' | 'green'; title: string; text: string }) {
+function Feature({ icon, title, text }: { icon: React.ReactNode; title: string; text: string }) {
   return (
-    <div className="harmony-reference-feature rounded-[24px] border px-4 py-3.5 sm:px-5 sm:py-4">
-      <div className="flex items-center gap-3.5">
-        <div className={`harmony-reference-feature-icon harmony-reference-feature-${tone} flex h-11 w-11 shrink-0 items-center justify-center rounded-full`}>{icon}</div>
-        <div>
-          <p className="text-sm font-semibold text-white">{title}</p>
-          <p className="mt-1 text-xs leading-5 text-white/58">{text}</p>
-        </div>
-      </div>
+    <div className="harmony-login-feature">
+      <span className="harmony-login-feature-icon" aria-hidden="true">{icon}</span>
+      <span className="harmony-login-feature-copy"><strong>{title}</strong><small>{text}</small></span>
     </div>
   )
 }
