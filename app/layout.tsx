@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { Geist, Geist_Mono } from 'next/font/google'
 import './globals.css'
 import { SystemMaintenanceGate } from '@/components/system/SystemMaintenanceGate'
+import { HarmonyThemeProvider } from '@/components/theme/ThemeProvider'
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -31,7 +32,7 @@ export default function RootLayout({
       lang="id"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col"><SystemMaintenanceGate>{children}</SystemMaintenanceGate></body>
+      <body className="min-h-full flex flex-col"><HarmonyThemeProvider><SystemMaintenanceGate>{children}</SystemMaintenanceGate></HarmonyThemeProvider></body>
     </html>
   )
 }

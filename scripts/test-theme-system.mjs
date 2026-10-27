@@ -1,0 +1,27 @@
+import assert from 'node:assert/strict'
+import { readFileSync, existsSync } from 'node:fs'
+const read = (file) => readFileSync(file,'utf8')
+const login = read('app/login/page.tsx')
+const layout = read('app/layout.tsx')
+const css = read('app/globals.css')
+const sidebar = read('components/layout/AppSidebar.tsx')
+const provider = read('components/theme/ThemeProvider.tsx')
+const toggle = read('components/theme/ThemeToggle.tsx')
+const pkg = JSON.parse(read('package.json'))
+const lock = JSON.parse(read('package-lock.json'))
+assert.equal(pkg.version, '3.8.4')
+assert.equal(pkg.version,lock.version)
+assert.equal(pkg.version,lock.packages[''].version)
+assert(existsSync('public/harmony-campus.jpg'), 'Real uploaded campus photo missing')
+assert(readFileSync('public/harmony-campus.jpg').subarray(0,3).equals(Buffer.from([255,216,255])), 'Campus image must be JPEG')
+for(const required of ['harmony-login-campus','HarmonyThemeToggle','src="/logo.png"','supabase.auth.signInWithPassword','supabase.auth.signInWithOAuth','supabase.auth.resetPasswordForEmail','redirectAuthenticatedUser']) {
+ assert(login.includes(required),`Login regression: ${required}`)
+}
+assert(login.includes('harmony-login-shutter--left') && login.includes('harmony-login-shutter--right'),'Login opening motion removed')
+assert(layout.includes('<HarmonyThemeProvider>') && layout.includes('<SystemMaintenanceGate>'), 'Theme or security gate missing from root layout')
+assert(sidebar.includes('HarmonyThemeToggle') && sidebar.includes('harmony-sidebar-theme'), 'Theme switch missing from sidebar')
+for(const required of ['harmony-color-theme','prefers-color-scheme: dark','localStorage.setItem','window.addEventListener(\'storage\'','data',"document.documentElement.dataset.harmonyTheme"]) assert(provider.includes(required),`Missing theme persistence: ${required}`)
+for(const required of ['aria-pressed','aria-label="Aktifkan mode gelap"','aria-label="Aktifkan mode terang"']) assert(toggle.includes(required),`Theme toggle accessibility missing: ${required}`)
+for(const required of ["html[data-harmony-theme='dark']","html[data-harmony-theme='light']",'--h-color-text','--h-color-glass-border','--h-color-focus','url(\'/harmony-campus.jpg\')','prefers-reduced-motion','prefers-reduced-transparency']) assert(css.includes(required),`Theme tokens/fallbacks missing: ${required}`)
+assert(css.includes('.harmony-login-logo-plate,.harmony-login-logo-plate:hover,.harmony-login-logo {transform:none!important'), 'Logo still tilted')
+console.log('HARMONY theme system PASS: real campus image, straight logo, system-aware themes, persisted accessible toggle, role shell, auth preserved')

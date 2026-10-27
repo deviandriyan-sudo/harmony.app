@@ -9,6 +9,7 @@ import { Loader2, LogOut, Pin, PinOff } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { isNavigationActive, type NavigationItem } from '@/lib/navigation'
 import { useEmployeeAvatar } from '@/components/profile/useEmployeeAvatar'
+import { HarmonyThemeToggle } from '@/components/theme/ThemeToggle'
 
 type Props = {
   menu: NavigationItem[]
@@ -92,6 +93,7 @@ export function AppSidebar({ menu, title = 'HARMONY', userName = 'HARMONY User',
       </div>
 
       <footer className="harmony-sidebar-footer shrink-0 border-t px-[9px] py-3">
+        <HarmonyThemeToggle className="harmony-sidebar-theme" />
         <div className="flex min-h-[48px] items-center gap-[11px] px-[9px]" title={`${userName} · ${userRole}`}>
           <div className="flex h-[39px] w-[39px] shrink-0 items-center justify-center overflow-hidden rounded-xl border border-white/70 bg-slate-900 text-[11px] font-bold text-white">{profilePhoto?<Image unoptimized src={profilePhoto} width={39} height={39} alt={`Foto profil ${userName}`} className="h-full w-full object-cover"/>:getInitials(userName)}</div>
           <div className="harmony-side-detail min-w-0 flex-1"><p className="truncate text-xs font-bold text-slate-900">{userName}</p><p className="truncate text-[11px] text-slate-500">{userRole}</p></div>

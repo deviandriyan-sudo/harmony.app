@@ -17,6 +17,7 @@ import {
   UserRound,
 } from 'lucide-react'
 
+import { HarmonyThemeToggle } from '@/components/theme/ThemeToggle'
 import { harmonyFetch } from '@/lib/harmony-client'
 import { remedFetch } from '@/lib/remed-client'
 import { supabase } from '@/lib/supabase'
@@ -210,6 +211,7 @@ export default function LoginPage() {
           <div className="harmony-login-shell-glint" aria-hidden="true" />
 
           <section className="harmony-login-brand" aria-label="Tentang HARMONY">
+            <div className="harmony-login-campus" aria-hidden="true" />
             <div className="harmony-login-brand-rings" aria-hidden="true" />
             <div className="harmony-login-brand-content">
               <div className="harmony-login-reveal harmony-login-reveal--1">
@@ -242,6 +244,7 @@ export default function LoginPage() {
             <div className="harmony-login-panel-corner harmony-login-panel-corner--bottom" aria-hidden="true" />
 
             <div className="harmony-login-form-inner">
+              <HarmonyThemeToggle className="harmony-login-theme-control" />
               <header className="harmony-login-intro harmony-login-reveal harmony-login-reveal--2">
                 <span className="harmony-login-secure"><Lock size={13} aria-hidden="true" /> SECURE LOGIN <span className="harmony-login-secure-dot" /></span>
                 <p className="harmony-login-overline">YOUR WORKSPACE AWAITS</p>

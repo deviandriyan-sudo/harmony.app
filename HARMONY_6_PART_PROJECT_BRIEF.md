@@ -1,0 +1,8 @@
+# Six-Part Implementation Brief — HARMONY V3.8.4
+
+1. **Role**: Senior Next.js/React engineer, design-system architect, accessibility reviewer and HRIS regression tester.
+2. **Task**: Add the supplied campus photograph to the login, straighten the existing institution logo, and establish a consistent, switchable dark/light color system across HR, Employee and Finance.
+3. **Context**: Next.js App Router / React 19 / TypeScript / Supabase / Vercel. The unmodified V3.8.3 full-replacement is the source baseline. Login supports email/password, Google, reset, maintenance and role redirects. All leave, PHL, Re-Med, HR approvals, finance and profile workflows must stay intact.
+4. **Reasoning & trade-offs**: Reuse CSS and existing Lucide icons instead of adding a motion/UI dependency; one shared client-side theme provider avoids multiple competing component states; photo only appears on login to keep other screens information-first; semantic colors are safer than manually assigning arbitrary bright shades. Theme initialization is client side, so a brief initial light flash can occur before hydration for returning dark-theme users.
+5. **Stop conditions**: No route removals, no changes to auth or financial/leave logic, no SQL migration, no `.env.local`, no node_modules/.next in ZIP. Stop and report any failed test honestly; do not claim server-side or live production flows are verified without running them.
+6. **Output**: One independently installable full-replacement ZIP with all source, uploaded photo, shared color tokens, accessible theme toggle, automated static regression tests, audit, changed-files and route report, installation/build/deploy guidance.

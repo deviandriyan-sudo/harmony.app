@@ -4518,3 +4518,318 @@ body > .harmony-leave-request-modal .harmony-leave-submit:focus-visible {outline
   .harmony-login-v383 .harmony-login-brand-center h1 {grid-column:2;grid-row:2;width:auto;font-size:clamp(23px,7vw,34px);margin:0;align-self:start}
   .harmony-login-v383 .harmony-login-field input {font-size:16px}
 }
+
+/* =======================================================================
+   HARMONY V3.8.4 / ONE DESIGN LANGUAGE, TWO THEMES
+   Role: HR / Employee / Finance. Scope: presentation only.
+   Colors are semantic; all permissions and business workflows are unchanged.
+   ======================================================================= */
+:root,
+html[data-harmony-theme='light'] {
+  --h-color-primary:#0869dc;
+  --h-color-primary-hover:#0759bd;
+  --h-color-primary-active:#064998;
+  --h-color-cyan:#087aa5;
+  --h-color-indigo:#5657c9;
+  --h-color-success:#127c5f;
+  --h-color-warning:#a96307;
+  --h-color-danger:#bd3347;
+  --h-color-info:#1568be;
+  --h-color-bg:#eff6ff;
+  --h-color-bg-elevated:#f8fbff;
+  --h-color-surface:rgba(250,253,255,.84);
+  --h-color-surface-raised:rgba(255,255,255,.94);
+  --h-color-glass-border:rgba(255,255,255,.87);
+  --h-color-divider:rgba(55,103,161,.18);
+  --h-color-text:#122d4d;
+  --h-color-text-soft:#405b7b;
+  --h-color-text-muted:#58708d;
+  --h-color-focus:#0869dc;
+  --h-color-shadow:rgba(23,72,142,.13);
+  --harmony-bg:var(--h-color-bg);
+  --harmony-surface:var(--h-color-bg-elevated);
+  --harmony-surface-glass:var(--h-color-surface);
+  --harmony-card:var(--h-color-surface);
+  --harmony-card-strong:var(--h-color-surface-raised);
+  --harmony-text:var(--h-color-text);
+  --harmony-muted:var(--h-color-text-soft);
+  --harmony-subtle:var(--h-color-text-muted);
+  --harmony-blue:var(--h-color-primary);
+  --harmony-cyan:var(--h-color-cyan);
+  --harmony-green:var(--h-color-success);
+  --harmony-orange:var(--h-color-warning);
+  --harmony-red:var(--h-color-danger);
+  --harmony-purple:var(--h-color-indigo);
+  --harmony-border:var(--h-color-glass-border);
+  --harmony-prism-ink:var(--h-color-text);
+  --harmony-prism-focus:var(--h-color-focus);
+  --harmony-prism-rim:var(--h-color-glass-border);
+}
+html[data-harmony-theme='dark'] {
+  color-scheme:dark;
+  --h-color-primary:#3995ff;
+  --h-color-primary-hover:#70baff;
+  --h-color-primary-active:#126fd5;
+  --h-color-cyan:#60dcff;
+  --h-color-indigo:#a0a9ff;
+  --h-color-success:#53e1b0;
+  --h-color-warning:#ffca75;
+  --h-color-danger:#ff8fa2;
+  --h-color-info:#85bbff;
+  --h-color-bg:#050d1b;
+  --h-color-bg-elevated:#0d233c;
+  --h-color-surface:rgba(18,46,78,.82);
+  --h-color-surface-raised:rgba(24,56,94,.94);
+  --h-color-glass-border:rgba(146,205,250,.21);
+  --h-color-divider:rgba(150,197,237,.18);
+  --h-color-text:#f4faff;
+  --h-color-text-soft:#cfddf3;
+  --h-color-text-muted:#a7bfdc;
+  --h-color-focus:#72d9ff;
+  --h-color-shadow:rgba(0,4,16,.52);
+  --harmony-bg:var(--h-color-bg);
+  --harmony-surface:var(--h-color-bg-elevated);
+  --harmony-surface-soft:#122a48;
+  --harmony-surface-glass:var(--h-color-surface);
+  --harmony-card:var(--h-color-surface);
+  --harmony-card-strong:var(--h-color-surface-raised);
+  --harmony-text:var(--h-color-text);
+  --harmony-muted:var(--h-color-text-soft);
+  --harmony-subtle:var(--h-color-text-muted);
+  --harmony-blue:var(--h-color-primary);
+  --harmony-blue-soft:rgba(41,127,220,.23);
+  --harmony-cyan:var(--h-color-cyan);
+  --harmony-green:var(--h-color-success);
+  --harmony-green-soft:rgba(28,174,126,.17);
+  --harmony-orange:var(--h-color-warning);
+  --harmony-orange-soft:rgba(198,134,32,.19);
+  --harmony-red:var(--h-color-danger);
+  --harmony-red-soft:rgba(204,59,83,.19);
+  --harmony-purple:var(--h-color-indigo);
+  --harmony-purple-soft:rgba(138,100,227,.20);
+  --harmony-border:var(--h-color-glass-border);
+  --harmony-border-strong:rgba(158,212,248,.35);
+  --harmony-prism-ink:var(--h-color-text);
+  --harmony-prism-focus:var(--h-color-focus);
+  --harmony-prism-rim:var(--h-color-glass-border);
+  --harmony-shadow-xs:0 2px 6px rgba(0,4,16,.27);
+  --harmony-shadow-sm:0 8px 22px rgba(0,4,16,.29);
+  --harmony-shadow-md:0 18px 39px rgba(0,4,16,.36);
+  --harmony-shadow-lg:0 27px 68px rgba(0,4,16,.48);
+}
+
+/* Shared accessible theme switch. On the rail it remains discoverable when collapsed. */
+.harmony-theme-switch {
+  display:inline-flex;align-items:center;gap:3px;padding:4px;max-width:100%;
+  border-radius:999px;border:1px solid var(--h-color-divider);
+  background:var(--h-color-surface);box-shadow:inset 0 1px 0 rgba(255,255,255,.11);
+}
+.harmony-theme-switch button {
+  display:inline-flex;align-items:center;justify-content:center;gap:6px;
+  min-width:63px;min-height:32px;padding:5px 8px;border-radius:999px;
+  color:var(--h-color-text-soft);font-size:11px;font-weight:750;
+  transition:background-color .18s ease,box-shadow .18s ease,color .18s ease;
+}
+.harmony-theme-switch button:hover:not(:disabled) {background:rgba(78,155,224,.13)}
+.harmony-theme-switch button.is-selected {background:linear-gradient(125deg,#167ef6,#0054bb);color:#fff;box-shadow:0 3px 12px rgba(14,108,218,.22)}
+.harmony-theme-switch button:focus-visible {outline:2px solid var(--h-color-focus);outline-offset:2px}
+.harmony-theme-switch button:disabled {opacity:.65}
+.harmony-theme-switch--compact .harmony-theme-label {display:none}
+.harmony-theme-switch--compact button {min-width:35px;padding:7px}
+.harmony-sidebar-theme {display:flex;width:100%;justify-content:center;margin:0 auto 10px;min-height:42px}
+.harmony-sidebar-theme button {flex:1;min-width:0}
+.harmony-sidebar-shell:not(.harmony-sidebar-pinned):not(.harmony-sidebar-mobile):not(:hover):not(:focus-within) .harmony-sidebar-theme {width:42px;padding:3px;flex-direction:column;border-radius:18px}
+.harmony-sidebar-shell:not(.harmony-sidebar-pinned):not(.harmony-sidebar-mobile):not(:hover):not(:focus-within) .harmony-sidebar-theme button {min-height:30px;padding:3px}
+.harmony-sidebar-shell:not(.harmony-sidebar-pinned):not(.harmony-sidebar-mobile):not(:hover):not(:focus-within) .harmony-sidebar-theme .harmony-theme-label {display:none}
+.harmony-login-theme-control {align-self:flex-end;margin-bottom:13px;position:relative;z-index:4}
+
+/* The source is the actual photograph provided for HARMONY, not an AI building. */
+.harmony-login-brand .harmony-login-campus {
+  position:absolute;z-index:0;inset:0;pointer-events:none;
+  background-image:
+    linear-gradient(180deg,rgba(5,28,55,.63) 0%,rgba(5,24,47,.71) 45%,rgba(3,21,42,.88) 100%),
+    linear-gradient(100deg,rgba(6,48,93,.48),rgba(9,70,127,.16)),
+    url('/harmony-campus.jpg');
+  background-repeat:no-repeat;background-position:center,center,center 58%;background-size:cover;
+}
+.harmony-login-brand-content {z-index:1}
+.harmony-login-brand-rings {z-index:1}
+.harmony-login-brand::before {z-index:1}
+.harmony-login-logo-plate,.harmony-login-logo-plate:hover,.harmony-login-logo {transform:none!important;rotate:none!important}
+.harmony-login-logo-plate {overflow:hidden}
+.harmony-login-logo {object-position:center}
+.harmony-login-brand-center h1 {letter-spacing:.1em}
+
+/* DARK: workspace, sidebar, navigation, glass surfaces and structured data. */
+html[data-harmony-theme='dark'] body,
+html[data-harmony-theme='dark'] .harmony-shell,
+html[data-harmony-theme='dark'] .harmony-workspace {
+  color:var(--h-color-text);
+  background:radial-gradient(ellipse at 4% 0%,rgba(10,72,130,.39),transparent 45%),linear-gradient(135deg,#050c1a,#0a1c32 56%,#051326) fixed!important;
+}
+html[data-harmony-theme='dark'] .harmony-workspace :is(
+  .harmony-card,.harmony-card-solid,.harmony-card-soft,.harmony-glass,
+  .harmony-unified-surface,.harmony-unified-toolbar,.harmony-metric-card,
+  .harmony-review-metric,.harmony-subtle-panel,.harmony-reference-surface,
+  .harmony-remed-workspace-header
+),
+html[data-harmony-theme='dark'] :is(.harmony-topbar,.harmony-module-subnav,.harmony-mobile-topbar,.harmony-popover-glass,.harmony-notification-portal),
+html[data-harmony-theme='dark'] body > .harmony-subnav-portal,
+html[data-harmony-theme='dark'] body > .harmony-sidebar-shell .harmony-sidebar-panel,
+html[data-harmony-theme='dark'] .harmony-sidebar-mobile .harmony-sidebar-panel {
+  background:linear-gradient(138deg,rgba(31,65,104,.88),rgba(9,29,54,.95))!important;
+  border-color:var(--h-color-glass-border)!important;
+  box-shadow:inset 0 1px 0 rgba(211,238,255,.13),0 12px 30px rgba(0,4,16,.30)!important;
+  color:var(--h-color-text);
+}
+html[data-harmony-theme='dark'] :is(.harmony-logo-glass,.harmony-sidebar-user,.harmony-topbar-search,.harmony-topbar-action,.harmony-topbar-badge,.harmony-mobile-glass,.harmony-mobile-brand) {
+  background:rgba(30,65,105,.64)!important;border-color:rgba(146,206,251,.27)!important;color:var(--h-color-text-soft)!important;
+}
+html[data-harmony-theme='dark'] .harmony-workspace :is(.harmony-reference-hero,.harmony-review-hero,.harmony-employee-hero,.harmony-hero-v25,.harmony-glass-dark,.harmony-glass-role-hero) {
+  background:linear-gradient(112deg,#0d4375 0%,#125eaa 52%,#247bbd 100%)!important;
+  border-color:rgba(122,198,251,.33)!important;
+}
+html[data-harmony-theme='dark'] .harmony-sidebar-panel .harmony-nav-active:not(.harmony-nav-remed),
+html[data-harmony-theme='dark'] .harmony-module-tab:is(.harmony-tab-active,.harmony-tab-active-secondary) {
+  background:linear-gradient(115deg,rgba(10,103,219,.86),rgba(22,74,148,.72))!important;
+  border-color:rgba(96,187,252,.45)!important;
+  color:#fff!important;
+}
+html[data-harmony-theme='dark'] .harmony-sidebar-panel .harmony-motion-nav:not(.harmony-nav-active):hover {background:rgba(63,136,213,.21)!important}
+html[data-harmony-theme='dark'] :is(.harmony-topbar,.harmony-workspace,.harmony-module-subnav,.harmony-sidebar-panel,.harmony-subnav-portal) :is(
+ .text-slate-900,.text-slate-800,.text-slate-700,.text-slate-600,.text-slate-500,
+ .text-gray-900,.text-gray-800,.text-gray-700,.text-gray-600,.text-gray-500
+) {color:var(--h-color-text-soft)!important}
+html[data-harmony-theme='dark'] :is(.harmony-workspace,.harmony-topbar,.harmony-sidebar-panel,.harmony-module-subnav,.harmony-subnav-portal) :is(h1,h2,h3,h4,label) {color:var(--h-color-text)!important}
+html[data-harmony-theme='dark'] .harmony-sidebar-panel .harmony-nav-active :is(.harmony-nav-title,.harmony-side-detail,.harmony-nav-icon),
+html[data-harmony-theme='dark'] .harmony-module-tab.harmony-tab-active :is(span,svg) {color:#fff!important}
+html[data-harmony-theme='dark'] .harmony-topbar h1,
+html[data-harmony-theme='dark'] .harmony-topbar [class*='text-[#17181b]'],
+html[data-harmony-theme='dark'] .harmony-topbar [class*='text-[#1d1d1f]'],
+html[data-harmony-theme='dark'] .harmony-topbar [class*='text-[#25272c]'] {color:var(--h-color-text)!important}
+html[data-harmony-theme='dark'] .harmony-workspace :is(input:not([type='checkbox']):not([type='radio']):not([type='file']),select,textarea),
+html[data-harmony-theme='dark'] .harmony-modal-surface :is(input:not([type='checkbox']):not([type='radio']):not([type='file']),select,textarea) {
+  background:linear-gradient(125deg,rgba(21,51,84,.94),rgba(14,39,70,.92))!important;
+  border-color:rgba(144,202,250,.35)!important;
+  color:#f4faff!important;
+  color-scheme:dark;
+}
+html[data-harmony-theme='dark'] :is(.harmony-workspace,.harmony-modal-surface) :is(input,textarea)::placeholder {color:#aec3df!important;opacity:1}
+html[data-harmony-theme='dark'] :is(.harmony-workspace,.harmony-modal-surface) :is(input,select,textarea):focus-visible {outline:2px solid #62caff!important;outline-offset:1px}
+html[data-harmony-theme='dark'] .harmony-topbar-search input {background:transparent!important;border:0!important;color:var(--h-color-text)!important}
+html[data-harmony-theme='dark'] .harmony-module-tab:not(.harmony-tab-active):not(.harmony-tab-active-secondary),
+html[data-harmony-theme='dark'] .harmony-module-more {color:var(--h-color-text-soft)!important}
+html[data-harmony-theme='dark'] .harmony-workspace :is(.harmony-button-secondary,.harmony-action-soft,.harmony-button-native),
+html[data-harmony-theme='dark'] .harmony-popover-glass {color:var(--h-color-text)!important}
+html[data-harmony-theme='dark'] .harmony-workspace :is(.harmony-metric-card,.harmony-review-metric)[data-tone] {
+  background:linear-gradient(125deg,rgba(23,63,102,.92),rgba(12,35,66,.93))!important;
+}
+/* Legacy explicit light utility cards: only in dark mode, no blanket alert recoloring. */
+html[data-harmony-theme='dark'] .harmony-workspace :is(div,section,article)[class*='bg-white/'][class*='rounded-'],
+html[data-harmony-theme='dark'] .harmony-workspace :is(div,section,article)[class*='bg-[#f5f5f7]'][class*='rounded-'] {
+  background:rgba(23,53,88,.87)!important;border-color:rgba(139,200,246,.22)!important;
+}
+html[data-harmony-theme='dark'] :is(.harmony-workspace,.harmony-modal-surface) :is(.harmony-table,table) {color:var(--h-color-text-soft)}
+html[data-harmony-theme='dark'] :is(.harmony-workspace,.harmony-modal-surface) :is(th,thead) {border-color:var(--h-color-divider)}
+html[data-harmony-theme='dark'] .harmony-workspace :is(tr,td) {border-color:var(--h-color-divider)}
+html[data-harmony-theme='dark'] :is(.harmony-modal-surface,.harmony-hr-edit-modal) {color:var(--h-color-text)}
+html[data-harmony-theme='dark'] .harmony-modal-surface > :first-child {
+  background:linear-gradient(147deg,rgba(24,57,95,.97),rgba(10,30,57,.98))!important;
+  border-color:rgba(135,203,249,.34)!important;
+  color:var(--h-color-text);
+}
+html[data-harmony-theme='dark'] .harmony-modal-surface :is(h1,h2,h3,h4,label) {color:var(--h-color-text)!important}
+html[data-harmony-theme='dark'] body > .harmony-subnav-portal :is(a,button) {color:var(--h-color-text-soft)}
+
+/* Login: real campus photo stays legible behind a consistent blue glass veil. */
+html[data-harmony-theme='light'] .harmony-login-v383 {
+  --login-ink:#0b2a4b;--login-muted:#476482;--login-cyan:#007bc4;
+  background:radial-gradient(ellipse at 72% 12%,rgba(129,205,252,.48),transparent 42%),linear-gradient(133deg,#d6eafd,#f7fbff 53%,#c7e4ff)!important;
+  color:var(--login-ink);
+}
+html[data-harmony-theme='light'] .harmony-login-shell {
+  background:rgba(241,249,255,.76);border-color:rgba(255,255,255,.92);
+  box-shadow:inset 0 1px 0 #fff,0 32px 110px rgba(34,96,162,.26);
+}
+html[data-harmony-theme='light'] .harmony-login-brand {
+  background:linear-gradient(150deg,rgba(213,236,255,.89),rgba(199,230,255,.72));
+  border-color:rgba(102,171,219,.4);
+}
+html[data-harmony-theme='light'] .harmony-login-campus {
+  background-image:
+    linear-gradient(180deg,rgba(224,241,255,.63) 0%,rgba(218,237,253,.78) 53%,rgba(220,240,255,.88) 100%),
+    url('/harmony-campus.jpg');
+}
+html[data-harmony-theme='light'] .harmony-login-form-panel {
+  background:linear-gradient(143deg,rgba(255,255,255,.92),rgba(225,241,255,.86))!important;
+}
+html[data-harmony-theme='light'] .harmony-login-brand-center h1,
+html[data-harmony-theme='light'] .harmony-login-intro h2 {color:#0b2c52;text-shadow:none}
+html[data-harmony-theme='light'] .harmony-login-brand-kicker,
+html[data-harmony-theme='light'] .harmony-login-overline {color:#17629c}
+html[data-harmony-theme='light'] .harmony-login-brand-description,
+html[data-harmony-theme='light'] .harmony-login-subtitle {color:#355778}
+html[data-harmony-theme='light'] .harmony-login-eyebrow,
+html[data-harmony-theme='light'] .harmony-login-secure {color:#155c92;background:rgba(255,255,255,.65);border-color:rgba(92,160,215,.37)}
+html[data-harmony-theme='light'] .harmony-login-feature {background:rgba(249,253,255,.69);border-color:rgba(101,165,221,.39)}
+html[data-harmony-theme='light'] .harmony-login-feature strong,
+html[data-harmony-theme='light'] .harmony-login-field-group>label {color:#15375e}
+html[data-harmony-theme='light'] .harmony-login-feature small,
+html[data-harmony-theme='light'] .harmony-login-footer,
+html[data-harmony-theme='light'] .harmony-login-footer>span {color:#3c6287}
+html[data-harmony-theme='light'] .harmony-login-field {background:rgba(239,248,255,.8);border-color:rgba(99,158,219,.42)}
+html[data-harmony-theme='light'] .harmony-login-field input {color:#0f3157!important}
+html[data-harmony-theme='light'] .harmony-login-field input::placeholder {color:#617d99}
+html[data-harmony-theme='light'] .harmony-login-field input:-webkit-autofill {-webkit-text-fill-color:#0f3157;box-shadow:0 0 0 100px #eaf5ff inset!important}
+html[data-harmony-theme='light'] .harmony-login-field-icon,
+html[data-harmony-theme='light'] .harmony-login-toggle-password {color:#286ba6}
+html[data-harmony-theme='light'] .harmony-login-form-options span,
+html[data-harmony-theme='light'] .harmony-login-divider {color:#4b6c8c}
+html[data-harmony-theme='light'] .harmony-login-form-options button {color:#075fb9}
+html[data-harmony-theme='light'] .harmony-login-google {background:rgba(255,255,255,.83);color:#113a66;border-color:rgba(135,189,236,.59)}
+html[data-harmony-theme='light'] .harmony-login-google:hover:not(:disabled) {background:#fff}
+html[data-harmony-theme='light'] .harmony-login-notice--warning {color:#7d4500;background:#fff5df;border-color:#d5a55a}
+html[data-harmony-theme='light'] .harmony-login-notice--error {color:#993347;background:#fff0f0;border-color:#e6aab3}
+html[data-harmony-theme='light'] .harmony-login-notice--info {color:#165b9a;background:#ecf7ff;border-color:#a4d7fa}
+@media(max-width:760px){
+  .harmony-login-theme-control {margin-bottom:16px}
+  .harmony-login-brand .harmony-login-campus {background-position:center,center,center 55%}
+  .harmony-sidebar-theme .harmony-theme-label {font-size:10px}
+}
+@media(prefers-reduced-motion:reduce){
+  .harmony-theme-switch button {transition:none!important}
+}
+@media(prefers-reduced-transparency:reduce){
+  html[data-harmony-theme='dark'] :is(.harmony-sidebar-panel,.harmony-topbar,.harmony-module-subnav) {background:#0f2946!important}
+  html[data-harmony-theme='light'] :is(.harmony-sidebar-panel,.harmony-topbar,.harmony-module-subnav) {background:#e9f5ff!important}
+}
+
+/* Legacy utility-color bridge: prevent nearly 1,000 fixed light-theme text
+   classes from becoming low-contrast on dark glass. This is scoped to the
+   HARMONY application; approval/badge colors retain their semantic tint. */
+html[data-harmony-theme='dark'] :is(.harmony-workspace,.harmony-topbar,.harmony-sidebar-panel,.harmony-modal-surface,.harmony-notification-portal,.harmony-subnav-portal) :is(
+  [class*='text-[#1d1d1f]'],[class*='text-[#17181b]'],[class*='text-[#25272c]'],
+  [class*='text-[#3a3a3c]'],[class*='text-[#202328]'],[class*='text-[#253453]']
+) {color:var(--h-color-text)!important}
+html[data-harmony-theme='dark'] :is(.harmony-workspace,.harmony-topbar,.harmony-sidebar-panel,.harmony-modal-surface,.harmony-notification-portal,.harmony-subnav-portal) :is(
+  [class*='text-[#6e6e73]'],[class*='text-[#86868b]'],[class*='text-[#747982]'],
+  [class*='text-[#9a9aa0]'],[class*='text-[#646971]'],[class*='text-[#8a8f98]'],
+  [class*='text-[#59677b]'],[class*='text-[#8e8e93]'],[class*='text-[#858a93]'],
+  [class*='text-[#5f646c]'],[class*='text-[#777c85]'],[class*='text-[#666b73]'],
+  [class*='text-[#787d85]'],[class*='text-[#4c5159]']
+) {color:var(--h-color-text-soft)!important}
+html[data-harmony-theme='dark'] :is(.harmony-workspace,.harmony-topbar,.harmony-sidebar-panel,.harmony-modal-surface) :is(
+  [class*='text-[#007aff]'],[class*='text-[#0059b8]'],[class*='text-[#0077a3]']
+) {color:#86c9ff!important}
+html[data-harmony-theme='dark'] .harmony-workspace :is(div,section,article,header,aside)[class~='bg-white'],
+html[data-harmony-theme='dark'] .harmony-workspace :is(div,section,article)[class*='bg-[#fafafa]'],
+html[data-harmony-theme='dark'] .harmony-workspace :is(div,section,article)[class*='bg-[#f8f8fa]'],
+html[data-harmony-theme='dark'] .harmony-workspace :is(div,section,article)[class*='bg-[#f8f9fb]'],
+html[data-harmony-theme='dark'] .harmony-workspace :is(div,section,article)[class*='bg-[#eef0f3]'] {
+  background:rgba(25,57,93,.87)!important;
+  border-color:var(--h-color-glass-border)!important;
+}
+html[data-harmony-theme='dark'] .harmony-workspace :is(div,section,article)[class*='bg-[#e8f2ff]'] {background:rgba(24,85,151,.32)!important}
+html[data-harmony-theme='dark'] .harmony-workspace :is(div,section,article)[class*='bg-[#f7edfc]'] {background:rgba(116,75,174,.25)!important}
+html[data-harmony-theme='dark'] .harmony-workspace :is(div,section,article)[class*='bg-[#eaf8ee]'] {background:rgba(23,145,98,.22)!important}
+html[data-harmony-theme='dark'] .harmony-workspace :is(div,section,article)[class*='bg-[#fff4e5]'] {background:rgba(174,111,27,.24)!important}
