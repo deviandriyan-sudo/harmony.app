@@ -3902,7 +3902,27 @@ body > .harmony-modal-surface > :first-child,
   padding:16px 20px;
   background:linear-gradient(120deg,rgba(247,252,255,.97),rgba(215,232,251,.88));
 }
-.harmony-hr-edit-modal form > div:first-child { padding:14px 18px; display:flex; flex-direction:column; gap:11px; }
+.harmony-hr-edit-modal .harmony-hr-form-scroll {
+  /* The form is a flex column within a capped-height dialog. Allow the scroll
+     viewport to shrink, but NEVER compress its many disclosure panels. */
+  min-height:0;
+  flex:1 1 auto;
+  padding:14px 18px;
+  display:flex;
+  flex-direction:column;
+  gap:11px;
+  overflow-y:auto;
+  overscroll-behavior:contain;
+  scrollbar-gutter:stable;
+}
+.harmony-hr-edit-modal .harmony-hr-form-scroll > * {
+  /* Default flex-shrink:1 produced the blank 10px accordion strips in HR. */
+  flex:0 0 auto;
+  min-width:0;
+}
+.harmony-hr-edit-modal .harmony-hr-form-scroll > details > summary {
+  flex-shrink:0;
+}
 .harmony-hr-edit-modal form > div:last-child { padding:13px 18px; background:rgba(233,244,255,.95); }
 .harmony-hr-form-disclosure {
   min-width:0;
@@ -3931,4 +3951,346 @@ body > .harmony-modal-surface > :first-child,
 .harmony-leave-value strong {font-size:17px;color:#1d4b83;}
 body > .harmony-subnav-portal {z-index:1600!important;background:rgba(248,252,255,.98)!important;box-shadow:0 24px 56px rgba(22,52,95,.20),inset 0 1px 0 #fff!important;backdrop-filter:blur(24px) saturate(160%);-webkit-backdrop-filter:blur(24px) saturate(160%);}
 body:has(.harmony-modal-surface) > .harmony-subnav-portal {visibility:hidden;pointer-events:none;}
-@media(max-width:640px){ .harmony-hr-edit-modal form > div:first-child {padding:10px;gap:8px;} .harmony-hr-form-body{padding:12px;} .harmony-hr-form-summary{padding:11px;} }
+@media(max-width:640px){ .harmony-hr-edit-modal .harmony-hr-form-scroll {padding:10px;gap:8px;} .harmony-hr-form-body{padding:12px;} .harmony-hr-form-summary{padding:11px;} }
+
+
+/* ================================================================
+   HARMONY V3.8.2 / PRISMATIC MOTION DESIGN SYSTEM
+   Presentation-only. No data, route, auth, overlay z-index or business logic.
+   Optical blue glass / quiet motion / semantic accessible contrast.
+   ================================================================ */
+:root {
+  /* Glacier canvas, professional navy text, disciplined coastal accents. */
+  --harmony-bg:#edf4fd;
+  --harmony-surface:#fbfdff;
+  --harmony-surface-soft:#f4f8fe;
+  --harmony-surface-glass:rgba(247,251,255,.78);
+  --harmony-card:rgba(248,252,255,.75);
+  --harmony-card-strong:rgba(250,253,255,.91);
+  --harmony-text:#142c4c;
+  --harmony-muted:#4a6583;
+  --harmony-subtle:#5b7390;
+  --harmony-border:rgba(142,179,222,.35);
+  --harmony-border-strong:rgba(102,149,206,.52);
+  --harmony-blue:#205fbc;
+  --harmony-blue-soft:#e5f0ff;
+  --harmony-green:#147b5f;
+  --harmony-green-soft:#e1f5ed;
+  --harmony-orange:#ab641c;
+  --harmony-orange-soft:#fff2dd;
+  --harmony-red:#c13c50;
+  --harmony-red-soft:#fff0f2;
+  --harmony-purple:#7952b9;
+  --harmony-purple-soft:#f2ebff;
+  --harmony-cyan:#147f9b;
+  --harmony-radius-sm:12px;
+  --harmony-radius-md:17px;
+  --harmony-radius-lg:22px;
+  --harmony-radius-xl:28px;
+  --harmony-shadow-xs:0 1px 3px rgba(28,69,119,.055);
+  --harmony-shadow-sm:0 5px 20px rgba(31,81,142,.075);
+  --harmony-shadow-md:0 14px 38px rgba(31,74,131,.10);
+  --harmony-shadow-lg:0 28px 68px rgba(21,57,116,.18);
+  --harmony-prism-glow:rgba(60,127,209,.14);
+  --harmony-prism-ink:#143354;
+  --harmony-prism-rim:rgba(255,255,255,.90);
+  --harmony-prism-focus:#1c63c7;
+  --harmony-motion-fast:140ms;
+  --harmony-motion-normal:220ms;
+  --harmony-motion-enter:360ms;
+  --harmony-ease:cubic-bezier(.22,1,.36,1);
+}
+
+/* The gradients are static: no distracting/expensive animated backdrop blur. */
+body, .harmony-shell {
+  background:
+    radial-gradient(ellipse 55% 54% at 10% 10%,rgba(249,253,255,.70),transparent 78%),
+    radial-gradient(ellipse 53% 50% at 92% 90%,rgba(142,186,239,.19),transparent 82%),
+    linear-gradient(129deg,#d9e8fa 0%,#edf5ff 52%,#dceafa 100%) fixed !important;
+  color:var(--harmony-prism-ink);
+}
+::selection {background:rgba(64,140,226,.23);color:#143354}
+
+/* Shared optical material: identical across HR, self-service, Finance & Re-Med. */
+.harmony-workspace :is(
+ .harmony-card,.harmony-card-solid,.harmony-card-soft,
+ .harmony-unified-surface,.harmony-unified-toolbar,
+ .harmony-metric-card,.harmony-review-metric,.harmony-subtle-panel,
+ .harmony-reference-surface,.harmony-remed-workspace-header
+) {
+  border-color:var(--harmony-prism-rim) !important;
+  background:
+   linear-gradient(116deg,rgba(255,255,255,.40) 0%,rgba(255,255,255,.07) 32%,transparent 53%),
+   linear-gradient(151deg,rgba(252,254,255,.79) 0%,rgba(220,236,255,.64) 100%) !important;
+  box-shadow:
+   inset 0 1px 0 rgba(255,255,255,.99),
+   inset 1px 0 0 rgba(255,255,255,.57),
+   inset 0 -1px 0 rgba(116,165,223,.13),
+   0 6px 22px rgba(32,89,163,.085) !important;
+  -webkit-backdrop-filter:blur(22px) saturate(138%);
+  backdrop-filter:blur(22px) saturate(138%);
+}
+/* Preserve status meaning; subtle tint is never used as the sole status signal. */
+.harmony-workspace .harmony-metric-card[data-tone='blue'] {
+  background:linear-gradient(123deg,rgba(255,255,255,.75),rgba(201,227,255,.67)) !important;
+}
+.harmony-workspace .harmony-metric-card[data-tone='green'] {
+  background:linear-gradient(123deg,rgba(255,255,255,.75),rgba(201,239,223,.63)) !important;
+}
+.harmony-workspace .harmony-metric-card[data-tone='orange'] {
+  background:linear-gradient(123deg,rgba(255,255,255,.75),rgba(255,227,197,.63)) !important;
+}
+.harmony-workspace .harmony-metric-card[data-tone='purple'] {
+  background:linear-gradient(123deg,rgba(255,255,255,.75),rgba(226,214,254,.65)) !important;
+}
+.harmony-workspace .harmony-metric-card[data-tone='red'] {
+  background:linear-gradient(123deg,rgba(255,255,255,.75),rgba(253,209,216,.63)) !important;
+}
+
+.harmony-workspace :is(.harmony-reference-hero,.harmony-review-hero,.harmony-employee-hero,.harmony-hero-v25,.harmony-glass-dark,.harmony-glass-role-hero) {
+  background:
+    linear-gradient(116deg,transparent 9%,rgba(255,255,255,.15) 24%,transparent 43%),
+    radial-gradient(ellipse 54% 120% at 100% -15%,rgba(210,242,255,.34),transparent 78%),
+    linear-gradient(112deg,#215aaa 0%,#377bcb 52%,#83b8e5 100%) !important;
+  border-color:rgba(226,244,255,.84) !important;
+  box-shadow:inset 0 2px 0 rgba(255,255,255,.45),inset 0 -2px 0 rgba(19,74,156,.18),0 14px 32px rgba(25,75,144,.16) !important;
+}
+.harmony-workspace .harmony-glass-role-hero :is(h1,h2,h3,p,span) {text-shadow:0 1px 1px rgba(12,46,96,.10)}
+
+/* Main rail, mobile header, tabs and popovers: one optical recipe. */
+body > .harmony-sidebar-shell .harmony-sidebar-panel,
+.harmony-sidebar-mobile .harmony-sidebar-panel,
+.harmony-topbar,.harmony-module-subnav,.harmony-mobile-topbar,
+.harmony-notification-portal,.harmony-popover-glass,
+body > .harmony-subnav-portal {
+  background:linear-gradient(137deg,rgba(251,254,255,.92),rgba(216,233,254,.83)) !important;
+  border-color:rgba(255,255,255,.88) !important;
+  box-shadow:inset 0 1px 0 #fff,0 13px 30px rgba(29,75,133,.11) !important;
+  -webkit-backdrop-filter:blur(25px) saturate(144%) !important;
+  backdrop-filter:blur(25px) saturate(144%) !important;
+}
+.harmony-sidebar-panel .harmony-motion-nav:not(.harmony-nav-active):hover {
+  background:rgba(232,243,255,.74);
+  color:#144c94;
+}
+.harmony-sidebar-panel .harmony-nav-active:not(.harmony-nav-remed) {
+  border:1px solid rgba(188,217,253,.87);
+  background:linear-gradient(125deg,rgba(255,255,255,.91),rgba(181,214,252,.83)) !important;
+  box-shadow:inset 0 1px 0 #fff,0 4px 13px rgba(30,93,177,.11) !important;
+}
+.harmony-module-tab.harmony-tab-active,.harmony-module-tab.harmony-tab-active-secondary {
+  color:#164f9c;
+  background:linear-gradient(137deg,rgba(245,251,255,.96),rgba(187,221,253,.76));
+  border-color:rgba(149,195,247,.65);
+}
+.harmony-workspace :is(.harmony-button-primary,.harmony-button-blue,.harmony-action-primary,.harmony-employee-action),
+.harmony-workspace :is(a,button)[class*='bg-blue-600']:not(:disabled) {
+  background:linear-gradient(111deg,rgba(255,255,255,.13),transparent 43%),linear-gradient(145deg,#3284e0,#195db8) !important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.51),0 5px 14px rgba(28,101,197,.18) !important;
+  color:#fff !important;
+}
+.harmony-workspace :is(.harmony-button-primary,.harmony-button-blue,.harmony-action-primary,.harmony-employee-action) :is(span,svg) {color:inherit}
+.harmony-workspace .harmony-glass-showcase-action:not(.harmony-workspace-action-primary) {color:#1a436f}
+.harmony-workspace .harmony-action-glyph {color:#145cac}
+
+/* Admin/profile inputs: easy-to-scan, never animate field values or cursor. */
+.harmony-workspace :is(input:not([type='checkbox']):not([type='radio']):not([type='file']),select,textarea),
+.harmony-modal-surface :is(input:not([type='checkbox']):not([type='radio']):not([type='file']),select,textarea) {
+  border-color:rgba(194,217,245,.83) !important;
+  background:linear-gradient(130deg,rgba(253,255,255,.82),rgba(225,239,255,.70)) !important;
+  color:#1a3656;
+  transition:border-color var(--harmony-motion-fast) ease,box-shadow var(--harmony-motion-fast) ease;
+}
+.harmony-workspace :is(input,select,textarea):focus-visible,
+.harmony-modal-surface :is(input,select,textarea):focus-visible {
+  border-color:#528ddd !important;
+  outline:2px solid rgba(33,103,200,.68);
+  outline-offset:1px;
+}
+.harmony-workspace :is(input,select,textarea):disabled {opacity:.73}
+.harmony-workspace :is(input,textarea)::placeholder {color:#647d99}
+.harmony-workspace :is(.harmony-card,.harmony-unified-surface,.harmony-metric-card) :is(h1,h2,h3) {letter-spacing:-.017em}
+.harmony-workspace :is(.harmony-card,.harmony-unified-surface) :is(p,small) {line-height:1.5}
+
+/* Motion principles: one entrance; lightweight hover feedback; no animation of
+   financial statuses, form values, alert banners, overlays positions or lists. */
+@keyframes harmony-prism-enter {from{opacity:0}to{opacity:1}}
+@keyframes harmony-prism-drop {from{opacity:0;transform:translate3d(0,-6px,0) scale(.985)}to{opacity:1;transform:translate3d(0,0,0) scale(1)}}
+@keyframes harmony-prism-rail {from{opacity:.65;transform:translate3d(-8px,0,0)}to{opacity:1;transform:translate3d(0,0,0)}}
+@keyframes harmony-prism-soft-rise {from{opacity:.65;transform:translate3d(0,8px,0)}to{opacity:1;transform:translate3d(0,0,0)}}
+@keyframes harmony-prism-float {0%,100%{transform:translate3d(0,0,0) rotate(-7deg)}50%{transform:translate3d(0,-6px,0) rotate(-6deg)}}
+@keyframes harmony-prism-sheen {from{transform:translateX(-100%) skewX(-18deg)}to{transform:translateX(260%) skewX(-18deg)}}
+/* Avoid transform on full-page roots: fixed dialogs must retain viewport coords. */
+.harmony-workspace > :is(main,section):not(.harmony-module-subnav) {
+  animation:harmony-prism-enter var(--harmony-motion-enter) ease;
+}
+.harmony-motion-rail:not(.harmony-sidebar-mobile) .harmony-sidebar-panel {
+  animation:harmony-prism-rail 260ms var(--harmony-ease) both;
+}
+.harmony-motion-subnav {animation:harmony-prism-enter 240ms ease both}
+.harmony-motion-nav {transition:background-color var(--harmony-motion-normal) ease,box-shadow var(--harmony-motion-normal) ease,color var(--harmony-motion-normal) ease}
+.harmony-motion-nav .harmony-nav-icon {transition:transform var(--harmony-motion-normal) var(--harmony-ease),background-color var(--harmony-motion-normal) ease}
+.harmony-motion-nav:hover .harmony-nav-icon {transform:scale(1.045)}
+.harmony-motion-nav:active .harmony-nav-icon {transform:scale(.95)}
+.harmony-motion-metric {transition:transform var(--harmony-motion-normal) var(--harmony-ease),box-shadow var(--harmony-motion-normal) ease !important}
+.harmony-motion-metric:is(a,button):hover,.harmony-motion-action:hover {transform:translate3d(0,-2px,0)}
+.harmony-motion-metric:is(a,button):active,.harmony-motion-action:active {transform:translate3d(0,0,0) scale(.99)}
+.harmony-motion-action {transition:transform var(--harmony-motion-normal) var(--harmony-ease),box-shadow var(--harmony-motion-normal) ease,background-color var(--harmony-motion-normal) ease !important}
+.harmony-workspace :is(.harmony-button-primary,.harmony-button-secondary,.harmony-button-blue,.harmony-button-native,.harmony-topbar-action),
+.harmony-sidebar-panel .harmony-logout {
+  transition:background-color var(--harmony-motion-normal) ease,box-shadow var(--harmony-motion-normal) ease,filter var(--harmony-motion-fast) ease;
+}
+.harmony-workspace :is(.harmony-button-primary,.harmony-button-blue,.harmony-button-native):not(:disabled):hover {filter:brightness(1.045)}
+.harmony-workspace :is(.harmony-button-primary,.harmony-button-blue,.harmony-button-native):not(:disabled):active {filter:brightness(.97)}
+.harmony-motion-sculpture {animation:harmony-prism-float 8s ease-in-out infinite;transform-origin:center center}
+.harmony-motion-disclosure[open] > :not(summary) {animation:harmony-prism-enter 190ms ease both}
+.harmony-motion-disclosure > summary {transition:background-color var(--harmony-motion-normal) ease}
+.harmony-motion-disclosure > summary:hover {background:rgba(226,241,255,.57)}
+/* Portals are already fixed with their own explicit z-index; no positioning changes. */
+.harmony-notification-portal,.harmony-subnav-portal {animation:harmony-prism-drop 185ms var(--harmony-ease) both}
+.harmony-modal-surface {animation:harmony-prism-enter 170ms ease both}
+.harmony-hr-form-disclosure[open] .harmony-hr-form-body {animation:harmony-prism-enter 180ms ease both}
+/* Hover gleam is opt-in, only on interactive actions; no perpetual shimmer. */
+.harmony-motion-action {position:relative;isolation:isolate;overflow:hidden}
+.harmony-motion-action::after {
+  content:'';position:absolute;inset:0 auto 0 0;width:32%;pointer-events:none;
+  background:linear-gradient(103deg,transparent,rgba(255,255,255,.30),transparent);
+  transform:translateX(-130%) skewX(-18deg);opacity:0;
+}
+.harmony-motion-action:hover::after {opacity:1;animation:harmony-prism-sheen 720ms ease-out both}
+/* The entire UI stays usable via keyboard with visible focus, never hover-only. */
+.harmony-workspace :is(button,a,summary,[role='button']):focus-visible,
+.harmony-sidebar-panel :is(button,a):focus-visible {
+  outline:2px solid var(--harmony-prism-focus) !important;outline-offset:3px;
+}
+@media (max-width:767px) {
+  .harmony-motion-sculpture {animation:none}
+  .harmony-motion-action:hover,.harmony-motion-metric:is(a,button):hover {transform:none}
+}
+@media (prefers-reduced-motion:reduce) {
+  *,*::before,*::after {
+    animation-duration:.01ms !important;
+    animation-iteration-count:1 !important;
+    scroll-behavior:auto !important;
+    transition-duration:.01ms !important;
+  }
+  .harmony-motion-action::after {display:none}
+}
+@media (prefers-reduced-transparency:reduce) {
+  .harmony-workspace :is(.harmony-card,.harmony-card-solid,.harmony-card-soft,.harmony-metric-card,.harmony-unified-surface,.harmony-unified-toolbar),
+  .harmony-sidebar-panel,.harmony-topbar,.harmony-module-subnav,.harmony-mobile-topbar,.harmony-notification-portal {
+    background:#f1f7ff !important;
+    backdrop-filter:none !important;-webkit-backdrop-filter:none !important;
+  }
+}
+@media print {
+  *,*::before,*::after {animation:none !important;transition:none !important;filter:none !important}
+  body,.harmony-shell {background:#fff !important}
+  .harmony-workspace :is(.harmony-card,.harmony-card-solid,.harmony-unified-surface,.harmony-metric-card){background:#fff !important;box-shadow:none !important;border-color:#d8e0e9 !important}
+}
+
+/* Keep search input seamless inside the search capsule, including on focus. */
+.harmony-workspace .harmony-topbar-search :is(input,input:focus),
+.harmony-topbar-search :is(input,input:focus) {
+  background:transparent !important;border:0 !important;box-shadow:none !important;
+}
+
+/* HARMONY V3.8.2 modal hotfix — scoped to the employee request form.
+   The dialog is actually mounted on <body>; a sticky topbar cannot overlap it.
+   No changes to leave balances, permissions, approvals or upload workflow. */
+body > .harmony-modal-surface.harmony-leave-request-modal {
+  z-index: 2145 !important;
+  overscroll-behavior: contain;
+  overflow: hidden;
+  padding: clamp(10px, 2vw, 20px);
+}
+body > .harmony-leave-request-modal > :first-child {
+  width: min(100%, 896px);
+  max-width: 896px;
+  max-height: min(94dvh, 920px);
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(145deg, rgba(248,252,255,.96), rgba(216,234,253,.94)) !important;
+  border: 1px solid rgba(255,255,255,.92) !important;
+  border-radius: 26px;
+  overflow: hidden;
+}
+body > .harmony-leave-request-modal form {min-height:0;flex:1;}
+body > .harmony-leave-request-modal form > :first-child {
+  min-height: 0;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(85,132,187,.48) transparent;
+}
+body > .harmony-leave-request-modal .harmony-label {
+  margin-bottom: 7px;
+  color: #193659;
+  font-size: 13px;
+  font-weight: 700;
+}
+body > .harmony-leave-request-modal :is(.harmony-select,.harmony-input,.harmony-textarea) {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  border-radius: 16px;
+  background: linear-gradient(125deg,rgba(255,255,255,.86),rgba(231,242,255,.77)) !important;
+  border: 1px solid rgba(150,189,232,.78) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.92),0 2px 6px rgba(43,86,140,.045) !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+  color: #173759;
+  color-scheme: light;
+}
+body > .harmony-leave-request-modal :is(.harmony-select,.harmony-input) {min-height: 46px;}
+body > .harmony-leave-request-modal :is(.harmony-select,.harmony-input,.harmony-textarea):focus-visible {
+  border-color: #286ac2 !important;
+  outline: 2px solid rgba(32,103,190,.72);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px rgba(32,103,190,.10) !important;
+}
+body > .harmony-leave-request-modal :is(.harmony-select,.harmony-input):disabled {
+  cursor: not-allowed;
+  background: rgba(222,232,244,.87) !important;
+  color: #60748f !important;
+}
+body > .harmony-leave-request-modal .harmony-textarea::placeholder {color:#627b99;opacity:1;}
+@media(max-width:640px) {
+  body > .harmony-modal-surface.harmony-leave-request-modal {align-items:center;padding:8px;}
+  body > .harmony-leave-request-modal > :first-child {max-height:calc(100dvh - 16px);border-radius:19px;}
+  body > .harmony-leave-request-modal form > :last-child {padding:12px 14px;}
+}
+@media(prefers-reduced-transparency:reduce) {
+  body > .harmony-leave-request-modal > :first-child {background:#edf5ff !important;backdrop-filter:none !important;-webkit-backdrop-filter:none !important;}
+}
+
+/* Employee leave landing: one prominent hero, compact metrics, direct primary CTA.
+   Reuses the existing openForm callback; history, balances and actions unchanged. */
+.harmony-employee-leave-page .harmony-leave-hero {
+  min-height: 0 !important;
+  padding-block: clamp(17px,2.2vw,25px) !important;
+}
+.harmony-employee-leave-page .harmony-leave-hero-action {
+  background:linear-gradient(130deg,rgba(255,255,255,.96),rgba(232,245,255,.88)) !important;
+  color:#164b8a !important;
+  box-shadow:inset 0 1px 0 #fff,0 7px 18px rgba(20,69,145,.14) !important;
+}
+.harmony-employee-leave-page .harmony-leave-hero-action:hover {transform:translateY(-1px);}
+.harmony-employee-leave-page .harmony-leave-summary-grid > .harmony-metric-card {
+  min-width:0;
+  min-height:100px;
+  padding:15px 14px !important;
+}
+.harmony-employee-leave-page .harmony-leave-summary-grid > .harmony-metric-card h3 {font-size:clamp(19px,1.6vw,24px);}
+.harmony-employee-leave-page .harmony-leave-summary-grid > .harmony-metric-card p:first-child {font-size:12px;}
+body > .harmony-leave-request-modal .harmony-leave-submit {
+  background:linear-gradient(145deg,#3689e8,#1863ce) !important;
+  border:1px solid rgba(222,239,255,.85) !important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.46),0 5px 16px rgba(21,99,205,.20) !important;
+  color:#fff !important;
+}
+body > .harmony-leave-request-modal .harmony-leave-submit:hover:not(:disabled) {filter:brightness(1.06);}
+body > .harmony-leave-request-modal .harmony-leave-submit:focus-visible {outline:2px solid #1454ac;outline-offset:3px;}
+@media (prefers-reduced-motion:reduce) {
+ .harmony-employee-leave-page .harmony-leave-hero-action:hover {transform:none;}
+}

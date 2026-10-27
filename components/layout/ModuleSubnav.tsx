@@ -89,7 +89,7 @@ export function ModuleSubnav({role}:{role:NavigationRole}){
   const activeModule=resolveModule(role,pathname)
   if(!activeModule)return null
   const details=resolveDetailTabs(role,pathname)
-  return <div className="harmony-module-subnav sticky top-[70px] z-20 mx-3 mt-3 rounded-[18px] border border-white/75 bg-white/65 p-2 shadow-[0_7px_25px_rgba(58,72,96,.06)] backdrop-blur-2xl sm:mx-5 lg:top-0 lg:mx-6" aria-label={activeModule.title}>
+  return <div className="harmony-module-subnav harmony-motion-subnav sticky top-[70px] z-20 mx-3 mt-3 rounded-[18px] border border-white/75 bg-white/65 p-2 shadow-[0_7px_25px_rgba(58,72,96,.06)] backdrop-blur-2xl sm:mx-5 lg:top-0 lg:mx-6" aria-label={activeModule.title}>
     <TabRow key={pathname+"-main"} pathname={pathname} tabs={[...activeModule.tabs]}/>
     {details.length>0&&<div className="mt-1.5"><TabRow key={pathname+"-details"} pathname={pathname} tabs={details} secondary/></div>}
   </div>

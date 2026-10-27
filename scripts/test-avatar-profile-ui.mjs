@@ -1,0 +1,18 @@
+import assert from 'node:assert/strict'
+import fs from 'node:fs'
+const read=p=>fs.readFileSync(p,'utf8')
+const dossier=read('components/profile/ProfileWorkspace.tsx')
+const sidebar=read('components/layout/AppSidebar.tsx')
+const hook=read('components/profile/useEmployeeAvatar.ts')
+const docsApi=read('app/api/employee/profile/documents/route.ts')
+assert(dossier.includes('aria-label="Ganti foto profil"'),'Camera button missing')
+assert(dossier.includes("uploadDocument(chosen,'avatar')"),'Direct avatar upload missing')
+assert(dossier.includes('await load(documentCategory===\'avatar\')'),'Avatar refresh missing')
+assert(dossier.includes("new Event('harmony:avatar-updated')"),'Cross-shell avatar update missing')
+assert(dossier.includes('preserveDraft'),'Unsubmitted biodata must be preserved during avatar upload')
+assert(dossier.includes('lg:break-words')&&!dossier.includes('lg:grid-cols-[230px_minmax(0,1fr)]'),'Account navigation clipping fix missing')
+assert(dossier.includes('<details key={group}'),'Compact document categories missing')
+assert(hook.includes('harmonyFetch<ProfileDocuments>')&&hook.includes("document.category==='avatar'"),'Avatar must come from existing authorized profile API')
+assert(sidebar.includes('useEmployeeAvatar()')&&sidebar.includes('{profilePhoto?'),'Sidebar profile image missing')
+assert(docsApi.includes("requireProfileAccess(request)")&&docsApi.includes("category==='avatar'")&&docsApi.includes('createSignedUrl'),'Original private avatar API or access checks missing')
+console.log('HARMONY profile photo / icons / document grouping PASS')

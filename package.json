@@ -1,6 +1,6 @@
 {
   "name": "harmony",
-  "version": "3.8.0",
+  "version": "3.8.2",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -10,7 +10,11 @@
     "test:smoke": "node scripts/smoke-check.mjs",
     "test:ptkp": "node scripts/test-ptkp.cjs",
     "test:ui": "node scripts/test-ui-integrity.mjs",
-    "test:balance": "node scripts/test-annual-leave-correction.mjs"
+    "test:balance": "node scripts/test-annual-leave-correction.mjs",
+    "test:avatar": "node scripts/test-avatar-profile-ui.mjs",
+    "test:motion": "node scripts/test-motion-design.mjs",
+    "test:modal": "node scripts/test-leave-modal-portal.mjs",
+    "test:hr-modal": "node scripts/test-hr-employee-modal.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.107.0",

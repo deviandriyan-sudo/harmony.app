@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useId, useMemo, useState } from 'react'
 import type { FormEvent, ReactNode } from 'react'
 import Link from 'next/link'
 import {
@@ -24,6 +24,7 @@ import {
 } from 'lucide-react'
 
 import { Topbar } from '@/components/layout/Topbar'
+import { HarmonyModalPortal } from '@/components/ui/HarmonyModalPortal'
 import {
   HarmonyAttachmentViewer,
   HarmonyPendingAttachmentPicker,
@@ -1098,11 +1099,12 @@ export default function EmployeeLeavePage() {
   return (
     <>
       <Topbar
+        compact
         title="Cuti & Izin"
         description="Ajukan cuti, izin, sakit, tugas luar, klaim PHL, jenis ketidakhadiran custom, dan postpone sisa cuti tahunan."
       />
 
-      <section className="space-y-6 p-4 sm:p-6">
+      <section className="harmony-employee-leave-page space-y-5 p-4 sm:p-6">
         {successMessage && (
           <AlertBox tone="green" title="Berhasil" icon={<CheckCircle2 size={18} />}>
             {successMessage}
@@ -1115,30 +1117,37 @@ export default function EmployeeLeavePage() {
           </AlertBox>
         )}
 
-        <div className="harmony-hero-v25 p-5 sm:p-7">
+        <div className="harmony-hero-v25 harmony-leave-hero p-5 sm:p-6">
           <div className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-[#007aff]/35 blur-3xl" />
           <div className="pointer-events-none absolute -bottom-28 -left-20 h-72 w-72 rounded-full bg-[#34c759]/20 blur-3xl" />
 
-          <div className="relative flex flex-col gap-7">
-            <div>
-              <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-4 py-2 text-xs font-semibold text-white/75 backdrop-blur-xl">
+          <div className="relative flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div className="min-w-0">
+              <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-4 py-2 text-xs font-semibold text-white/75 backdrop-blur-xl">
                 <CalendarDays size={15} className="text-[#5ac8fa]" />
                 Employee Leave Request
               </div>
 
-              <h1 className="max-w-4xl text-3xl font-semibold tracking-[-0.045em] md:text-5xl">
+              <h1 className="max-w-4xl text-2xl font-semibold tracking-[-0.045em] md:text-3xl">
                 Cuti, Izin & PHL
               </h1>
 
-              <p className="mt-5 max-w-3xl text-sm leading-7 text-white/62">
+              <p className="mt-2 max-w-3xl text-sm leading-6 text-white/85">
                 Ajukan cuti, izin, sakit, tugas luar, klaim PHL, dan pantau status approval dalam satu dashboard.
               </p>
             </div>
-
+            <button
+              type="button"
+              onClick={openForm}
+              className="harmony-leave-hero-action inline-flex min-h-11 shrink-0 items-center justify-center gap-2 self-start rounded-2xl border border-white/75 bg-white/90 px-5 text-sm font-bold text-blue-800 shadow-[0_5px_18px_rgba(13,59,129,.16)] transition hover:bg-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white md:self-center"
+            >
+              <Plus size={18} />
+              Ajukan Cuti / Izin
+            </button>
           </div>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+        <div className="harmony-leave-summary-grid grid gap-3 md:grid-cols-2 xl:grid-cols-5">
           <SummaryCard
             title="Cuti Tahunan Matang"
             value={`${annualRegularRemaining} hari`}
@@ -1333,12 +1342,14 @@ function LeaveRequestModal({
   onSubmit: (event: FormEvent<HTMLFormElement>) => void
   onClose: () => void
 }) {
+  const titleId = useId()
+
   return (
-    <div className="harmony-modal-surface fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-3 backdrop-blur-sm sm:p-5">
+    <HarmonyModalPortal labelledBy={titleId} onClose={onClose} canClose={!submitting} className="harmony-leave-request-modal">
       <div className="flex max-h-[94vh] w-full max-w-4xl flex-col overflow-hidden rounded-[32px] bg-white shadow-[0_30px_90px_rgba(0,0,0,0.24)]">
         <div className="flex items-start justify-between gap-4 border-b border-black/5 p-5 sm:p-6">
           <div>
-            <h2 className="text-xl font-semibold text-[#1d1d1f]">
+            <h2 id={titleId} className="text-xl font-semibold text-[#1d1d1f]">
               Form Pengajuan Cuti / Izin / PHL
             </h2>
 
@@ -1352,6 +1363,7 @@ function LeaveRequestModal({
           <button
             type="button"
             onClick={onClose}
+            aria-label="Tutup form pengajuan"
             disabled={submitting}
             className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#f5f5f7] text-[#1d1d1f] transition hover:bg-[#e5e5ea] disabled:opacity-50"
           >
@@ -1374,10 +1386,12 @@ function LeaveRequestModal({
               supervisorTwo={supervisorTwo}
             />
 
-            <label className="block">
-              <span className="harmony-label">Jenis Pengajuan</span>
+            <div className="block">
+              <label htmlFor="harmony-leave-request-type" className="harmony-label">Jenis Pengajuan</label>
 
               <select
+                id="harmony-leave-request-type"
+                disabled={submitting}
                 value={form.request_type}
                 onChange={(event) => onUpdate('request_type', event.target.value as RequestType)}
                 className="harmony-select"
@@ -1409,7 +1423,7 @@ function LeaveRequestModal({
                   )}
                 </div>
               )}
-            </label>
+            </div>
 
             <div className="grid gap-4 md:grid-cols-2">
               <label className="block">
@@ -1418,6 +1432,7 @@ function LeaveRequestModal({
                 <input
                   type="date"
                   value={form.start_date}
+                  disabled={submitting}
                   onChange={(event) => onUpdate('start_date', event.target.value)}
                   className="harmony-input"
                 />
@@ -1430,7 +1445,7 @@ function LeaveRequestModal({
                   type="date"
                   value={form.end_date}
                   onChange={(event) => onUpdate('end_date', event.target.value)}
-                  disabled={form.request_type === 'phl_claim'}
+                  disabled={form.request_type === 'phl_claim' || submitting}
                   className="harmony-input disabled:cursor-not-allowed disabled:bg-[#f2f3f5] disabled:text-[#6e6e73]"
                 />
               </label>
@@ -1464,6 +1479,7 @@ function LeaveRequestModal({
 
               <textarea
                 value={form.reason}
+                disabled={submitting}
                 onChange={(event) => onUpdate('reason', event.target.value)}
                 placeholder="Tuliskan alasan pengajuan secara singkat dan jelas."
                 className="harmony-textarea"
@@ -1493,6 +1509,7 @@ function LeaveRequestModal({
 
                   <textarea
                     value={form.job_pending}
+                    disabled={submitting}
                     onChange={(event) => onUpdate('job_pending', event.target.value)}
                     placeholder="Contoh: follow up dokumen, pekerjaan yang harus dicek, atau pekerjaan yang belum selesai."
                     className="harmony-textarea"
@@ -1504,6 +1521,7 @@ function LeaveRequestModal({
 
                   <select
                     value={form.handover_to}
+                    disabled={submitting}
                     onChange={(event) => onUpdate('handover_to', event.target.value)}
                     className="harmony-select"
                   >
@@ -1531,6 +1549,7 @@ function LeaveRequestModal({
 
                   <textarea
                     value={form.handover_note}
+                    disabled={submitting}
                     onChange={(event) => onUpdate('handover_note', event.target.value)}
                     placeholder="Opsional: arahan tambahan untuk penerima job pending."
                     className="harmony-textarea"
@@ -1569,7 +1588,7 @@ function LeaveRequestModal({
               <button
                 type="submit"
                 disabled={submitting || loading}
-                className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-[#1d1d1f] px-5 text-sm font-bold text-white transition hover:bg-black disabled:cursor-not-allowed disabled:opacity-50"
+                className="harmony-leave-submit inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl px-5 text-sm font-bold text-white transition disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {submitting ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
                 {submitting ? 'Mengirim...' : `Ajukan ${selectedRequestMeta.label}`}
@@ -1578,7 +1597,7 @@ function LeaveRequestModal({
           </div>
         </form>
       </div>
-    </div>
+    </HarmonyModalPortal>
   )
 }
 

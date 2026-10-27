@@ -8,6 +8,7 @@ import { createPortal } from 'react-dom'
 import { Loader2, LogOut, Pin, PinOff } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { isNavigationActive, type NavigationItem } from '@/lib/navigation'
+import { useEmployeeAvatar } from '@/components/profile/useEmployeeAvatar'
 
 type Props = {
   menu: NavigationItem[]
@@ -25,10 +26,11 @@ export function AppSidebar({ menu, title = 'HARMONY', userName = 'HARMONY User',
   const [loggingOut, setLoggingOut] = useState(false)
   const [pinned, setPinned] = useState(false)
   const [portalReady, setPortalReady] = useState(false)
+  const profilePhoto = useEmployeeAvatar()
 
   // Portal the fixed desktop rail above page stacking contexts; the shared
   // workspace follows its current width through CSS during expand/collapse.
-  useEffect(() => { setPortalReady(true) }, [])
+  useEffect(() => { const timer=window.setTimeout(()=>setPortalReady(true),0);return()=>window.clearTimeout(timer) }, [])
 
   useEffect(() => {
     if (mobile) return
@@ -59,7 +61,7 @@ export function AppSidebar({ menu, title = 'HARMONY', userName = 'HARMONY User',
     } finally { setLoggingOut(false) }
   }
 
-  const sidebar = <aside className={`harmony-sidebar-shell ${mobile ? 'harmony-sidebar-mobile' : ''} ${pinned && !mobile ? 'harmony-sidebar-pinned' : ''}`} aria-label="Navigasi HARMONY">
+  const sidebar = <aside className={`harmony-sidebar-shell harmony-motion-rail ${mobile ? 'harmony-sidebar-mobile' : ''} ${pinned && !mobile ? 'harmony-sidebar-pinned' : ''}`} aria-label="Navigasi HARMONY">
     <div className="harmony-sidebar-panel flex h-full min-h-0 flex-col overflow-hidden rounded-[25px]">
       <header className="harmony-sidebar-header flex h-[72px] shrink-0 items-center gap-2 border-b px-[13px]">
         <div className="harmony-logo-glass flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-[15px] border">
@@ -81,7 +83,7 @@ export function AppSidebar({ menu, title = 'HARMONY', userName = 'HARMONY User',
             const active = isNavigationActive(pathname, item)
             const Icon = item.icon
             return <Link key={item.href} href={item.href} aria-label={item.title} onClick={onNavigate} aria-current={active ? 'page' : undefined}
-              className={`harmony-nav-item ${active ? 'harmony-nav-active' : ''} ${item.remed ? 'harmony-nav-remed' : ''} group flex h-[49px] items-center gap-[11px] rounded-[15px] px-[9px] text-slate-700 transition-colors duration-200 focus-visible:outline-2 focus-visible:outline-blue-500`}>
+              className={`harmony-nav-item harmony-motion-nav ${active ? 'harmony-nav-active' : ''} ${item.remed ? 'harmony-nav-remed' : ''} group flex h-[49px] items-center gap-[11px] rounded-[15px] px-[9px] text-slate-700 transition-colors duration-200 focus-visible:outline-2 focus-visible:outline-blue-500`}>
               <span className={`harmony-nav-icon flex h-[39px] w-[39px] shrink-0 items-center justify-center rounded-xl ${active ? 'bg-white/10 text-white' : item.remed ? 'bg-emerald-50 text-emerald-700' : 'bg-white/65 text-slate-600 group-hover:text-blue-600'}`}><Icon size={19} strokeWidth={2} /></span>
               <span className={`harmony-side-detail min-w-0 flex-1 truncate text-[13px] font-semibold ${active ? 'text-white' : 'text-slate-700'}`}>{item.title}</span>
             </Link>
@@ -91,7 +93,7 @@ export function AppSidebar({ menu, title = 'HARMONY', userName = 'HARMONY User',
 
       <footer className="harmony-sidebar-footer shrink-0 border-t px-[9px] py-3">
         <div className="flex min-h-[48px] items-center gap-[11px] px-[9px]" title={`${userName} · ${userRole}`}>
-          <div className="flex h-[39px] w-[39px] shrink-0 items-center justify-center rounded-xl bg-slate-900 text-[11px] font-bold text-white">{getInitials(userName)}</div>
+          <div className="flex h-[39px] w-[39px] shrink-0 items-center justify-center overflow-hidden rounded-xl border border-white/70 bg-slate-900 text-[11px] font-bold text-white">{profilePhoto?<Image unoptimized src={profilePhoto} width={39} height={39} alt={`Foto profil ${userName}`} className="h-full w-full object-cover"/>:getInitials(userName)}</div>
           <div className="harmony-side-detail min-w-0 flex-1"><p className="truncate text-xs font-bold text-slate-900">{userName}</p><p className="truncate text-[11px] text-slate-500">{userRole}</p></div>
         </div>
         <button type="button" onClick={handleLogout} disabled={loggingOut} title="Keluar" aria-label="Keluar"

@@ -2736,7 +2736,7 @@ function EmployeeFormModal({
         </div>
 
         <form onSubmit={onSubmit} className="flex min-h-0 flex-1 flex-col">
-          <div className="space-y-6 overflow-y-auto p-6">
+          <div className="harmony-hr-form-scroll space-y-6 overflow-y-auto p-6" role="region" aria-label="Kategori data karyawan" tabIndex={0}>
             {errorMessage ? (
               <div className="rounded-[20px] border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
                 {errorMessage}

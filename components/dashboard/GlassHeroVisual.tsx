@@ -4,7 +4,7 @@ import { CalendarCheck2, FileCheck2, ShieldCheck, WalletCards } from 'lucide-rea
 export function GlassHeroVisual({ role }: { role: 'hr' | 'employee' | 'finance' }) {
   const Icon = role === 'finance' ? WalletCards : role === 'employee' ? FileCheck2 : CalendarCheck2
   return (
-    <div className={`harmony-glass-scene harmony-glass-scene-${role}`} aria-hidden="true">
+    <div className={`harmony-glass-scene harmony-glass-scene-${role} harmony-motion-sculpture`} aria-hidden="true">
       <div className="harmony-scene-halo" />
       <div className="harmony-scene-disc harmony-scene-disc-back" />
       <div className="harmony-scene-disc harmony-scene-disc-front" />
