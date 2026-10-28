@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import type { SupabaseClient } from '@supabase/supabase-js'
 
 import {
   apiError,
@@ -10,13 +11,13 @@ import {
 
 export const runtime = 'nodejs'
 
-async function findAuthUserByEmail(admin: any, email: string) {
+async function findAuthUserByEmail(admin: SupabaseClient, email: string) {
   const list = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 })
   if (list.error) throw list.error
-  return list.data.users.find((item: any) => normalizeEmail(item.email) === email) || null
+  return list.data.users.find((item) => normalizeEmail(item.email) === email) || null
 }
 
-async function writeAudit(admin: any, actor: any, payload: Record<string, unknown>) {
+async function writeAudit(admin: SupabaseClient, actor: { id: string; email: string }, payload: Record<string, unknown>) {
   await admin.from('hr_setting_action_logs').insert({
     actor_user_id: actor.id,
     actor_email: actor.email,
@@ -36,8 +37,8 @@ export async function GET(request: NextRequest) {
     if (usersResult.error) throw usersResult.error
 
     const users = usersResult.data || []
-    const employeeIds = [...new Set(users.map((item: any) => item.employee_id).filter(Boolean))]
-    const employeesById = new Map<string, any>()
+    const employeeIds = [...new Set(users.map((item) => item.employee_id).filter(Boolean))]
+    const employeesById = new Map<string, { id: string; employee_number?: string | null; full_name?: string | null; email?: string | null; department?: string | null; position?: string | null; machine_pin?: string | null }>()
 
     if (employeeIds.length > 0) {
       const employeesResult = await admin
@@ -53,7 +54,7 @@ export async function GET(request: NextRequest) {
     }
 
     return NextResponse.json({
-      users: users.map((user: any) => ({
+      users: users.map((user) => ({
         ...user,
         employees: user.employee_id ? employeesById.get(user.employee_id) || null : null,
       })),
@@ -84,7 +85,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ message: 'Role hanya boleh employee atau hr.' }, { status: 400 })
     }
 
-    let employee: any = null
+    let employee: { id: string; employee_number?: string | null; full_name?: string | null; email?: string | null; department?: string | null; position?: string | null; is_active?: boolean | null } | null = null
     if (employeeId) {
       const employeeResult = await admin
         .from('employees')

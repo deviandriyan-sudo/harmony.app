@@ -170,8 +170,8 @@ export async function loadAttendanceReportingDataset(
   }
 
   const leaveRequests: AttendanceReportingRequest[] = (leaveResult.data || [])
-    .filter((item: any) => String(item.request_type || '').trim().toLowerCase() !== 'phl_claim')
-    .map((item: any) => ({
+    .filter((item) => String(item.request_type || '').trim().toLowerCase() !== 'phl_claim')
+    .map((item) => ({
     id: item.id,
     source_table: 'leave_requests',
     employee_id: item.employee_id,
@@ -192,7 +192,7 @@ export async function loadAttendanceReportingDataset(
     updated_at: item.updated_at,
   }))
 
-  const phlClaims: AttendanceReportingRequest[] = (phlResult.data || []).map((item: any) => ({
+  const phlClaims: AttendanceReportingRequest[] = (phlResult.data || []).map((item) => ({
     id: item.id,
     source_table: 'phl_records',
     employee_id: item.employee_id,
@@ -274,7 +274,11 @@ export function buildAttendanceReportingRows(
       }
     })
     .filter((row) => options.includeInactive || row.employee.is_active !== false || row.hasPeriodActivity)
-    .map(({ hasPeriodActivity: _hasPeriodActivity, ...row }) => row)
+    .map((row) => {
+      const output = { ...row }
+      Reflect.deleteProperty(output, 'hasPeriodActivity')
+      return output
+    })
     .sort((a, b) =>
       String(a.employee.full_name || a.employee.employee_number || a.employee.machine_pin || '').localeCompare(
         String(b.employee.full_name || b.employee.employee_number || b.employee.machine_pin || ''),

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffectEvent, useEffect, useMemo, useState } from 'react'
 import {
   AlertTriangle,
   Building2,
@@ -111,8 +111,9 @@ export default function EmployeeSettingsPage() {
     return getPasswordStrength(passwordForm.new_password)
   }, [passwordForm.new_password])
 
+  const onProfileLoad = useEffectEvent(fetchProfile)
   useEffect(() => {
-    fetchProfile()
+    onProfileLoad()
   }, [])
 
   async function resolveSupervisorLabel(value?: string | null) {
@@ -433,7 +434,7 @@ export default function EmployeeSettingsPage() {
         </div>
 
         {loading && (
-          <div className="harmony-card p-6 text-sm text-[#6e6e73]">
+          <div className="harmony-card p-6 text-sm harmony-text-secondary">
             Memuat data pengaturan...
           </div>
         )}
@@ -443,10 +444,10 @@ export default function EmployeeSettingsPage() {
             <div className="space-y-6">
               <div className="harmony-card overflow-hidden">
                 <div className="border-b border-black/5 p-6">
-                  <h3 className="text-lg font-semibold text-[#1d1d1f]">
+                  <h3 className="text-lg font-semibold harmony-text-primary">
                     Data Organisasi
                   </h3>
-                  <p className="mt-1 text-sm leading-6 text-[#6e6e73]">
+                  <p className="mt-1 text-sm leading-6 harmony-text-secondary">
                     Data berikut hanya dapat diperbarui oleh HR.
                   </p>
                 </div>
@@ -498,10 +499,10 @@ export default function EmployeeSettingsPage() {
 
               <div className="harmony-card overflow-hidden">
                 <div className="border-b border-black/5 p-6">
-                  <h3 className="text-lg font-semibold text-[#1d1d1f]">
+                  <h3 className="text-lg font-semibold harmony-text-primary">
                     Ubah Password
                   </h3>
-                  <p className="mt-1 text-sm leading-6 text-[#6e6e73]">
+                  <p className="mt-1 text-sm leading-6 harmony-text-secondary">
                     Password akan diperbarui langsung ke Supabase Auth.
                   </p>
                 </div>
@@ -545,10 +546,10 @@ export default function EmployeeSettingsPage() {
 
             <div className="harmony-card overflow-hidden">
               <div className="border-b border-black/5 p-6">
-                <h3 className="text-lg font-semibold text-[#1d1d1f]">
+                <h3 className="text-lg font-semibold harmony-text-primary">
                   Data Pribadi
                 </h3>
-                <p className="mt-1 text-sm leading-6 text-[#6e6e73]">
+                <p className="mt-1 text-sm leading-6 harmony-text-secondary">
                   Data berikut dapat diperbarui oleh employee dan otomatis tersimpan pada database HR.
                 </p>
               </div>
@@ -647,16 +648,16 @@ function ReadOnlyItem({
 }) {
   return (
     <div className="flex items-center gap-3 rounded-[22px] border border-black/5 bg-white/70 p-4 shadow-sm">
-      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#e8f2ff] text-[#007aff]">
+      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#e8f2ff] harmony-text-link">
         {icon}
       </div>
 
       <div className="min-w-0">
-        <p className="text-xs font-bold uppercase tracking-wide text-[#6e6e73]">
+        <p className="text-xs font-bold uppercase tracking-wide harmony-text-secondary">
           {label}
         </p>
 
-        <p className="mt-1 truncate text-sm font-semibold text-[#1d1d1f]">
+        <p className="mt-1 truncate text-sm font-semibold harmony-text-primary">
           {value}
         </p>
       </div>
@@ -685,7 +686,7 @@ function InputField({
 
       <div className="flex min-h-12 items-center gap-3 rounded-[22px] border border-white/80 bg-white/60 px-4 shadow-sm transition focus-within:border-[#007aff]/40 focus-within:bg-white focus-within:shadow-md">
         {icon && (
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[16px] bg-white/80 text-[#86868b] shadow-sm">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[16px] bg-white/80 harmony-text-muted shadow-sm">
             {icon}
           </div>
         )}
@@ -694,7 +695,7 @@ function InputField({
           value={value}
           onChange={(event) => onChange(event.target.value)}
           placeholder={placeholder}
-          className="min-h-12 w-full min-w-0 bg-transparent text-sm font-medium text-[#1d1d1f] outline-none placeholder:text-[#9a9aa0]"
+          className="min-h-12 w-full min-w-0 bg-transparent text-sm font-medium harmony-text-primary outline-none harmony-placeholder-muted"
         />
       </div>
     </label>
@@ -722,7 +723,7 @@ function TextareaField({
 
       <div className="flex min-h-32 items-start gap-3 rounded-[22px] border border-white/80 bg-white/60 px-4 py-3 shadow-sm transition focus-within:border-[#007aff]/40 focus-within:bg-white focus-within:shadow-md">
         {icon && (
-          <div className="mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-[16px] bg-white/80 text-[#86868b] shadow-sm">
+          <div className="mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-[16px] bg-white/80 harmony-text-muted shadow-sm">
             {icon}
           </div>
         )}
@@ -731,7 +732,7 @@ function TextareaField({
           value={value}
           onChange={(event) => onChange(event.target.value)}
           placeholder={placeholder}
-          className="min-h-28 w-full min-w-0 resize-none bg-transparent text-sm font-medium text-[#1d1d1f] outline-none placeholder:text-[#9a9aa0]"
+          className="min-h-28 w-full min-w-0 resize-none bg-transparent text-sm font-medium harmony-text-primary outline-none harmony-placeholder-muted"
         />
       </div>
     </label>
@@ -758,7 +759,7 @@ function PasswordField({
       </span>
 
       <div className="flex min-h-12 items-center gap-3 rounded-[22px] border border-white/80 bg-white/60 px-4 shadow-sm transition focus-within:border-[#007aff]/40 focus-within:bg-white focus-within:shadow-md">
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[16px] bg-white/80 text-[#86868b] shadow-sm">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[16px] bg-white/80 harmony-text-muted shadow-sm">
           <Lock size={17} />
         </div>
 
@@ -767,13 +768,13 @@ function PasswordField({
           value={value}
           onChange={(event) => onChange(event.target.value)}
           placeholder="Minimal 8 karakter"
-          className="min-h-12 w-full min-w-0 bg-transparent text-sm font-medium text-[#1d1d1f] outline-none placeholder:text-[#9a9aa0]"
+          className="min-h-12 w-full min-w-0 bg-transparent text-sm font-medium harmony-text-primary outline-none harmony-placeholder-muted"
         />
 
         <button
           type="button"
           onClick={onToggle}
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl text-[#86868b] transition hover:bg-white hover:text-[#1d1d1f]"
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl harmony-text-muted transition hover:bg-white harmony-hover-text-primary"
           aria-label={show ? 'Sembunyikan password' : 'Tampilkan password'}
         >
           {show ? <EyeOff size={17} /> : <Eye size={17} />}
@@ -809,7 +810,7 @@ function PasswordStrengthBox({
   return (
     <div className="rounded-[22px] border border-black/5 bg-[#f5f5f7]/75 p-4">
       <div className="flex items-center justify-between gap-4">
-        <p className="text-xs font-semibold uppercase tracking-wide text-[#6e6e73]">
+        <p className="text-xs font-semibold uppercase tracking-wide harmony-text-secondary">
           Kekuatan Password
         </p>
 

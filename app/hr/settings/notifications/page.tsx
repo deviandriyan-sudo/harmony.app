@@ -1,6 +1,8 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+
+import { readErrorMessage } from '@/lib/error-utils'
+import { useEffectEvent, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import {
   AlertTriangle,
@@ -110,8 +112,9 @@ export default function HRNotificationDiagnosticsPage() {
     ].includes(role)
   }, [appUser?.role])
 
+  const onInitialize = useEffectEvent(initialize)
   useEffect(() => {
-    initialize()
+    onInitialize()
   }, [])
 
   async function initialize() {
@@ -173,11 +176,11 @@ export default function HRNotificationDiagnosticsPage() {
       )
 
       await fetchDiagnostic()
-    } catch (error: any) {
+    } catch (error: unknown) {
       setMessage({
         type: 'error',
         text:
-          error?.message ||
+          readErrorMessage(error) ||
           'Diagnostik email belum dapat dibuka.',
       })
     } finally {
@@ -230,8 +233,8 @@ export default function HRNotificationDiagnosticsPage() {
         if (result?.paused || !result?.claimed || !result?.remaining) break
       }
       setMessage({ type: 'info', text: `${totalCompleted} notifikasi background selesai. ${lastMessage}` })
-    } catch (error: any) {
-      setMessage({ type: 'error', text: error?.message || 'Queue notifikasi gagal diproses.' })
+    } catch (error: unknown) {
+      setMessage({ type: 'error', text: readErrorMessage(error) || 'Queue notifikasi gagal diproses.' })
     } finally {
       await fetchNotificationQueue()
       setNotificationQueueProcessing(false)
@@ -275,8 +278,8 @@ export default function HRNotificationDiagnosticsPage() {
       const result = await response.json().catch(() => null)
       if (!response.ok) throw new Error(result?.message || 'Gagal mengulang antrean.')
       setMessage({ type: 'info', text: result.message || 'Antrean gagal telah diaktifkan kembali.' })
-    } catch (error: any) {
-      setMessage({ type: 'error', text: error?.message || 'Gagal memproses antrean.' })
+    } catch (error: unknown) {
+      setMessage({ type: 'error', text: readErrorMessage(error) || 'Gagal memproses antrean.' })
     } finally {
       await fetchAttendanceEmailQueue()
       setQueueProcessing(false)
@@ -302,8 +305,8 @@ export default function HRNotificationDiagnosticsPage() {
         if (result?.paused || !result?.claimed || !result?.remaining) break
       }
       setMessage({ type: 'info', text: `${totalSent} notifikasi berhasil diterima penyedia email. ${lastMessage}` })
-    } catch (error: any) {
-      setMessage({ type: 'error', text: error?.message || 'Proses antrean gagal.' })
+    } catch (error: unknown) {
+      setMessage({ type: 'error', text: readErrorMessage(error) || 'Proses antrean gagal.' })
     } finally {
       await fetchAttendanceEmailQueue()
       setQueueProcessing(false)
@@ -360,11 +363,11 @@ export default function HRNotificationDiagnosticsPage() {
         text:
           'Status konfigurasi email berhasil diperbarui.',
       })
-    } catch (error: any) {
+    } catch (error: unknown) {
       setMessage({
         type: 'error',
         text:
-          error?.message ||
+          readErrorMessage(error) ||
           'Status email gagal diperbarui.',
       })
     } finally {
@@ -428,11 +431,11 @@ export default function HRNotificationDiagnosticsPage() {
       })
 
       await fetchDiagnostic()
-    } catch (error: any) {
+    } catch (error: unknown) {
       setMessage({
         type: 'error',
         text:
-          error?.message ||
+          readErrorMessage(error) ||
           'Email test belum berhasil dikirim.',
       })
     } finally {
@@ -550,7 +553,7 @@ export default function HRNotificationDiagnosticsPage() {
                     Status Pusat Notifikasi
                   </div>
 
-                  <h1 className="mt-2 text-2xl font-bold tracking-tight text-[#1d1d1f]">
+                  <h1 className="mt-2 text-2xl font-bold tracking-tight harmony-text-primary">
                     {domain?.permissionLimited
                       ? 'Konfigurasi siap diuji'
                       : diagnostic?.ready
@@ -558,7 +561,7 @@ export default function HRNotificationDiagnosticsPage() {
                         : 'Email belum siap digunakan'}
                   </h1>
 
-                  <p className="mt-2 max-w-3xl text-sm leading-6 text-[#6e6e73]">
+                  <p className="mt-2 max-w-3xl text-sm leading-6 harmony-text-secondary">
                     Semua workflow email HARMONY memakai mesin pusat yang sama.
                     Jika status ini belum siap, notifikasi absensi, cuti, PHL,
                     postpone, approval, dan finalisasi juga akan gagal.
@@ -656,8 +659,8 @@ export default function HRNotificationDiagnosticsPage() {
             <section className="rounded-[24px] border border-black/5 bg-white/75 p-4 shadow-sm backdrop-blur-xl sm:p-5">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <h2 className="text-sm font-bold text-[#1d1d1f]">Background Notification Queue</h2>
-                  <p className="mt-1 text-xs text-[#6e6e73]">Notifikasi transaksi masuk database queue lebih dulu agar submit/approve tidak menunggu Resend. Worker memproses otomatis setelah response dan cron menjadi fallback.</p>
+                  <h2 className="text-sm font-bold harmony-text-primary">Background Notification Queue</h2>
+                  <p className="mt-1 text-xs harmony-text-secondary">Notifikasi transaksi masuk database queue lebih dulu agar submit/approve tidak menunggu Resend. Worker memproses otomatis setelah response dan cron menjadi fallback.</p>
                 </div>
                 <button type="button" onClick={() => processNotificationQueue(false)}
                   disabled={notificationQueueProcessing || !notificationQueue}
@@ -686,8 +689,8 @@ export default function HRNotificationDiagnosticsPage() {
             <section className="rounded-[24px] border border-black/5 bg-white/75 p-4 shadow-sm backdrop-blur-xl sm:p-5">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <h2 className="text-sm font-bold text-[#1d1d1f]">Notifikasi Upload Absensi</h2>
-                  <p className="mt-1 text-xs text-[#6e6e73]">Satu pemberitahuan per karyawan per periode. Pending otomatis dicoba ulang; Failed memerlukan pemeriksaan HR.</p>
+                  <h2 className="text-sm font-bold harmony-text-primary">Notifikasi Upload Absensi</h2>
+                  <p className="mt-1 text-xs harmony-text-secondary">Satu pemberitahuan per karyawan per periode. Pending otomatis dicoba ulang; Failed memerlukan pemeriksaan HR.</p>
                 </div>
                 <button type="button" onClick={processPendingAttendanceEmails}
                   disabled={queueProcessing || !attendanceQueue}
@@ -720,14 +723,14 @@ export default function HRNotificationDiagnosticsPage() {
             <section className="grid gap-5 xl:grid-cols-[1.05fr_0.95fr]">
               <div className="rounded-[30px] border border-black/5 bg-white p-5 shadow-sm sm:p-6">
                 <div className="flex items-start gap-3">
-                  <div className="rounded-2xl bg-[#e8f2ff] p-3 text-[#007aff]">
+                  <div className="rounded-2xl bg-[#e8f2ff] p-3 harmony-text-link">
                     <Send size={20} />
                   </div>
                   <div>
-                    <h2 className="text-lg font-bold text-[#1d1d1f]">
+                    <h2 className="text-lg font-bold harmony-text-primary">
                       Kirim Email Test
                     </h2>
-                    <p className="mt-1 text-sm leading-6 text-[#6e6e73]">
+                    <p className="mt-1 text-sm leading-6 harmony-text-secondary">
                       Gunakan email yang sudah terdaftar pada employees atau
                       app_users HARMONY.
                     </p>
@@ -780,10 +783,10 @@ export default function HRNotificationDiagnosticsPage() {
                     <ShieldCheck size={20} />
                   </div>
                   <div>
-                    <h2 className="text-lg font-bold text-[#1d1d1f]">
+                    <h2 className="text-lg font-bold harmony-text-primary">
                       Checklist Konfigurasi
                     </h2>
-                    <p className="mt-1 text-sm leading-6 text-[#6e6e73]">
+                    <p className="mt-1 text-sm leading-6 harmony-text-secondary">
                       Semua poin berikut harus aman sebelum email workflow dipakai.
                     </p>
                   </div>
@@ -888,7 +891,7 @@ function StatusCard({
       <p className="mt-4 text-[11px] font-bold uppercase tracking-wide text-slate-400">
         {label}
       </p>
-      <p className="mt-1 break-words text-sm font-bold text-[#1d1d1f]">
+      <p className="mt-1 break-words text-sm font-bold harmony-text-primary">
         {value}
       </p>
       {subvalue && (

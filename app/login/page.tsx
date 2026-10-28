@@ -1,5 +1,7 @@
 'use client'
 
+
+import { readErrorMessage } from '@/lib/error-utils'
 import Image from 'next/image'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
@@ -45,20 +47,25 @@ export default function LoginPage() {
   const [maintenanceMessage, setMaintenanceMessage] = useState('')
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search)
-    const googleError = params.get('google_error')
-    const info = params.get('info')
+    let active = true
+    queueMicrotask(() => {
+      if (!active) return
+      const params = new URLSearchParams(window.location.search)
+      const googleError = params.get('google_error')
+      const info = params.get('info')
 
-    if (googleError) {
-      setMessage(decodeURIComponent(googleError))
-      setMessageType('error')
-    } else if (info) {
-      setMessage(decodeURIComponent(info))
-      setMessageType('info')
-    }
+      if (googleError) {
+        setMessage(decodeURIComponent(googleError))
+        setMessageType('error')
+      } else if (info) {
+        setMessage(decodeURIComponent(info))
+        setMessageType('info')
+      }
 
-    loadSystemStatus()
-    checkExistingSession()
+      void loadSystemStatus()
+      void checkExistingSession()
+    })
+    return () => { active = false }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -142,8 +149,8 @@ export default function LoginPage() {
 
       if (error || !data.user) throw new Error(error?.message || 'Login gagal.')
       await redirectAuthenticatedUser()
-    } catch (error: any) {
-      setMessage(error?.message || 'Login gagal.')
+    } catch (error: unknown) {
+      setMessage(readErrorMessage(error) || 'Login gagal.')
       setLoading(false)
     }
   }

@@ -1,22 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import {
-  CalendarDays,
-  Building2,
-  Globe2,
-  Plus,
-  Search,
-  Save,
-  X,
-  Pencil,
-  Power,
-  RefreshCcw,
-  Sparkles,
-  CalendarCheck2,
-  Landmark,
-  BadgeCheck,
-} from 'lucide-react'
+import { CalendarDays, Building2, Globe2, Plus, Search, Save, X, Pencil, Power, RefreshCcw, Sparkles, CalendarCheck2, Landmark } from 'lucide-react'
 
 import { supabase } from '@/lib/supabase'
 import { Topbar } from '@/components/layout/Topbar'
@@ -79,7 +64,10 @@ export default function HRHolidaysPage() {
   }
 
   useEffect(() => {
-    fetchHolidays()
+    let active = true
+    // Start session/data loading after the effect setup, avoiding a cascading synchronous render.
+    queueMicrotask(() => { if (active) void fetchHolidays() })
+    return () => { active = false }
   }, [])
 
   function updateForm(
@@ -350,18 +338,18 @@ export default function HRHolidaysPage() {
           <div className="harmony-card harmony-slide-up overflow-hidden">
             <div className="flex flex-col gap-4 border-b border-black/5 bg-white/55 p-5 lg:flex-row lg:items-start lg:justify-between">
               <div>
-                <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-[#e8f2ff] px-3 py-1.5 text-xs font-bold text-[#0059b8]">
+                <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-[#e8f2ff] px-3 py-1.5 text-xs font-bold harmony-text-link">
                   <Sparkles size={14} />
                   Holiday Calendar
                 </div>
 
-                <h2 className="text-lg font-semibold text-[#1d1d1f]">
+                <h2 className="text-lg font-semibold harmony-text-primary">
                   {editingHolidayId
                     ? 'Edit Hari Libur'
                     : 'Tambah Hari Libur'}
                 </h2>
 
-                <p className="mt-1 text-sm text-[#6e6e73]">
+                <p className="mt-1 text-sm harmony-text-secondary">
                   {editingHolidayId
                     ? 'Perbarui tanggal, nama, jenis, sumber, dan status hari libur.'
                     : 'Tambahkan hari libur nasional, cuti bersama, atau libur perusahaan.'}
@@ -384,15 +372,15 @@ export default function HRHolidaysPage() {
             >
               <div className="rounded-[26px] border border-black/5 bg-white/60 p-5 shadow-sm">
                 <div className="mb-5 flex items-start gap-3">
-                  <div className="rounded-2xl bg-[#e8f2ff] p-3 text-[#007aff]">
+                  <div className="rounded-2xl bg-[#e8f2ff] p-3 harmony-text-link">
                     <CalendarDays size={18} />
                   </div>
 
                   <div>
-                    <h3 className="font-semibold text-[#1d1d1f]">
+                    <h3 className="font-semibold harmony-text-primary">
                       Detail Hari Libur
                     </h3>
-                    <p className="mt-1 text-sm leading-6 text-[#6e6e73]">
+                    <p className="mt-1 text-sm leading-6 harmony-text-secondary">
                       Data ini akan dipakai sistem untuk deteksi hari libur dan kandidat PHL.
                     </p>
                   </div>
@@ -509,16 +497,16 @@ export default function HRHolidaysPage() {
         <div className="harmony-card harmony-slide-up overflow-hidden">
           <div className="flex flex-col gap-4 border-b border-black/5 bg-white/55 p-5 xl:flex-row xl:items-center xl:justify-between">
             <div>
-              <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-[#f7edfc] px-3 py-1.5 text-xs font-bold text-[#7b2cbf]">
+              <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-[#f7edfc] px-3 py-1.5 text-xs font-bold harmony-text-violet">
                 <Landmark size={14} />
                 Holiday Master
               </div>
 
-              <h2 className="text-lg font-semibold text-[#1d1d1f]">
+              <h2 className="text-lg font-semibold harmony-text-primary">
                 Master Kalender Libur
               </h2>
 
-              <p className="mt-1 text-sm text-[#6e6e73]">
+              <p className="mt-1 text-sm harmony-text-secondary">
                 Semua tanggal libur di halaman ini dipakai untuk klasifikasi weekday/weekend/hari libur pada pengajuan PHL.
               </p>
             </div>
@@ -546,12 +534,12 @@ export default function HRHolidaysPage() {
 
           <div className="grid gap-3 border-b border-black/5 bg-white/35 p-5 xl:grid-cols-[1fr_200px_200px_180px]">
             <div className="flex min-h-11 items-center gap-3 rounded-2xl border border-black/5 bg-[#f5f5f7]/85 px-4 shadow-sm transition focus-within:border-[#007aff]/40 focus-within:bg-white focus-within:shadow-md">
-              <Search size={18} className="text-[#6e6e73]" />
+              <Search size={18} className="harmony-text-secondary" />
               <input
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
                 placeholder="Cari tanggal, nama, jenis..."
-                className="w-full bg-transparent text-sm outline-none placeholder:text-[#86868b]"
+                className="w-full bg-transparent text-sm outline-none harmony-placeholder-muted"
               />
             </div>
 
@@ -594,7 +582,7 @@ export default function HRHolidaysPage() {
           </div>
 
           {loading && (
-            <div className="p-6 text-sm text-[#6e6e73]">
+            <div className="p-6 text-sm harmony-text-secondary">
               Loading data hari libur...
             </div>
           )}
@@ -603,7 +591,7 @@ export default function HRHolidaysPage() {
             <div className="overflow-x-auto">
               <table className="w-full min-w-[1050px] border-collapse text-left text-sm">
                 <thead>
-                  <tr className="border-b border-black/5 bg-[#f5f5f7]/90 text-xs uppercase tracking-wide text-[#6e6e73]">
+                  <tr className="border-b border-black/5 bg-[#f5f5f7]/90 text-xs uppercase tracking-wide harmony-text-secondary">
                     <th className="w-[14%] px-5 py-4 font-semibold">Tanggal</th>
                     <th className="w-[29%] px-5 py-4 font-semibold">Nama Libur</th>
                     <th className="w-[17%] px-5 py-4 font-semibold">Jenis</th>
@@ -622,15 +610,15 @@ export default function HRHolidaysPage() {
                     >
                       <td className="px-5 py-3.5">
                         <div className="flex items-center gap-3">
-                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#e8f2ff] text-[#007aff]">
+                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#e8f2ff] harmony-text-link">
                             <CalendarDays size={18} />
                           </div>
 
                           <div>
-                            <div className="font-semibold text-[#1d1d1f]">
+                            <div className="font-semibold harmony-text-primary">
                               {formatDisplayDate(holiday.holiday_date)}
                             </div>
-                            <div className="mt-1 text-xs text-[#6e6e73]">
+                            <div className="mt-1 text-xs harmony-text-secondary">
                               {formatDayName(holiday.holiday_date)}
                             </div>
                           </div>
@@ -638,10 +626,10 @@ export default function HRHolidaysPage() {
                       </td>
 
                       <td className="px-5 py-3.5">
-                        <div className="font-semibold text-[#1d1d1f]">
+                        <div className="font-semibold harmony-text-primary">
                           {holiday.holiday_name || '-'}
                         </div>
-                        <div className="mt-1 text-xs text-[#6e6e73]">
+                        <div className="mt-1 text-xs harmony-text-secondary">
                           {holiday.holiday_date || '-'}
                         </div>
                       </td>
@@ -650,11 +638,11 @@ export default function HRHolidaysPage() {
                         <HolidayTypeBadge type={holiday.holiday_type || '-'} />
                       </td>
 
-                      <td className="px-5 py-3.5 text-[#1d1d1f]">
+                      <td className="px-5 py-3.5 harmony-text-primary">
                         {holiday.year || '-'}
                       </td>
 
-                      <td className="px-5 py-3.5 text-[#1d1d1f]">
+                      <td className="px-5 py-3.5 harmony-text-primary">
                         {formatSource(holiday.source || '-')}
                       </td>
 
@@ -668,7 +656,7 @@ export default function HRHolidaysPage() {
                             type="button"
                             onClick={() => handleEdit(holiday)}
                             title="Edit hari libur"
-                            className="flex h-9 w-9 items-center justify-center rounded-2xl border border-black/5 bg-white text-[#1d1d1f] shadow-sm transition hover:-translate-y-0.5 hover:bg-[#f5f5f7] hover:shadow-md"
+                            className="flex h-9 w-9 items-center justify-center rounded-2xl border border-black/5 bg-white harmony-text-primary shadow-sm transition hover:-translate-y-0.5 hover:bg-[#f5f5f7] hover:shadow-md"
                           >
                             <Pencil size={15} />
                           </button>
@@ -695,15 +683,15 @@ export default function HRHolidaysPage() {
 
               {filteredHolidays.length === 0 && (
                 <div className="p-8 text-center">
-                  <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-3xl bg-[#f5f5f7] text-[#007aff]">
+                  <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-3xl bg-[#f5f5f7] harmony-text-link">
                     <CalendarDays size={24} />
                   </div>
 
-                  <h3 className="mt-4 font-semibold text-[#1d1d1f]">
+                  <h3 className="mt-4 font-semibold harmony-text-primary">
                     Data hari libur tidak ditemukan
                   </h3>
 
-                  <p className="mt-1 text-sm text-[#6e6e73]">
+                  <p className="mt-1 text-sm harmony-text-secondary">
                     Coba ubah filter pencarian, tahun, jenis, atau status.
                   </p>
                 </div>
@@ -730,10 +718,10 @@ function SummaryCard({
   tone: 'blue' | 'green' | 'orange' | 'purple' | 'red'
 }) {
   const toneClass = {
-    blue: 'text-[#007aff] bg-[#e8f2ff]',
-    green: 'text-[#168034] bg-[#eaf8ee]',
-    orange: 'text-[#b35b00] bg-[#fff4e5]',
-    purple: 'text-[#7b2cbf] bg-[#f7edfc]',
+    blue: 'harmony-text-link bg-[#e8f2ff]',
+    green: 'harmony-text-success bg-[#eaf8ee]',
+    orange: 'harmony-text-warning bg-[#fff4e5]',
+    purple: 'harmony-text-violet bg-[#f7edfc]',
     red: 'text-red-700 bg-red-50',
   }[tone]
 
@@ -741,15 +729,15 @@ function SummaryCard({
     <div className="harmony-metric-card harmony-slide-up p-5">
       <div className="flex items-center justify-between gap-4">
         <div className="min-w-0">
-          <p className="truncate text-sm text-[#6e6e73]">
+          <p className="truncate text-sm harmony-text-secondary">
             {title}
           </p>
 
-          <h3 className="mt-2 truncate text-2xl font-semibold tracking-tight text-[#1d1d1f]">
+          <h3 className="mt-2 truncate text-2xl font-semibold tracking-tight harmony-text-primary">
             {value}
           </h3>
 
-          <p className="mt-1 line-clamp-1 text-xs leading-5 text-[#86868b]">
+          <p className="mt-1 line-clamp-1 text-xs leading-5 harmony-text-muted">
             {description}
           </p>
         </div>

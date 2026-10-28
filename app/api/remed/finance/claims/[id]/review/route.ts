@@ -1,3 +1,5 @@
+
+import { readErrorMessage } from '@/lib/error-utils'
 import { NextRequest, NextResponse } from 'next/server'
 import { requireRemedApi, remedApiError } from '@/lib/server/remed-api-auth'
 import { notifyRemedFinanceDecision } from '@/lib/server/workflow-notifications'
@@ -47,12 +49,12 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
         ctx.access.email,
         note,
       )
-    } catch (notificationError: any) {
+    } catch (notificationError: unknown) {
       notification = {
         ok: false,
         sent: 0,
         failed: 1,
-        message: notificationError?.message || 'Notifikasi email keputusan Finance gagal diproses.',
+        message: readErrorMessage(notificationError) || 'Notifikasi email keputusan Finance gagal diproses.',
       }
       console.warn('Re-Med Finance email notification warning:', notificationError)
     }

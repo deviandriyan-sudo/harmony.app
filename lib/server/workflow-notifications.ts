@@ -17,7 +17,16 @@ export type WorkflowNotificationResult = {
   details?: Array<{ target: string; ok: boolean; message: string }>
 }
 
-type RemedClaimContext = any & {
+type RemedClaimContext = {
+  id: string
+  claim_number?: string | null
+  approved_amount?: number | null
+  submitted_amount?: number | null
+  treatment_date?: string | null
+  employee_note?: string | null
+  finance_note?: string | null
+  hr_note?: string | null
+  provider_name?: string | null
   employee?: {
     id?: string | null
     full_name?: string | null
@@ -107,7 +116,7 @@ async function getRemedRoleEmails(admin: SupabaseClient, role: 'hr' | 'finance')
     .eq('role', role)
     .eq('is_active', true)
 
-  let emails = uniqueEmails((data || []).map((row: any) => row.email))
+  let emails = uniqueEmails((data || []).map((row) => row.email))
 
   if (role === 'hr' && emails.length === 0) {
     const fallback = await admin
@@ -117,8 +126,8 @@ async function getRemedRoleEmails(admin: SupabaseClient, role: 'hr' | 'finance')
 
     emails = uniqueEmails(
       (fallback.data || [])
-        .filter((row: any) => clean(row.role).toLowerCase().includes('hr'))
-        .map((row: any) => row.email),
+        .filter((row) => clean(row.role).toLowerCase().includes('hr'))
+        .map((row) => row.email),
     )
   }
 

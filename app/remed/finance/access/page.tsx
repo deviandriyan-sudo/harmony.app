@@ -67,8 +67,8 @@ export default function Page() {
       <RemedPageHeader eyebrow="Re-Med · Finance" title="Profil & Keamanan Finance" description="Identitas akses Finance dan keamanan akun HARMONY." icon={ShieldCheck} />
 
       <div className="harmony-unified-surface p-6">
-        <p className="text-lg font-bold text-[#17181b]">{session?.userName || 'Finance'}</p>
-        <p className="mt-1 text-sm text-[#747982]">{session?.email || '-'}</p>
+        <p className="text-lg font-bold harmony-text-primary">{session?.userName || 'Finance'}</p>
+        <p className="mt-1 text-sm harmony-text-secondary">{session?.email || '-'}</p>
         <div className="mt-5 rounded-[18px] border border-emerald-100 bg-emerald-50 p-4 text-sm leading-6 text-emerald-800">
           Akses Finance hanya berlaku untuk modul Re-Med dan tidak memberikan akses HR HARMONY.
         </div>
@@ -80,8 +80,8 @@ export default function Page() {
             <KeyRound size={20} />
           </div>
           <div>
-            <h2 className="font-bold text-[#17181b]">Ganti Password</h2>
-            <p className="mt-1 text-sm text-[#747982]">Setelah password berubah, HARMONY mengirim email keamanan ke email akun Finance.</p>
+            <h2 className="font-bold harmony-text-primary">Ganti Password</h2>
+            <p className="mt-1 text-sm harmony-text-secondary">Setelah password berubah, HARMONY mengirim email keamanan ke email akun Finance.</p>
           </div>
         </div>
 
@@ -90,7 +90,7 @@ export default function Page() {
           <PasswordField label="Konfirmasi Password" value={confirmPassword} show={showConfirmPassword} onChange={setConfirmPassword} onToggle={() => setShowConfirmPassword((value) => !value)} />
         </div>
 
-        {newPassword && <p className="mt-3 text-xs font-semibold text-[#747982]">Kekuatan password: {passwordStrength}</p>}
+        {newPassword && <p className="mt-3 text-xs font-semibold harmony-text-secondary">Kekuatan password: {passwordStrength}</p>}
         {message && <div className="mt-4 rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">{message}</div>}
         {error && <div className="mt-4 rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
 
@@ -118,7 +118,7 @@ function PasswordField({
 }) {
   return (
     <label className="block">
-      <span className="text-xs font-bold uppercase tracking-wide text-[#747982]">{label}</span>
+      <span className="text-xs font-bold uppercase tracking-wide harmony-text-secondary">{label}</span>
       <div className="mt-2 flex min-h-12 items-center rounded-2xl border border-black/10 bg-white px-4">
         <input
           type={show ? 'text' : 'password'}
@@ -128,7 +128,7 @@ function PasswordField({
           autoComplete="new-password"
           className="min-w-0 flex-1 bg-transparent text-sm outline-none"
         />
-        <button type="button" onClick={onToggle} className="ml-2 text-[#747982]" aria-label={show ? 'Sembunyikan password' : 'Tampilkan password'}>
+        <button type="button" onClick={onToggle} className="ml-2 harmony-text-secondary" aria-label={show ? 'Sembunyikan password' : 'Tampilkan password'}>
           {show ? <EyeOff size={17} /> : <Eye size={17} />}
         </button>
       </div>

@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+
+import { readErrorMessage } from '@/lib/error-utils'
+import { useEffectEvent, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import {
   AlertTriangle,
@@ -426,11 +428,11 @@ export default function EmployeeAttendancePage() {
   // Satu tanggal hanya boleh masuk SATU kartu ringkasan.
   // Ini mencegah manual attendance terhitung sebagai Hadir + Incomplete
   // atau Hadir + Tanpa Data secara bersamaan.
-  const summaryBuckets = useMemo(() => {
-    return calendarRows.map((row) =>
-      classifyAttendanceSummary(row, getDraft(row)),
-    );
-  }, [calendarRows, rowDrafts]);
+  // Satu periode maksimal 31 hari; hitung ulang dari draft terbaru setiap render.
+  // Menghindari memo yang berisiko menggunakan callback getDraft dari render lama.
+  const summaryBuckets = calendarRows.map((row) =>
+    classifyAttendanceSummary(row, getDraft(row)),
+  );
 
   const presentCount = summaryBuckets.filter(
     (bucket) => bucket === "present",
@@ -440,9 +442,7 @@ export default function EmployeeAttendancePage() {
     (bucket) => bucket === "incomplete",
   ).length;
 
-  const noRecordCount = summaryBuckets.filter(
-    (bucket) => bucket === "no_record",
-  ).length;
+
 
   const phlCandidateCount = summaryBuckets.filter(
     (bucket) => bucket === "phl",
@@ -460,8 +460,9 @@ export default function EmployeeAttendancePage() {
     periodTotals.sick +
     periodTotals.officialTravel;
 
+  const onPeriodLoad = useEffectEvent(fetchData)
   useEffect(() => {
-    fetchData();
+    onPeriodLoad();
   }, [periodMonth]);
 
   async function fetchData(resetMessage = true) {
@@ -745,12 +746,7 @@ export default function EmployeeAttendancePage() {
     );
   }
 
-  function hasResettableVerification(row: CalendarDayRow) {
-    return (
-      hasLocalResettableVerification(row) ||
-      hasDatabaseEmployeeVerification(row)
-    );
-  }
+
 
   function canShowResetButton(row: CalendarDayRow) {
     // Tombol selalu dirender. Fungsi ini menentukan apakah tombol aktif.
@@ -889,9 +885,9 @@ export default function EmployeeAttendancePage() {
       );
 
       await fetchData(false);
-    } catch (error: any) {
+    } catch (error: unknown) {
       setErrorMessage(
-        error?.message ||
+        readErrorMessage(error) ||
           "Terjadi kesalahan saat mereset verifikasi absensi.",
       );
     } finally {
@@ -1004,11 +1000,11 @@ export default function EmployeeAttendancePage() {
         existing_proof_url: existingProofUrl,
         existing_proof_name: existingProofName,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       setLiveManualRecord(null);
       setLiveManualForm(createLiveManualForm(date));
       setErrorMessage(
-        error?.message || "Data absensi manual harian gagal dimuat.",
+        readErrorMessage(error) || "Data absensi manual harian gagal dimuat.",
       );
     } finally {
       setLiveManualLoading(false);
@@ -1234,9 +1230,9 @@ export default function EmployeeAttendancePage() {
       if (savedPeriod === periodMonth) {
         await fetchData(false);
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       setErrorMessage(
-        error?.message || "Terjadi kesalahan saat menyimpan absensi manual.",
+        readErrorMessage(error) || "Terjadi kesalahan saat menyimpan absensi manual.",
       );
     } finally {
       setLiveManualSaving(false);
@@ -1438,9 +1434,9 @@ export default function EmployeeAttendancePage() {
       );
 
       await fetchData(false);
-    } catch (error: any) {
+    } catch (error: unknown) {
       setErrorMessage(
-        error?.message ||
+        readErrorMessage(error) ||
           "Terjadi kesalahan saat menyimpan absensi manual.",
       );
     } finally {
@@ -1497,8 +1493,8 @@ export default function EmployeeAttendancePage() {
           "Submit periode berhasil dibatalkan. Data kembali dapat diedit sebelum dikirim ulang.",
       );
       await fetchData(false);
-    } catch (cancelError: any) {
-      setErrorMessage(cancelError?.message || "Submit periode gagal dibatalkan.");
+    } catch (cancelError: unknown) {
+      setErrorMessage(readErrorMessage(cancelError) || "Submit periode gagal dibatalkan.");
     } finally {
       setCancellingPeriod(false);
     }
@@ -1815,9 +1811,9 @@ export default function EmployeeAttendancePage() {
               ? "attendance_phl_support"
               : "attendance_support",
           });
-        } catch (attachmentError: any) {
+        } catch (attachmentError: unknown) {
           setErrorMessage(
-            `Data ${formatDisplayDate(row.date)} tersimpan, tetapi lampiran tambahan gagal: ${attachmentError?.message || "terjadi kendala"}.`,
+            `Data ${formatDisplayDate(row.date)} tersimpan, tetapi lampiran tambahan gagal: ${readErrorMessage(attachmentError) || "terjadi kendala"}.`,
           );
           setSubmittingPeriod(false);
           return;
@@ -1934,11 +1930,11 @@ export default function EmployeeAttendancePage() {
         totalRecipients: result.sent,
         message: result.message,
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       return {
         sent: false,
         totalRecipients: 0,
-        message: error?.message || "Email notifikasi gagal dikirim.",
+        message: readErrorMessage(error) || "Email notifikasi gagal dikirim.",
       };
     }
   }
@@ -2203,23 +2199,23 @@ export default function EmployeeAttendancePage() {
 
           <div className="relative flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
             <div className="max-w-3xl">
-              <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-[#007aff]/15 bg-white px-3 py-1.5 text-xs font-bold text-[#0059b8] shadow-sm">
+              <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-[#007aff]/15 bg-white px-3 py-1.5 text-xs font-bold harmony-text-link shadow-sm">
                 <Clock3 size={15} />
                 Absensi Harian · Tidak Menunggu Periode
               </div>
 
-              <h2 className="text-xl font-semibold tracking-tight text-[#1d1d1f] sm:text-2xl">
+              <h2 className="text-xl font-semibold tracking-tight harmony-text-primary sm:text-2xl">
                 Sedang bekerja di luar kantor dan tidak bisa fingerprint?
               </h2>
 
-              <p className="mt-2 text-sm leading-6 text-[#6e6e73]">
+              <p className="mt-2 text-sm leading-6 harmony-text-secondary">
                 Simpan jam masuk/pulang manual dan bukti langsung pada hari
                 kejadian. Data akan otomatis ikut muncul pada periode absensi
                 yang sesuai, meskipun file fingerprint periode tersebut belum
                 di-upload HR.
               </p>
 
-              <div className="mt-3 flex flex-wrap gap-2 text-[11px] font-semibold text-[#6e6e73]">
+              <div className="mt-3 flex flex-wrap gap-2 text-[11px] font-semibold harmony-text-secondary">
                 <span className="rounded-full bg-white px-3 py-1.5 shadow-sm">
                   Tersimpan langsung ke database
                 </span>
@@ -2358,11 +2354,11 @@ export default function EmployeeAttendancePage() {
           <div className="border-b border-black/5 p-4 sm:p-6">
             <div className="flex min-w-0 flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
               <div className="min-w-0">
-                <h2 className="text-lg font-semibold text-[#1d1d1f]">
+                <h2 className="text-lg font-semibold harmony-text-primary">
                   Rekap Absensi Pribadi
                 </h2>
 
-                <p className="mt-1 text-sm text-[#6e6e73]">
+                <p className="mt-1 text-sm harmony-text-secondary">
                   Periode {formatDisplayDate(periodRange.start)} s.d.{" "}
                   {formatDisplayDate(periodRange.end)}.
                 </p>
@@ -2370,7 +2366,7 @@ export default function EmployeeAttendancePage() {
 
               <div className="flex w-full min-w-0 flex-col gap-3 xl:w-auto xl:max-w-none">
                 <div className="flex min-w-0 flex-wrap items-center gap-2 rounded-[24px] border border-[#d8e8ff] bg-[#f7fbff] p-3">
-                  <div className="mr-1 flex items-center gap-2 text-xs font-bold text-[#0059b8]">
+                  <div className="mr-1 flex items-center gap-2 text-xs font-bold harmony-text-link">
                     <CalendarDays size={15} />
                     Periode Absensi
                   </div>
@@ -2409,7 +2405,7 @@ export default function EmployeeAttendancePage() {
                     ))}
                   </select>
 
-                  <div className="inline-flex min-h-11 items-center rounded-2xl border border-[#d8e8ff] bg-white px-4 text-xs font-semibold text-[#3a3a3c]">
+                  <div className="inline-flex min-h-11 items-center rounded-2xl border border-[#d8e8ff] bg-white px-4 text-xs font-semibold harmony-text-primary">
                     Aktif: {getPeriodLabel(periodMonth)}
                   </div>
 
@@ -2439,7 +2435,7 @@ export default function EmployeeAttendancePage() {
           </div>
 
           {loading && (
-            <div className="flex items-center gap-3 p-6 text-sm text-[#6e6e73]">
+            <div className="flex items-center gap-3 p-6 text-sm harmony-text-secondary">
               <RefreshCcw size={18} className="animate-spin" />
               Memuat data absensi...
             </div>
@@ -2498,11 +2494,11 @@ export default function EmployeeAttendancePage() {
                   <div className="rounded-[28px] border border-black/5 bg-white/70 p-5 shadow-sm">
                     <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                       <div>
-                        <h3 className="text-lg font-semibold text-[#1d1d1f]">
+                        <h3 className="text-lg font-semibold harmony-text-primary">
                           Ringkasan Terakhir
                         </h3>
 
-                        <p className="mt-1 text-sm text-[#6e6e73]">
+                        <p className="mt-1 text-sm harmony-text-secondary">
                           Snapshot absensi terakhir dan ringkasan periode aktif.
                         </p>
                       </div>
@@ -2531,7 +2527,7 @@ export default function EmployeeAttendancePage() {
                         />
                       </div>
                     ) : (
-                      <div className="mt-5 rounded-[24px] border border-dashed border-black/10 bg-[#f5f5f7]/70 p-6 text-sm text-[#6e6e73]">
+                      <div className="mt-5 rounded-[24px] border border-dashed border-black/10 bg-[#f5f5f7]/70 p-6 text-sm harmony-text-secondary">
                         Belum ada data absensi pada periode ini, tetapi employee
                         tetap bisa menambahkan keterangan manual per tanggal
                         selama periode belum dikunci atau belum disubmit.
@@ -2542,10 +2538,10 @@ export default function EmployeeAttendancePage() {
                   <div>
                     <div className="mb-3 flex items-center justify-between gap-3">
                       <div>
-                        <h3 className="text-base font-semibold text-[#1d1d1f]">
+                        <h3 className="text-base font-semibold harmony-text-primary">
                           Summary Periode
                         </h3>
-                        <p className="mt-1 text-sm text-[#6e6e73]">
+                        <p className="mt-1 text-sm harmony-text-secondary">
                           Ringkasan kehadiran periode aktif tepat di atas detail absensi.
                         </p>
                       </div>
@@ -2606,17 +2602,17 @@ export default function EmployeeAttendancePage() {
 
               <div className="flex flex-col gap-4 border-b border-black/5 bg-[#f5f5f7]/70 p-6 xl:flex-row xl:items-center xl:justify-between">
                 <div>
-                  <h3 className="text-base font-semibold text-[#1d1d1f]">
+                  <h3 className="text-base font-semibold harmony-text-primary">
                     Konfirmasi Absensi Periode
                   </h3>
 
-                  <p className="mt-1 text-sm leading-6 text-[#6e6e73]">
+                  <p className="mt-1 text-sm leading-6 harmony-text-secondary">
                     Centang seluruh hari sebagai tanda verifikasi employee. Setelah
                     checklist 100%, tombol Submit/Kirim Ulang akan mengirim seluruh
                     data relevan periode tanggal 11 sampai 10 ke atasan.
                   </p>
 
-                  <p className="mt-1 text-xs font-semibold text-[#007aff]">
+                  <p className="mt-1 text-xs font-semibold harmony-text-link">
                     Checklist review: {selectedRows.length} dari {selectableRows.length}{" "}
                     hari. Submit tetap mencakup seluruh periode.
                   </p>
@@ -2717,11 +2713,11 @@ export default function EmployeeAttendancePage() {
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
-                          <p className="text-sm font-bold text-[#1d1d1f]">
+                          <p className="text-sm font-bold harmony-text-primary">
                             {formatDisplayDate(row.date)}
                           </p>
 
-                          <p className="mt-1 text-xs font-semibold text-[#6e6e73]">
+                          <p className="mt-1 text-xs font-semibold harmony-text-secondary">
                             {row.day_name}
                           </p>
 
@@ -2769,12 +2765,12 @@ export default function EmployeeAttendancePage() {
                         />
 
                         <div className="rounded-2xl bg-[#f5f5f7]/80 p-3">
-                          <p className="mb-2 text-[11px] font-bold uppercase tracking-wide text-[#86868b]">
+                          <p className="mb-2 text-[11px] font-bold uppercase tracking-wide harmony-text-muted">
                             Status
                           </p>
 
                           {isOffDayNoAttendance ? (
-                            <span className="inline-flex rounded-full bg-white/80 px-3 py-1 text-xs font-bold text-[#6e6e73]">
+                            <span className="inline-flex rounded-full bg-white/80 px-3 py-1 text-xs font-bold harmony-text-secondary">
                               {row.holiday_name ? "Libur" : "Weekend"}
                             </span>
                           ) : (
@@ -2785,14 +2781,14 @@ export default function EmployeeAttendancePage() {
 
                       <div className="mt-4 space-y-3">
                         <div className="rounded-2xl bg-[#f5f5f7]/80 p-3">
-                          <p className="mb-2 text-[11px] font-bold uppercase tracking-wide text-[#86868b]">
+                          <p className="mb-2 text-[11px] font-bold uppercase tracking-wide harmony-text-muted">
                             Keterangan
                           </p>
                           <RequestLabelBadge row={row} draft={draft} />
                         </div>
 
                         <div className="rounded-2xl bg-[#f5f5f7]/80 p-3">
-                          <p className="mb-2 text-[11px] font-bold uppercase tracking-wide text-[#86868b]">
+                          <p className="mb-2 text-[11px] font-bold uppercase tracking-wide harmony-text-muted">
                             Validasi
                           </p>
                           <ValidationInfo row={row} draft={draft} />
@@ -2801,7 +2797,7 @@ export default function EmployeeAttendancePage() {
                         <div className="rounded-2xl bg-[#f5f5f7]/80 p-3">
                           <div className="flex items-center justify-between gap-3">
                             <div>
-                              <p className="mb-2 text-[11px] font-bold uppercase tracking-wide text-[#86868b]">
+                              <p className="mb-2 text-[11px] font-bold uppercase tracking-wide harmony-text-muted">
                                 Approval
                               </p>
                               <ApprovalBadge
@@ -2818,7 +2814,7 @@ export default function EmployeeAttendancePage() {
                                 type="button"
                                 disabled={isReadOnlyPeriod || submittingPeriod}
                                 onClick={() => openEdit(row)}
-                                className="inline-flex min-h-10 shrink-0 items-center justify-center gap-2 rounded-2xl bg-[#e8f2ff] px-4 text-xs font-bold text-[#0059b8] transition hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
+                                className="inline-flex min-h-10 shrink-0 items-center justify-center gap-2 rounded-2xl bg-[#e8f2ff] px-4 text-xs font-bold harmony-text-link transition hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
                               >
                                 <PencilLine size={15} />
                                 Lengkapi
@@ -2858,7 +2854,7 @@ export default function EmployeeAttendancePage() {
               <div className="hidden overflow-x-auto 2xl:block">
                 <table className="min-w-[1320px] w-full table-fixed border-collapse text-left text-[12px]">
                   <thead>
-                    <tr className="border-b border-black/5 bg-[#f5f5f7]/90 text-xs uppercase tracking-wide text-[#6e6e73]">
+                    <tr className="border-b border-black/5 bg-[#f5f5f7]/90 text-xs uppercase tracking-wide harmony-text-secondary">
                       <th className="w-[58px] px-3 py-3 text-center font-semibold">
                         Cek
                       </th>
@@ -2923,7 +2919,7 @@ export default function EmployeeAttendancePage() {
                             />
                           </td>
 
-                          <td className="px-3 py-3 font-semibold text-[#1d1d1f]">
+                          <td className="px-3 py-3 font-semibold harmony-text-primary">
                             {formatDisplayDate(row.date)}
 
                             {row.holiday_name && (
@@ -2933,7 +2929,7 @@ export default function EmployeeAttendancePage() {
                             )}
                           </td>
 
-                          <td className="px-3 py-3 text-[#6e6e73]">
+                          <td className="px-3 py-3 harmony-text-secondary">
                             {row.day_name}
                           </td>
 
@@ -2965,13 +2961,13 @@ export default function EmployeeAttendancePage() {
                             />
                           </td>
 
-                          <td className="px-3 py-3 align-top text-[#1d1d1f]">
+                          <td className="px-3 py-3 align-top harmony-text-primary">
                             {formatDuration(row.log?.work_duration_minutes)}
                           </td>
 
                           <td className="px-3 py-3 align-top">
                             {isOffDayNoAttendance ? (
-                              <span className="inline-flex rounded-full bg-white/80 px-3 py-1 text-xs font-bold text-[#6e6e73]">
+                              <span className="inline-flex rounded-full bg-white/80 px-3 py-1 text-xs font-bold harmony-text-secondary">
                                 {row.holiday_name ? "Libur" : "Weekend"}
                               </span>
                             ) : (
@@ -3006,7 +3002,7 @@ export default function EmployeeAttendancePage() {
                                 type="button"
                                 disabled={isReadOnlyPeriod || submittingPeriod}
                                 onClick={() => openEdit(row)}
-                                className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-2xl bg-[#e8f2ff] px-3 text-[11px] font-bold text-[#0059b8] transition hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
+                                className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-2xl bg-[#e8f2ff] px-3 text-[11px] font-bold harmony-text-link transition hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
                               >
                                 <PencilLine size={15} />
                                 Lengkapi
@@ -3126,16 +3122,16 @@ function LiveManualAttendanceModal({
       <div className="flex max-h-[94vh] w-full max-w-3xl flex-col overflow-hidden rounded-[32px] bg-white shadow-[0_32px_100px_rgba(0,0,0,0.28)]">
         <div className="flex items-start justify-between gap-4 border-b border-black/5 p-5 sm:p-6">
           <div>
-            <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-[#e8f2ff] px-3 py-1.5 text-xs font-bold text-[#0059b8]">
+            <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-[#e8f2ff] px-3 py-1.5 text-xs font-bold harmony-text-link">
               <Clock3 size={14} />
               Absensi Manual Harian
             </div>
 
-            <h2 className="text-xl font-semibold text-[#1d1d1f] sm:text-2xl">
+            <h2 className="text-xl font-semibold harmony-text-primary sm:text-2xl">
               Kehadiran di Luar Kantor
             </h2>
 
-            <p className="mt-1 text-sm leading-6 text-[#6e6e73]">
+            <p className="mt-1 text-sm leading-6 harmony-text-secondary">
               {employee?.full_name || "Employee"} · data disimpan sekarang dan
               akan otomatis masuk ke periode yang sesuai.
             </p>
@@ -3145,7 +3141,7 @@ function LiveManualAttendanceModal({
             type="button"
             onClick={onClose}
             disabled={saving}
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#f5f5f7] text-[#1d1d1f] disabled:opacity-50"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#f5f5f7] harmony-text-primary disabled:opacity-50"
           >
             <X size={18} />
           </button>
@@ -3176,7 +3172,7 @@ function LiveManualAttendanceModal({
           </div>
 
           {loading ? (
-            <div className="flex items-center gap-3 rounded-[22px] bg-[#f5f5f7] p-4 text-sm text-[#6e6e73]">
+            <div className="flex items-center gap-3 rounded-[22px] bg-[#f5f5f7] p-4 text-sm harmony-text-secondary">
               <RefreshCcw size={17} className="animate-spin" />
               Mengecek data tanggal ini...
             </div>
@@ -3226,7 +3222,7 @@ function LiveManualAttendanceModal({
                 }
                 className="harmony-input disabled:cursor-not-allowed disabled:opacity-60"
               />
-              <p className="mt-1 text-[11px] leading-5 text-[#86868b]">
+              <p className="mt-1 text-[11px] leading-5 harmony-text-muted">
                 Bisa diisi lebih dulu saat mulai bekerja.
               </p>
             </label>
@@ -3242,7 +3238,7 @@ function LiveManualAttendanceModal({
                 }
                 className="harmony-input disabled:cursor-not-allowed disabled:opacity-60"
               />
-              <p className="mt-1 text-[11px] leading-5 text-[#86868b]">
+              <p className="mt-1 text-[11px] leading-5 harmony-text-muted">
                 Dapat ditambahkan kemudian pada tanggal yang sama.
               </p>
             </label>
@@ -3332,10 +3328,10 @@ function LiveManualStatusBox({
 }) {
   return (
     <div className="rounded-2xl border border-black/5 bg-[#f5f5f7]/80 p-4">
-      <p className="text-[10px] font-bold uppercase tracking-wide text-[#86868b]">
+      <p className="text-[10px] font-bold uppercase tracking-wide harmony-text-muted">
         {label}
       </p>
-      <p className="mt-1 text-sm font-semibold text-[#1d1d1f]">{value}</p>
+      <p className="mt-1 text-sm font-semibold harmony-text-primary">{value}</p>
     </div>
   );
 }
@@ -3370,11 +3366,11 @@ function EditAttendanceModal({
       <div className="flex max-h-[92vh] w-full max-w-3xl flex-col overflow-hidden rounded-[32px] bg-white shadow-[0_30px_90px_rgba(0,0,0,0.24)]">
         <div className="flex items-start justify-between gap-4 border-b border-black/5 p-6">
           <div>
-            <h2 className="text-xl font-semibold text-[#1d1d1f]">
+            <h2 className="text-xl font-semibold harmony-text-primary">
               Lengkapi Absensi
             </h2>
 
-            <p className="mt-1 text-sm leading-6 text-[#6e6e73]">
+            <p className="mt-1 text-sm leading-6 harmony-text-secondary">
               {formatDisplayDate(row.date)} · {row.day_name}
             </p>
           </div>
@@ -3382,7 +3378,7 @@ function EditAttendanceModal({
           <button
             type="button"
             onClick={onClose}
-            className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#f5f5f7] text-[#1d1d1f]"
+            className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#f5f5f7] harmony-text-primary"
           >
             <X size={18} />
           </button>
@@ -3443,8 +3439,8 @@ function EditAttendanceModal({
             </select>
           </label>
 
-          <div className="rounded-[22px] border border-black/5 bg-[#f5f5f7]/80 p-4 text-sm leading-6 text-[#6e6e73]">
-            <p className="font-semibold text-[#1d1d1f]">{meta.label}</p>
+          <div className="rounded-[22px] border border-black/5 bg-[#f5f5f7]/80 p-4 text-sm leading-6 harmony-text-secondary">
+            <p className="font-semibold harmony-text-primary">{meta.label}</p>
             <p className="mt-1">{getDailyTypeDescription(draft.daily_type)}</p>
           </div>
 
@@ -3603,7 +3599,7 @@ function AttendanceCheckButton({
         "mx-auto flex h-9 w-9 items-center justify-center rounded-2xl border text-xs font-bold transition disabled:cursor-not-allowed disabled:opacity-60",
         selected
           ? "border-[#007aff] bg-[#007aff] text-white shadow-sm"
-          : "border-[#007aff]/30 bg-white text-[#007aff] hover:border-[#007aff] hover:bg-[#e8f2ff]",
+          : "border-[#007aff]/30 bg-white harmony-text-link hover:border-[#007aff] hover:bg-[#e8f2ff]",
       ].join(" ")}
       title={selected ? "Batalkan pilihan" : "Pilih hari absensi"}
     >
@@ -3625,7 +3621,7 @@ function RequestLabelBadge({
 }) {
   if (row.log?.phl_work_request_id) {
     return (
-      <span className="inline-flex rounded-full bg-[#f3e8ff] px-3 py-1 text-xs font-bold text-[#7b2cbf]">
+      <span className="inline-flex rounded-full bg-[#f3e8ff] px-3 py-1 text-xs font-bold harmony-text-violet">
         PHL Approved
       </span>
     );
@@ -3633,7 +3629,7 @@ function RequestLabelBadge({
 
   if (isOffDayPHLOptOut(row, draft)) {
     return (
-      <span className="inline-flex rounded-full bg-[#e8f2ff] px-3 py-1 text-xs font-bold text-[#0059b8]">
+      <span className="inline-flex rounded-full bg-[#e8f2ff] px-3 py-1 text-xs font-bold harmony-text-link">
         Tidak Mengajukan PHL
       </span>
     );
@@ -3644,14 +3640,14 @@ function RequestLabelBadge({
 
   if (isOffDayWithoutAttendance(row, draft)) {
     return (
-      <span className="inline-flex rounded-full bg-white/80 px-3 py-1 text-xs font-bold text-[#6e6e73]">
+      <span className="inline-flex rounded-full bg-white/80 px-3 py-1 text-xs font-bold harmony-text-secondary">
         {getOffDayLabel(row)}
       </span>
     );
   }
 
   return (
-    <span className="inline-flex rounded-full bg-[#f5f5f7] px-3 py-1 text-xs font-bold text-[#1d1d1f]">
+    <span className="inline-flex rounded-full bg-[#f5f5f7] px-3 py-1 text-xs font-bold harmony-text-primary">
       {label}
     </span>
   );
@@ -3672,8 +3668,8 @@ function ValidationInfo({
   if (row.log?.phl_work_request_id) {
     return (
       <div className="space-y-1">
-        <p className="text-xs font-bold text-[#7b2cbf]">PHL sudah disetujui</p>
-        <p className="text-xs leading-5 text-[#6e6e73]">
+        <p className="text-xs font-bold harmony-text-violet">PHL sudah disetujui</p>
+        <p className="text-xs leading-5 harmony-text-secondary">
           Saldo berasal dari workflow PHL terpisah dan hanya ditautkan ke absensi ini.
         </p>
       </div>
@@ -3683,8 +3679,8 @@ function ValidationInfo({
   if (isOffDayPHLOptOut(row, draft)) {
     return (
       <div className="space-y-1">
-        <p className="text-xs font-bold text-[#0059b8]">PHL tidak diajukan</p>
-        <p className="text-xs leading-5 text-[#6e6e73]">
+        <p className="text-xs font-bold harmony-text-link">PHL tidak diajukan</p>
+        <p className="text-xs leading-5 harmony-text-secondary">
           Hari non-kerja. Bukti perintah atasan tidak diwajibkan.
         </p>
       </div>
@@ -3694,8 +3690,8 @@ function ValidationInfo({
   if (isOffDayWithoutAttendance(row, draft)) {
     return (
       <div className="space-y-1">
-        <p className="text-xs font-bold text-[#6e6e73]">Hari non-kerja</p>
-        <p className="text-xs leading-5 text-[#86868b]">
+        <p className="text-xs font-bold harmony-text-secondary">Hari non-kerja</p>
+        <p className="text-xs leading-5 harmony-text-muted">
           Tidak dihitung sebagai hari cuti.
         </p>
       </div>
@@ -3705,8 +3701,8 @@ function ValidationInfo({
   if (phl) {
     return (
       <div className="space-y-1">
-        <p className="text-xs font-bold text-[#7b2cbf]">Potensi PHL</p>
-        <p className="text-xs leading-5 text-[#6e6e73]">
+        <p className="text-xs font-bold harmony-text-violet">Potensi PHL</p>
+        <p className="text-xs leading-5 harmony-text-secondary">
           Wajib bukti perintah atasan.
         </p>
       </div>
@@ -3716,8 +3712,8 @@ function ValidationInfo({
   if (meta.isAbsenceLike) {
     return (
       <div className="space-y-1">
-        <p className="text-xs font-bold text-[#0059b8]">{meta.label}</p>
-        <p className="text-xs leading-5 text-[#6e6e73]">
+        <p className="text-xs font-bold harmony-text-link">{meta.label}</p>
+        <p className="text-xs leading-5 harmony-text-secondary">
           Menunggu validasi atasan.
         </p>
       </div>
@@ -3728,7 +3724,7 @@ function ValidationInfo({
     return (
       <div className="space-y-1">
         <p className="text-xs font-bold text-orange-700">Perlu koreksi jam</p>
-        <p className="text-xs leading-5 text-[#6e6e73]">
+        <p className="text-xs leading-5 harmony-text-secondary">
           Check in/out belum lengkap.
         </p>
       </div>
@@ -3739,7 +3735,7 @@ function ValidationInfo({
     return (
       <div className="space-y-1">
         <p className="text-xs font-bold text-red-700">Perlu keterangan</p>
-        <p className="text-xs leading-5 text-[#6e6e73]">
+        <p className="text-xs leading-5 harmony-text-secondary">
           Tidak ada data mesin.
         </p>
       </div>
@@ -3752,16 +3748,16 @@ function ValidationInfo({
 function TimeCell({ value, manual }: { value: string; manual: boolean }) {
   return (
     <div>
-      <div className="flex items-center gap-2 font-semibold text-[#1d1d1f]">
+      <div className="flex items-center gap-2 font-semibold harmony-text-primary">
         <Timer
           size={14}
-          className={manual ? "text-[#007aff]" : "text-[#86868b]"}
+          className={manual ? "harmony-text-link" : "harmony-text-muted"}
         />
         {value}
       </div>
 
       {manual && (
-        <p className="mt-1 text-[11px] font-bold text-[#007aff]">Manual</p>
+        <p className="mt-1 text-[11px] font-bold harmony-text-link">Manual</p>
       )}
     </div>
   );
@@ -3778,20 +3774,20 @@ function MobileInfoBox({
 }) {
   return (
     <div className="rounded-2xl bg-[#f5f5f7]/80 p-3">
-      <p className="text-[11px] font-bold uppercase tracking-wide text-[#86868b]">
+      <p className="text-[11px] font-bold uppercase tracking-wide harmony-text-muted">
         {label}
       </p>
 
-      <div className="mt-2 flex items-center gap-2 font-semibold text-[#1d1d1f]">
+      <div className="mt-2 flex items-center gap-2 font-semibold harmony-text-primary">
         <Timer
           size={14}
-          className={manual ? "text-[#007aff]" : "text-[#86868b]"}
+          className={manual ? "harmony-text-link" : "harmony-text-muted"}
         />
         <span className="truncate">{value}</span>
       </div>
 
       {manual && (
-        <p className="mt-1 text-[11px] font-bold text-[#007aff]">Manual</p>
+        <p className="mt-1 text-[11px] font-bold harmony-text-link">Manual</p>
       )}
     </div>
   );
@@ -3802,7 +3798,7 @@ function ReadOnlyBox({ label, value }: { label: string; value: string }) {
     <div>
       <span className="harmony-label">{label}</span>
 
-      <div className="flex min-h-12 items-center rounded-[18px] border border-black/5 bg-[#f5f5f7]/85 px-4 text-sm font-semibold text-[#1d1d1f]">
+      <div className="flex min-h-12 items-center rounded-[18px] border border-black/5 bg-[#f5f5f7]/85 px-4 text-sm font-semibold harmony-text-primary">
         {value}
       </div>
     </div>
@@ -3834,24 +3830,24 @@ function SummaryCard({
   tone: "blue" | "green" | "orange" | "red" | "purple";
 }) {
   const toneClass = {
-    blue: "text-[#007aff] bg-[#e8f2ff]",
-    green: "text-[#168034] bg-[#eaf8ee]",
-    orange: "text-[#b35b00] bg-[#fff4e5]",
+    blue: "harmony-text-link bg-[#e8f2ff]",
+    green: "harmony-text-success bg-[#eaf8ee]",
+    orange: "harmony-text-warning bg-[#fff4e5]",
     red: "text-red-700 bg-red-50",
-    purple: "text-[#7b2cbf] bg-[#f7edfc]",
+    purple: "harmony-text-violet bg-[#f7edfc]",
   }[tone];
 
   return (
     <div className="harmony-metric-card p-6">
       <div className="flex items-center justify-between gap-4">
         <div className="min-w-0">
-          <p className="truncate text-sm text-[#6e6e73]">{title}</p>
+          <p className="truncate text-sm harmony-text-secondary">{title}</p>
 
-          <h3 className="mt-2 truncate text-3xl font-semibold tracking-tight text-[#1d1d1f]">
+          <h3 className="mt-2 truncate text-3xl font-semibold tracking-tight harmony-text-primary">
             {value}
           </h3>
 
-          <p className="mt-1 line-clamp-1 text-xs leading-5 text-[#86868b]">
+          <p className="mt-1 line-clamp-1 text-xs leading-5 harmony-text-muted">
             {description}
           </p>
         </div>
@@ -3865,9 +3861,9 @@ function SummaryCard({
 function MiniInfoCard({ title, value }: { title: string; value: string }) {
   return (
     <div className="rounded-[22px] border border-black/5 bg-[#f5f5f7]/70 p-4">
-      <p className="truncate text-xs font-semibold text-[#6e6e73]">{title}</p>
+      <p className="truncate text-xs font-semibold harmony-text-secondary">{title}</p>
 
-      <p className="mt-2 truncate text-xl font-semibold text-[#1d1d1f]">
+      <p className="mt-2 truncate text-xl font-semibold harmony-text-primary">
         {value}
       </p>
     </div>
@@ -3907,16 +3903,16 @@ function StatusBadge({
             : status === "phl" ||
                 status === "pending_phl" ||
                 status === "phl_claim"
-              ? "bg-[#f7edfc] text-[#7b2cbf]"
+              ? "bg-[#f7edfc] harmony-text-violet"
               : status === "leave" ||
                   status.includes("leave") ||
                   status === "permit"
-                ? "bg-[#e8f2ff] text-[#0059b8]"
+                ? "bg-[#e8f2ff] harmony-text-link"
                 : status === "sick"
-                  ? "bg-[#f7edfc] text-[#7b2cbf]"
+                  ? "bg-[#f7edfc] harmony-text-violet"
                   : status === "official_travel"
-                    ? "bg-[#eef1f5] text-[#3a3a3c]"
-                    : "bg-[#f5f5f7] text-[#6e6e73]";
+                    ? "bg-[#eef1f5] harmony-text-primary"
+                    : "bg-[#f5f5f7] harmony-text-secondary";
 
   return (
     <span
@@ -3935,7 +3931,7 @@ function ApprovalBadge({ status }: { status: string }) {
         ? "bg-red-50 text-red-700"
         : status === "pending"
           ? "bg-orange-50 text-orange-700"
-          : "bg-[#f5f5f7] text-[#6e6e73]";
+          : "bg-[#f5f5f7] harmony-text-secondary";
 
   return (
     <span
@@ -3946,33 +3942,7 @@ function ApprovalBadge({ status }: { status: string }) {
   );
 }
 
-function PeriodStatusBadge({
-  period,
-}: {
-  period: AttendancePeriodConfirmation | null;
-}) {
-  const locked = Boolean(period?.is_locked);
 
-  const className = locked
-    ? "bg-red-50 text-red-700"
-    : period?.hr_status === "finalized"
-      ? "bg-green-50 text-green-700"
-      : period?.supervisor_status === "approved"
-        ? "bg-green-50 text-green-700"
-        : period?.supervisor_status === "pending"
-          ? "bg-orange-50 text-orange-700"
-          : period?.supervisor_status === "rejected"
-            ? "bg-red-50 text-red-700"
-            : "bg-[#f5f5f7] text-[#6e6e73]";
-
-  return (
-    <span
-      className={`inline-flex rounded-full px-3 py-1 text-xs font-bold ${className}`}
-    >
-      {formatPeriodStatus(period)}
-    </span>
-  );
-}
 
 function hasAttendanceActivity(row: CalendarDayRow, draft?: RowDraft) {
   return Boolean(
@@ -4711,27 +4681,6 @@ function formatApprovalStatus(status: string) {
   return status || "-";
 }
 
-function formatPeriodStatus(period: AttendancePeriodConfirmation | null) {
-  if (!period) return "Belum disubmit ke atasan.";
-  if (period.is_locked) return "Dikunci HR.";
-  if (period.hr_status === "finalized") return "Sudah difinalisasi HR.";
-  if (period.hr_status === "ready_for_hr")
-    return "Sudah disetujui atasan dan siap diproses HR.";
-  if (period.supervisor_status === "approved")
-    return "Sudah disetujui atasan dan menunggu HR.";
-  if (period.supervisor_status === "rejected")
-    return "Ditolak atasan. Perlu revisi employee.";
-  if (period.supervisor_status === "pending")
-    return "Sudah dikirim dan sedang menunggu approval atasan.";
-  if (period.employee_status === "submitted")
-    return "Sudah disubmit oleh employee.";
-
-  return "Belum disubmit ke atasan.";
-}
-
-function isValidEmail(value: string) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || "").trim());
-}
 
 function formatDuration(value: number | null | undefined) {
   if (value === null || value === undefined) return "-";

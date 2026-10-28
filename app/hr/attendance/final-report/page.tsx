@@ -1,5 +1,7 @@
 'use client'
 
+
+import { readErrorMessage } from '@/lib/error-utils'
 import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
@@ -265,8 +267,8 @@ export default function HRAttendanceFinalReportPage() {
       setConfirmations((confirmationResult.data || []) as Confirmation[])
       setLogs((logResult.data || []) as Log[])
       setHolidays((holidayResult.data || []) as AttendanceHoliday[])
-    } catch (error: any) {
-      setErrorMessage(error?.message || 'Data finalisasi HR gagal dimuat.')
+    } catch (error: unknown) {
+      setErrorMessage(readErrorMessage(error) || 'Data finalisasi HR gagal dimuat.')
     } finally {
       setLoading(false)
     }
@@ -441,8 +443,8 @@ export default function HRAttendanceFinalReportPage() {
         `${row.employee.full_name || 'Karyawan'} berhasil difinalisasi dan dikunci. ${updatedLogs?.length || 0} log menjadi Final HR.`,
       )
       await fetchData()
-    } catch (error: any) {
-      setErrorMessage(error?.message || 'Finalisasi HR gagal.')
+    } catch (error: unknown) {
+      setErrorMessage(readErrorMessage(error) || 'Finalisasi HR gagal.')
     } finally {
       setProcessingId('')
     }
@@ -506,7 +508,7 @@ export default function HRAttendanceFinalReportPage() {
             </label>
 
             <div className="flex min-h-12 items-center gap-2 rounded-2xl border border-black/5 bg-[#f5f5f7] px-4">
-              <Search size={16} className="text-[#86868b]" />
+              <Search size={16} className="harmony-text-muted" />
               <input
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
@@ -543,14 +545,14 @@ export default function HRAttendanceFinalReportPage() {
           </div>
 
           {loading ? (
-            <div className="flex items-center gap-3 p-7 text-sm text-[#6e6e73]">
+            <div className="flex items-center gap-3 p-7 text-sm harmony-text-secondary">
               <Loader2 size={18} className="animate-spin" /> Memuat status finalisasi...
             </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="min-w-[1500px] w-full border-collapse text-left text-xs">
                 <thead>
-                  <tr className="border-b border-black/5 bg-[#f5f5f7] text-[#6e6e73]">
+                  <tr className="border-b border-black/5 bg-[#f5f5f7] harmony-text-secondary">
                     <Th>Karyawan</Th>
                     <Th>Submit</Th>
                     <Th>Atasan</Th>
@@ -565,8 +567,8 @@ export default function HRAttendanceFinalReportPage() {
                   {filteredRows.map((row) => (
                     <tr key={row.employee.id} className="border-b border-black/5 hover:bg-[#fafafa]">
                       <Td>
-                        <div className="font-bold text-[#1d1d1f]">{row.employee.full_name || '-'}</div>
-                        <div className="mt-1 text-[11px] text-[#86868b]">
+                        <div className="font-bold harmony-text-primary">{row.employee.full_name || '-'}</div>
+                        <div className="mt-1 text-[11px] harmony-text-muted">
                           {row.employee.employee_number || '-'} · {row.employee.department || '-'}
                         </div>
                       </Td>
@@ -575,7 +577,7 @@ export default function HRAttendanceFinalReportPage() {
                       <Td><Status value={row.allHRApproved ? 'HR Approved' : 'Belum Selesai'} good={row.allHRApproved} /></Td>
                       <Td><strong>{row.summary.officePresent}</strong></Td>
                       <Td>
-                        <div className="space-y-1 text-[11px] text-[#6e6e73]">
+                        <div className="space-y-1 text-[11px] harmony-text-secondary">
                           <div>Incomplete: <strong>{row.summary.incomplete}</strong></div>
                           <div>Tanpa Data: <strong>{row.summary.noRecord}</strong></div>
                           <div>Konflik: <strong className={row.summary.conflict ? 'text-red-700' : ''}>{row.summary.conflict}</strong></div>
@@ -643,8 +645,8 @@ function HeroMetric({ label, value }: { label: string; value: string }) {
 function Stat({ label, value }: { label: string; value: number }) {
   return (
     <div className="rounded-2xl border border-black/5 bg-[#f5f5f7] p-4">
-      <p className="text-[10px] font-bold uppercase tracking-wide text-[#86868b]">{label}</p>
-      <p className="mt-1 text-xl font-bold text-[#1d1d1f]">{value}</p>
+      <p className="text-[10px] font-bold uppercase tracking-wide harmony-text-muted">{label}</p>
+      <p className="mt-1 text-xl font-bold harmony-text-primary">{value}</p>
     </div>
   )
 }

@@ -1,3 +1,5 @@
+
+import { readErrorMessage } from '@/lib/error-utils'
 import { NextRequest, NextResponse } from 'next/server'
 import { requireRemedApi, remedApiError } from '@/lib/server/remed-api-auth'
 import { notifyRemedHrDecision } from '@/lib/server/workflow-notifications'
@@ -52,12 +54,12 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
         ctx.access.email,
         note,
       )
-    } catch (notificationError: any) {
+    } catch (notificationError: unknown) {
       notification = {
         ok: false,
         sent: 0,
         failed: 1,
-        message: notificationError?.message || 'Notifikasi email keputusan HR gagal diproses.',
+        message: readErrorMessage(notificationError) || 'Notifikasi email keputusan HR gagal diproses.',
       }
       console.warn('Re-Med HR email notification warning:', notificationError)
     }

@@ -283,7 +283,7 @@ async function getSupervisorReferences(admin: SupabaseClient, employee: Employee
     .eq('employee_id', employee.id)
     .eq('is_active', true)
 
-  ;(data || []).forEach((row: any) => {
+  ;(data || []).forEach((row) => {
     ;[row?.supervisor_1, row?.supervisor_2].forEach((value) => {
       const cleaned = clean(value)
       if (cleaned) references.add(cleaned)
@@ -318,8 +318,8 @@ async function getHrEmails(admin: SupabaseClient) {
 
   return uniqueEmails(
     (data || [])
-      .filter((row: any) => normalize(row?.role).includes('hr'))
-      .map((row: any) => row?.email),
+      .filter((row) => normalize(row?.role).includes('hr'))
+      .map((row) => row?.email),
   )
 }
 
@@ -354,7 +354,7 @@ async function getLeaveRequest(
     if (!error && data) {
       return {
         table,
-        row: data as Record<string, any>,
+        row: data as Record<string, unknown>,
       }
     }
   }
@@ -362,7 +362,7 @@ async function getLeaveRequest(
   return null
 }
 
-function leaveRequestTypeLabel(row: Record<string, any>, table: string, data: Record<string, unknown>) {
+function leaveRequestTypeLabel(row: Record<string, unknown>, table: string, data: Record<string, unknown>) {
   if (table === 'phl_records') return 'Klaim PHL'
 
   return (
@@ -373,7 +373,7 @@ function leaveRequestTypeLabel(row: Record<string, any>, table: string, data: Re
   )
 }
 
-function leavePeriod(row: Record<string, any>, table: string) {
+function leavePeriod(row: Record<string, unknown>, table: string) {
   const start = table === 'phl_records'
     ? clean(row.claim_start_date || row.phl_date || row.valid_from)
     : clean(row.start_date)
@@ -386,25 +386,25 @@ function leavePeriod(row: Record<string, any>, table: string) {
   return `${formatDate(start)} s.d. ${formatDate(end)}`
 }
 
-function leaveTotalDays(row: Record<string, any>, table: string) {
+function leaveTotalDays(row: Record<string, unknown>, table: string) {
   return table === 'phl_records'
     ? numberValue(row.used_days || row.balance_days)
     : numberValue(row.total_days)
 }
 
-function leaveReason(row: Record<string, any>) {
+function leaveReason(row: Record<string, unknown>) {
   return clean(row.reason || row.notes) || '-'
 }
 
-function leaveJobPending(row: Record<string, any>) {
+function leaveJobPending(row: Record<string, unknown>) {
   return clean(row.job_pending || row.job_pending_summary || row.job_pending_detail) || '-'
 }
 
-function leaveHandover(row: Record<string, any>) {
+function leaveHandover(row: Record<string, unknown>) {
   return clean(row.handover_to_full_name || row.handover_to) || '-'
 }
 
-function leaveHandoverNote(row: Record<string, any>) {
+function leaveHandoverNote(row: Record<string, unknown>) {
   return clean(row.handover_note) || '-'
 }
 
@@ -462,7 +462,7 @@ async function getPostponeRequest(
       .select('*')
       .eq('id', entityId)
       .maybeSingle()
-    if (data) return data as Record<string, any>
+    if (data) return data as Record<string, unknown>
   }
 
   if (!sourceCycleId) return null
@@ -477,12 +477,12 @@ async function getPostponeRequest(
   const actorIds = new Set(identityValues(actor))
 
   return (
-    (data || []).find((row: any) => {
+    (data || []).find((row) => {
       return [row.employee_id, row.employee_number, row.full_name]
         .map(normalize)
         .some((value) => value && actorIds.has(value))
     }) || null
-  ) as Record<string, any> | null
+  ) as Record<string, unknown> | null
 }
 
 async function ensureOwnedPostpone(
@@ -554,7 +554,7 @@ async function ensureSupervisorPostpone(
     throw Object.assign(new Error('Akun ini bukan atasan yang berhak memproses postpone tersebut.'), { status: 403 })
   }
 
-  return { row: row as Record<string, any>, employee: targetEmployee }
+  return { row: row as Record<string, unknown>, employee: targetEmployee }
 }
 
 async function notifyAttendancePeriodSubmitted(input: WorkflowInput, actor: EmployeeRow) {

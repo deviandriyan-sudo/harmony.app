@@ -40,7 +40,22 @@ function supervisorFieldMatches(value: unknown, keys: string[]) {
   return Boolean(target && keys.includes(target))
 }
 
-function assignmentIsEffective(row: any, today: string) {
+type PHLWorkNotificationRow = {
+  employee_id: string
+  email?: string | null
+  full_name?: string | null
+  work_date?: string | null
+  work_start_time?: string | null
+  work_end_time?: string | null
+  recorded_work_minutes?: number | null
+  work_purpose?: string | null
+  status?: string | null
+  supervisor_name?: string | null
+  supervisor_note?: string | null
+  cancel_note?: string | null
+}
+
+function assignmentIsEffective(row: { is_active?: boolean | null; is_primary?: boolean | null; start_date?: string | null; end_date?: string | null }, today: string) {
   if (row?.is_active === false || row?.is_primary === true) return false
   const start = clean(row?.start_date).slice(0, 10)
   const end = clean(row?.end_date).slice(0, 10)
@@ -154,7 +169,7 @@ async function supervisorEmailsForEmployee(
 
   return unique(
     (candidates || [])
-      .filter((candidate: any) => {
+      .filter((candidate) => {
         const candidateKeys = unique([
           candidate.id,
           candidate.employee_number,
@@ -164,7 +179,7 @@ async function supervisorEmailsForEmployee(
         ])
         return [...refs].some((ref) => candidateKeys.includes(ref))
       })
-      .map((candidate: any) => candidate.email)
+      .map((candidate) => candidate.email)
       .filter(isEmail),
   )
 }
@@ -173,9 +188,12 @@ function appUrl(path: string) {
   return `${getNotificationEnvironmentStatus().appUrl}${path}`
 }
 
-function formatDate(value: string) {
-  const date = new Date(`${value}T00:00:00`)
-  if (Number.isNaN(date.getTime())) return value
+function formatDate(value: string | null | undefined) {
+  // Database rows may omit work_date; always render a readable placeholder.
+  const dateValue = clean(value)
+  if (!dateValue) return '-'
+  const date = new Date(`${dateValue}T00:00:00`)
+  if (Number.isNaN(date.getTime())) return dateValue
   return new Intl.DateTimeFormat('id-ID', {
     day: '2-digit',
     month: 'short',
@@ -190,7 +208,7 @@ function formatMinutes(value: number) {
 
 export async function notifyPHLWorkSubmitted(
   admin: SupabaseClient,
-  requestRow: any,
+  requestRow: PHLWorkNotificationRow,
 ) {
   const emails = await supervisorEmailsForEmployee(admin, requestRow.employee_id)
   if (emails.length === 0) {
@@ -231,7 +249,7 @@ export async function notifyPHLWorkSubmitted(
   return { ok: result.ok, message: result.message }
 }
 
-export async function notifyPHLWorkDecision(requestRow: any) {
+export async function notifyPHLWorkDecision(requestRow: PHLWorkNotificationRow) {
   const email = clean(requestRow.email)
   if (!isEmail(email)) return { ok: false, message: 'Email employee belum tersedia.' }
 
@@ -270,7 +288,7 @@ export async function notifyPHLWorkDecision(requestRow: any) {
 
 export async function notifyPHLWorkCancelled(
   admin: SupabaseClient,
-  requestRow: any,
+  requestRow: PHLWorkNotificationRow,
 ) {
   const emails = await supervisorEmailsForEmployee(admin, requestRow.employee_id)
   if (emails.length === 0) return { ok: false, message: 'Email atasan belum ditemukan.' }

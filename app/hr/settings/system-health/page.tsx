@@ -1,5 +1,7 @@
 'use client'
 
+
+import { readErrorMessage } from '@/lib/error-utils'
 import { useEffect, useMemo, useState } from 'react'
 import {
   AlertTriangle,
@@ -90,8 +92,8 @@ export default function SystemHealthPage() {
       setSystemControl(payload)
       setSystemMessage(payload.message || 'Status HARMONY berhasil diperbarui.')
       await loadHealth()
-    } catch (value: any) {
-      setError(value?.message || 'Status HARMONY gagal diperbarui.')
+    } catch (value: unknown) {
+      setError(readErrorMessage(value) || 'Status HARMONY gagal diperbarui.')
     } finally {
       setSystemUpdating(false)
     }
@@ -102,9 +104,9 @@ export default function SystemHealthPage() {
     setError('')
     try {
       setPayload(await harmonyFetch<HealthPayload>('/api/health'))
-    } catch (value: any) {
+    } catch (value: unknown) {
       setPayload(null)
-      setError(value?.message || 'System Health tidak dapat dibaca.')
+      setError(readErrorMessage(value) || 'System Health tidak dapat dibaca.')
     } finally {
       setLoading(false)
     }
@@ -134,10 +136,10 @@ export default function SystemHealthPage() {
                 {systemControl?.systemEnabled === false ? <Wrench size={23} /> : <Power size={23} />}
               </div>
               <div>
-                <p className="text-lg font-bold text-[#1d1d1f]">
+                <p className="text-lg font-bold harmony-text-primary">
                   {systemControl?.systemEnabled === false ? 'Maintenance Mode Aktif' : 'HARMONY Online'}
                 </p>
-                <p className="mt-1 max-w-2xl text-sm leading-6 text-[#6e6e73]">
+                <p className="mt-1 max-w-2xl text-sm leading-6 harmony-text-secondary">
                   Satu switch mengontrol akses Employee/Finance dan pengiriman email. HR Administrator tetap dapat masuk saat maintenance untuk menyelesaikan update.
                 </p>
                 <div className="mt-3 flex flex-wrap gap-2 text-xs font-bold">
@@ -170,12 +172,12 @@ export default function SystemHealthPage() {
         <div className="harmony-card rounded-[30px] p-5 sm:p-6">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex items-start gap-4">
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[18px] bg-[#e8f2ff] text-[#007aff]">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[18px] bg-[#e8f2ff] harmony-text-link">
                 <ServerCog size={23} />
               </div>
               <div>
-                <p className="text-lg font-bold text-[#1d1d1f]">HARMONY Stability Monitor</p>
-                <p className="mt-1 text-sm leading-6 text-[#6e6e73]">
+                <p className="text-lg font-bold harmony-text-primary">HARMONY Stability Monitor</p>
+                <p className="mt-1 text-sm leading-6 harmony-text-secondary">
                   Gunakan halaman ini setelah migration, perubahan environment, atau deployment baru.
                 </p>
               </div>
@@ -208,8 +210,8 @@ export default function SystemHealthPage() {
 
         <div className="harmony-card overflow-hidden rounded-[30px]">
           <div className="border-b border-black/5 px-5 py-4 sm:px-6">
-            <p className="text-base font-bold text-[#1d1d1f]">Diagnostic Checks</p>
-            <p className="mt-1 text-sm text-[#6e6e73]">
+            <p className="text-base font-bold harmony-text-primary">Diagnostic Checks</p>
+            <p className="mt-1 text-sm harmony-text-secondary">
               {payload?.checkedAt ? `Terakhir diperiksa ${new Date(payload.checkedAt).toLocaleString('id-ID')}` : 'Belum diperiksa.'}
             </p>
           </div>
@@ -220,8 +222,8 @@ export default function SystemHealthPage() {
                 <div className="flex items-start gap-3">
                   <StatusIcon status={check.status} />
                   <div>
-                    <p className="text-sm font-bold text-[#1d1d1f]">{check.label}</p>
-                    <p className="mt-1 text-sm leading-6 text-[#6e6e73]">{check.detail}</p>
+                    <p className="text-sm font-bold harmony-text-primary">{check.label}</p>
+                    <p className="mt-1 text-sm leading-6 harmony-text-secondary">{check.detail}</p>
                   </div>
                 </div>
                 <StatusBadge status={check.status} />
@@ -229,7 +231,7 @@ export default function SystemHealthPage() {
             ))}
 
             {!loading && !payload?.checks?.length && !error && (
-              <div className="px-6 py-12 text-center text-sm text-[#6e6e73]">Belum ada hasil diagnostic.</div>
+              <div className="px-6 py-12 text-center text-sm harmony-text-secondary">Belum ada hasil diagnostic.</div>
             )}
           </div>
         </div>
@@ -245,13 +247,13 @@ function Metric({ label, value, icon, tone = 'neutral' }: { label: string; value
       ? 'bg-amber-50 text-amber-700'
       : tone === 'error'
         ? 'bg-red-50 text-red-700'
-        : 'bg-[#e8f2ff] text-[#007aff]'
+        : 'bg-[#e8f2ff] harmony-text-link'
 
   return (
     <div className="harmony-metric-card rounded-[26px] p-5">
       <div className={`flex h-10 w-10 items-center justify-center rounded-[16px] ${toneClass}`}>{icon}</div>
-      <p className="mt-4 text-xs font-bold uppercase tracking-[0.08em] text-[#86868b]">{label}</p>
-      <p className="mt-1 text-2xl font-bold text-[#1d1d1f]">{value}</p>
+      <p className="mt-4 text-xs font-bold uppercase tracking-[0.08em] harmony-text-muted">{label}</p>
+      <p className="mt-1 text-2xl font-bold harmony-text-primary">{value}</p>
     </div>
   )
 }

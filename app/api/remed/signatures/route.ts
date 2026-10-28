@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import type { SupabaseClient } from '@supabase/supabase-js'
 import {
   REMED_SIGNATURE_ALLOWED_MIME_TYPES,
   REMED_SIGNATURE_BUCKET,
@@ -33,7 +34,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   let uploadedPath = ''
-  let cleanupAdmin: any = null
+  let cleanupAdmin: SupabaseClient | null = null
 
   try {
     const ctx = await requireRemedApi(request)

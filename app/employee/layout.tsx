@@ -1,5 +1,7 @@
 'use client'
 
+
+import { readErrorMessage } from '@/lib/error-utils'
 import Image from 'next/image'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
@@ -31,11 +33,6 @@ export default function EmployeeLayout({ children }: { children: React.ReactNode
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
   const [hasRemedAccess, setHasRemedAccess] = useState(false)
   const [hasSubordinates, setHasSubordinates] = useState(false)
-
-  useEffect(() => {
-    checkAccess()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
 
   useEffect(() => {
     if (!mobileSidebarOpen) return
@@ -83,8 +80,8 @@ export default function EmployeeLayout({ children }: { children: React.ReactNode
         void hasSupervisorAssignments(payload.appUser.employee_id).then(setHasSubordinates)
       }
       setAllowed(true)
-    } catch (error: any) {
-      setMessage(error?.message || 'Akses Employee tidak dapat diverifikasi.')
+    } catch (error: unknown) {
+      setMessage(readErrorMessage(error) || 'Akses Employee tidak dapat diverifikasi.')
       await supabase.auth.signOut()
       router.replace('/login')
       return
@@ -93,17 +90,25 @@ export default function EmployeeLayout({ children }: { children: React.ReactNode
     }
   }
 
+  useEffect(() => {
+    let active = true
+    // Start session/data loading after the effect setup, avoiding a cascading synchronous render.
+    queueMicrotask(() => { if (active) void checkAccess() })
+    return () => { active = false }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   if (loading) {
     return <AccessLoading message={message} />
   }
 
   if (!allowed) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-[#f5f5f7] p-6">
+      <main className="harmony-access-state flex min-h-screen items-center justify-center bg-[#f5f5f7] p-6">
         <div className="w-full max-w-md rounded-[32px] border border-red-100 bg-white p-8 text-center shadow-[0_24px_70px_rgba(15,23,42,0.12)]">
           <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-red-50 text-red-600"><ShieldAlert size={26} /></div>
-          <h1 className="mt-5 text-xl font-semibold text-[#1d1d1f]">Akses Ditolak</h1>
-          <p className="mt-2 text-sm leading-6 text-[#6e6e73]">Akun ini tidak memiliki akses Employee HARMONY.</p>
+          <h1 className="mt-5 text-xl font-semibold harmony-text-primary">Akses Ditolak</h1>
+          <p className="mt-2 text-sm leading-6 harmony-text-secondary">Akun ini tidak memiliki akses Employee HARMONY.</p>
         </div>
       </main>
     )
@@ -137,7 +142,7 @@ export default function EmployeeLayout({ children }: { children: React.ReactNode
                 mobile
                 onNavigate={() => setMobileSidebarOpen(false)}
               />
-              <button type="button" aria-label="Tutup menu" onClick={() => setMobileSidebarOpen(false)} className="absolute right-[-48px] top-4 flex h-10 w-10 items-center justify-center rounded-2xl bg-white text-[#1d1d1f] shadow-lg"><X size={20} /></button>
+              <button type="button" aria-label="Tutup menu" onClick={() => setMobileSidebarOpen(false)} className="absolute right-[-48px] top-4 flex h-10 w-10 items-center justify-center rounded-2xl bg-white harmony-text-primary shadow-lg"><X size={20} /></button>
             </div>
           </div>
         )}
@@ -145,14 +150,14 @@ export default function EmployeeLayout({ children }: { children: React.ReactNode
         <main className="min-w-0 flex-1 overflow-x-hidden lg:ml-[88px] harmony-desktop-main">
           <div className="harmony-mobile-topbar sticky top-0 z-40 border-b px-4 py-3 lg:hidden">
             <div className="flex items-center justify-between gap-3">
-              <button type="button" onClick={() => setMobileSidebarOpen(true)} className="harmony-mobile-glass flex h-11 w-11 items-center justify-center rounded-2xl text-[#1d1d1f]" aria-label="Buka menu"><Menu size={22} /></button>
+              <button type="button" onClick={() => setMobileSidebarOpen(true)} className="harmony-mobile-glass flex h-11 w-11 items-center justify-center rounded-2xl harmony-text-primary" aria-label="Buka menu"><Menu size={22} /></button>
               <div className="harmony-mobile-brand flex min-w-0 flex-1 items-center gap-3 rounded-2xl px-3 py-2">
                 <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-black/5 bg-white">
                   <Image src="/logo.png" alt="HARMONY Logo" width={30} height={30} className="h-7 w-7 object-contain" priority />
                 </div>
                 <div className="min-w-0">
-                  <p className="truncate text-sm font-bold text-[#1d1d1f]">HARMONY</p>
-                  <p className="truncate text-[11px] font-medium text-[#6e6e73]">Employee Dashboard</p>
+                  <p className="truncate text-sm font-bold harmony-text-primary">HARMONY</p>
+                  <p className="truncate text-[11px] font-medium harmony-text-secondary">Employee Dashboard</p>
                 </div>
               </div>
             </div>
@@ -173,11 +178,11 @@ function formatEmailName(email: string) {
 
 function AccessLoading({ message }: { message: string }) {
   return (
-    <main className="flex min-h-screen items-center justify-center bg-[#f5f5f7] p-6">
+    <main className="harmony-access-state flex min-h-screen items-center justify-center bg-[#f5f5f7] p-6">
       <div className="w-full max-w-md rounded-[32px] border border-black/5 bg-white p-8 text-center shadow-[0_24px_70px_rgba(15,23,42,0.12)]">
-        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[#e8f2ff] text-[#007aff]"><Loader2 size={26} className="animate-spin" /></div>
-        <h1 className="mt-5 text-xl font-semibold text-[#1d1d1f]">Memeriksa Akses</h1>
-        <p className="mt-2 text-sm leading-6 text-[#6e6e73]">{message}</p>
+        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[#e8f2ff] harmony-text-link"><Loader2 size={26} className="animate-spin" /></div>
+        <h1 className="mt-5 text-xl font-semibold harmony-text-primary">Memeriksa Akses</h1>
+        <p className="mt-2 text-sm leading-6 harmony-text-secondary">{message}</p>
       </div>
     </main>
   )

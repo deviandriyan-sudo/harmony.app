@@ -1,3 +1,5 @@
+
+import { readErrorMessage } from '@/lib/error-utils'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
@@ -65,9 +67,9 @@ export async function GET(request: NextRequest) {
       { success: true, types: data || [] },
       { headers: { 'Cache-Control': 'no-store, max-age=0' } },
     )
-  } catch (error: any) {
+  } catch (error: unknown) {
     return NextResponse.json(
-      { success: false, error: error?.message || 'Gagal memuat master jenis.' },
+      { success: false, error: readErrorMessage(error) || 'Gagal memuat master jenis.' },
       { status: 500 },
     )
   }

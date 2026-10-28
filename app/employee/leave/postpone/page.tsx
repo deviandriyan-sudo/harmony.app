@@ -1,20 +1,11 @@
 'use client'
 
+
+import { readErrorMessage } from '@/lib/error-utils'
 import { useEffect, useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
 import Link from 'next/link'
-import {
-  ArrowLeft,
-  CalendarDays,
-  CheckCircle2,
-  Clock3,
-  Loader2,
-  RefreshCcw,
-  RotateCcw,
-  Send,
-  ShieldCheck,
-  XCircle,
-} from 'lucide-react'
+import { ArrowLeft, Loader2, RefreshCcw, RotateCcw, Send, XCircle } from 'lucide-react'
 
 import { supabase } from '@/lib/supabase'
 import { Topbar } from '@/components/layout/Topbar'
@@ -152,15 +143,7 @@ function formatDate(value?: string | null) {
   }).format(date)
 }
 
-function getName(employee?: Employee | null) {
-  return (
-    employee?.full_name ||
-    employee?.employee_name ||
-    employee?.name ||
-    employee?.email ||
-    '-'
-  )
-}
+
 
 function getEmployeeNumber(employee?: Employee | null) {
   return (
@@ -171,9 +154,7 @@ function getEmployeeNumber(employee?: Employee | null) {
   )
 }
 
-function getDepartment(employee?: Employee | null) {
-  return employee?.department || employee?.unit || employee?.work_unit || ''
-}
+
 
 function normalize(value?: string | null) {
   return String(value || '').trim().toLowerCase()
@@ -242,11 +223,11 @@ async function notifyPostponeRequestSubmitted({
       count: result.sent,
       message: result.message,
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     return {
       success: false,
       count: 0,
-      message: error?.message || 'Email notifikasi gagal dikirim.',
+      message: readErrorMessage(error) || 'Email notifikasi gagal dikirim.',
     }
   }
 }
@@ -386,13 +367,13 @@ export default function EmployeeLeavePostponePage() {
           ? current
           : firstEligible?.id || cycleRows[0]?.id || '',
       )
-    } catch (error: any) {
+    } catch (error: unknown) {
       setEmployee(null)
       setCycles([])
       setRequests([])
       setMessage({
         type: 'error',
-        text: error?.message || 'Gagal memuat data postpone cuti.',
+        text: readErrorMessage(error) || 'Gagal memuat data postpone cuti.',
       })
     } finally {
       setLoading(false)
@@ -495,10 +476,10 @@ export default function EmployeeLeavePostponePage() {
           ? `Pengajuan postpone berhasil dikirim dan notifikasi email diproses untuk ${notificationResult.count} penerima.`
           : `Pengajuan postpone berhasil dikirim, tetapi email notifikasi belum terkirim: ${notificationResult.message}`,
       })
-    } catch (error: any) {
+    } catch (error: unknown) {
       setMessage({
         type: 'error',
-        text: error?.message || 'Gagal mengirim pengajuan postpone.',
+        text: readErrorMessage(error) || 'Gagal mengirim pengajuan postpone.',
       })
     } finally {
       setSaving(false)
@@ -560,8 +541,8 @@ export default function EmployeeLeavePostponePage() {
         notificationText = notification.ok
           ? ` ${notification.message}`
           : ` Namun email pembatalan belum terkirim lengkap: ${notification.message}`
-      } catch (notificationError: any) {
-        notificationText = ` Namun email pembatalan gagal diproses: ${notificationError?.message || 'terjadi kendala notifikasi'}.`
+      } catch (notificationError: unknown) {
+        notificationText = ` Namun email pembatalan gagal diproses: ${readErrorMessage(notificationError) || 'terjadi kendala notifikasi'}.`
       }
 
       setMessage({
@@ -569,10 +550,10 @@ export default function EmployeeLeavePostponePage() {
         text: `${result.message || 'Pengajuan postpone berhasil dibatalkan sebelum approval atasan.'}${notificationText}`,
       })
       await fetchData()
-    } catch (error: any) {
+    } catch (error: unknown) {
       setMessage({
         type: 'error',
-        text: error?.message || 'Pengajuan postpone gagal dibatalkan.',
+        text: readErrorMessage(error) || 'Pengajuan postpone gagal dibatalkan.',
       })
     } finally {
       setCancellingId('')
@@ -603,11 +584,11 @@ export default function EmployeeLeavePostponePage() {
                 Annual Leave Carry Forward
               </div>
 
-              <h1 className="mt-3 text-2xl font-bold text-[#1d1d1f] sm:text-3xl">
+              <h1 className="mt-3 text-2xl font-bold harmony-text-primary sm:text-3xl">
                 Postpone Sisa Cuti Tahunan
               </h1>
 
-              <p className="mt-2 max-w-3xl text-sm leading-6 text-[#6e6e73]">
+              <p className="mt-2 max-w-3xl text-sm leading-6 harmony-text-secondary">
                 Sisa cuti tahunan dapat diajukan postpone paling lambat H-7 sebelum tanggal akhir cycle.
                 Jika disetujui HR, sisa cuti berlaku sampai 6 bulan setelah anniversary cuti berikutnya. Contoh anniversary 25 Februari → expiry 25 Agustus.
               </p>
@@ -641,11 +622,11 @@ export default function EmployeeLeavePostponePage() {
 
         <section className="grid gap-4 lg:grid-cols-[0.95fr_1.05fr]">
           <div className="rounded-[28px] border border-black/5 bg-white p-5 shadow-sm sm:p-6">
-            <h2 className="text-lg font-bold text-[#1d1d1f]">
+            <h2 className="text-lg font-bold harmony-text-primary">
               Form Pengajuan
             </h2>
 
-            <p className="mt-1 text-sm text-[#6e6e73]">
+            <p className="mt-1 text-sm harmony-text-secondary">
               Pilih cycle cuti tahunan yang masih memiliki sisa cuti. Jika sudah melewati H-7 sebelum cycle berakhir,
               form employee otomatis terkunci dan hanya HR yang bisa input manual.
             </p>
@@ -662,7 +643,7 @@ export default function EmployeeLeavePostponePage() {
             ) : (
               <form onSubmit={handleSubmit} className="mt-6 space-y-4">
                 <label className="block">
-                  <span className="text-sm font-bold text-[#1d1d1f]">
+                  <span className="text-sm font-bold harmony-text-primary">
                     Cycle Cuti Tahunan
                   </span>
 
@@ -706,7 +687,7 @@ export default function EmployeeLeavePostponePage() {
                 )}
 
                 <label className="block">
-                  <span className="text-sm font-bold text-[#1d1d1f]">
+                  <span className="text-sm font-bold harmony-text-primary">
                     Jumlah Hari Diajukan
                   </span>
 
@@ -723,7 +704,7 @@ export default function EmployeeLeavePostponePage() {
                 </label>
 
                 <label className="block">
-                  <span className="text-sm font-bold text-[#1d1d1f]">
+                  <span className="text-sm font-bold harmony-text-primary">
                     Alasan Pengajuan
                   </span>
 
@@ -749,11 +730,11 @@ export default function EmployeeLeavePostponePage() {
           </div>
 
           <div className="rounded-[28px] border border-black/5 bg-white p-5 shadow-sm sm:p-6">
-            <h2 className="text-lg font-bold text-[#1d1d1f]">
+            <h2 className="text-lg font-bold harmony-text-primary">
               Riwayat Pengajuan
             </h2>
 
-            <p className="mt-1 text-sm text-[#6e6e73]">
+            <p className="mt-1 text-sm harmony-text-secondary">
               Pantau status approval atasan dan HR.
             </p>
 
@@ -770,10 +751,10 @@ export default function EmployeeLeavePostponePage() {
                   >
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                       <div>
-                        <p className="font-bold text-[#1d1d1f]">
+                        <p className="font-bold harmony-text-primary">
                           {item.requested_days || 0} hari postpone
                         </p>
-                        <p className="mt-1 text-xs text-[#6e6e73]">
+                        <p className="mt-1 text-xs harmony-text-secondary">
                           Cycle end: {formatDate(item.old_cycle_end)} · Expired: {formatDate(item.new_expired_at)}
                         </p>
                       </div>

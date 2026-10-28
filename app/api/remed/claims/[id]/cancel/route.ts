@@ -1,3 +1,5 @@
+
+import { readErrorMessage } from '@/lib/error-utils'
 import { NextRequest, NextResponse } from 'next/server'
 import { requireRemedApi, remedApiError } from '@/lib/server/remed-api-auth'
 import { notifyRemedClaimCancelled } from '@/lib/server/workflow-notifications'
@@ -32,13 +34,13 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
         reason,
         beforeClaim?.status || null,
       )
-    } catch (notificationError: any) {
+    } catch (notificationError: unknown) {
       notification = {
         ok: false,
         sent: 0,
         failed: 1,
         message:
-          notificationError?.message ||
+          readErrorMessage(notificationError) ||
           'Notifikasi pembatalan Re-Med gagal diproses.',
       }
       console.warn('Re-Med cancellation email notification warning:', notificationError)

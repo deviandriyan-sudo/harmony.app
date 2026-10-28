@@ -92,7 +92,7 @@ for (const file of routeFiles) {
 
 for (const [label, map] of [['page', pageRoutes], ['API', apiRoutes]]) {
   const shapes = new Map()
-  for (const [route, file] of map) {
+  for (const [route] of map) {
     const shape = routeShape(route)
     if (shapes.has(shape) && shapes.get(shape) !== route) {
       failures.push(`Dynamic ${label} route collision: ${shapes.get(shape)} <-> ${route}`)

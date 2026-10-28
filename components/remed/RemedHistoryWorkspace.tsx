@@ -24,7 +24,11 @@ export function RemedHistoryWorkspace({ role }: { role: 'hr' | 'finance' }) {
       setLoading(false)
     }
   }, [])
-  useEffect(() => { void load() }, [load])
+  useEffect(() => {
+    let active = true
+    queueMicrotask(() => { if (active) void load() })
+    return () => { active = false }
+  }, [load])
   return (
     <section className="mx-auto max-w-[1540px] space-y-6 p-4 sm:p-6 lg:p-8">
       <RemedPageHeader eyebrow={`Re-Med · ${role === 'hr' ? 'HR' : 'Finance'}`}

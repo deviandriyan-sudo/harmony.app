@@ -1,5 +1,7 @@
 'use client'
 
+
+import { readErrorMessage } from '@/lib/error-utils'
 import { FormEvent, useEffect, useState } from 'react'
 import { Mail, Pencil, Save, ShieldCheck, X } from 'lucide-react'
 import { RemedPageHeader } from '@/components/remed/RemedPageHeader'
@@ -76,8 +78,8 @@ export default function Page() {
       setEditingId('')
       setEditingEmail('')
       await load()
-    } catch (error: any) {
-      setMessage(error?.message || 'Gagal mengubah email akses.')
+    } catch (error: unknown) {
+      setMessage(readErrorMessage(error) || 'Gagal mengubah email akses.')
     } finally {
       setSavingEmail(false)
     }
@@ -101,8 +103,8 @@ export default function Page() {
       setMessage('Akses tersimpan.')
       form.reset()
       await load()
-    } catch (error: any) {
-      setMessage(error?.message || 'Gagal menyimpan akses.')
+    } catch (error: unknown) {
+      setMessage(readErrorMessage(error) || 'Gagal menyimpan akses.')
     }
   }
 
@@ -165,8 +167,8 @@ export default function Page() {
                   </div>
                 ) : (
                   <>
-                    <p className="truncate font-bold text-[#17181b]">{row.email}</p>
-                    <p className="mt-1 text-xs text-[#747982]">{row.role} · {row.auth_user_id ? 'Auth linked' : 'Auth belum dibuat'}</p>
+                    <p className="truncate font-bold harmony-text-primary">{row.email}</p>
+                    <p className="mt-1 text-xs harmony-text-secondary">{row.role} · {row.auth_user_id ? 'Auth linked' : 'Auth belum dibuat'}</p>
                   </>
                 )}
               </div>

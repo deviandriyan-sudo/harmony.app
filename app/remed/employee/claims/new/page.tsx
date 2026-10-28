@@ -1,5 +1,7 @@
 'use client'
 
+
+import { readErrorMessage } from '@/lib/error-utils'
 import { FormEvent, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { FilePlus2, Loader2, Paperclip, Send, X } from 'lucide-react'
@@ -152,8 +154,8 @@ export default function NewRemedClaimPage() {
         }).catch(() => null)
         throw uploadError
       }
-    } catch (error: any) {
-      setMessage(error?.message || 'Gagal mengajukan reimbursement.')
+    } catch (error: unknown) {
+      setMessage(readErrorMessage(error) || 'Gagal mengajukan reimbursement.')
     } finally {
       setUploadLabel('')
       setLoading(false)
@@ -254,7 +256,7 @@ export default function NewRemedClaimPage() {
               <h2 className="harmony-section-title">Bukti Kuitansi</h2>
               <p className="harmony-section-copy">Minimal 1 file dan maksimal 3 file.</p>
             </div>
-            <span className="rounded-full bg-[#eef0f3] px-3 py-1 text-xs font-bold text-[#646971]">{files.length}/3</span>
+            <span className="rounded-full bg-[#eef0f3] px-3 py-1 text-xs font-bold harmony-text-secondary">{files.length}/3</span>
           </div>
 
           <input
@@ -283,7 +285,7 @@ export default function NewRemedClaimPage() {
             <div className="mt-3 space-y-2">
               {files.map((file, index) => (
                 <div key={`${file.name}-${index}`} className="flex items-center justify-between rounded-[16px] border border-black/[0.055] bg-[#f8f9fb] px-4 py-3 text-sm">
-                  <div className="min-w-0 pr-3"><span className="block truncate font-semibold">{file.name}</span><span className="mt-0.5 block text-[11px] text-[#8a8f98]">{Math.max(1, Math.round(file.size / 1024))} KB · siap diunggah saat pengajuan dikirim</span></div>
+                  <div className="min-w-0 pr-3"><span className="block truncate font-semibold">{file.name}</span><span className="mt-0.5 block text-[11px] harmony-text-muted">{Math.max(1, Math.round(file.size / 1024))} KB · siap diunggah saat pengajuan dikirim</span></div>
                   <button type="button" onClick={() => setFiles((current) => current.filter((_, itemIndex) => itemIndex !== index))} className="flex h-8 w-8 items-center justify-center rounded-[11px] text-red-500 transition hover:bg-red-50"><X size={17} /></button>
                 </div>
               ))}

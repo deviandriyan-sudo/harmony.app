@@ -1,5 +1,7 @@
+
+import { readErrorMessage } from '@/lib/error-utils'
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 
 export const runtime = 'nodejs'
 
@@ -82,7 +84,7 @@ type Identity = {
   isHR: boolean
 }
 
-async function resolveIdentity(request: NextRequest, admin: any) {
+async function resolveIdentity(request: NextRequest, admin: SupabaseClient) {
   const authHeader = request.headers.get('authorization') || ''
   const token = authHeader.replace(/^Bearer\s+/i, '').trim()
 
@@ -102,7 +104,7 @@ async function resolveIdentity(request: NextRequest, admin: any) {
     }
   }
 
-  let appUser: any = null
+  let appUser: { role?: string | null; employee_id?: string | null; email?: string | null; is_active?: boolean | null } | null = null
 
   const byId = await admin
     .from('app_users')
@@ -145,7 +147,7 @@ async function resolveIdentity(request: NextRequest, admin: any) {
 }
 
 async function loadParent(
-  admin: any,
+  admin: SupabaseClient,
   entityType: string,
   entityId: string,
 ) {
@@ -197,7 +199,7 @@ async function loadParent(
   return { ...result, entityType }
 }
 
-async function parentRequiresProof(admin: any, entityType: string, parent: any) {
+async function parentRequiresProof(admin: SupabaseClient, entityType: string, parent: Record<string, unknown>) {
   let requestTypeCode = ''
 
   if (entityType === 'leave_request') {
@@ -219,7 +221,7 @@ async function parentRequiresProof(admin: any, entityType: string, parent: any) 
 }
 
 async function isSupervisorOfOwner(
-  admin: any,
+  admin: SupabaseClient,
   identity: Identity,
   ownerEmployeeId: string,
 ) {
@@ -262,9 +264,9 @@ async function isSupervisorOfOwner(
 }
 
 async function canViewParent(
-  admin: any,
+  admin: SupabaseClient,
   identity: Identity,
-  parent: any,
+  parent: Record<string, unknown>,
 ) {
   const ownerEmployeeId = clean(parent?.employee_id)
   if (!ownerEmployeeId) return identity.isHR
@@ -273,7 +275,7 @@ async function canViewParent(
   return isSupervisorOfOwner(admin, identity, ownerEmployeeId)
 }
 
-function ownerCanInitializeSubmittedParent(entityType: string, parent: any) {
+function ownerCanInitializeSubmittedParent(entityType: string, parent: Record<string, unknown> | null) {
   if (entityType === 'leave_request' || entityType === 'phl_record') {
     const supervisor = normalize(parent?.supervisor_status)
     const hr = normalize(parent?.hr_status)
@@ -297,7 +299,7 @@ function ownerCanInitializeSubmittedParent(entityType: string, parent: any) {
   return false
 }
 
-function attendanceIsEditable(parent: any) {
+function attendanceIsEditable(parent: Record<string, unknown> | null) {
   if (parent?.deleted_at || parent?.is_locked) return false
 
   const employeeStatus = normalize(parent?.employee_confirmation_status)
@@ -382,9 +384,9 @@ export async function GET(request: NextRequest) {
       success: true,
       attachments: data || [],
     })
-  } catch (error: any) {
+  } catch (error: unknown) {
     return NextResponse.json(
-      { success: false, error: error?.message || 'Lampiran gagal dimuat.' },
+      { success: false, error: readErrorMessage(error) || 'Lampiran gagal dimuat.' },
       { status: 500 },
     )
   }
@@ -424,7 +426,7 @@ export async function POST(request: NextRequest) {
 
     const parentResult = await loadParent(admin, entityType, entityId)
     if (parentResult.error) throw parentResult.error
-    const parent: any = parentResult.data
+    const parent = parentResult.data as Record<string, unknown> | null
 
     if (!parent) {
       return NextResponse.json(
@@ -496,7 +498,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const existingUrls = new Set(existing.map((item: any) => clean(item.file_url)).filter(Boolean))
+    const existingUrls = new Set(existing.map((item) => clean(item.file_url)).filter(Boolean))
     const requestedNewCount = (legacyUrl && !existingUrls.has(legacyUrl) ? 1 : 0) + files.length
 
     const finalAttachmentCount = existing.length + requestedNewCount
@@ -523,9 +525,9 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const usedSlots = new Set(existing.map((item: any) => Number(item.slot_no)))
+    const usedSlots = new Set(existing.map((item) => Number(item.slot_no)))
     const availableSlots = [1, 2, 3].filter((slot) => !usedSlots.has(slot))
-    const rowsToInsert: any[] = []
+    const rowsToInsert: Array<Record<string, unknown>> = []
     const uploadedPathsThisRequest: string[] = []
 
     if (legacyUrl && !existingUrls.has(legacyUrl)) {
@@ -620,9 +622,9 @@ export async function POST(request: NextRequest) {
       attachments: attachments || [],
       message: `${attachments?.length || 0} dokumen pendukung tersimpan.`,
     })
-  } catch (error: any) {
+  } catch (error: unknown) {
     return NextResponse.json(
-      { success: false, error: error?.message || 'Lampiran gagal disimpan.' },
+      { success: false, error: readErrorMessage(error) || 'Lampiran gagal disimpan.' },
       { status: 500 },
     )
   }
@@ -667,7 +669,7 @@ export async function DELETE(request: NextRequest) {
 
     const parentResult = await loadParent(admin, attachment.entity_type, attachment.entity_id)
     if (parentResult.error) throw parentResult.error
-    const parent: any = parentResult.data
+    const parent = parentResult.data as Record<string, unknown> | null
 
     if (!parent) {
       return NextResponse.json(
@@ -733,7 +735,7 @@ export async function DELETE(request: NextRequest) {
     }
 
     if (clean(parent.phl_proof_url) === deletedUrl) {
-      const phlFallback = (remaining || []).find((item: any) =>
+      const phlFallback = (remaining || []).find((item) =>
         normalize(item.attachment_kind).includes('phl'),
       )
       updatePayload.phl_proof_url = phlFallback?.file_url || null
@@ -754,9 +756,9 @@ export async function DELETE(request: NextRequest) {
       success: true,
       message: 'Lampiran draft berhasil dihapus.',
     })
-  } catch (error: any) {
+  } catch (error: unknown) {
     return NextResponse.json(
-      { success: false, error: error?.message || 'Lampiran gagal dihapus.' },
+      { success: false, error: readErrorMessage(error) || 'Lampiran gagal dihapus.' },
       { status: 500 },
     )
   }

@@ -1,5 +1,7 @@
 'use client'
 
+
+import { readErrorMessage } from '@/lib/error-utils'
 import Link from 'next/link'
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { downloadRawCsv, downloadStyledWorkbook } from '@/lib/export/styled-workbook'
@@ -17,12 +19,9 @@ import {
 } from 'lucide-react'
 
 import { Topbar } from '@/components/layout/Topbar'
-import {
-  formatDateID,
-  formatDateTimeID,
-} from '@/lib/attendance-reporting'
+import { formatDateTimeID } from '@/lib/attendance-reporting'
 import { useHRAttendanceReporting } from '@/components/attendance/useHRAttendanceReporting'
-import type { AttendanceReportingRow } from '@/lib/attendance-reporting-data'
+
 
 type ReportFilter =
   | 'all'
@@ -122,7 +121,7 @@ export default function HRAttendanceExportPage() {
     if (typeof window === 'undefined') return
     const querySearch = new URLSearchParams(window.location.search).get('q')
     if (querySearch) setSearch(querySearch)
-  }, [])
+  }, [setSearch])
 
   function buildRecapRows() {
     return filteredRows.map((row, index) => ({
@@ -381,8 +380,8 @@ export default function HRAttendanceExportPage() {
         { name: 'Definisi', rows: buildDefinitionRows() },
       ])
       setSuccessMessage(`Export XLSX berhasil: ${fileName}`)
-    } catch (error: any) {
-      setErrorMessage(error?.message || 'Export XLSX gagal.')
+    } catch (error: unknown) {
+      setErrorMessage(readErrorMessage(error) || 'Export XLSX gagal.')
     } finally {
       setExporting(false)
     }
@@ -399,8 +398,8 @@ export default function HRAttendanceExportPage() {
 
       downloadRawCsv(`HARMONY_KEHADIRAN_TUNJANGAN_${periodMonth}_${filter}.csv`, recap)
       setSuccessMessage('Export CSV berhasil.')
-    } catch (error: any) {
-      setErrorMessage(error?.message || 'Export CSV gagal.')
+    } catch (error: unknown) {
+      setErrorMessage(readErrorMessage(error) || 'Export CSV gagal.')
     } finally {
       setExporting(false)
     }
@@ -463,7 +462,7 @@ export default function HRAttendanceExportPage() {
         <section className="harmony-card overflow-hidden">
           <div className="grid gap-3 border-b border-black/5 p-5 md:grid-cols-[minmax(220px,1fr)_230px_auto] md:items-center">
             <div className="flex min-h-11 items-center gap-2 rounded-2xl border border-black/5 bg-[#f5f5f7] px-4">
-              <Search size={16} className="text-[#86868b]" />
+              <Search size={16} className="harmony-text-muted" />
               <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Cari nama, NIP, PIN, unit..." className="w-full bg-transparent text-sm outline-none" />
             </div>
 
@@ -496,19 +495,19 @@ export default function HRAttendanceExportPage() {
           </div>
 
           {loading ? (
-            <div className="flex items-center gap-3 p-8 text-sm text-[#6e6e73]"><Loader2 size={18} className="animate-spin" />Menggabungkan raw machine, manual, dan approved request...</div>
+            <div className="flex items-center gap-3 p-8 text-sm harmony-text-secondary"><Loader2 size={18} className="animate-spin" />Menggabungkan raw machine, manual, dan approved request...</div>
           ) : (
             <div className="overflow-x-auto">
               <table className="min-w-[2200px] w-full border-collapse text-left text-xs">
                 <thead>
-                  <tr className="border-b border-black/5 bg-[#f5f5f7] text-[#6e6e73]">
+                  <tr className="border-b border-black/5 bg-[#f5f5f7] harmony-text-secondary">
                     <Th>Karyawan</Th><Th>Workflow</Th><Th>Hari Kerja</Th><Th>Hadir Kantor</Th><Th>Late</Th><Th>Manual/Lapangan</Th><Th>ST/Tugas Luar</Th><Th>Kerja Libur</Th><Th>Kehadiran Tercatat</Th><Th>Dasar Tunjangan</Th><Th>Transport</Th><Th>Makan</Th><Th>Manual Pending</Th><Th>Cuti</Th><Th>PHL</Th><Th>Sakit</Th><Th>Izin</Th><Th>Alpa</Th><Th>Incomplete</Th><Th>Pending</Th><Th>Tanpa Data</Th><Th>Konflik</Th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredRows.map((row) => (
                     <tr key={row.employee.id} className="border-b border-black/5 hover:bg-[#fafafa]">
-                      <Td><div className="font-bold text-[#1d1d1f]">{row.employee.full_name || '-'}</div><div className="mt-1 text-[11px] text-[#86868b]">{row.employee.employee_number || '-'} · PIN {row.employee.machine_pin || '-'} · {row.employee.department || '-'}</div>{row.synthetic && <span className="mt-2 inline-flex rounded-full bg-red-50 px-2.5 py-1 text-[10px] font-bold text-red-700">Perlu mapping</span>}</Td>
+                      <Td><div className="font-bold harmony-text-primary">{row.employee.full_name || '-'}</div><div className="mt-1 text-[11px] harmony-text-muted">{row.employee.employee_number || '-'} · PIN {row.employee.machine_pin || '-'} · {row.employee.department || '-'}</div>{row.synthetic && <span className="mt-2 inline-flex rounded-full bg-red-50 px-2.5 py-1 text-[10px] font-bold text-red-700">Perlu mapping</span>}</Td>
                       <Td><div className="space-y-1"><StatusLine label="Emp" value={workflowLabel(row.confirmation?.employee_status)} /><StatusLine label="Atasan" value={workflowLabel(row.confirmation?.supervisor_status)} /><StatusLine label="HR" value={workflowLabel(row.confirmation?.hr_status)} /></div></Td>
                       <Count value={row.summary.scheduledWorkdays} />
                       <Count value={row.summary.officePresent} />
@@ -560,11 +559,11 @@ function MetricCard({ label, value, tone }: { label: string; value: number; tone
   return <div className={`rounded-[22px] p-5 ${cls}`}><p className="text-[10px] font-bold uppercase tracking-wide opacity-70">{label}</p><p className="mt-2 text-3xl font-bold">{value}</p></div>
 }
 
-function SmallMetric({ label, value }: { label: string; value: number }) { return <div className="rounded-2xl border border-black/5 bg-white p-3"><p className="text-[10px] font-bold uppercase tracking-wide text-[#86868b]">{label}</p><p className="mt-1 text-lg font-bold text-[#1d1d1f]">{value}</p></div> }
+function SmallMetric({ label, value }: { label: string; value: number }) { return <div className="rounded-2xl border border-black/5 bg-white p-3"><p className="text-[10px] font-bold uppercase tracking-wide harmony-text-muted">{label}</p><p className="mt-1 text-lg font-bold harmony-text-primary">{value}</p></div> }
 function Th({ children }: { children: ReactNode }) { return <th className="whitespace-nowrap px-4 py-3 font-bold">{children}</th> }
 function Td({ children }: { children: ReactNode }) { return <td className="px-4 py-4 align-top">{children}</td> }
-function Count({ value, strong = false, danger = false }: { value: number; strong?: boolean; danger?: boolean }) { return <td className="px-4 py-4 text-center"><span className={`inline-flex min-w-8 justify-center rounded-full px-2.5 py-1 font-bold ${danger ? 'bg-red-50 text-red-700' : strong ? 'bg-green-50 text-green-700' : 'bg-[#f5f5f7] text-[#1d1d1f]'}`}>{value}</span></td> }
-function StatusLine({ label, value }: { label: string; value: string }) { return <div className="text-[11px] text-[#6e6e73]"><span className="font-bold text-[#1d1d1f]">{label}:</span> {value}</div> }
+function Count({ value, strong = false, danger = false }: { value: number; strong?: boolean; danger?: boolean }) { return <td className="px-4 py-4 text-center"><span className={`inline-flex min-w-8 justify-center rounded-full px-2.5 py-1 font-bold ${danger ? 'bg-red-50 text-red-700' : strong ? 'bg-green-50 text-green-700' : 'bg-[#f5f5f7] harmony-text-primary'}`}>{value}</span></td> }
+function StatusLine({ label, value }: { label: string; value: string }) { return <div className="text-[11px] harmony-text-secondary"><span className="font-bold harmony-text-primary">{label}:</span> {value}</div> }
 
 function workflowLabel(value: unknown) {
   const key = String(value || '').trim().toLowerCase()

@@ -1,3 +1,5 @@
+
+import { readErrorMessage } from '@/lib/error-utils'
 import { NextRequest, NextResponse } from 'next/server'
 
 import { supabaseAdmin } from '@/lib/supabase-admin'
@@ -28,7 +30,7 @@ export async function GET(request: NextRequest) {
     const authUserId = authData.user.id
     const authEmail = normalize(authData.user.email)
 
-    let appUser: any = null
+    let appUser: { id: string; email: string | null; role: string; employee_id: string | null; is_active: boolean | null } | null = null
     const byId = await supabaseAdmin
       .from('app_users')
       .select('id,email,role,employee_id,is_active')
@@ -56,7 +58,7 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ message: 'Role akun HARMONY tidak dikenali.' }, { status: 403 })
       }
 
-      let employee: any = null
+      let employee: { id: string; employee_number: string | null; full_name: string | null; department: string | null; position: string | null; email: string | null; is_active: boolean | null } | null = null
       if (appUser.employee_id) {
         const employeeResult = await supabaseAdmin
           .from('employees')
@@ -97,7 +99,7 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    let financeAccess: any = null
+    let financeAccess: { id: string; auth_user_id: string; email: string | null; role: string | null; is_active: boolean | null } | null = null
     const financeById = await supabaseAdmin
       .from('remed_user_access')
       .select('id,auth_user_id,email,role,is_active')
@@ -136,9 +138,9 @@ export async function GET(request: NextRequest) {
       { message: 'Akun belum terdaftar atau tidak aktif pada HARMONY.' },
       { status: 403 },
     )
-  } catch (error: any) {
+  } catch (error: unknown) {
     return NextResponse.json(
-      { message: error?.message || 'Gagal memeriksa akses HARMONY.' },
+      { message: readErrorMessage(error) || 'Gagal memeriksa akses HARMONY.' },
       { status: 500 },
     )
   }

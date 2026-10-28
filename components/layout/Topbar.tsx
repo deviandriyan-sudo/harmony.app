@@ -1,5 +1,7 @@
 'use client'
 
+
+import { readErrorMessage } from '@/lib/error-utils'
 import {
   AlertTriangle,
   Bell,
@@ -14,7 +16,7 @@ import {
   Sparkles,
   X,
 } from 'lucide-react'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffectEvent, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 
 import { supabase } from '@/lib/supabase'
@@ -55,7 +57,7 @@ type NotificationLog = {
   email_provider_id?: string | null
   email_error?: string | null
 
-  metadata?: Record<string, any> | null
+  metadata?: { action_url?: string | null; actionUrl?: string | null; [key: string]: unknown } | null
 
   sent_at?: string | null
   read_at?: string | null
@@ -120,6 +122,17 @@ export function Topbar({
   const [isRefreshingTasks, setIsRefreshingTasks] = useState(false)
   const [isMarking, setIsMarking] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
+  // Time is captured outside render and refreshed while the shell is mounted.
+  // A null initial value keeps SSR and client hydration deterministic.
+  const [relativeTimeNow, setRelativeTimeNow] = useState<number | null>(null)
+
+  useEffect(() => {
+    let active = true
+    const tick = () => { if (active) setRelativeTimeNow(Date.now()) }
+    queueMicrotask(tick)
+    const timer = window.setInterval(tick, TASK_REFRESH_MS)
+    return () => { active = false; window.clearInterval(timer) }
+  }, [])
 
   const unreadHistoryCount = useMemo(() => {
     return notifications.filter((item) => !item.read_at).length
@@ -166,8 +179,9 @@ export function Topbar({
     saveTaskReadState(next)
   }
 
+  const onNotificationLoad = useEffectEvent(fetchCurrentUserAndNotifications)
   useEffect(() => {
-    void fetchCurrentUserAndNotifications()
+    void onNotificationLoad()
   }, [])
 
   useEffect(() => {
@@ -202,8 +216,11 @@ export function Topbar({
     window.addEventListener('scroll', updatePopoverPosition, true)
 
     if (document.querySelector('.harmony-modal-surface')) {
-      setIsOpen(false)
-      return
+      queueMicrotask(() => setIsOpen(false))
+      return () => {
+        window.removeEventListener('resize', updatePopoverPosition)
+        window.removeEventListener('scroll', updatePopoverPosition, true)
+      }
     }
 
     const observer = new MutationObserver(() => {
@@ -223,12 +240,13 @@ export function Topbar({
     }
   }, [isOpen])
 
+  const onTaskRefresh = useEffectEvent(refreshTasksFromCurrentSession)
   useEffect(() => {
     let active = true
 
     async function silentRefresh() {
       if (!active) return
-      await refreshTasksFromCurrentSession(true)
+      await onTaskRefresh(true)
     }
 
     const timer = window.setInterval(() => {
@@ -284,10 +302,10 @@ export function Topbar({
         fetchNotifications(email),
         fetchTasks(token, false),
       ])
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error(error)
       setErrorMessage(
-        error?.message || 'Gagal memuat pusat notifikasi. Silakan refresh halaman.',
+        readErrorMessage(error) || 'Gagal memuat pusat notifikasi. Silakan refresh halaman.',
       )
     } finally {
       setIsLoading(false)
@@ -339,11 +357,11 @@ export function Topbar({
 
       setTasks(Array.isArray(payload.tasks) ? payload.tasks : [])
       setTaskWarning(String(payload.warning || '').trim())
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Task center warning:', error)
       if (!silent) {
         setErrorMessage(
-          error?.message || 'Gagal memuat task yang perlu ditindaklanjuti.',
+          readErrorMessage(error) || 'Gagal memuat task yang perlu ditindaklanjuti.',
         )
       }
     } finally {
@@ -473,12 +491,12 @@ export function Topbar({
       null
 
     if (!actionUrl || typeof actionUrl !== 'string') return
-    window.location.href = actionUrl
+    window.location.assign(actionUrl)
   }
 
   function openTask(task: HarmonyActionTask) {
     if (!task.action_url) return
-    window.location.href = task.action_url
+    window.location.assign(task.action_url)
   }
 
   function getRelativeTime(value?: string | null) {
@@ -487,7 +505,15 @@ export function Topbar({
     const date = new Date(value)
     if (Number.isNaN(date.getTime())) return '-'
 
-    const diffMs = Date.now() - date.getTime()
+    // Until hydration finishes, show a stable absolute date instead of
+    // reading the clock during render (React render-purity invariant).
+    if (relativeTimeNow === null) {
+      return date.toLocaleDateString('id-ID', {
+        day: '2-digit', month: 'short', year: 'numeric',
+      })
+    }
+
+    const diffMs = Math.max(0, relativeTimeNow - date.getTime())
     const diffMinutes = Math.floor(diffMs / 60000)
     const diffHours = Math.floor(diffMinutes / 60)
     const diffDays = Math.floor(diffHours / 24)
@@ -508,17 +534,17 @@ export function Topbar({
     <header className="harmony-topbar sticky top-0 z-30 border-b">
       <div className={`flex flex-col gap-4 px-5 py-4 sm:px-6 xl:flex-row xl:items-center xl:justify-between ${compact ? "min-h-[72px]" : "min-h-[108px]"}`}>
         <div className={compact ? "sr-only" : "min-w-0"}>
-          <div className="harmony-topbar-badge mb-2.5 inline-flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-[11px] font-bold text-[#747982]">
-            <Sparkles size={14} className="text-[#007aff]" />
+          <div className="harmony-topbar-badge mb-2.5 inline-flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-[11px] font-bold harmony-text-secondary">
+            <Sparkles size={14} className="harmony-text-link" />
             {badge}
           </div>
 
-          <h1 className="truncate text-[28px] font-semibold tracking-[-0.045em] text-[#17181b]">
+          <h1 className="truncate text-[28px] font-semibold tracking-[-0.045em] harmony-text-primary">
             {title}
           </h1>
 
           {description && (
-            <p className="mt-2 max-w-3xl text-sm leading-6 text-[#6e6e73]">
+            <p className="mt-2 max-w-3xl text-sm leading-6 harmony-text-secondary">
               {description}
             </p>
           )}
@@ -526,12 +552,12 @@ export function Topbar({
 
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
           <div className="harmony-topbar-search flex h-11 min-w-0 items-center gap-3 rounded-full border px-4 transition focus-within:border-blue-300 sm:w-[320px]">
-            <Search size={18} className="shrink-0 text-[#86868b]" />
+            <Search size={18} className="shrink-0 harmony-text-muted" />
 
             <input
               type="text"
               placeholder="Cari nama, NIP, unit kerja, atau menu..."
-              className="w-full rounded-full border-0 bg-transparent text-sm text-[#1d1d1f] shadow-none outline-none ring-0 placeholder:text-[#86868b] focus:border-0 focus:outline-none focus:ring-0"
+              className="w-full rounded-full border-0 bg-transparent text-sm harmony-text-primary shadow-none outline-none ring-0 harmony-placeholder-muted focus:border-0 focus:outline-none focus:ring-0"
             />
           </div>
 
@@ -541,10 +567,10 @@ export function Topbar({
               onClick={handleToggleNotification}
               aria-controls="harmony-notification-panel"
               aria-expanded={isOpen}
-              className="harmony-topbar-action relative flex h-11 items-center justify-center gap-2 rounded-full border px-4 text-sm font-semibold text-[#25272c] transition"
+              className="harmony-topbar-action relative flex h-11 items-center justify-center gap-2 rounded-full border px-4 text-sm font-semibold harmony-text-primary transition"
             >
               <span className="relative">
-                <Bell size={18} className="text-[#007aff]" />
+                <Bell size={18} className="harmony-text-link" />
 
                 {totalBadgeCount > 0 && (
                   <span className="absolute -right-2 -top-2 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold leading-none text-white">
@@ -560,11 +586,11 @@ export function Topbar({
               <div ref={popoverRef} id="harmony-notification-panel" className="harmony-popover-glass harmony-notification-portal fixed w-[min(460px,calc(100vw-24px))] overflow-hidden rounded-[28px] border" style={popoverPosition} role="dialog" aria-label="Pusat Notifikasi">
                 <div className="flex items-start justify-between gap-3 border-b border-black/5 p-5">
                   <div>
-                    <h2 className="text-base font-bold tracking-[-0.02em] text-[#1d1d1f]">
+                    <h2 className="text-base font-bold tracking-[-0.02em] harmony-text-primary">
                       Pusat Notifikasi
                     </h2>
 
-                    <p className="mt-1 text-xs leading-5 text-[#86868b]">
+                    <p className="mt-1 text-xs leading-5 harmony-text-muted">
                       {pendingTaskCount > 0
                         ? `${pendingTaskCount} task belum dibaca`
                         : 'Tidak ada task baru'}
@@ -579,7 +605,7 @@ export function Topbar({
                       onClick={() => void refreshAll()}
                       disabled={isLoading || isRefreshingTasks}
                       title="Refresh task dan notifikasi"
-                      className="flex h-9 w-9 items-center justify-center rounded-2xl bg-[#f5f5f7] text-[#6e6e73] transition hover:bg-[#e8f2ff] hover:text-[#007aff] disabled:cursor-not-allowed disabled:opacity-50"
+                      className="flex h-9 w-9 items-center justify-center rounded-2xl bg-[#f5f5f7] harmony-text-secondary transition hover:bg-[#e8f2ff] harmony-hover-text-link disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       <RefreshCcw
                         size={15}
@@ -594,7 +620,7 @@ export function Topbar({
                       onClick={handleMarkAllAsRead}
                       disabled={isMarking || (unreadHistoryCount === 0 && unreadTasks.length === 0)}
                       title="Tandai semua task dan riwayat sebagai dibaca"
-                      className="inline-flex h-9 items-center gap-1.5 rounded-2xl bg-[#f5f5f7] px-3 text-xs font-bold text-[#1d1d1f] transition hover:bg-[#e8f2ff] disabled:cursor-not-allowed disabled:opacity-50"
+                      className="inline-flex h-9 items-center gap-1.5 rounded-2xl bg-[#f5f5f7] px-3 text-xs font-bold harmony-text-primary transition hover:bg-[#e8f2ff] disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       {isMarking ? (
                         <Loader2 size={14} className="animate-spin" />
@@ -608,7 +634,7 @@ export function Topbar({
                       type="button"
                       onClick={() => setIsOpen(false)}
                       aria-label="Tutup pusat notifikasi"
-                      className="flex h-9 w-9 items-center justify-center rounded-2xl bg-[#f5f5f7] text-[#6e6e73] transition hover:bg-[#e8f2ff] hover:text-[#007aff]"
+                      className="flex h-9 w-9 items-center justify-center rounded-2xl bg-[#f5f5f7] harmony-text-secondary transition hover:bg-[#e8f2ff] harmony-hover-text-link"
                     >
                       <X size={16} />
                     </button>
@@ -629,7 +655,7 @@ export function Topbar({
 
                 <div className="max-h-[560px] overflow-y-auto">
                   {isLoading ? (
-                    <div className="flex items-center gap-3 p-5 text-sm font-medium text-[#6e6e73]">
+                    <div className="flex items-center gap-3 p-5 text-sm font-medium harmony-text-secondary">
                       <Loader2 size={18} className="animate-spin" />
                       Memuat task dan notifikasi...
                     </div>
@@ -701,13 +727,13 @@ export function Topbar({
                                     <div className="flex items-start justify-between gap-3">
                                       <div>
                                         <div className="flex flex-wrap items-center gap-2">
-                                          <h4 className="text-sm font-bold leading-5 text-[#1d1d1f]">
+                                          <h4 className="text-sm font-bold leading-5 harmony-text-primary">
                                             {item.title}
                                           </h4>
                                           <TaskScopeBadge scope={item.scope} />
                                         </div>
 
-                                        <p className="mt-1 text-xs leading-5 text-[#6e6e73]">
+                                        <p className="mt-1 text-xs leading-5 harmony-text-secondary">
                                           {item.message}
                                         </p>
                                       </div>
@@ -716,11 +742,11 @@ export function Topbar({
                                         <span className="flex min-w-7 items-center justify-center rounded-full bg-red-500 px-2 py-1 text-[11px] font-bold text-white">
                                           {item.count}
                                         </span>
-                                        <ChevronRight size={15} className="text-[#86868b]" />
+                                        <ChevronRight size={15} className="harmony-text-muted" />
                                       </div>
                                     </div>
 
-                                    <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] font-semibold text-[#9a9aa0]">
+                                    <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] font-semibold harmony-text-muted">
                                       <span className={priorityTextClass(item.priority)}>
                                         {priorityLabel(item.priority)}
                                       </span>
@@ -774,14 +800,14 @@ export function Topbar({
                       <section>
                         <div className="flex items-center justify-between gap-3 px-5 pb-2 pt-4">
                           <div className="flex items-center gap-2">
-                            <Bell size={15} className="text-[#007aff]" />
+                            <Bell size={15} className="harmony-text-link" />
                             <h3 className="text-xs font-bold uppercase tracking-wide text-[#41607d]">
                               Riwayat Notifikasi
                             </h3>
                           </div>
 
                           {unreadHistoryCount > 0 && (
-                            <span className="rounded-full bg-[#e8f2ff] px-2.5 py-1 text-[11px] font-bold text-[#0059b8]">
+                            <span className="rounded-full bg-[#e8f2ff] px-2.5 py-1 text-[11px] font-bold harmony-text-link">
                               {unreadHistoryCount} baru
                             </span>
                           )}
@@ -789,15 +815,15 @@ export function Topbar({
 
                         {notifications.length === 0 ? (
                           <div className="p-6 pt-3 text-center">
-                            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-[#e8f2ff] text-[#007aff]">
+                            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-[#e8f2ff] harmony-text-link">
                               <Bell size={22} />
                             </div>
 
-                            <h3 className="mt-4 text-sm font-bold text-[#1d1d1f]">
+                            <h3 className="mt-4 text-sm font-bold harmony-text-primary">
                               Belum ada riwayat notifikasi
                             </h3>
 
-                            <p className="mt-1 text-xs leading-5 text-[#86868b]">
+                            <p className="mt-1 text-xs leading-5 harmony-text-muted">
                               Notifikasi event dan email HARMONY akan muncul di sini.
                             </p>
                           </div>
@@ -832,7 +858,7 @@ export function Topbar({
                                       <div className="flex items-start justify-between gap-3">
                                         <h3
                                           className={[
-                                            'text-sm leading-5 text-[#1d1d1f]',
+                                            'text-sm leading-5 harmony-text-primary',
                                             isUnread ? 'font-bold' : 'font-semibold',
                                           ].join(' ')}
                                         >
@@ -842,16 +868,16 @@ export function Topbar({
                                         {actionUrl && (
                                           <ExternalLink
                                             size={14}
-                                            className="mt-0.5 shrink-0 text-[#86868b]"
+                                            className="mt-0.5 shrink-0 harmony-text-muted"
                                           />
                                         )}
                                       </div>
 
-                                      <p className="mt-1 line-clamp-2 text-xs leading-5 text-[#6e6e73]">
+                                      <p className="mt-1 line-clamp-2 text-xs leading-5 harmony-text-secondary">
                                         {notification.notification_message}
                                       </p>
 
-                                      <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] font-medium text-[#9a9aa0]">
+                                      <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] font-medium harmony-text-muted">
                                         <span>
                                           {getRelativeTime(notification.created_at)}
                                         </span>
@@ -886,7 +912,7 @@ export function Topbar({
                   )}
                 </div>
 
-                <div className="border-t border-black/5 bg-[#f5f5f7]/70 px-5 py-3 text-center text-[11px] leading-5 text-[#86868b]">
+                <div className="border-t border-black/5 bg-[#f5f5f7]/70 px-5 py-3 text-center text-[11px] leading-5 harmony-text-muted">
                   Task dihitung langsung dari status workflow canonical. Riwayat event tetap diambil dari notification_logs.
                 </div>
               </div>, document.body

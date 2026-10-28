@@ -1,3 +1,5 @@
+
+import { readErrorMessage } from '@/lib/error-utils'
 import { NextRequest, NextResponse } from 'next/server'
 import { requireRemedApi, remedApiError } from '@/lib/server/remed-api-auth'
 import { normalizeRemedRole } from '@/lib/remed'
@@ -166,8 +168,8 @@ async function sendAccessEmailChangeNotice({
       }),
     })
     return { success: result.ok, message: result.message }
-  } catch (error: any) {
-    return { success: false, message: error?.message || 'Notifikasi perubahan email gagal dikirim.' }
+  } catch (error: unknown) {
+    return { success: false, message: readErrorMessage(error) || 'Notifikasi perubahan email gagal dikirim.' }
   }
 }
 
@@ -202,7 +204,7 @@ export async function PATCH(request: NextRequest) {
     if (conflict.error) throw conflict.error
     if (conflict.data) throw Object.assign(new Error('Email baru sudah digunakan akses Re-Med lain.'), { status: 409 })
 
-    let authUser: any = null
+    let authUser: { user_metadata?: Record<string, unknown> } | null = null
     if (current.auth_user_id) {
       const byId = await ctx.admin.auth.admin.getUserById(current.auth_user_id)
       if (byId.error || !byId.data?.user) {
@@ -213,7 +215,7 @@ export async function PATCH(request: NextRequest) {
       const list = await ctx.admin.auth.admin.listUsers({ page: 1, perPage: 1000 })
       if (list.error) throw list.error
       const authConflict = list.data.users.find(
-        (user: any) => String(user.email || '').trim().toLowerCase() === newEmail && user.id !== current.auth_user_id,
+        (user) => String(user.email || '').trim().toLowerCase() === newEmail && user.id !== current.auth_user_id,
       )
       if (authConflict) throw Object.assign(new Error('Email baru sudah digunakan Supabase Auth user lain.'), { status: 409 })
     }

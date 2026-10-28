@@ -1,7 +1,9 @@
 "use client";
 
+
+import { readErrorMessage } from '@/lib/error-utils'
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffectEvent, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import {
   AlertTriangle,
@@ -111,8 +113,8 @@ const MONTH_OPTIONS = [
 ];
 
 export default function EmployeeAttendanceApprovalListPage() {
-  const [appUser, setAppUser] = useState<AppUser | null>(null);
-  const [supervisor, setSupervisor] = useState<Employee | null>(null);
+  const [, setAppUser] = useState<AppUser | null>(null);
+  const [, setSupervisor] = useState<Employee | null>(null);
   const [subordinates, setSubordinates] = useState<Employee[]>([]);
   const [confirmations, setConfirmations] = useState<
     AttendancePeriodConfirmation[]
@@ -199,9 +201,10 @@ export default function EmployeeAttendanceApprovalListPage() {
     });
   }, [confirmations, employeeMap, searchQuery, statusFilter]);
 
+  const onPeriodLoad = useEffectEvent(fetchData)
   useEffect(() => {
     if (!periodReady) return;
-    fetchData(false);
+    onPeriodLoad(false);
   }, [periodMonth, periodReady]);
 
   // Return from detail lands on the same employee instead of resetting to the summary.
@@ -359,10 +362,10 @@ export default function EmployeeAttendanceApprovalListPage() {
       });
 
       setConfirmations(relevantConfirmations);
-    } catch (error: any) {
+    } catch (error: unknown) {
       setConfirmations([]);
       setErrorMessage(
-        error?.message ||
+        readErrorMessage(error) ||
           "Data approval absensi tim belum berhasil dimuat.",
       );
     } finally {
@@ -467,15 +470,15 @@ export default function EmployeeAttendanceApprovalListPage() {
           <div className="border-b border-black/5 p-5 sm:p-6">
             <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
               <div className="flex min-w-0 items-start gap-3">
-                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#e8f2ff] text-[#007aff]">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#e8f2ff] harmony-text-link">
                   <Filter size={18} />
                 </div>
 
                 <div className="min-w-0">
-                  <h2 className="text-lg font-semibold text-[#1d1d1f]">
+                  <h2 className="text-lg font-semibold harmony-text-primary">
                     Filter Approval
                   </h2>
-                  <p className="mt-1 text-sm leading-6 text-[#6e6e73]">
+                  <p className="mt-1 text-sm leading-6 harmony-text-secondary">
                     Periode cutoff: {formatDisplayDate(periodRange.start)} -{" "}
                     {formatDisplayDate(periodRange.end)}
                   </p>
@@ -486,7 +489,7 @@ export default function EmployeeAttendanceApprovalListPage() {
                 type="button"
                 onClick={() => fetchData(true)}
                 disabled={refreshing || loading}
-                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl border border-black/5 bg-white px-4 text-sm font-bold text-[#1d1d1f] shadow-sm transition hover:bg-[#f5f5f7] disabled:cursor-not-allowed disabled:opacity-60"
+                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl border border-black/5 bg-white px-4 text-sm font-bold harmony-text-primary shadow-sm transition hover:bg-[#f5f5f7] disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {refreshing ? (
                   <Loader2 size={17} className="animate-spin" />
@@ -567,7 +570,7 @@ export default function EmployeeAttendanceApprovalListPage() {
                 <div className="relative">
                   <Search
                     size={17}
-                    className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[#86868b]"
+                    className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 harmony-text-muted"
                   />
                   <input
                     value={searchQuery}
@@ -581,7 +584,7 @@ export default function EmployeeAttendanceApprovalListPage() {
           </div>
 
           {loading ? (
-            <div className="flex items-center gap-3 p-6 text-sm text-[#6e6e73]">
+            <div className="flex items-center gap-3 p-6 text-sm harmony-text-secondary">
               <Loader2 size={18} className="animate-spin" />
               Memuat pengajuan absensi bawahan...
             </div>
@@ -618,7 +621,7 @@ export default function EmployeeAttendanceApprovalListPage() {
               <div className="hidden overflow-x-auto 2xl:block">
                 <table className="min-w-[1220px] w-full table-fixed border-collapse text-left text-[12px]">
                   <thead>
-                    <tr className="border-b border-black/5 bg-[#f5f5f7]/90 text-xs uppercase tracking-wide text-[#6e6e73]">
+                    <tr className="border-b border-black/5 bg-[#f5f5f7]/90 text-xs uppercase tracking-wide harmony-text-secondary">
                       <th className="w-[250px] px-4 py-3 font-semibold">
                         Karyawan
                       </th>
@@ -663,7 +666,7 @@ export default function EmployeeAttendanceApprovalListPage() {
                           </td>
 
                           <td className="px-4 py-4 align-top">
-                            <p className="font-bold text-[#1d1d1f]">
+                            <p className="font-bold harmony-text-primary">
                               {formatDisplayDate(
                                 confirmation.period_start ||
                                   periodRange.start,
@@ -674,14 +677,14 @@ export default function EmployeeAttendanceApprovalListPage() {
                                   periodRange.end,
                               )}
                             </p>
-                            <p className="mt-1 text-xs text-[#86868b]">
+                            <p className="mt-1 text-xs harmony-text-muted">
                               {formatPeriodMonthLabel(
                                 confirmation.period_month,
                               )}
                             </p>
                           </td>
 
-                          <td className="px-4 py-4 align-top text-[#6e6e73]">
+                          <td className="px-4 py-4 align-top harmony-text-secondary">
                             {formatDateTime(
                               confirmation.employee_submitted_at || "",
                             )}
@@ -725,11 +728,11 @@ export default function EmployeeAttendanceApprovalListPage() {
 
         <div className="rounded-[28px] border border-[#cfe3ff] bg-[#f4f9ff] p-5 text-sm leading-6 text-[#41607d]">
           <div className="flex items-start gap-3">
-            <div className="rounded-2xl bg-white p-2.5 text-[#007aff] shadow-sm">
+            <div className="rounded-2xl bg-white p-2.5 harmony-text-link shadow-sm">
               <Eye size={18} />
             </div>
             <div>
-              <p className="font-bold text-[#1d1d1f]">
+              <p className="font-bold harmony-text-primary">
                 Flow approval tidak diubah
               </p>
               <p className="mt-1">
@@ -831,18 +834,18 @@ function EmployeeIdentity({
 
   return (
     <div className="flex min-w-0 items-start gap-3">
-      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#e8f2ff] text-[#007aff]">
+      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#e8f2ff] harmony-text-link">
         <UserRound size={18} />
       </div>
 
       <div className="min-w-0">
-        <p className="break-words text-sm font-bold leading-5 text-[#1d1d1f]">
+        <p className="break-words text-sm font-bold leading-5 harmony-text-primary">
           {name}
         </p>
-        <p className="mt-1 break-words text-xs leading-5 text-[#6e6e73]">
+        <p className="mt-1 break-words text-xs leading-5 harmony-text-secondary">
           {number} · {department}
         </p>
-        <p className="break-words text-xs leading-5 text-[#86868b]">
+        <p className="break-words text-xs leading-5 harmony-text-muted">
           {position}
         </p>
       </div>
@@ -860,7 +863,7 @@ function StatusBadge({ status }: { status?: string | null }) {
         ? "bg-red-50 text-red-700"
         : normalized === "pending"
           ? "bg-orange-50 text-orange-700"
-          : "bg-[#f5f5f7] text-[#6e6e73]";
+          : "bg-[#f5f5f7] harmony-text-secondary";
 
   return (
     <span
@@ -878,10 +881,10 @@ function HRStatusBadge({ status }: { status?: string | null }) {
     normalized === "finalized"
       ? "bg-green-50 text-green-700"
       : normalized === "ready_for_hr"
-        ? "bg-[#e8f2ff] text-[#0059b8]"
+        ? "bg-[#e8f2ff] harmony-text-link"
         : normalized.includes("rejected")
           ? "bg-red-50 text-red-700"
-          : "bg-[#f5f5f7] text-[#6e6e73]";
+          : "bg-[#f5f5f7] harmony-text-secondary";
 
   return (
     <span
@@ -904,13 +907,13 @@ function EmptyState({
   return (
     <div className="p-6">
       <div className="rounded-[28px] border border-dashed border-black/10 bg-[#f5f5f7]/70 p-8 text-center">
-        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-3xl bg-white text-[#007aff] shadow-sm">
+        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-3xl bg-white harmony-text-link shadow-sm">
           {icon}
         </div>
-        <h3 className="mt-5 text-lg font-semibold text-[#1d1d1f]">
+        <h3 className="mt-5 text-lg font-semibold harmony-text-primary">
           {title}
         </h3>
-        <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-[#6e6e73]">
+        <p className="mx-auto mt-2 max-w-xl text-sm leading-6 harmony-text-secondary">
           {description}
         </p>
       </div>
@@ -921,10 +924,10 @@ function EmptyState({
 function MiniData({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-2xl bg-[#f5f5f7]/80 p-3">
-      <p className="text-[10px] font-bold uppercase tracking-wide text-[#86868b]">
+      <p className="text-[10px] font-bold uppercase tracking-wide harmony-text-muted">
         {label}
       </p>
-      <p className="mt-1 break-words text-xs font-bold leading-5 text-[#1d1d1f]">
+      <p className="mt-1 break-words text-xs font-bold leading-5 harmony-text-primary">
         {value}
       </p>
     </div>
@@ -945,22 +948,22 @@ function SummaryCard({
   tone: SummaryTone;
 }) {
   const toneClass = {
-    blue: "text-[#007aff] bg-[#e8f2ff]",
-    green: "text-[#168034] bg-[#eaf8ee]",
-    orange: "text-[#b35b00] bg-[#fff4e5]",
+    blue: "harmony-text-link bg-[#e8f2ff]",
+    green: "harmony-text-success bg-[#eaf8ee]",
+    orange: "harmony-text-warning bg-[#fff4e5]",
     red: "text-red-700 bg-red-50",
-    purple: "text-[#7b2cbf] bg-[#f7edfc]",
+    purple: "harmony-text-violet bg-[#f7edfc]",
   }[tone];
 
   return (
     <div className="harmony-metric-card p-5">
       <div className="flex items-center justify-between gap-4">
         <div className="min-w-0">
-          <p className="truncate text-sm text-[#6e6e73]">{title}</p>
-          <h3 className="mt-2 truncate text-2xl font-semibold tracking-tight text-[#1d1d1f]">
+          <p className="truncate text-sm harmony-text-secondary">{title}</p>
+          <h3 className="mt-2 truncate text-2xl font-semibold tracking-tight harmony-text-primary">
             {value}
           </h3>
-          <p className="mt-1 line-clamp-2 text-xs leading-5 text-[#86868b]">
+          <p className="mt-1 line-clamp-2 text-xs leading-5 harmony-text-muted">
             {description}
           </p>
         </div>
@@ -973,16 +976,7 @@ function SummaryCard({
   );
 }
 
-function HeroMetric({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-[22px] border border-white/10 bg-white/10 p-4 backdrop-blur-xl">
-      <p className="text-[11px] font-semibold uppercase tracking-wide text-white/45">
-        {label}
-      </p>
-      <p className="mt-1 text-xl font-semibold text-white">{value}</p>
-    </div>
-  );
-}
+
 
 function resolveSubordinateIds(
   supervisor: Employee,

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
+import { useEffect, useRef, useSyncExternalStore, type KeyboardEvent, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 
 type HarmonyModalPortalProps = {
@@ -10,6 +10,11 @@ type HarmonyModalPortalProps = {
   onClose: () => void
   canClose?: boolean
 }
+
+
+const subscribeMount = () => () => {}
+const clientMounted = () => true
+const serverMounted = () => false
 
 /**
  * Keeps a modal above sticky headers and animated/glass stacking contexts.
@@ -23,17 +28,8 @@ export function HarmonyModalPortal({
   onClose,
   canClose = true,
 }: HarmonyModalPortalProps) {
-  const [mounted, setMounted] = useState(false)
+  const mounted = useSyncExternalStore(subscribeMount, clientMounted, serverMounted)
   const dialogRef = useRef<HTMLDivElement>(null)
-  const closeRef = useRef(onClose)
-  const canCloseRef = useRef(canClose)
-  closeRef.current = onClose
-  canCloseRef.current = canClose
-
-  useEffect(() => {
-    setMounted(true)
-  }, [])
-
   useEffect(() => {
     if (!mounted) return
 
@@ -53,9 +49,9 @@ export function HarmonyModalPortal({
   const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     if (event.key === 'Escape') {
       event.stopPropagation()
-      if (canCloseRef.current) {
+      if (canClose) {
         event.preventDefault()
-        closeRef.current()
+        onClose()
       }
       return
     }

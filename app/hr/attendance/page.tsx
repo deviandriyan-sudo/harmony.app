@@ -139,11 +139,11 @@ export default function HRAttendanceHomePage() {
                 HARMONY Attendance Control
               </div>
 
-              <h1 className="mt-4 max-w-3xl text-3xl font-semibold tracking-[-0.035em] text-[#1d1d1f]">
+              <h1 className="mt-4 max-w-3xl text-3xl font-semibold tracking-[-0.035em] harmony-text-primary">
                 Empat langkah untuk satu periode absensi
               </h1>
 
-              <p className="mt-3 max-w-4xl text-sm leading-7 text-[#6e6e73]">
+              <p className="mt-3 max-w-4xl text-sm leading-7 harmony-text-secondary">
                 Route lama tetap aktif. Halaman ini hanya menyederhanakan cara HR bekerja menjadi Input, Review, Finalisasi, lalu Laporan.
                 Sinkronisasi dan Audit tetap tersedia sebagai tools pendukung.
               </p>
@@ -200,8 +200,8 @@ export default function HRAttendanceHomePage() {
                 <Wrench size={18} />
               </div>
               <div className="min-w-0 flex-1">
-                <h2 className="font-semibold text-[#1d1d1f]">Tools & Riwayat</h2>
-                <p className="mt-1 text-sm leading-6 text-[#6e6e73]">
+                <h2 className="font-semibold harmony-text-primary">Tools & Riwayat</h2>
+                <p className="mt-1 text-sm leading-6 harmony-text-secondary">
                   Digunakan bila HR perlu re-sync manual, troubleshooting, atau melihat aktivitas finalisasi dan lock.
                 </p>
 
@@ -227,8 +227,8 @@ export default function HRAttendanceHomePage() {
                 <CalendarDays size={18} />
               </div>
               <div>
-                <h2 className="font-semibold text-[#1d1d1f]">Prinsip reporting tetap sama</h2>
-                <p className="mt-1 text-sm leading-6 text-[#5f6f66]">
+                <h2 className="font-semibold harmony-text-primary">Prinsip reporting tetap sama</h2>
+                <p className="mt-1 text-sm leading-6 harmony-text-secondary">
                   Hari kerja terverifikasi tetap dipisahkan menjadi Hadir Kantor, Manual/Lapangan, ST/Tugas Luar, dan Kerja Hari Libur.
                   Konflik cuti/sakit/izin/PHL tetap ditandai sebagai konflik, bukan double count.
                 </p>
@@ -278,7 +278,7 @@ function AttendanceStepCard({
   }[step.tone]
 
   return (
-    <div className={`flex min-h-[330px] flex-col rounded-[28px] border p-5 shadow-sm ${tones.shell}`}>
+    <div data-tone={step.tone} className={`harmony-attendance-step-card flex min-h-[330px] flex-col rounded-[28px] border p-5 shadow-sm ${tones.shell}`}>
       <div className="flex items-start justify-between gap-4">
         <div className={`flex h-11 w-11 items-center justify-center rounded-2xl ${tones.icon}`}>
           {step.icon}
@@ -289,10 +289,10 @@ function AttendanceStepCard({
       </div>
 
       <div className="mt-5 flex-1">
-        <h2 className="text-lg font-semibold text-[#1d1d1f]">{step.title}</h2>
-        <p className="mt-2 text-sm leading-6 text-[#6e6e73]">{step.description}</p>
+        <h2 className="text-lg font-semibold harmony-text-primary">{step.title}</h2>
+        <p className="mt-2 text-sm leading-6 harmony-text-secondary">{step.description}</p>
 
-        <div className="mt-4 rounded-2xl border border-black/5 bg-white/70 p-3 text-xs leading-5 text-[#6e6e73]">
+        <div className="harmony-attendance-step-helper mt-4 rounded-2xl border border-black/5 bg-white/70 p-3 text-xs leading-5 harmony-text-secondary">
           {step.helper}
         </div>
       </div>
@@ -311,10 +311,10 @@ function AttendanceStepCard({
           <Link
             key={`${step.step}-${action.href}`}
             href={action.href}
-            className="harmony-attendance-step-secondary flex min-h-10 items-center justify-between rounded-2xl border border-black/5 bg-white/75 px-4 text-xs font-bold text-[#1d1d1f] transition hover:bg-white"
+            className="harmony-attendance-step-secondary flex min-h-10 items-center justify-between rounded-2xl border border-black/5 bg-white/75 px-4 text-xs font-bold harmony-text-primary transition hover:bg-white"
           >
             {action.label}
-            <ArrowRight size={14} className="text-[#86868b]" />
+            <ArrowRight size={14} className="harmony-text-muted" />
           </Link>
         ))}
       </div>
@@ -360,13 +360,13 @@ function ToolLink({
   return (
     <Link
       href={href}
-      className="flex items-center justify-between gap-3 rounded-2xl border border-black/5 bg-white/80 px-4 py-3 text-xs font-bold text-[#1d1d1f] shadow-sm transition hover:-translate-y-0.5 hover:bg-white"
+      className="harmony-attendance-tool-link flex items-center justify-between gap-3 rounded-2xl border border-black/5 bg-white/80 px-4 py-3 text-xs font-bold harmony-text-primary shadow-sm transition hover:-translate-y-0.5 hover:bg-white"
     >
       <span className="flex items-center gap-2">
         {icon}
         {label}
       </span>
-      <ArrowUpRight size={14} className="text-[#86868b]" />
+      <ArrowUpRight size={14} className="harmony-text-muted" />
     </Link>
   )
 }

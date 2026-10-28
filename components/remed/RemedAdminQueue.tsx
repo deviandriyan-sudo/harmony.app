@@ -39,7 +39,11 @@ export function RemedAdminQueue({ mode }: { mode: QueueMode }) {
       setLoading(false)
     }
   }, [config.status])
-  useEffect(() => { void load() }, [load])
+  useEffect(() => {
+    let active = true
+    queueMicrotask(() => { if (active) void load() })
+    return () => { active = false }
+  }, [load])
   return <section className={`harmony-glass-showcase harmony-glass-showcase-${config.role.toLowerCase()} mx-auto max-w-[1540px] space-y-6 p-4 sm:p-6 lg:p-8`}>
     <RemedPageHeader eyebrow={`Re-Med · ${config.role}`} title={config.title}
       description={config.description} icon={mode === 'payment' ? Banknote : ClipboardCheck}

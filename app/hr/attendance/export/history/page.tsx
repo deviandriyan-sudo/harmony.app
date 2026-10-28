@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, CalendarRange, CheckCheck, Download, FileSpreadsheet, Loader2, Search, Users, X } from 'lucide-react'
+import { AlertTriangle, CalendarRange, CheckCheck, Download, Loader2, Search, Users, X } from 'lucide-react'
 
 import { Topbar } from '@/components/layout/Topbar'
 import { getCutoffRange, getCurrentPeriodMonthWita, getEmployeeLogs, type AttendanceDayClassification } from '@/lib/attendance-reporting'

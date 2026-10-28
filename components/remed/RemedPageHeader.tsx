@@ -20,8 +20,8 @@ export function RemedPageHeader({
         <div className="inline-flex items-center gap-2 rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1.5 text-[11px] font-bold text-emerald-700">
           <Icon size={14} /> {eyebrow}
         </div>
-        <h1 className="mt-3 text-2xl font-semibold tracking-[-0.04em] text-[#17181b] sm:text-3xl">{title}</h1>
-        {description ? <p className="mt-2 max-w-3xl text-sm leading-6 text-[#747982]">{description}</p> : null}
+        <h1 className="mt-3 text-2xl font-semibold tracking-[-0.04em] harmony-text-primary sm:text-3xl">{title}</h1>
+        {description ? <p className="mt-2 max-w-3xl text-sm leading-6 harmony-text-secondary">{description}</p> : null}
       </div>
       {actions ? <div className="shrink-0">{actions}</div> : null}
     </div>

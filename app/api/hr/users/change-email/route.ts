@@ -1,4 +1,7 @@
+
+import { readErrorMessage } from '@/lib/error-utils'
 import { NextRequest, NextResponse } from 'next/server'
+import type { User } from '@supabase/supabase-js'
 
 import {
   buildServerHarmonyEmailHtml,
@@ -15,8 +18,19 @@ import {
 
 export const runtime = 'nodejs'
 
-type AnyRow = Record<string, any>
-type AuthUser = Record<string, any>
+type AnyRow = Record<string, unknown> & {
+  id?: string
+  email?: string | null
+  employee_id?: string | null
+  employee_number?: string | null
+  full_name?: string | null
+  is_active?: boolean | null
+  auth_user_id?: string | null
+}
+type AuthUser = User
+
+type HarmonyAdmin = Awaited<ReturnType<typeof requireHRApi>>['admin']
+type RowQuery = PromiseLike<{ data: AnyRow[] | null; error: { message: string } | null }>
 
 function clean(value: unknown) {
   return String(value || '').trim()
@@ -26,7 +40,7 @@ function unique(values: unknown[]) {
   return Array.from(new Set(values.map((value) => normalizeEmail(value)).filter(Boolean)))
 }
 
-async function listAuthUsers(admin: any) {
+async function listAuthUsers(admin: HarmonyAdmin) {
   const users: AuthUser[] = []
   const perPage = 200
 
@@ -120,8 +134,8 @@ async function sendEmailChangeNotice({
     })
 
     return { success: result.ok, message: result.message }
-  } catch (error: any) {
-    return { success: false, message: error?.message || 'Notifikasi perubahan email gagal dikirim.' }
+  } catch (error: unknown) {
+    return { success: false, message: readErrorMessage(error) || 'Notifikasi perubahan email gagal dikirim.' }
   }
 }
 
@@ -160,7 +174,7 @@ export async function POST(request: NextRequest) {
     stage = 'resolve_app_user'
     const appUserMap = new Map<string, AnyRow>()
 
-    const collectAppUsers = async (query: any) => {
+    const collectAppUsers = async (query: RowQuery) => {
       const result = await query
       if (result.error) throw result.error
       for (const row of result.data || []) appUserMap.set(clean(row.id), row)
@@ -445,17 +459,17 @@ export async function POST(request: NextRequest) {
 
     stage = 'load_remed_links'
     const remedCollections: AnyRow[][] = []
-    const remedQueries = [
+    const remedQueries: RowQuery[] = [
       admin.from('remed_user_access').select('id,auth_user_id,employee_id,email,role,is_active').eq('auth_user_id', authUserId),
-      authUserId !== appUserId
-        ? admin.from('remed_user_access').select('id,auth_user_id,employee_id,email,role,is_active').eq('auth_user_id', appUserId)
-        : null,
-      employeeId
-        ? admin.from('remed_user_access').select('id,auth_user_id,employee_id,email,role,is_active').eq('employee_id', employeeId)
-        : null,
+      ...(authUserId !== appUserId
+        ? [admin.from('remed_user_access').select('id,auth_user_id,employee_id,email,role,is_active').eq('auth_user_id', appUserId)]
+        : []),
+      ...(employeeId
+        ? [admin.from('remed_user_access').select('id,auth_user_id,employee_id,email,role,is_active').eq('employee_id', employeeId)]
+        : []),
       admin.from('remed_user_access').select('id,auth_user_id,employee_id,email,role,is_active').ilike('email', oldEmail),
       admin.from('remed_user_access').select('id,auth_user_id,employee_id,email,role,is_active').ilike('email', newEmail),
-    ].filter(Boolean) as any[]
+    ]
 
     for (const query of remedQueries) {
       const result = await query
@@ -607,8 +621,8 @@ export async function POST(request: NextRequest) {
         },
       })
       if (audit.error) auditWarning = audit.error.message
-    } catch (error: any) {
-      auditWarning = error?.message || 'Audit log tidak dapat ditulis.'
+    } catch (error: unknown) {
+      auditWarning = readErrorMessage(error) || 'Audit log tidak dapat ditulis.'
     }
 
     stage = 'send_notifications'

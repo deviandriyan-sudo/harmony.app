@@ -1,27 +1,11 @@
 'use client'
 
-import { useEffect, useId, useMemo, useState } from 'react'
+
+import { readErrorMessage } from '@/lib/error-utils'
+import { useEffectEvent, useEffect, useId, useMemo, useState } from 'react'
 import type { FormEvent, ReactNode } from 'react'
 import Link from 'next/link'
-import {
-  AlertTriangle,
-  ArrowRight,
-  CalendarDays,
-  CheckCircle2,
-  Clock3,
-  FileText,
-  Loader2,
-  Plane,
-  Plus,
-  RefreshCcw,
-  RotateCcw,
-  Send,
-  Upload,
-  UserCheck,
-  UserRound,
-  WalletCards,
-  X,
-} from 'lucide-react'
+import { AlertTriangle, CalendarDays, CheckCircle2, Clock3, Loader2, Plane, Plus, RefreshCcw, RotateCcw, Send, UserCheck, UserRound, WalletCards, X } from 'lucide-react'
 
 import { Topbar } from '@/components/layout/Topbar'
 import { HarmonyModalPortal } from '@/components/ui/HarmonyModalPortal'
@@ -35,14 +19,7 @@ import {
   HARMONY_ATTACHMENT_REQUIRED_FILES,
   registerHarmonySubmissionAttachments,
 } from '@/lib/harmony-attachments'
-import {
-  getApprovalStageLabel,
-  getApprovalStageTone,
-  getHRApprovalLabel,
-  getSupervisorApprovalLabel,
-  isFinalApproved,
-  isWorkflowPending,
-} from '@/lib/leave-workflow-status'
+import { getApprovalStageLabel, getApprovalStageTone, getHRApprovalLabel, getSupervisorApprovalLabel, isWorkflowPending } from '@/lib/leave-workflow-status'
 import { sendHarmonyWorkflowNotification } from '@/lib/notifications'
 import {
   getActiveHarmonyTypesForScope,
@@ -231,11 +208,11 @@ async function notifyLeaveRequestSubmitted({
       count: result.sent,
       message: result.message,
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     return {
       success: false,
       count: 0,
-      message: error?.message || 'Email notifikasi gagal dikirim.',
+      message: readErrorMessage(error) || 'Email notifikasi gagal dikirim.',
     }
   }
 }
@@ -295,9 +272,7 @@ export default function EmployeeLeavePage() {
     return leaveRequests.filter((item) => isWorkflowPending(item)).length
   }, [leaveRequests])
 
-  const approvedCount = useMemo(() => {
-    return leaveRequests.filter((item) => isFinalApproved(item)).length
-  }, [leaveRequests])
+
 
   const calculatedDays = useMemo(() => {
     if (!form.start_date || !form.end_date) return 0
@@ -336,8 +311,9 @@ export default function EmployeeLeavePage() {
     )
   }, [employeeDirectory, form.handover_to])
 
+  const onInitialLoad = useEffectEvent(fetchData)
   useEffect(() => {
-    fetchData()
+    onInitialLoad()
   }, [])
 
   async function fetchData() {
@@ -398,7 +374,7 @@ export default function EmployeeLeavePage() {
 
     await Promise.all([
       fetchSupervisorData(employeeData),
-      fetchAnnualLeaveSummary(employeeData.id),
+      fetchAnnualLeaveSummary(),
       fetchPHLBalance(employeeData.id),
       fetchLeaveRequests(employeeData.id),
       fetchHolidays(),
@@ -444,7 +420,7 @@ export default function EmployeeLeavePage() {
     setSupervisorTwo(foundTwo)
   }
 
-  async function fetchAnnualLeaveSummary(_employeeId: string) {
+  async function fetchAnnualLeaveSummary() {
     try {
       const payload = await harmonyFetch<{
         balance_summary?: AnnualLeaveSummary | null
@@ -456,8 +432,8 @@ export default function EmployeeLeavePage() {
       }
 
       setAnnualLeave(payload.balance_summary || null)
-    } catch (error: any) {
-      console.warn('Leave lifecycle summary warning:', error?.message || error)
+    } catch (error: unknown) {
+      console.warn('Leave lifecycle summary warning:', readErrorMessage(error) || error)
       setAnnualLeave(null)
     }
   }
@@ -514,7 +490,7 @@ export default function EmployeeLeavePage() {
       (item) => normalizeText(item.request_type) !== 'phl_claim',
     )
 
-    const phlRows: LeaveRequest[] = (phlResult.data || []).map((item: any) => ({
+    const phlRows: LeaveRequest[] = (phlResult.data || []).map((item) => ({
       id: item.id,
       source_table: 'phl_records',
       employee_id: item.employee_id || employeeId,
@@ -696,8 +672,8 @@ export default function EmployeeLeavePage() {
           success: result.success !== false,
           message: String(result.message || ''),
         }
-      } catch (error: any) {
-        return { success: false, message: error?.message || 'Rollback klaim PHL gagal.' }
+      } catch (error: unknown) {
+        return { success: false, message: readErrorMessage(error) || 'Rollback klaim PHL gagal.' }
       }
     }
 
@@ -871,9 +847,9 @@ export default function EmployeeLeavePage() {
         if (!insertedRequestId) {
           throw new Error('Klaim PHL tersimpan tanpa ID request. Hubungi HR sebelum submit ulang.')
         }
-      } catch (claimError: any) {
+      } catch (claimError: unknown) {
         await cleanupUploadedProof(uploaded.storagePath)
-        setErrorMessage(claimError?.message || 'Klaim PHL belum berhasil disimpan.')
+        setErrorMessage(readErrorMessage(claimError) || 'Klaim PHL belum berhasil disimpan.')
         setSubmitting(false)
         return
       }
@@ -963,7 +939,7 @@ export default function EmployeeLeavePage() {
               ? 'phl_claim_support'
               : `${form.request_type}_support`,
         })
-      } catch (attachmentError: any) {
+      } catch (attachmentError: unknown) {
         const rollback = await rollbackCreatedRequest(
           insertedRequestId,
           form.request_type,
@@ -975,8 +951,8 @@ export default function EmployeeLeavePage() {
 
         setErrorMessage(
           rollback.success
-            ? `Pengajuan tidak diteruskan karena lampiran gagal disimpan lengkap. Request sudah dibatalkan otomatis sehingga tidak masuk approval. Detail: ${attachmentError?.message || 'registrasi lampiran gagal'}.`
-            : `Lampiran gagal disimpan dan rollback request juga gagal. Jangan submit ulang sebelum HR memeriksa request ${insertedRequestId}. Detail lampiran: ${attachmentError?.message || 'registrasi lampiran gagal'}. Detail rollback: ${rollback.message || 'tidak diketahui'}.`,
+            ? `Pengajuan tidak diteruskan karena lampiran gagal disimpan lengkap. Request sudah dibatalkan otomatis sehingga tidak masuk approval. Detail: ${readErrorMessage(attachmentError) || 'registrasi lampiran gagal'}.`
+            : `Lampiran gagal disimpan dan rollback request juga gagal. Jangan submit ulang sebelum HR memeriksa request ${insertedRequestId}. Detail lampiran: ${readErrorMessage(attachmentError) || 'registrasi lampiran gagal'}. Detail rollback: ${rollback.message || 'tidak diketahui'}.`,
         )
         setSubmitting(false)
         await fetchLeaveRequests(employee.id)
@@ -1001,7 +977,7 @@ export default function EmployeeLeavePage() {
     setSubmitting(false)
 
     await Promise.all([
-      fetchAnnualLeaveSummary(employee.id),
+      fetchAnnualLeaveSummary(),
       fetchPHLBalance(employee.id),
       fetchLeaveRequests(employee.id),
       fetchHolidays(),
@@ -1076,8 +1052,8 @@ export default function EmployeeLeavePage() {
         cancellationNotification = notification.ok
           ? ` ${notification.message}`
           : ` Namun email pembatalan belum terkirim lengkap: ${notification.message}`
-      } catch (notificationError: any) {
-        cancellationNotification = ` Namun email pembatalan gagal diproses: ${notificationError?.message || 'terjadi kendala notifikasi'}.`
+      } catch (notificationError: unknown) {
+        cancellationNotification = ` Namun email pembatalan gagal diproses: ${readErrorMessage(notificationError) || 'terjadi kendala notifikasi'}.`
       }
 
       setSuccessMessage(
@@ -1085,12 +1061,12 @@ export default function EmployeeLeavePage() {
       )
 
       await Promise.all([
-        fetchAnnualLeaveSummary(employee.id),
+        fetchAnnualLeaveSummary(),
         fetchPHLBalance(employee.id),
         fetchLeaveRequests(employee.id),
       ])
-    } catch (cancelError: any) {
-      setErrorMessage(cancelError?.message || 'Pengajuan gagal dibatalkan.')
+    } catch (cancelError: unknown) {
+      setErrorMessage(readErrorMessage(cancelError) || 'Pengajuan gagal dibatalkan.')
     } finally {
       setCancellingId('')
     }
@@ -1219,11 +1195,11 @@ export default function EmployeeLeavePage() {
         <div className="harmony-card overflow-hidden">
           <div className="flex flex-col gap-4 border-b border-black/5 p-5 sm:p-6 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <h2 className="text-lg font-semibold text-[#1d1d1f]">
+              <h2 className="text-lg font-semibold harmony-text-primary">
                 Dashboard Pengajuan
               </h2>
 
-              <p className="mt-1 text-sm leading-6 text-[#6e6e73]">
+              <p className="mt-1 text-sm leading-6 harmony-text-secondary">
                 Buka form pengajuan lewat modal, akses postpone cuti, atau refresh saldo dan riwayat.
               </p>
             </div>
@@ -1349,11 +1325,11 @@ function LeaveRequestModal({
       <div className="flex max-h-[94vh] w-full max-w-4xl flex-col overflow-hidden rounded-[32px] bg-white shadow-[0_30px_90px_rgba(0,0,0,0.24)]">
         <div className="flex items-start justify-between gap-4 border-b border-black/5 p-5 sm:p-6">
           <div>
-            <h2 id={titleId} className="text-xl font-semibold text-[#1d1d1f]">
+            <h2 id={titleId} className="text-xl font-semibold harmony-text-primary">
               Form Pengajuan Cuti / Izin / PHL
             </h2>
 
-            <p className="mt-1 text-sm leading-6 text-[#6e6e73]">
+            <p className="mt-1 text-sm leading-6 harmony-text-secondary">
               {form.request_type === 'phl_claim'
                 ? 'Klaim PHL menggunakan 1 saldo untuk 1 tanggal yang dipilih, termasuk Sabtu, Minggu, atau hari libur.'
                 : 'Isi data pengajuan. Sabtu, Minggu, dan hari libur aktif tidak dihitung sebagai jatah cuti.'}
@@ -1365,7 +1341,7 @@ function LeaveRequestModal({
             onClick={onClose}
             aria-label="Tutup form pengajuan"
             disabled={submitting}
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#f5f5f7] text-[#1d1d1f] transition hover:bg-[#e5e5ea] disabled:opacity-50"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#f5f5f7] harmony-text-primary transition hover:bg-[#e5e5ea] disabled:opacity-50"
           >
             <X size={18} />
           </button>
@@ -1374,7 +1350,7 @@ function LeaveRequestModal({
         <form onSubmit={onSubmit} className="flex min-h-0 flex-1 flex-col">
           <div className="min-h-0 flex-1 space-y-5 overflow-y-auto p-5 sm:p-6">
             {loading && (
-              <div className="flex items-center gap-3 rounded-2xl border border-black/5 bg-[#f5f5f7]/70 p-4 text-sm text-[#6e6e73]">
+              <div className="flex items-center gap-3 rounded-2xl border border-black/5 bg-[#f5f5f7]/70 p-4 text-sm harmony-text-secondary">
                 <Loader2 size={18} className="animate-spin" />
                 Memuat data saldo, atasan, dan riwayat...
               </div>
@@ -1446,7 +1422,7 @@ function LeaveRequestModal({
                   value={form.end_date}
                   onChange={(event) => onUpdate('end_date', event.target.value)}
                   disabled={form.request_type === 'phl_claim' || submitting}
-                  className="harmony-input disabled:cursor-not-allowed disabled:bg-[#f2f3f5] disabled:text-[#6e6e73]"
+                  className="harmony-input disabled:cursor-not-allowed disabled:bg-[#f2f3f5] harmony-disabled-text-secondary"
                 />
               </label>
             </div>
@@ -1488,16 +1464,16 @@ function LeaveRequestModal({
 
             <div className="rounded-[28px] border border-black/5 bg-[#f5f5f7]/75 p-5">
               <div className="mb-4 flex items-center gap-2">
-                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white text-[#007aff] shadow-sm">
+                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white harmony-text-link shadow-sm">
                   <UserRound size={18} />
                 </div>
 
                 <div>
-                  <h3 className="font-semibold text-[#1d1d1f]">
+                  <h3 className="font-semibold harmony-text-primary">
                     Job Pending & Serah Terima
                   </h3>
 
-                  <p className="text-xs leading-5 text-[#6e6e73]">
+                  <p className="text-xs leading-5 harmony-text-secondary">
                     Wajib diisi agar pekerjaan tetap terpantau selama karyawan tidak masuk.
                   </p>
                 </div>
@@ -1581,7 +1557,7 @@ function LeaveRequestModal({
             ) : null}
 
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <p className="text-xs leading-5 text-[#6e6e73]">
+              <p className="text-xs leading-5 harmony-text-secondary">
                 Pengajuan akan dikirim ke atasan/HR dan tersinkron ke riwayat setelah berhasil submit.
               </p>
 
@@ -1621,16 +1597,16 @@ function HistorySection({
       <div className="harmony-card overflow-hidden">
         <div className="flex flex-col gap-3 border-b border-black/5 p-5 sm:p-6 md:flex-row md:items-center md:justify-between">
           <div>
-            <h2 className="text-lg font-semibold text-[#1d1d1f]">
+            <h2 className="text-lg font-semibold harmony-text-primary">
               Riwayat Pengajuan Cuti / Izin / PHL
             </h2>
 
-            <p className="mt-1 text-sm leading-6 text-[#6e6e73]">
+            <p className="mt-1 text-sm leading-6 harmony-text-secondary">
               Pantau status pengajuan, approval atasan, HR, dan periode cuti/izin/PHL yang sudah diajukan.
             </p>
           </div>
 
-          <div className="rounded-full bg-[#f5f5f7] px-4 py-2 text-xs font-bold text-[#6e6e73]">
+          <div className="rounded-full bg-[#f5f5f7] px-4 py-2 text-xs font-bold harmony-text-secondary">
             {leaveRequests.length} pengajuan
           </div>
         </div>
@@ -1661,11 +1637,11 @@ function HistorySection({
 
       <div className="harmony-card overflow-hidden">
         <div className="border-b border-black/5 p-5 sm:p-6">
-          <h3 className="text-lg font-semibold text-[#1d1d1f]">
+          <h3 className="text-lg font-semibold harmony-text-primary">
             Saldo PHL Aktif
           </h3>
 
-          <p className="mt-1 text-sm leading-6 text-[#6e6e73]">
+          <p className="mt-1 text-sm leading-6 harmony-text-secondary">
             PHL berlaku maksimal 90 hari kalender dari tanggal PHL.
           </p>
         </div>
@@ -1720,16 +1696,16 @@ function HistoryCard({
           <div className="flex flex-wrap items-center gap-2">
             <StatusBadge label={workflowLabel} tone={tone} />
 
-            <span className="rounded-full bg-[#f5f5f7] px-3 py-1 text-xs font-bold text-[#1d1d1f]">
+            <span className="rounded-full bg-[#f5f5f7] px-3 py-1 text-xs font-bold harmony-text-primary">
               {label}
             </span>
           </div>
 
-          <h3 className="mt-3 text-base font-bold text-[#1d1d1f]">
+          <h3 className="mt-3 text-base font-bold harmony-text-primary">
             {formatDisplayDate(request.start_date || '')} - {formatDisplayDate(request.end_date || '')}
           </h3>
 
-          <p className="mt-1 text-sm leading-6 text-[#6e6e73]">
+          <p className="mt-1 text-sm leading-6 harmony-text-secondary">
             {request.reason || 'Tidak ada alasan tertulis.'}
           </p>
 
@@ -1745,11 +1721,11 @@ function HistoryCard({
 
           {(request.job_pending || handoverDisplay || request.handover_note) && (
             <div className="mt-4 rounded-2xl bg-[#f5f5f7]/80 p-4">
-              <p className="text-xs font-bold uppercase tracking-wide text-[#86868b]">
+              <p className="text-xs font-bold uppercase tracking-wide harmony-text-muted">
                 Job Pending
               </p>
 
-              <p className="mt-2 text-sm leading-6 text-[#1d1d1f]">
+              <p className="mt-2 text-sm leading-6 harmony-text-primary">
                 {request.job_pending || '-'}
               </p>
 
@@ -1800,22 +1776,22 @@ function PHLBalanceCard({ record }: { record: PHLRecord }) {
     <div className="rounded-[24px] border border-black/5 bg-[#f7edfc]/50 p-4">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-sm font-bold text-[#1d1d1f]">
+          <p className="text-sm font-bold harmony-text-primary">
             {formatDisplayDate(record.phl_date || '')}
           </p>
 
-          <p className="mt-1 text-xs leading-5 text-[#6e6e73]">
+          <p className="mt-1 text-xs leading-5 harmony-text-secondary">
             Expired: {formatDisplayDate(record.expired_at || '')}
           </p>
         </div>
 
-        <span className="rounded-full bg-white px-3 py-1 text-xs font-bold text-[#7b2cbf]">
+        <span className="rounded-full bg-white px-3 py-1 text-xs font-bold harmony-text-violet">
           {record.remaining_days || 0} hari
         </span>
       </div>
 
       {record.reason && (
-        <p className="mt-3 text-xs leading-5 text-[#6e6e73]">
+        <p className="mt-3 text-xs leading-5 harmony-text-secondary">
           {record.reason}
         </p>
       )}
@@ -1836,16 +1812,16 @@ function EmployeeIdentity({
     <div className="rounded-[26px] border border-black/5 bg-[#f5f5f7]/70 p-4">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex min-w-0 items-center gap-3">
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white text-[#007aff] shadow-sm">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white harmony-text-link shadow-sm">
             <UserRound size={20} />
           </div>
 
           <div className="min-w-0">
-            <h3 className="truncate text-sm font-bold text-[#1d1d1f]">
+            <h3 className="truncate text-sm font-bold harmony-text-primary">
               {employee?.full_name || employee?.email || 'Employee'}
             </h3>
 
-            <p className="mt-1 truncate text-xs text-[#6e6e73]">
+            <p className="mt-1 truncate text-xs harmony-text-secondary">
               {employee?.employee_number || '-'} · {employee?.department || '-'} · {employee?.position || '-'}
             </p>
           </div>
@@ -1902,23 +1878,23 @@ function SummaryCard({
   tone: 'blue' | 'green' | 'orange' | 'purple'
 }) {
   const toneClass = {
-    blue: 'bg-[#e8f2ff] text-[#007aff]',
+    blue: 'bg-[#e8f2ff] harmony-text-link',
     green: 'bg-green-50 text-green-700',
     orange: 'bg-orange-50 text-orange-700',
-    purple: 'bg-[#f7edfc] text-[#7b2cbf]',
+    purple: 'bg-[#f7edfc] harmony-text-violet',
   }[tone]
 
   return (
     <div className="harmony-metric-card p-5 sm:p-6">
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0 flex-1">
-          <p className="text-sm text-[#6e6e73]">{title}</p>
+          <p className="text-sm harmony-text-secondary">{title}</p>
 
-          <h3 className="mt-2 break-words text-2xl font-semibold leading-tight tracking-tight text-[#1d1d1f] sm:text-[28px]">
+          <h3 className="mt-2 break-words text-2xl font-semibold leading-tight tracking-tight harmony-text-primary sm:text-[28px]">
             {value}
           </h3>
 
-          <p className="mt-2 text-xs leading-5 text-[#86868b]">
+          <p className="mt-2 text-xs leading-5 harmony-text-muted">
             {description}
           </p>
         </div>
@@ -1929,20 +1905,7 @@ function SummaryCard({
   )
 }
 
-function HeroMetric({
-  label,
-  value,
-}: {
-  label: string
-  value: string
-}) {
-  return (
-    <div className="rounded-[22px] border border-white/10 bg-white/10 p-4 backdrop-blur-xl">
-      <p className="text-xs font-semibold text-white/50">{label}</p>
-      <p className="mt-1 break-words text-xl font-semibold text-white">{value}</p>
-    </div>
-  )
-}
+
 
 function StatusBadge({
   label,
@@ -1955,9 +1918,9 @@ function StatusBadge({
     green: 'bg-green-50 text-green-700',
     orange: 'bg-orange-50 text-orange-700',
     red: 'bg-red-50 text-red-700',
-    blue: 'bg-[#e8f2ff] text-[#0059b8]',
-    purple: 'bg-[#f7edfc] text-[#7b2cbf]',
-    neutral: 'bg-[#f5f5f7] text-[#6e6e73]',
+    blue: 'bg-[#e8f2ff] harmony-text-link',
+    purple: 'bg-[#f7edfc] harmony-text-violet',
+    neutral: 'bg-[#f5f5f7] harmony-text-secondary',
   }[tone]
 
   return (
@@ -1979,9 +1942,9 @@ function InfoTile({
   tone: 'blue' | 'green' | 'purple'
 }) {
   const className = {
-    blue: 'bg-[#e8f2ff] text-[#0059b8]',
+    blue: 'bg-[#e8f2ff] harmony-text-link',
     green: 'bg-green-50 text-green-700',
-    purple: 'bg-[#f7edfc] text-[#7b2cbf]',
+    purple: 'bg-[#f7edfc] harmony-text-violet',
   }[tone]
 
   return (
@@ -2010,10 +1973,10 @@ function AutoReadInfo({
 }) {
   return (
     <div className="min-w-0">
-      <p className="font-bold uppercase tracking-wide text-[#86868b]">
+      <p className="font-bold uppercase tracking-wide harmony-text-muted">
         {label}
       </p>
-      <p className="mt-1 truncate font-semibold text-[#1d1d1f]">
+      <p className="mt-1 truncate font-semibold harmony-text-primary">
         {value}
       </p>
     </div>
@@ -2029,11 +1992,11 @@ function SmallInfo({
 }) {
   return (
     <div className="min-w-0 rounded-2xl bg-[#f5f5f7]/75 px-3 py-2">
-      <p className="text-[11px] font-bold uppercase tracking-wide text-[#86868b]">
+      <p className="text-[11px] font-bold uppercase tracking-wide harmony-text-muted">
         {label}
       </p>
 
-      <p className="mt-1 truncate text-xs font-bold text-[#1d1d1f]">
+      <p className="mt-1 truncate text-xs font-bold harmony-text-primary">
         {value}
       </p>
     </div>
@@ -2042,7 +2005,7 @@ function SmallInfo({
 
 function LoadingState() {
   return (
-    <div className="flex items-center gap-3 rounded-[24px] border border-black/5 bg-[#f5f5f7]/70 p-5 text-sm text-[#6e6e73]">
+    <div className="flex items-center gap-3 rounded-[24px] border border-black/5 bg-[#f5f5f7]/70 p-5 text-sm harmony-text-secondary">
       <Loader2 size={18} className="animate-spin" />
       Memuat data...
     </div>
@@ -2058,11 +2021,11 @@ function EmptyState({
 }) {
   return (
     <div className="rounded-[24px] border border-dashed border-black/10 bg-[#f5f5f7]/70 p-6 text-center">
-      <p className="text-sm font-bold text-[#1d1d1f]">
+      <p className="text-sm font-bold harmony-text-primary">
         {title}
       </p>
 
-      <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-[#6e6e73]">
+      <p className="mx-auto mt-2 max-w-md text-sm leading-6 harmony-text-secondary">
         {description}
       </p>
     </div>
@@ -2213,48 +2176,4 @@ function resolveHandoverDisplay(
 
 function normalizeText(value?: string | null) {
   return String(value || '').trim().toLowerCase()
-}
-
-function isPendingStatus(value?: string | null) {
-  const normalized = normalizeText(value)
-
-  return (
-    normalized === 'pending' ||
-    normalized === 'waiting_supervisor' ||
-    normalized === 'pending_supervisor' ||
-    normalized === 'pending_hr'
-  )
-}
-
-function formatStatus(value?: string | null) {
-  const normalized = normalizeText(value)
-
-  const map: Record<string, string> = {
-    pending: 'Menunggu Approval',
-    waiting_supervisor: 'Menunggu Atasan',
-    pending_supervisor: 'Menunggu Atasan',
-    pending_hr: 'Menunggu HR',
-    approved: 'Disetujui',
-    rejected: 'Ditolak',
-    cancelled: 'Dibatalkan',
-    leave: 'Cuti',
-    sick: 'Sakit',
-    permit: 'Izin',
-    official_travel: 'Tugas Luar',
-    phl_claim: 'Klaim PHL',
-  }
-
-  return map[normalized] || value || '-'
-}
-
-function getStatusTone(status?: string | null): 'green' | 'orange' | 'red' | 'blue' | 'purple' | 'neutral' {
-  const value = normalizeText(status)
-
-  if (value === 'approved') return 'green'
-  if (value === 'rejected' || value === 'cancelled') return 'red'
-  if (value === 'pending_hr') return 'blue'
-  if (value === 'phl_claim') return 'purple'
-  if (isPendingStatus(value)) return 'orange'
-
-  return 'neutral'
 }

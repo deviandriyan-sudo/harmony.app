@@ -59,9 +59,9 @@ export async function GET(request: NextRequest) {
 
     const claims = allClaims || []
     const recent = claims.slice(0, 8)
-    const pending = relevantStatuses ? claims.filter((x: any) => relevantStatuses!.includes(x.status)).length : 0
-    const paid = claims.filter((x: any) => x.status === 'paid')
-    const paidTotal = paid.reduce((sum: number, x: any) => sum + Number(x.approved_amount || x.submitted_amount || 0), 0)
+    const pending = relevantStatuses ? claims.filter((x) => relevantStatuses!.includes(x.status)).length : 0
+    const paid = claims.filter((x) => x.status === 'paid')
+    const paidTotal = paid.reduce((sum: number, x) => sum + Number(x.approved_amount || x.submitted_amount || 0), 0)
 
     return NextResponse.json({
       role: ctx.access.role,

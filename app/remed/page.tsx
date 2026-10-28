@@ -22,7 +22,7 @@ export default function RemedIndexPage() {
 
   return (
     <main className="flex min-h-screen items-center justify-center">
-      <Loader2 className="animate-spin text-[#18794e]" />
+      <Loader2 className="animate-spin harmony-text-success" />
     </main>
   )
 }

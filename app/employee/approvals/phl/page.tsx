@@ -1,5 +1,7 @@
 'use client'
 
+
+import { readErrorMessage } from '@/lib/error-utils'
 import { useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import {
@@ -68,8 +70,8 @@ export default function PHLApprovalPage() {
           window.history.replaceState(window.history.state, '', url.pathname + url.search + url.hash)
         }
       }
-    } catch (error: any) {
-      setMessage({ type: 'error', text: error?.message || 'Data approval PHL gagal dimuat.' })
+    } catch (error: unknown) {
+      setMessage({ type: 'error', text: readErrorMessage(error) || 'Data approval PHL gagal dimuat.' })
     } finally {
       setLoading(false)
     }
@@ -111,8 +113,8 @@ export default function PHLApprovalPage() {
       })
       // When the last pending request is completed, reveal history instead of an empty Pending tab.
       await load(filter === 'pending' ? null : undefined)
-    } catch (error: any) {
-      setMessage({ type: 'error', text: error?.message || 'Approval PHL gagal diproses.' })
+    } catch (error: unknown) {
+      setMessage({ type: 'error', text: readErrorMessage(error) || 'Approval PHL gagal diproses.' })
     } finally {
       setProcessing('')
     }
@@ -159,14 +161,14 @@ export default function PHLApprovalPage() {
                   onClick={() => selectFilter(item)}
                   className={[
                     'rounded-full px-4 py-2 text-xs font-bold transition',
-                    filter === item ? 'bg-[#1d1d1f] text-white' : 'bg-[#f5f5f7] text-[#6e6e73]',
+                    filter === item ? 'bg-[#1d1d1f] text-white' : 'bg-[#f5f5f7] harmony-text-secondary',
                   ].join(' ')}
                 >
                   {item === 'pending' ? 'Pending' : item === 'approved' ? 'Approved' : item === 'rejected' ? 'Rejected' : 'Semua'}
                 </button>
               ))}
             </div>
-            <button type="button" onClick={() => void load()} disabled={loading} className="inline-flex min-h-10 items-center justify-center gap-2 rounded-2xl bg-[#e8f2ff] px-4 text-xs font-bold text-[#0059b8] disabled:opacity-50">
+            <button type="button" onClick={() => void load()} disabled={loading} className="inline-flex min-h-10 items-center justify-center gap-2 rounded-2xl bg-[#e8f2ff] px-4 text-xs font-bold harmony-text-link disabled:opacity-50">
               <RefreshCcw size={15} className={loading ? 'animate-spin' : ''} />Refresh
             </button>
           </div>
@@ -175,17 +177,17 @@ export default function PHLApprovalPage() {
         {!loading && counts.pending === 0 && requests.length > 0 && filter === 'all' && (
           <div className="harmony-card flex flex-wrap items-center justify-between gap-3 px-5 py-4 text-sm text-[#355c47]">
             <span className="inline-flex items-center gap-2"><CheckCircle2 size={18} />Tidak ada PHL menunggu approval. {counts.approved} disetujui, {counts.rejected} ditolak.</span>
-            <span className="text-xs text-[#6e6e73]">Menampilkan seluruh riwayat pengajuan.</span>
+            <span className="text-xs harmony-text-secondary">Menampilkan seluruh riwayat pengajuan.</span>
           </div>
         )}
 
         {loading ? (
-          <div className="harmony-card flex items-center gap-3 p-6 text-sm text-[#6e6e73]"><Loader2 size={18} className="animate-spin" />Memuat approval PHL...</div>
+          <div className="harmony-card flex items-center gap-3 p-6 text-sm harmony-text-secondary"><Loader2 size={18} className="animate-spin" />Memuat approval PHL...</div>
         ) : filtered.length === 0 ? (
-          <div className="harmony-card space-y-3 p-8 text-center text-sm text-[#86868b]">
+          <div className="harmony-card space-y-3 p-8 text-center text-sm harmony-text-muted">
             <p>{filter === 'pending' ? 'Tidak ada pengajuan PHL yang menunggu approval.' : 'Tidak ada pengajuan PHL pada filter ini.'}</p>
             {requests.length > 0 && filter !== 'all' && (
-              <button type="button" onClick={() => selectFilter('all')} className="rounded-full bg-[#e8f2ff] px-4 py-2 text-xs font-semibold text-[#0059b8]">Lihat Semua Pengajuan ({requests.length})</button>
+              <button type="button" onClick={() => selectFilter('all')} className="rounded-full bg-[#e8f2ff] px-4 py-2 text-xs font-semibold harmony-text-link">Lihat Semua Pengajuan ({requests.length})</button>
             )}
           </div>
         ) : (
@@ -196,22 +198,22 @@ export default function PHLApprovalPage() {
                   <div>
                     <div className="flex flex-wrap items-center gap-2">
                       <StatusBadge status={item.status} />
-                      <span className="rounded-full bg-[#f5f5f7] px-3 py-1 text-xs font-bold text-[#6e6e73]">{dayTypeLabel(item.work_day_type)}</span>
+                      <span className="rounded-full bg-[#f5f5f7] px-3 py-1 text-xs font-bold harmony-text-secondary">{dayTypeLabel(item.work_day_type)}</span>
                       {item.origin === 'legacy_attendance' && <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-bold text-amber-700">Migrasi Absensi Lama</span>}
                     </div>
-                    <h2 className="mt-3 text-lg font-semibold text-[#1d1d1f]">{item.full_name || '-'}</h2>
-                    <p className="mt-1 text-xs text-[#86868b]">{item.employee_number || '-'} · {item.department || '-'} · {item.position || '-'}</p>
+                    <h2 className="mt-3 text-lg font-semibold harmony-text-primary">{item.full_name || '-'}</h2>
+                    <p className="mt-1 text-xs harmony-text-muted">{item.employee_number || '-'} · {item.department || '-'} · {item.position || '-'}</p>
                   </div>
                   <div className="text-left sm:text-right">
-                    <p className="text-sm font-bold text-[#1d1d1f]">{formatDate(item.work_date)}</p>
-                    <p className="mt-1 text-xs text-[#86868b]">{item.work_start_time.slice(0, 5)}–{item.work_end_time.slice(0, 5)}</p>
+                    <p className="text-sm font-bold harmony-text-primary">{formatDate(item.work_date)}</p>
+                    <p className="mt-1 text-xs harmony-text-muted">{item.work_start_time.slice(0, 5)}–{item.work_end_time.slice(0, 5)}</p>
                   </div>
                 </div>
 
                 <div className="mt-4 rounded-2xl bg-[#f5f5f7] p-4">
-                  <p className="text-[11px] font-bold uppercase tracking-wide text-[#86868b]">Penugasan</p>
-                  <p className="mt-2 text-sm font-semibold leading-6 text-[#1d1d1f]">{item.work_purpose}</p>
-                  {item.notes && <p className="mt-2 text-xs leading-5 text-[#6e6e73]">{item.notes}</p>}
+                  <p className="text-[11px] font-bold uppercase tracking-wide harmony-text-muted">Penugasan</p>
+                  <p className="mt-2 text-sm font-semibold leading-6 harmony-text-primary">{item.work_purpose}</p>
+                  {item.notes && <p className="mt-2 text-xs leading-5 harmony-text-secondary">{item.notes}</p>}
                 </div>
 
                 <div className="mt-4 grid grid-cols-2 gap-3">
@@ -221,14 +223,14 @@ export default function PHLApprovalPage() {
 
                 <div className="mt-4 flex flex-wrap gap-2">
                   {item.attachments.map((attachment) => (
-                    <a key={attachment.id} href={attachment.signed_url || '#'} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 rounded-xl bg-[#e8f2ff] px-3 py-2 text-xs font-bold text-[#0059b8]">
+                    <a key={attachment.id} href={attachment.signed_url || '#'} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 rounded-xl bg-[#e8f2ff] px-3 py-2 text-xs font-bold harmony-text-link">
                       <FileText size={14} />{attachment.file_name}
                     </a>
                   ))}
                 </div>
 
                 {item.supervisor_note && item.status !== 'pending_supervisor' && (
-                  <p className="mt-4 rounded-2xl border border-black/5 bg-white p-3 text-xs leading-5 text-[#6e6e73]">Catatan: <strong>{item.supervisor_note}</strong></p>
+                  <p className="mt-4 rounded-2xl border border-black/5 bg-white p-3 text-xs leading-5 harmony-text-secondary">Catatan: <strong>{item.supervisor_note}</strong></p>
                 )}
 
                 {item.status === 'pending_supervisor' && (
@@ -266,7 +268,7 @@ function Metric({ label, value }: { label: string; value: number }) {
 }
 
 function Info({ label, value, icon }: { label: string; value: string; icon: ReactNode }) {
-  return <div className="rounded-2xl bg-[#f5f5f7] p-3"><div className="flex items-center gap-2 text-[#007aff]">{icon}<span className="text-[11px] font-bold uppercase tracking-wide text-[#86868b]">{label}</span></div><p className="mt-2 text-sm font-bold text-[#1d1d1f]">{value}</p></div>
+  return <div className="rounded-2xl bg-[#f5f5f7] p-3"><div className="flex items-center gap-2 harmony-text-link">{icon}<span className="text-[11px] font-bold uppercase tracking-wide harmony-text-muted">{label}</span></div><p className="mt-2 text-sm font-bold harmony-text-primary">{value}</p></div>
 }
 
 function StatusBadge({ status }: { status: string }) {

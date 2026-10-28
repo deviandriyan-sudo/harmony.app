@@ -1,4 +1,7 @@
+
+import { readErrorMessage } from '@/lib/error-utils'
 import { NextRequest, NextResponse } from 'next/server'
+import type { SupabaseClient, User } from '@supabase/supabase-js'
 
 import {
   buildServerHarmonyEmailHtml,
@@ -15,11 +18,11 @@ import {
 
 export const runtime = 'nodejs'
 
-async function findAuthUserByEmail(admin: any, email: string) {
+async function findAuthUserByEmail(admin: SupabaseClient, email: string) {
   const listResult = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 })
   if (listResult.error) throw listResult.error
   return listResult.data.users.find(
-    (user: any) => normalizeEmail(user.email) === email,
+    (user) => normalizeEmail(user.email) === email,
   ) || null
 }
 
@@ -70,10 +73,10 @@ async function sendAccountNotification({
     })
 
     return { success: result.ok, message: result.message }
-  } catch (error: any) {
+  } catch (error: unknown) {
     return {
       success: false,
-      message: error?.message || 'Email notifikasi gagal dikirim. Proses akun tetap berhasil.',
+      message: readErrorMessage(error) || 'Email notifikasi gagal dikirim. Proses akun tetap berhasil.',
     }
   }
 }
@@ -96,7 +99,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    let targetAppUser: any = null
+    let targetAppUser: { id: string; employee_id?: string | null; email?: string | null } | null = null
     if (requestedUserId) {
       const byId = await admin
         .from('app_users')
@@ -203,7 +206,7 @@ export async function POST(request: NextRequest) {
       if (!byEmail.error && byEmail.data) targetAppUser = byEmail.data
     }
 
-    let authUser: any = null
+    let authUser: User | null = null
     if (targetAppUser?.id) {
       const authById = await admin.auth.admin.getUserById(targetAppUser.id)
       if (!authById.error && authById.data?.user) authUser = authById.data.user

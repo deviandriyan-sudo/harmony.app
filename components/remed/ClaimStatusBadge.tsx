@@ -16,7 +16,7 @@ const styles: Record<RemedClaimStatus, string> = {
 
 export function ClaimStatusBadge({ status }: { status: RemedClaimStatus }) {
   return (
-    <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${styles[status] || styles.cancelled}`}>
+    <span data-remed-status={status} className={`harmony-remed-status inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${styles[status] || styles.cancelled}`}>
       {REMED_STATUS_LABELS[status] || status}
     </span>
   )

@@ -1,29 +1,12 @@
 'use client'
 
+
+import { readErrorMessage } from '@/lib/error-utils'
 import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useParams } from 'next/navigation'
-import {
-  AlertTriangle,
-  ArrowLeft,
-  CalendarDays,
-  CheckCircle2,
-  Clock3,
-  WalletCards,
-  ExternalLink,
-  Eye,
-  FileText,
-  Loader2,
-  Lock,
-  LockOpen,
-  RefreshCcw,
-  ShieldCheck,
-  Timer,
-  UserRound,
-  X,
-  XCircle,
-} from 'lucide-react'
+import { AlertTriangle, ArrowLeft, CalendarDays, CheckCircle2, WalletCards, ExternalLink, Eye, FileText, Loader2, Lock, LockOpen, RefreshCcw, ShieldCheck, X, XCircle } from 'lucide-react'
 
 import { Topbar } from '@/components/layout/Topbar'
 import { HarmonyAttachmentViewer } from '@/components/attachments/HarmonyAttachments'
@@ -351,10 +334,6 @@ export default function EmployeeApprovalDetailPage() {
     actionableLogs.length > 0 &&
     actionableLogs.every((item) => selectedLogIds.includes(item.id))
 
-  useEffect(() => {
-    fetchData()
-  }, [employeeId, periodMonth])
-
   async function fetchData(resetMessage = true) {
     setLoading(true)
 
@@ -482,6 +461,14 @@ export default function EmployeeApprovalDetailPage() {
     await refreshPeriodPHL()
   }
 
+  useEffect(() => {
+    let active = true
+    // Start session/data loading after the effect setup, avoiding a cascading synchronous render.
+    queueMicrotask(() => { if (active) void fetchData() })
+    return () => { active = false }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [employeeId, periodMonth])
+
   async function refreshPeriodPHL() {
     if (!employeeId) return
     setPhlLoading(true)
@@ -489,8 +476,8 @@ export default function EmployeeApprovalDetailPage() {
     try {
       const items = await fetchTeamPHLWorkRequestsForPeriod(employeeId, periodRange.start, periodRange.end)
       setPhlRequests(items)
-    } catch (error: any) {
-      setPhlError(error?.message || 'Pengajuan PHL gagal dimuat.')
+    } catch (error: unknown) {
+      setPhlError(readErrorMessage(error) || 'Pengajuan PHL gagal dimuat.')
       setPhlRequests([])
     } finally {
       setPhlLoading(false)
@@ -529,8 +516,8 @@ export default function EmployeeApprovalDetailPage() {
         .gte('attendance_date', periodRange.start).lte('attendance_date', periodRange.end)
         .order('attendance_date', { ascending: true })
       if (!attendanceResult.error) setLogs(attendanceResult.data || [])
-    } catch (error: any) {
-      setErrorMessage(error?.message || 'Approval saldo PHL tidak berhasil. Saldo tidak boleh ditambahkan manual.')
+    } catch (error: unknown) {
+      setErrorMessage(readErrorMessage(error) || 'Approval saldo PHL tidak berhasil. Saldo tidak boleh ditambahkan manual.')
     } finally {
       setPhlProcessingId('')
     }
@@ -675,9 +662,9 @@ export default function EmployeeApprovalDetailPage() {
         date: log.attendance_date,
         note: note || (action === 'approve' ? 'Disetujui oleh atasan.' : 'Ditolak oleh atasan.'),
       })
-    } catch (emailError: any) {
+    } catch (emailError: unknown) {
       console.warn('Approval email notification warning:', emailError)
-      emailInfo = `Email notifikasi belum terkirim: ${emailError?.message || 'Terjadi kendala saat mengirim email.'}`
+      emailInfo = `Email notifikasi belum terkirim: ${readErrorMessage(emailError) || 'Terjadi kendala saat mengirim email.'}`
     }
 
     setSuccessMessage(
@@ -768,9 +755,9 @@ export default function EmployeeApprovalDetailPage() {
         totalDays: selectedActionableLogs.length,
         note: 'Disetujui oleh atasan dari pilihan manual.',
       })
-    } catch (emailError: any) {
+    } catch (emailError: unknown) {
       console.warn('Approval selected email notification warning:', emailError)
-      emailInfo = `Email notifikasi belum terkirim: ${emailError?.message || 'Terjadi kendala saat mengirim email.'}`
+      emailInfo = `Email notifikasi belum terkirim: ${readErrorMessage(emailError) || 'Terjadi kendala saat mengirim email.'}`
     }
 
     setSuccessMessage(`${selectedActionableLogs.length} tanggal absensi berhasil disetujui. ${emailInfo}`)
@@ -870,9 +857,9 @@ export default function EmployeeApprovalDetailPage() {
         totalDays: submittedLogs.length,
         note: 'Periode disetujui oleh atasan.',
       })
-    } catch (emailError: any) {
+    } catch (emailError: unknown) {
       console.warn('Approval period email notification warning:', emailError)
-      emailInfo = `Email notifikasi belum terkirim: ${emailError?.message || 'Terjadi kendala saat mengirim email.'}`
+      emailInfo = `Email notifikasi belum terkirim: ${readErrorMessage(emailError) || 'Terjadi kendala saat mengirim email.'}`
     }
 
     setSuccessMessage(`Periode absensi berhasil disetujui atasan dan siap diproses HR. Tidak ada penambahan saldo PHL dari approval absensi. ${emailInfo}`)
@@ -949,9 +936,9 @@ export default function EmployeeApprovalDetailPage() {
         totalDays: logs.length,
         note: rejectReason,
       })
-    } catch (emailError: any) {
+    } catch (emailError: unknown) {
       console.warn('Reject period email notification warning:', emailError)
-      emailInfo = `Email notifikasi belum terkirim: ${emailError?.message || 'Terjadi kendala saat mengirim email.'}`
+      emailInfo = `Email notifikasi belum terkirim: ${readErrorMessage(emailError) || 'Terjadi kendala saat mengirim email.'}`
     }
 
     setSuccessMessage(`Periode absensi berhasil ditolak dan dikembalikan ke employee. Employee sekarang dapat memperbaiki/melengkapi data lalu mengirim ulang seluruh periode. ${emailInfo}`)
@@ -1139,12 +1126,12 @@ export default function EmployeeApprovalDetailPage() {
         <section className="harmony-card harmony-phl-review-panel space-y-4 p-4 sm:p-5" aria-label="Keputusan saldo PHL periode ini">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <div className="flex items-center gap-2 text-base font-semibold text-[#253453]">
+              <div className="flex items-center gap-2 text-base font-semibold harmony-text-primary">
                 <WalletCards size={19} className="text-[#7664bf]" />
                 Persetujuan PHL dari Absensi
                 {phlPendingCount > 0 && <span className="rounded-full bg-violet-100 px-2.5 py-1 text-xs text-violet-800">{phlPendingCount} menunggu</span>}
               </div>
-              <p className="mt-1 text-xs leading-5 text-[#59677b]">Dua keputusan terpisah: setujui jam kerja pada tabel absensi, lalu setujui saldo hanya jika ada pengajuan PHL beserta bukti. Keduanya memakai workflow PHL yang sama.</p>
+              <p className="mt-1 text-xs leading-5 harmony-text-secondary">Dua keputusan terpisah: setujui jam kerja pada tabel absensi, lalu setujui saldo hanya jika ada pengajuan PHL beserta bukti. Keduanya memakai workflow PHL yang sama.</p>
             </div>
             <div className="flex gap-2">
               <button type="button" onClick={() => void refreshPeriodPHL()} disabled={phlLoading} className="harmony-button-secondary inline-flex items-center gap-2 !px-3 !py-2 text-xs"><RefreshCcw size={14} className={phlLoading ? 'animate-spin' : ''} /> Refresh</button>
@@ -1152,9 +1139,9 @@ export default function EmployeeApprovalDetailPage() {
             </div>
           </div>
           {phlError && <div role="alert" className="rounded-xl bg-orange-50 p-3 text-xs text-orange-800">Pengajuan PHL belum terbaca: {phlError}</div>}
-          {phlLoading && <div className="flex items-center gap-2 text-xs text-[#59677b]"><Loader2 size={14} className="animate-spin" /> Memuat pengajuan saldo...</div>}
+          {phlLoading && <div className="flex items-center gap-2 text-xs harmony-text-secondary"><Loader2 size={14} className="animate-spin" /> Memuat pengajuan saldo...</div>}
           {!phlLoading && !phlError && phlRequests.length === 0 && (
-            <p className="rounded-2xl border border-dashed border-violet-200/80 bg-white/50 px-4 py-3 text-xs text-[#59677b]">Belum ada Pengajuan Saldo PHL pada periode ini. Kehadiran tetap bisa disetujui tanpa saldo. Karyawan dapat mengajukan PHL dari menu Pengajuan Saldo PHL dengan Surat Tugas dan durasi minimal 4 jam.</p>
+            <p className="rounded-2xl border border-dashed border-violet-200/80 bg-white/50 px-4 py-3 text-xs harmony-text-secondary">Belum ada Pengajuan Saldo PHL pada periode ini. Kehadiran tetap bisa disetujui tanpa saldo. Karyawan dapat mengajukan PHL dari menu Pengajuan Saldo PHL dengan Surat Tugas dan durasi minimal 4 jam.</p>
           )}
           {phlRequests.length > 0 && (
             <div className="grid gap-3 xl:grid-cols-2">
@@ -1162,10 +1149,10 @@ export default function EmployeeApprovalDetailPage() {
                 <article key={item.id} className="harmony-phl-review-item rounded-2xl p-4">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2"><strong className="text-sm text-[#253453]">{formatDisplayDate(item.work_date)}</strong>
+                      <div className="flex flex-wrap items-center gap-2"><strong className="text-sm harmony-text-primary">{formatDisplayDate(item.work_date)}</strong>
                         <span className={`rounded-full px-2 py-1 text-[11px] font-semibold ${item.status === 'approved' ? 'bg-emerald-100 text-emerald-800' : item.status === 'pending_supervisor' ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-700'}`}>{phlWorkStatusLabel(item.status)}</span>
                       </div>
-                      <p className="mt-1 text-xs text-[#59677b]">{item.work_start_time.slice(0,5)}–{item.work_end_time.slice(0,5)} · {formatPHLMinutes(item.requested_work_minutes)} · {item.work_purpose}</p>
+                      <p className="mt-1 text-xs harmony-text-secondary">{item.work_start_time.slice(0,5)}–{item.work_end_time.slice(0,5)} · {formatPHLMinutes(item.requested_work_minutes)} · {item.work_purpose}</p>
                     </div>
                     {item.status === 'pending_supervisor' && (
                       <div className="flex shrink-0 flex-wrap gap-2">
@@ -1177,9 +1164,9 @@ export default function EmployeeApprovalDetailPage() {
                   <div className="mt-3 flex flex-wrap gap-2">
                     {item.attachments?.length ? item.attachments.map((file) => file.signed_url ? (
                       <a key={file.id} href={file.signed_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 rounded-lg border border-violet-200/70 bg-white/65 px-2.5 py-1.5 text-[11px] text-violet-800 hover:bg-white"><FileText size={12}/>{file.file_name}</a>
-                    ) : <span key={file.id} className="text-[11px] text-[#59677b]">{file.file_name}</span>) : <span className="text-[11px] text-amber-700">Tidak ada Surat Tugas terlampir; approval akan divalidasi server.</span>}
+                    ) : <span key={file.id} className="text-[11px] harmony-text-secondary">{file.file_name}</span>) : <span className="text-[11px] text-amber-700">Tidak ada Surat Tugas terlampir; approval akan divalidasi server.</span>}
                   </div>
-                  {item.supervisor_note && item.status !== 'pending_supervisor' && <p className="mt-2 text-xs text-[#59677b]">Catatan: {item.supervisor_note}</p>}
+                  {item.supervisor_note && item.status !== 'pending_supervisor' && <p className="mt-2 text-xs harmony-text-secondary">Catatan: {item.supervisor_note}</p>}
                 </article>
               ))}
             </div>
@@ -1189,11 +1176,11 @@ export default function EmployeeApprovalDetailPage() {
         <div className="harmony-card overflow-hidden">
           <div className="flex flex-col gap-4 border-b border-black/5 p-5 sm:p-6 xl:flex-row xl:items-center xl:justify-between">
             <div>
-              <h2 className="text-lg font-semibold text-[#1d1d1f]">
+              <h2 className="text-lg font-semibold harmony-text-primary">
                 Detail Absensi Periode
               </h2>
 
-              <p className="mt-1 text-sm leading-6 text-[#6e6e73]">
+              <p className="mt-1 text-sm leading-6 harmony-text-secondary">
                 Review detail absensi harian. Sabtu/Minggu dan libur aktif diberi warna berbeda.
               </p>
 
@@ -1218,7 +1205,7 @@ export default function EmployeeApprovalDetailPage() {
               <button
                 type="button"
                 onClick={() => fetchData()}
-                className="inline-flex min-h-10 items-center justify-center gap-2 rounded-2xl border border-black/10 bg-white px-4 text-xs font-bold text-[#1d1d1f] transition hover:bg-[#f5f5f7]"
+                className="inline-flex min-h-10 items-center justify-center gap-2 rounded-2xl border border-black/10 bg-white px-4 text-xs font-bold harmony-text-primary transition hover:bg-[#f5f5f7]"
               >
                 <RefreshCcw size={16} />
                 Refresh
@@ -1228,7 +1215,7 @@ export default function EmployeeApprovalDetailPage() {
                 type="button"
                 disabled={isReadOnly || processingPeriod || actionableLogs.length === 0}
                 onClick={toggleSelectAllDaily}
-                className="inline-flex min-h-10 items-center justify-center gap-2 rounded-2xl border border-blue-100 bg-blue-50 px-4 text-xs font-bold text-[#0059b8] transition hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-60"
+                className="inline-flex min-h-10 items-center justify-center gap-2 rounded-2xl border border-blue-100 bg-blue-50 px-4 text-xs font-bold harmony-text-link transition hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 <CheckCircle2 size={16} />
                 {allActionableSelected ? 'Batal Pilih' : 'Centang Pending'}
@@ -1282,7 +1269,7 @@ export default function EmployeeApprovalDetailPage() {
           </div>
 
           {loading && (
-            <div className="flex items-center gap-3 p-6 text-sm text-[#6e6e73]">
+            <div className="flex items-center gap-3 p-6 text-sm harmony-text-secondary">
               <Loader2 size={18} className="animate-spin" />
               Memuat detail approval...
             </div>
@@ -1295,7 +1282,7 @@ export default function EmployeeApprovalDetailPage() {
               </div>
 
               {calendarRows.length === 0 ? (
-                <div className="rounded-[28px] border border-dashed border-black/10 bg-[#f5f5f7]/70 p-8 text-center text-sm leading-6 text-[#6e6e73]">
+                <div className="rounded-[28px] border border-dashed border-black/10 bg-[#f5f5f7]/70 p-8 text-center text-sm leading-6 harmony-text-secondary">
                   Belum ada data kalender absensi pada periode ini.
                 </div>
               ) : (
@@ -1315,7 +1302,7 @@ export default function EmployeeApprovalDetailPage() {
                       </colgroup>
 
                       <thead>
-                        <tr className="border-b border-black/5 bg-[#f5f5f7]/90 text-[10px] uppercase tracking-wide text-[#6e6e73]">
+                        <tr className="border-b border-black/5 bg-[#f5f5f7]/90 text-[10px] uppercase tracking-wide harmony-text-secondary">
                           <th className="px-3 py-3 text-center font-semibold">
                             <input
                               type="checkbox"
@@ -1373,10 +1360,10 @@ export default function EmployeeApprovalDetailPage() {
                               </td>
 
                               <td className="px-3 py-3 align-top">
-                                <p className="break-words font-bold leading-5 text-[#1d1d1f]">
+                                <p className="break-words font-bold leading-5 harmony-text-primary">
                                   {formatDisplayDate(row.date)}
                                 </p>
-                                <p className="mt-1 text-[11px] font-semibold leading-4 text-[#6e6e73]">
+                                <p className="mt-1 text-[11px] font-semibold leading-4 harmony-text-secondary">
                                   {row.day_name}
                                 </p>
                                 {row.holiday_name && (
@@ -1398,7 +1385,7 @@ export default function EmployeeApprovalDetailPage() {
 
                               <td className="px-3 py-3 align-top">
                                 {isOffday && !log ? (
-                                  <span className="text-xs font-semibold text-[#86868b]">-</span>
+                                  <span className="text-xs font-semibold harmony-text-muted">-</span>
                                 ) : (
                                   <div className="space-y-2">
                                     <StatusBadge status={displayStatus} log={log} />
@@ -1408,7 +1395,7 @@ export default function EmployeeApprovalDetailPage() {
                               </td>
 
                               <td className="px-3 py-3 align-top">
-                                <p className="line-clamp-3 break-words text-xs leading-5 text-[#6e6e73]">
+                                <p className="line-clamp-3 break-words text-xs leading-5 harmony-text-secondary">
                                   {log?.employee_daily_note ||
                                     log?.correction_reason ||
                                     log?.notes ||
@@ -1421,13 +1408,13 @@ export default function EmployeeApprovalDetailPage() {
                                   <button
                                     type="button"
                                     onClick={() => log && setSelectedLog(log)}
-                                    className="inline-flex items-center gap-1.5 rounded-2xl bg-[#e8f2ff] px-3 py-1.5 text-[11px] font-bold text-[#0059b8] transition hover:bg-blue-100"
+                                    className="inline-flex items-center gap-1.5 rounded-2xl bg-[#e8f2ff] px-3 py-1.5 text-[11px] font-bold harmony-text-link transition hover:bg-blue-100"
                                   >
                                     <FileText size={13} />
                                     {proofCount} bukti
                                   </button>
                                 ) : (
-                                  <span className="text-xs font-semibold text-[#86868b]">-</span>
+                                  <span className="text-xs font-semibold harmony-text-muted">-</span>
                                 )}
                               </td>
 
@@ -1481,7 +1468,7 @@ export default function EmployeeApprovalDetailPage() {
                                     </IconActionButton>
                                   </div>
                                 ) : (
-                                  <span className="flex justify-center text-xs font-semibold text-[#86868b]">
+                                  <span className="flex justify-center text-xs font-semibold harmony-text-muted">
                                     -
                                   </span>
                                 )}
@@ -1583,8 +1570,8 @@ function CompactTime({
   value: string
 }) {
   return (
-    <p className="text-[11px] leading-5 text-[#6e6e73]">
-      <span className="font-bold text-[#1d1d1f]">{label}:</span> {value || '-'}
+    <p className="text-[11px] leading-5 harmony-text-secondary">
+      <span className="font-bold harmony-text-primary">{label}:</span> {value || '-'}
     </p>
   )
 }
@@ -1603,7 +1590,7 @@ function IconActionButton({
   children: ReactNode
 }) {
   const toneClass = {
-    blue: 'bg-[#e8f2ff] text-[#0059b8] hover:bg-blue-100',
+    blue: 'bg-[#e8f2ff] harmony-text-link hover:bg-blue-100',
     green: 'bg-green-50 text-green-700 hover:bg-green-100',
     red: 'bg-red-50 text-red-700 hover:bg-red-100',
   }[tone]
@@ -1666,10 +1653,10 @@ function DailyMobileApprovalCard({
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="font-bold text-[#1d1d1f]">
+          <p className="font-bold harmony-text-primary">
             {formatDisplayDate(row.date)}
           </p>
-          <p className="mt-1 text-xs font-semibold text-[#6e6e73]">
+          <p className="mt-1 text-xs font-semibold harmony-text-secondary">
             {row.day_name}
           </p>
           {row.holiday_name && (
@@ -1701,17 +1688,17 @@ function DailyMobileApprovalCard({
       </div>
 
       <div className="mt-4 flex flex-wrap gap-2">
-        {log ? <StatusBadge status={displayStatus} log={log} /> : <span className="text-xs font-semibold text-[#86868b]">-</span>}
+        {log ? <StatusBadge status={displayStatus} log={log} /> : <span className="text-xs font-semibold harmony-text-muted">-</span>}
         <RequestLabelBadge log={log} status={displayStatus} />
         <ApprovalBadge status={log?.supervisor_approval_status || 'none'} />
       </div>
 
-      <p className="mt-4 line-clamp-3 text-xs leading-5 text-[#6e6e73]">
+      <p className="mt-4 line-clamp-3 text-xs leading-5 harmony-text-secondary">
         {log?.employee_daily_note || log?.correction_reason || log?.notes || '-'}
       </p>
 
       <div className="mt-4 flex items-center justify-between gap-3">
-        <span className="text-xs font-bold text-[#6e6e73]">
+        <span className="text-xs font-bold harmony-text-secondary">
           {proofCount > 0 ? `${proofCount} bukti/evidence` : 'Tidak ada bukti'}
         </span>
 
@@ -1745,10 +1732,10 @@ function MobileMiniBox({
 }) {
   return (
     <div className="rounded-2xl bg-[#f5f5f7]/80 p-3">
-      <p className="text-[10px] font-bold uppercase tracking-wide text-[#6e6e73]">
+      <p className="text-[10px] font-bold uppercase tracking-wide harmony-text-secondary">
         {label}
       </p>
-      <p className="mt-1 whitespace-pre-line text-xs font-semibold leading-5 text-[#1d1d1f]">
+      <p className="mt-1 whitespace-pre-line text-xs font-semibold leading-5 harmony-text-primary">
         {value}
       </p>
     </div>
@@ -1779,11 +1766,11 @@ function AttendanceDetailModal({
       <div className="flex max-h-[92vh] w-full max-w-4xl flex-col overflow-hidden rounded-[32px] bg-white shadow-[0_30px_90px_rgba(0,0,0,0.24)]">
         <div className="flex items-start justify-between gap-4 border-b border-black/5 p-6">
           <div>
-            <h2 className="text-xl font-semibold text-[#1d1d1f]">
+            <h2 className="text-xl font-semibold harmony-text-primary">
               Detail Absensi
             </h2>
 
-            <p className="mt-1 text-sm leading-6 text-[#6e6e73]">
+            <p className="mt-1 text-sm leading-6 harmony-text-secondary">
               {formatDisplayDate(log.attendance_date)} · {log.full_name || '-'}
             </p>
           </div>
@@ -1791,7 +1778,7 @@ function AttendanceDetailModal({
           <button
             type="button"
             onClick={onClose}
-            className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#f5f5f7] text-[#1d1d1f]"
+            className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#f5f5f7] harmony-text-primary"
           >
             <X size={18} />
           </button>
@@ -1860,11 +1847,11 @@ function RejectModal({
       <div className="flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-[32px] bg-white shadow-[0_30px_90px_rgba(0,0,0,0.24)]">
         <div className="flex items-start justify-between gap-4 border-b border-black/5 p-6">
           <div>
-            <h2 className="text-xl font-semibold text-[#1d1d1f]">
+            <h2 className="text-xl font-semibold harmony-text-primary">
               {target.type === 'period' ? 'Reject Periode Absensi' : 'Reject Absensi Harian'}
             </h2>
 
-            <p className="mt-1 text-sm leading-6 text-[#6e6e73]">
+            <p className="mt-1 text-sm leading-6 harmony-text-secondary">
               {target.name}
               {target.type === 'daily' ? ` · ${formatDisplayDate(target.date)}` : ''}
             </p>
@@ -1873,7 +1860,7 @@ function RejectModal({
           <button
             type="button"
             onClick={onClose}
-            className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#f5f5f7] text-[#1d1d1f]"
+            className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#f5f5f7] harmony-text-primary"
           >
             <X size={18} />
           </button>
@@ -1915,29 +1902,7 @@ function RejectModal({
   )
 }
 
-function ProofLinks({
-  log,
-}: {
-  log: AttendanceLog | null
-}) {
-  if (!log) {
-    return <span className="text-xs font-semibold text-[#86868b]">-</span>
-  }
 
-  return (
-    <HarmonyAttachmentViewer
-      entityType="attendance_log"
-      entityId={log.id}
-      legacyLinks={[
-        { url: log.absence_proof_url, name: log.absence_proof_name || 'Bukti Keterangan' },
-        { url: log.phl_proof_url, name: log.phl_proof_name || 'Bukti PHL' },
-        { url: log.correction_proof_url, name: log.correction_proof_name || 'Bukti Koreksi' },
-      ]}
-      compact
-      emptyText="-"
-    />
-  )
-}
 
 function RequestLabelBadge({
   log,
@@ -1947,13 +1912,13 @@ function RequestLabelBadge({
   status: string
 }) {
   if (!log) {
-    return <span className="text-xs font-semibold text-[#86868b]">-</span>
+    return <span className="text-xs font-semibold harmony-text-muted">-</span>
   }
 
   const label = getRequestLabel(log, status)
 
   if (label === '-') {
-    return <span className="text-xs font-semibold text-[#86868b]">-</span>
+    return <span className="text-xs font-semibold harmony-text-muted">-</span>
   }
 
   const tone = getRequestTone(log.absence_request_type || status)
@@ -1962,9 +1927,9 @@ function RequestLabelBadge({
     green: 'bg-green-50 text-green-700',
     orange: 'bg-orange-50 text-orange-700',
     red: 'bg-red-50 text-red-700',
-    blue: 'bg-[#e8f2ff] text-[#0059b8]',
-    purple: 'bg-[#f7edfc] text-[#7b2cbf]',
-    neutral: 'bg-[#f5f5f7] text-[#6e6e73]',
+    blue: 'bg-[#e8f2ff] harmony-text-link',
+    purple: 'bg-[#f7edfc] harmony-text-violet',
+    neutral: 'bg-[#f5f5f7] harmony-text-secondary',
   }[tone]
 
   return (
@@ -1974,32 +1939,9 @@ function RequestLabelBadge({
   )
 }
 
-function TimeCell({
-  value,
-}: {
-  value: string
-}) {
-  return (
-    <div className="flex items-center gap-2 font-semibold text-[#1d1d1f]">
-      <Timer size={14} className="text-[#86868b]" />
-      {value}
-    </div>
-  )
-}
 
-function ManualTime({
-  label,
-  value,
-}: {
-  label: string
-  value: string
-}) {
-  return (
-    <p className="text-xs leading-5 text-[#6e6e73]">
-      <span className="font-bold text-[#1d1d1f]">{label}:</span> {value}
-    </p>
-  )
-}
+
+
 
 function LockInfo({
   label,
@@ -2035,26 +1977,26 @@ function SummaryCard({
   tone: 'blue' | 'green' | 'orange' | 'red' | 'purple'
 }) {
   const toneClass = {
-    blue: 'text-[#007aff] bg-[#e8f2ff]',
-    green: 'text-[#168034] bg-[#eaf8ee]',
-    orange: 'text-[#b35b00] bg-[#fff4e5]',
+    blue: 'harmony-text-link bg-[#e8f2ff]',
+    green: 'harmony-text-success bg-[#eaf8ee]',
+    orange: 'harmony-text-warning bg-[#fff4e5]',
     red: 'text-red-700 bg-red-50',
-    purple: 'text-[#7b2cbf] bg-[#f7edfc]',
+    purple: 'harmony-text-violet bg-[#f7edfc]',
   }[tone]
 
   return (
     <div className="harmony-metric-card p-6">
       <div className="flex items-center justify-between gap-4">
         <div className="min-w-0">
-          <p className="truncate text-sm text-[#6e6e73]">
+          <p className="truncate text-sm harmony-text-secondary">
             {title}
           </p>
 
-          <h3 className="mt-2 truncate text-2xl font-semibold tracking-tight text-[#1d1d1f]">
+          <h3 className="mt-2 truncate text-2xl font-semibold tracking-tight harmony-text-primary">
             {value}
           </h3>
 
-          <p className="mt-1 line-clamp-1 text-xs leading-5 text-[#86868b]">
+          <p className="mt-1 line-clamp-1 text-xs leading-5 harmony-text-muted">
             {description}
           </p>
         </div>
@@ -2096,11 +2038,11 @@ function InfoBox({
 }) {
   return (
     <div className="rounded-[20px] border border-black/5 bg-white p-4">
-      <p className="text-xs font-bold uppercase tracking-wide text-[#6e6e73]">
+      <p className="text-xs font-bold uppercase tracking-wide harmony-text-secondary">
         {label}
       </p>
 
-      <p className="mt-2 whitespace-pre-line text-sm font-semibold leading-6 text-[#1d1d1f]">
+      <p className="mt-2 whitespace-pre-line text-sm font-semibold leading-6 harmony-text-primary">
         {value}
       </p>
     </div>
@@ -2116,11 +2058,11 @@ function ContentBox({
 }) {
   return (
     <div className="mt-5 rounded-[24px] border border-black/5 bg-[#f5f5f7]/70 p-5">
-      <p className="text-xs font-bold uppercase tracking-wide text-[#6e6e73]">
+      <p className="text-xs font-bold uppercase tracking-wide harmony-text-secondary">
         {title}
       </p>
 
-      <p className="mt-2 whitespace-pre-line text-sm leading-6 text-[#1d1d1f]">
+      <p className="mt-2 whitespace-pre-line text-sm leading-6 harmony-text-primary">
         {content}
       </p>
     </div>
@@ -2144,14 +2086,14 @@ function StatusBadge({
           : status === 'absent' || status === 'no_record'
             ? 'bg-red-50 text-red-700'
             : status === 'phl' || status === 'pending_phl' || status === 'phl_claim'
-              ? 'bg-[#f7edfc] text-[#7b2cbf]'
+              ? 'bg-[#f7edfc] harmony-text-violet'
               : status === 'leave' || status.includes('leave') || status === 'permit'
-                ? 'bg-[#e8f2ff] text-[#0059b8]'
+                ? 'bg-[#e8f2ff] harmony-text-link'
                 : status === 'sick'
-                  ? 'bg-[#f7edfc] text-[#7b2cbf]'
+                  ? 'bg-[#f7edfc] harmony-text-violet'
                   : status === 'official_travel'
-                    ? 'bg-[#eef1f5] text-[#3a3a3c]'
-                    : 'bg-[#f5f5f7] text-[#6e6e73]'
+                    ? 'bg-[#eef1f5] harmony-text-primary'
+                    : 'bg-[#f5f5f7] harmony-text-secondary'
 
   return (
     <span className={`inline-flex rounded-full px-3 py-1 text-xs font-bold ${className}`}>
@@ -2174,7 +2116,7 @@ function ApprovalBadge({
         ? 'bg-red-50 text-red-700'
         : normalized === 'pending'
           ? 'bg-orange-50 text-orange-700'
-          : 'bg-[#f5f5f7] text-[#6e6e73]'
+          : 'bg-[#f5f5f7] harmony-text-secondary'
 
   return (
     <span className={`inline-flex rounded-full px-3 py-1 text-xs font-bold ${className}`}>
@@ -2200,7 +2142,7 @@ function PeriodStatusBadge({
           ? 'bg-orange-50 text-orange-700'
           : normalizeStatus(period?.supervisor_status) === 'rejected'
             ? 'bg-red-50 text-red-700'
-            : 'bg-[#f5f5f7] text-[#6e6e73]'
+            : 'bg-[#f5f5f7] harmony-text-secondary'
 
   return (
     <span className={`inline-flex rounded-full px-3 py-1 text-xs font-bold ${className}`}>

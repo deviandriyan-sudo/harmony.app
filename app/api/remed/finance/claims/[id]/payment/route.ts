@@ -1,3 +1,5 @@
+
+import { readErrorMessage } from '@/lib/error-utils'
 import { randomUUID } from 'crypto'
 import { NextRequest, NextResponse } from 'next/server'
 import { REMED_ALLOWED_MIME_TYPES, REMED_BUCKET, REMED_MAX_FILE_SIZE, safeFileName } from '@/lib/remed'
@@ -68,12 +70,12 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
         paymentDate,
         paymentReference,
       )
-    } catch (notificationError: any) {
+    } catch (notificationError: unknown) {
       notification = {
         ok: false,
         sent: 0,
         failed: 1,
-        message: notificationError?.message || 'Notifikasi email pembayaran gagal diproses.',
+        message: readErrorMessage(notificationError) || 'Notifikasi email pembayaran gagal diproses.',
       }
       console.warn('Re-Med payment email notification warning:', notificationError)
     }

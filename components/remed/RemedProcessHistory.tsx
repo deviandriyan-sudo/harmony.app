@@ -1,5 +1,7 @@
 'use client'
 
+
+import { readErrorMessage } from '@/lib/error-utils'
 import { useMemo, useState } from 'react'
 import { Loader2, Search, Trash2 } from 'lucide-react'
 import { formatRemedDate, formatRupiah, REMED_STATUS_LABELS } from '@/lib/remed'
@@ -74,8 +76,8 @@ export function RemedProcessHistory({
       })
       if (result.warning) window.alert(result.warning)
       await onDeleted?.()
-    } catch (error: any) {
-      window.alert(error?.message || 'Gagal menghapus riwayat klaim.')
+    } catch (error: unknown) {
+      window.alert(readErrorMessage(error) || 'Gagal menghapus riwayat klaim.')
     } finally {
       setDeletingClaimId(null)
     }
@@ -90,7 +92,7 @@ export function RemedProcessHistory({
           {allowDelete ? <p className="mt-1 text-[11px] text-[#92969d]">Pembersihan permanen hanya tersedia untuk klaim yang sudah dihapus dari data operasional.</p> : null}
         </div>
         <label className="flex min-h-11 min-w-0 items-center gap-2 rounded-[16px] border border-black/[0.07] bg-[#f6f7f9] px-3.5 sm:w-[360px]">
-          <Search size={16} className="shrink-0 text-[#8a8f98]" />
+          <Search size={16} className="shrink-0 harmony-text-muted" />
           <input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
@@ -101,11 +103,11 @@ export function RemedProcessHistory({
       </div>
 
       {!filtered.length ? (
-        <div className="m-5 rounded-[22px] border border-dashed border-black/10 bg-[#f8f9fb] p-9 text-center text-sm text-[#747982]">Belum ada riwayat proses.</div>
+        <div className="m-5 rounded-[22px] border border-dashed border-black/10 bg-[#f8f9fb] p-9 text-center text-sm harmony-text-secondary">Belum ada riwayat proses.</div>
       ) : (
         <div className="overflow-x-auto">
           <table className="min-w-[1240px] w-full text-left text-sm">
-            <thead className="bg-[#f6f7f9] text-[11px] font-bold uppercase tracking-[0.08em] text-[#777c85]">
+            <thead className="bg-[#f6f7f9] text-[11px] font-bold uppercase tracking-[0.08em] harmony-text-secondary">
               <tr>
                 <th className="px-5 py-3.5">Waktu</th>
                 <th className="px-5 py-3.5">Klaim / Karyawan</th>
@@ -123,21 +125,21 @@ export function RemedProcessHistory({
                 const deleting = deletingClaimId === item.claim_id
                 return (
                   <tr key={item.event_id} className="align-top transition hover:bg-[#fafbfc]">
-                    <td className="whitespace-nowrap px-5 py-4 text-[#747982]">
-                      <p className="font-semibold text-[#25272c]">{formatRemedDate(item.event_at)}</p>
+                    <td className="whitespace-nowrap px-5 py-4 harmony-text-secondary">
+                      <p className="font-semibold harmony-text-primary">{formatRemedDate(item.event_at)}</p>
                       <p className="mt-1 text-xs">{new Date(item.event_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}</p>
                     </td>
                     <td className="px-5 py-4">
-                      <p className="font-bold text-[#17181b]">{item.claim_number || '-'}</p>
-                      <p className="mt-1 text-xs text-[#747982]">{item.employee_name || '-'}</p>
+                      <p className="font-bold harmony-text-primary">{item.claim_number || '-'}</p>
+                      <p className="mt-1 text-xs harmony-text-secondary">{item.employee_name || '-'}</p>
                     </td>
-                    <td className="px-5 py-4 text-[#5f646c]">
+                    <td className="px-5 py-4 harmony-text-secondary">
                       <p>{item.claim_type_name || '-'}</p>
-                      <p className="mt-1 text-xs text-[#8a8f98]">{formatRemedDate(item.treatment_date)}</p>
+                      <p className="mt-1 text-xs harmony-text-muted">{formatRemedDate(item.treatment_date)}</p>
                     </td>
                     <td className="px-5 py-4">
                       <div className="flex flex-wrap items-center gap-2">
-                        {item.from_status ? <span className="rounded-full bg-[#eef0f3] px-2.5 py-1 text-xs font-bold text-[#5f646c]">{statusLabel(item.from_status)}</span> : null}
+                        {item.from_status ? <span className="rounded-full bg-[#eef0f3] px-2.5 py-1 text-xs font-bold harmony-text-secondary">{statusLabel(item.from_status)}</span> : null}
                         <span className="text-[#a0a4ab]">→</span>
                         <span className={[
                           'rounded-full px-2.5 py-1 text-xs font-bold',
@@ -150,16 +152,16 @@ export function RemedProcessHistory({
                       </div>
                     </td>
                     <td className="px-5 py-4">
-                      <p className="font-bold text-[#25272c]">{actorLabel(item.actor_role)}</p>
-                      <p className="mt-1 max-w-[220px] break-all text-xs text-[#747982]">{item.actor_email || '-'}</p>
+                      <p className="font-bold harmony-text-primary">{actorLabel(item.actor_role)}</p>
+                      <p className="mt-1 max-w-[220px] break-all text-xs harmony-text-secondary">{item.actor_email || '-'}</p>
                     </td>
                     <td className="px-5 py-4">
-                      <p className={item.note ? 'max-w-[320px] whitespace-pre-wrap text-[#25272c]' : 'text-[#9da1a8]'}>{item.note || 'Tidak ada catatan.'}</p>
+                      <p className={item.note ? 'max-w-[320px] whitespace-pre-wrap harmony-text-primary' : 'text-[#9da1a8]'}>{item.note || 'Tidak ada catatan.'}</p>
                     </td>
                     <td className="whitespace-nowrap px-5 py-4 text-right">
-                      <p className="font-bold text-[#17181b]">{formatRupiah(item.approved_amount || item.submitted_amount || 0)}</p>
+                      <p className="font-bold harmony-text-primary">{formatRupiah(item.approved_amount || item.submitted_amount || 0)}</p>
                       {item.approved_amount && item.submitted_amount && Number(item.approved_amount) !== Number(item.submitted_amount) ? (
-                        <p className="mt-1 text-xs text-[#747982]">Diajukan {formatRupiah(item.submitted_amount)}</p>
+                        <p className="mt-1 text-xs harmony-text-secondary">Diajukan {formatRupiah(item.submitted_amount)}</p>
                       ) : null}
                     </td>
                     {allowDelete ? (

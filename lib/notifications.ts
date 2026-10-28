@@ -1,3 +1,5 @@
+
+import { readErrorName } from '@/lib/error-utils'
 import { supabase } from '@/lib/supabase'
 import type {
   HarmonyWorkflowNotificationResult,
@@ -96,8 +98,8 @@ export async function sendHarmonyEmail(
       cc: Array.isArray(result?.cc) ? result.cc : [],
       bcc: Array.isArray(result?.bcc) ? result.bcc : [],
     }
-  } catch (error: any) {
-    if (error?.name === 'AbortError') {
+  } catch (error: unknown) {
+    if (readErrorName(error) === 'AbortError') {
       throw new Error(
         'Pengiriman email melewati batas waktu 20 detik. Cek koneksi Resend dan konfigurasi domain.'
       )
@@ -177,8 +179,8 @@ export async function sendHarmonyWorkflowNotification(
       failed: Number(result?.failed || 0),
       details: Array.isArray(result?.details) ? result.details : [],
     }
-  } catch (error: any) {
-    if (error?.name === 'AbortError') {
+  } catch (error: unknown) {
+    if (readErrorName(error) === 'AbortError') {
       throw new Error(
         'Pengiriman workflow email melewati batas waktu 20 detik. Cek koneksi Resend dan konfigurasi domain.',
       )

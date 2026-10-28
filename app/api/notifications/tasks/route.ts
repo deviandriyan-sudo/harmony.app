@@ -125,7 +125,7 @@ function isSamePerson(
 }
 
 function listNames(
-  rows: Array<Record<string, any>>,
+  rows: Array<Record<string, unknown>>,
   employeeById: Map<string, HarmonyEmployeeIdentity>,
 ) {
   const names = Array.from(
@@ -146,7 +146,7 @@ function listNames(
   return `${names.slice(0, 3).join(', ')}, +${names.length - 3} lainnya`
 }
 
-function oldestCreatedAt(rows: Array<Record<string, any>>) {
+function oldestCreatedAt(rows: Array<Record<string, unknown>>) {
   const values = rows
     .map((row) => String(row.created_at || row.employee_submitted_at || '').trim())
     .filter(Boolean)
@@ -205,7 +205,7 @@ export async function GET(request: NextRequest) {
     const employeeById = new Map(employees.map((item) => [item.id, item]))
     const activeEmployeeIds = new Set(employees.map((item) => item.id))
     const activeAssignments = (
-      (assignmentDirectoryResult.data || []) as Array<Record<string, any>>
+      (assignmentDirectoryResult.data || []) as Array<Record<string, unknown>>
     ).filter((assignment) => {
       if (assignment.is_active === false || assignment.is_primary === true) {
         return false
@@ -254,10 +254,10 @@ export async function GET(request: NextRequest) {
       if (rejectedLogsResult.error) throw rejectedLogsResult.error
 
       const confirmations = (confirmationResult.data || []) as Array<
-        Record<string, any>
+        Record<string, unknown>
       >
       const rejectedLogs = (rejectedLogsResult.data || []) as Array<
-        Record<string, any>
+        Record<string, unknown>
       >
 
       const rejectedPeriods = new Set<string>()
@@ -443,7 +443,7 @@ export async function GET(request: NextRequest) {
         if (postponeResult.error) throw postponeResult.error
 
         const attendancePending = (
-          (attendanceResult.data || []) as Array<Record<string, any>>
+          (attendanceResult.data || []) as Array<Record<string, unknown>>
         ).filter((row) => {
           const employeeStatus = normalizeHarmonyText(row.employee_status)
           const supervisorStatus = normalizeHarmonyText(row.supervisor_status)
@@ -458,7 +458,7 @@ export async function GET(request: NextRequest) {
           // membuka konteks periode yang benar, bukan fallback ke periode berjalan.
           const attendanceByPeriod = new Map<
             string,
-            Array<Record<string, any>>
+            Array<Record<string, unknown>>
           >()
 
           attendancePending.forEach((row) => {
@@ -491,7 +491,7 @@ export async function GET(request: NextRequest) {
         }
 
         const leavePending = (
-          (leaveResult.data || []) as Array<Record<string, any>>
+          (leaveResult.data || []) as Array<Record<string, unknown>>
         ).filter((row) => {
           if (normalizeHarmonyText(row.request_type) === 'phl_claim') return false
           const status = normalizeHarmonyText(row.supervisor_status || row.status)
@@ -515,7 +515,7 @@ export async function GET(request: NextRequest) {
         }
 
         const phlPending = (
-          (phlResult.data || []) as Array<Record<string, any>>
+          (phlResult.data || []) as Array<Record<string, unknown>>
         ).filter((row) => {
           const supervisor = normalizeHarmonyText(row.supervisor_status)
           const hr = normalizeHarmonyText(row.hr_status)
@@ -544,7 +544,7 @@ export async function GET(request: NextRequest) {
         }
 
         const postponePending = (
-          (postponeResult.data || []) as Array<Record<string, any>>
+          (postponeResult.data || []) as Array<Record<string, unknown>>
         ).filter((row) => {
           const asSupervisor1 =
             isSamePerson(row.supervisor_1, employee) &&
@@ -620,7 +620,7 @@ export async function GET(request: NextRequest) {
       if (attendanceResult.error) throw attendanceResult.error
 
       const leaveReady = (
-        (leaveResult.data || []) as Array<Record<string, any>>
+        (leaveResult.data || []) as Array<Record<string, unknown>>
       ).filter((row) => {
         if (normalizeHarmonyText(row.request_type) === 'phl_claim') return false
         const supervisor = normalizeHarmonyText(row.supervisor_status)
@@ -648,7 +648,7 @@ export async function GET(request: NextRequest) {
       }
 
       const phlReady = (
-        (phlResult.data || []) as Array<Record<string, any>>
+        (phlResult.data || []) as Array<Record<string, unknown>>
       ).filter((row) => {
         const supervisor = normalizeHarmonyText(row.supervisor_status)
         const hr = normalizeHarmonyText(row.hr_status)
@@ -677,7 +677,7 @@ export async function GET(request: NextRequest) {
       }
 
       const postponeReady = (
-        (postponeResult.data || []) as Array<Record<string, any>>
+        (postponeResult.data || []) as Array<Record<string, unknown>>
       ).filter((row) => {
         return (
           normalizeHarmonyText(row.approval_status) === 'pending_hr' &&
@@ -702,7 +702,7 @@ export async function GET(request: NextRequest) {
       }
 
       const attendanceReady = (
-        (attendanceResult.data || []) as Array<Record<string, any>>
+        (attendanceResult.data || []) as Array<Record<string, unknown>>
       ).filter((row) => {
         return (
           normalizeHarmonyText(row.supervisor_status) === 'approved' &&

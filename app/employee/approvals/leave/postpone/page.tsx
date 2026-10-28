@@ -1,5 +1,7 @@
 'use client'
 
+
+import { readErrorMessage } from '@/lib/error-utils'
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import {
@@ -146,7 +148,7 @@ export default function EmployeePostponeApprovalPage() {
   const [processingId, setProcessingId] = useState<string | null>(null)
 
   const [currentEmployee, setCurrentEmployee] = useState<Employee | null>(null)
-  const [employees, setEmployees] = useState<Employee[]>([])
+  const [, setEmployees] = useState<Employee[]>([])
   const [requests, setRequests] = useState<LeavePostponeRequest[]>([])
   const [search, setSearch] = useState('')
 
@@ -243,10 +245,10 @@ export default function EmployeePostponeApprovalPage() {
       if (postponeError) throw postponeError
 
       setRequests((postponeData || []) as LeavePostponeRequest[])
-    } catch (error: any) {
+    } catch (error: unknown) {
       setMessage({
         type: 'error',
-        text: error?.message || 'Gagal mengambil data approval postpone.',
+        text: readErrorMessage(error) || 'Gagal mengambil data approval postpone.',
       })
     } finally {
       setLoading(false)
@@ -301,12 +303,12 @@ export default function EmployeePostponeApprovalPage() {
         success: result.ok,
         message: result.message,
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.warn('Postpone approval notification warning:', error)
 
       return {
         success: false,
-        message: error?.message || 'Email notifikasi gagal dikirim.',
+        message: readErrorMessage(error) || 'Email notifikasi gagal dikirim.',
       }
     }
   }
@@ -332,7 +334,7 @@ export default function EmployeePostponeApprovalPage() {
     try {
       const hasSupervisor2 = Boolean(request.supervisor_2)
 
-      let payload: Record<string, any> = {
+      let payload: Record<string, string | null> = {
         edited_by: getEmployeeName(currentEmployee),
         updated_at: new Date().toISOString(),
       }
@@ -383,10 +385,10 @@ export default function EmployeePostponeApprovalPage() {
       })
 
       await fetchData()
-    } catch (error: any) {
+    } catch (error: unknown) {
       setMessage({
         type: 'error',
-        text: error?.message || 'Gagal approve pengajuan postpone.',
+        text: readErrorMessage(error) || 'Gagal approve pengajuan postpone.',
       })
     } finally {
       setProcessingId(null)
@@ -420,7 +422,7 @@ export default function EmployeePostponeApprovalPage() {
     setMessage(null)
 
     try {
-      let payload: Record<string, any> = {
+      let payload: Record<string, string | null> = {
         approval_status: 'rejected',
         hr_status: 'rejected',
         edited_by: getEmployeeName(currentEmployee),
@@ -468,10 +470,10 @@ export default function EmployeePostponeApprovalPage() {
       })
 
       await fetchData()
-    } catch (error: any) {
+    } catch (error: unknown) {
       setMessage({
         type: 'error',
-        text: error?.message || 'Gagal reject pengajuan postpone.',
+        text: readErrorMessage(error) || 'Gagal reject pengajuan postpone.',
       })
     } finally {
       setProcessingId(null)
@@ -502,12 +504,12 @@ export default function EmployeePostponeApprovalPage() {
                 Supervisor Approval
               </div>
 
-              <h1 className="mt-3 text-2xl font-bold text-[#1d1d1f] sm:text-3xl">
+              <h1 className="mt-3 text-2xl font-bold harmony-text-primary sm:text-3xl">
                 Approval Postpone Cuti
               </h1>
 
-              <p className="mt-2 text-sm leading-6 text-[#6e6e73]">
-                Login sebagai: <span className="font-bold text-[#1d1d1f]">{getEmployeeName(currentEmployee)}</span>
+              <p className="mt-2 text-sm leading-6 harmony-text-secondary">
+                Login sebagai: <span className="font-bold harmony-text-primary">{getEmployeeName(currentEmployee)}</span>
               </p>
             </div>
 
@@ -573,10 +575,10 @@ export default function EmployeePostponeApprovalPage() {
                 >
                   <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                     <div>
-                      <p className="font-bold text-[#1d1d1f]">
+                      <p className="font-bold harmony-text-primary">
                         {item.full_name || '-'}
                       </p>
-                      <p className="mt-1 text-xs text-[#6e6e73]">
+                      <p className="mt-1 text-xs harmony-text-secondary">
                         {item.employee_number || '-'} · {item.department || '-'}
                       </p>
 

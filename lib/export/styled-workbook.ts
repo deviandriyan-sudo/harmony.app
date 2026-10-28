@@ -3,6 +3,14 @@
 import * as XLSX from 'xlsx'
 
 type ReportValue = string | number | boolean | null | undefined
+type CFBEntry = { content?: Uint8Array | ArrayLike<number> | null; size?: number }
+type CFBArchive = unknown
+type CFBApi = {
+  read(input: string, options: { type: 'binary' }): CFBArchive
+  find(archive: CFBArchive, path: string): CFBEntry | null
+  write(archive: CFBArchive, options: { type: 'binary'; fileType: 'zip'; compression: boolean }): string
+}
+
 export type ReportRow = Record<string, ReportValue>
 export type StyledSheet = { name: string; rows: ReportRow[]; columns?: string[]; widths?: Record<string, number> }
 
@@ -27,7 +35,7 @@ export function downloadStyledWorkbook(filename: string, sheets: StyledSheet[]) 
     styling.push({ headers, rows: bodyRows })
   }
 
-  const cfb = (XLSX as unknown as { CFB: any }).CFB
+  const cfb = (XLSX as unknown as { CFB: CFBApi }).CFB
   const initial = XLSX.write(workbook, { type: 'binary', bookType: 'xlsx', compression: true })
   const archive = cfb.read(initial, { type: 'binary' })
   replacePart(cfb, archive, 'xl/styles.xml', STYLES_XML)
@@ -114,12 +122,12 @@ function cellStyle(heading: string, value: ReportValue, row: ReportRow, rowNumbe
   return base
 }
 
-function getPart(cfb: any, archive: any, path: string): string {
+function getPart(cfb: CFBApi, archive: CFBArchive, path: string): string {
   const found = cfb.find(archive, `Root Entry/${path}`)
   if (!found?.content) return ''
   return new TextDecoder().decode(found.content instanceof Uint8Array ? found.content : new Uint8Array(found.content))
 }
-function replacePart(cfb: any, archive: any, path: string, content: string) {
+function replacePart(cfb: CFBApi, archive: CFBArchive, path: string, content: string) {
   const file = cfb.find(archive, `Root Entry/${path}`)
   if (!file) throw new Error(`XLSX: bagian ${path} tidak ditemukan`)
   const bytes = new TextEncoder().encode(content)

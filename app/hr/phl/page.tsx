@@ -1,18 +1,9 @@
 'use client'
 
+
+import { readErrorMessage } from '@/lib/error-utils'
 import { useEffect, useMemo, useState } from 'react'
-import {
-  AlertTriangle,
-  CalendarDays,
-  CheckCircle2,
-  Clock3,
-  FileText,
-  Loader2,
-  RefreshCcw,
-  ShieldCheck,
-  WalletCards,
-  XCircle,
-} from 'lucide-react'
+import { AlertTriangle, CheckCircle2, Clock3, FileText, Loader2, RefreshCcw, ShieldCheck, WalletCards, XCircle } from 'lucide-react'
 
 import { Topbar } from '@/components/layout/Topbar'
 import {
@@ -64,8 +55,8 @@ export default function HRPHLPage() {
     setMessage('')
     try {
       setRequests(await fetchPHLWorkRequests('all'))
-    } catch (error: any) {
-      setMessage(error?.message || 'Data monitoring PHL gagal dimuat.')
+    } catch (error: unknown) {
+      setMessage(readErrorMessage(error) || 'Data monitoring PHL gagal dimuat.')
     } finally {
       setLoading(false)
     }
@@ -103,7 +94,7 @@ export default function HRPHLPage() {
               {(['all', 'pending', 'approved', 'rejected', 'cancelled'] as Filter[]).map((item) => (
                 <button key={item} type="button" onClick={() => setFilter(item)} className={[
                   'rounded-full px-4 py-2 text-xs font-bold',
-                  filter === item ? 'bg-[#1d1d1f] text-white' : 'bg-[#f5f5f7] text-[#6e6e73]',
+                  filter === item ? 'bg-[#1d1d1f] text-white' : 'bg-[#f5f5f7] harmony-text-secondary',
                 ].join(' ')}>
                   {item === 'all' ? 'Semua' : item === 'pending' ? 'Pending' : item === 'approved' ? 'Approved' : item === 'rejected' ? 'Rejected' : 'Cancelled'}
                 </button>
@@ -111,20 +102,20 @@ export default function HRPHLPage() {
             </div>
             <div className="flex gap-2">
               <input value={search} onChange={(event) => setSearch(event.target.value)} className="harmony-input min-w-0 xl:w-[320px]" placeholder="Cari karyawan / tugas / unit..." />
-              <button type="button" onClick={() => void load()} disabled={loading} className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#e8f2ff] text-[#0059b8]"><RefreshCcw size={17} className={loading ? 'animate-spin' : ''} /></button>
+              <button type="button" onClick={() => void load()} disabled={loading} className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#e8f2ff] harmony-text-link"><RefreshCcw size={17} className={loading ? 'animate-spin' : ''} /></button>
             </div>
           </div>
         </div>
 
         {loading ? (
-          <div className="harmony-card flex items-center gap-3 p-6 text-sm text-[#6e6e73]"><Loader2 size={18} className="animate-spin" />Memuat data PHL...</div>
+          <div className="harmony-card flex items-center gap-3 p-6 text-sm harmony-text-secondary"><Loader2 size={18} className="animate-spin" />Memuat data PHL...</div>
         ) : filtered.length === 0 ? (
-          <div className="harmony-card p-8 text-center text-sm text-[#86868b]">Tidak ada data PHL pada filter ini.</div>
+          <div className="harmony-card p-8 text-center text-sm harmony-text-muted">Tidak ada data PHL pada filter ini.</div>
         ) : (
           <div className="harmony-card overflow-hidden p-0">
             <div className="overflow-x-auto">
               <table className="min-w-[1100px] w-full text-left text-sm">
-                <thead className="bg-[#f5f5f7] text-xs uppercase tracking-wide text-[#86868b]">
+                <thead className="bg-[#f5f5f7] text-xs uppercase tracking-wide harmony-text-muted">
                   <tr>
                     <th className="px-4 py-3">Karyawan</th>
                     <th className="px-4 py-3">Tanggal</th>
@@ -140,41 +131,41 @@ export default function HRPHLPage() {
                   {filtered.map((item) => (
                     <tr key={item.id} className="align-top">
                       <td className="px-4 py-4">
-                        <p className="font-bold text-[#1d1d1f]">{item.full_name || '-'}</p>
+                        <p className="font-bold harmony-text-primary">{item.full_name || '-'}</p>
                         {item.origin === 'legacy_attendance' && <span className="mt-1 inline-flex rounded-full bg-amber-50 px-2 py-1 text-[10px] font-bold text-amber-700">Migrasi Absensi Lama</span>}
-                        <p className="mt-1 text-xs text-[#86868b]">{item.employee_number || '-'} · {item.department || '-'}</p>
+                        <p className="mt-1 text-xs harmony-text-muted">{item.employee_number || '-'} · {item.department || '-'}</p>
                       </td>
                       <td className="px-4 py-4">
-                        <p className="font-semibold text-[#1d1d1f]">{formatDate(item.work_date)}</p>
-                        <p className="mt-1 text-xs text-[#86868b]">{dayTypeLabel(item.work_day_type)}</p>
+                        <p className="font-semibold harmony-text-primary">{formatDate(item.work_date)}</p>
+                        <p className="mt-1 text-xs harmony-text-muted">{dayTypeLabel(item.work_day_type)}</p>
                       </td>
                       <td className="max-w-[260px] px-4 py-4">
-                        <p className="font-semibold leading-5 text-[#1d1d1f]">{item.work_purpose}</p>
-                        <p className="mt-1 text-xs text-[#86868b]">{item.work_start_time.slice(0, 5)}–{item.work_end_time.slice(0, 5)}</p>
+                        <p className="font-semibold leading-5 harmony-text-primary">{item.work_purpose}</p>
+                        <p className="mt-1 text-xs harmony-text-muted">{item.work_start_time.slice(0, 5)}–{item.work_end_time.slice(0, 5)}</p>
                       </td>
                       <td className="px-4 py-4">
-                        <p className="font-bold text-[#1d1d1f]">{item.attendance_verified ? formatPHLMinutes(item.recorded_work_minutes) : formatPHLMinutes(item.requested_work_minutes)}</p>
-                        <p className="mt-1 text-xs text-[#86868b]">{item.attendance_verified ? 'Absensi tercatat' : 'Jam form · sinkron saat approve'}</p>
+                        <p className="font-bold harmony-text-primary">{item.attendance_verified ? formatPHLMinutes(item.recorded_work_minutes) : formatPHLMinutes(item.requested_work_minutes)}</p>
+                        <p className="mt-1 text-xs harmony-text-muted">{item.attendance_verified ? 'Absensi tercatat' : 'Jam form · sinkron saat approve'}</p>
                       </td>
                       <td className="px-4 py-4">
                         <div className="flex max-w-[220px] flex-col gap-1.5">
                           {item.attachments.map((attachment) => (
-                            <a key={attachment.id} href={attachment.signed_url || '#'} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 text-xs font-bold text-[#0059b8]"><FileText size={13} />{attachment.file_name}</a>
+                            <a key={attachment.id} href={attachment.signed_url || '#'} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 text-xs font-bold harmony-text-link"><FileText size={13} />{attachment.file_name}</a>
                           ))}
                         </div>
                       </td>
                       <td className="px-4 py-4">
-                        <p className="font-semibold text-[#1d1d1f]">{item.supervisor_name || '-'}</p>
-                        {item.supervisor_note && <p className="mt-1 max-w-[220px] text-xs leading-5 text-[#86868b]">{item.supervisor_note}</p>}
+                        <p className="font-semibold harmony-text-primary">{item.supervisor_name || '-'}</p>
+                        {item.supervisor_note && <p className="mt-1 max-w-[220px] text-xs leading-5 harmony-text-muted">{item.supervisor_note}</p>}
                       </td>
                       <td className="px-4 py-4"><StatusBadge status={item.status} /></td>
                       <td className="px-4 py-4">
                         {item.status === 'approved' ? (
                           <div>
                             <span className="inline-flex items-center gap-1 rounded-full bg-green-50 px-3 py-1 text-xs font-bold text-green-700"><WalletCards size={13} />+1 PHL</span>
-                            <p className="mt-2 text-xs text-[#86868b]">s.d. {item.expired_at ? formatDate(item.expired_at) : '-'}</p>
+                            <p className="mt-2 text-xs harmony-text-muted">s.d. {item.expired_at ? formatDate(item.expired_at) : '-'}</p>
                           </div>
-                        ) : <span className="text-xs font-semibold text-[#86868b]">Tidak berubah</span>}
+                        ) : <span className="text-xs font-semibold harmony-text-muted">Tidak berubah</span>}
                       </td>
                     </tr>
                   ))}

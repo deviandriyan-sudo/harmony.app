@@ -1,37 +1,15 @@
 'use client'
 
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
-import {
-  AlertTriangle,
-  BriefcaseBusiness,
-  CheckCircle2,
-  Clock3,
-  FileText,
-  History,
-  Landmark,
-  Loader2,
-  RefreshCcw,
-  RotateCcw,
-  Search,
-  ShieldCheck,
-  Trash2,
-  UserRound,
-  WalletCards,
-  X,
-  XCircle,
-} from 'lucide-react'
+
+import { readErrorMessage } from '@/lib/error-utils'
+import { useEffectEvent, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { AlertTriangle, BriefcaseBusiness, CheckCircle2, FileText, History, Landmark, Loader2, RefreshCcw, RotateCcw, Search, ShieldCheck, Trash2, UserRound, WalletCards, X, XCircle } from 'lucide-react'
 
 import { Topbar } from '@/components/layout/Topbar'
 import { HarmonyAttachmentViewer } from '@/components/attachments/HarmonyAttachments'
 import { supabase } from '@/lib/supabase'
 import { harmonyFetch } from '@/lib/harmony-client'
-import {
-  canHRProcessApproval,
-  getHRApprovalLabel,
-  getSupervisorApprovalLabel,
-  isFinalApproved,
-  isSupervisorApproved,
-} from '@/lib/leave-workflow-status'
+import { canHRProcessApproval, getHRApprovalLabel, getSupervisorApprovalLabel, isSupervisorApproved } from '@/lib/leave-workflow-status'
 import { sendHarmonyEmail } from '@/lib/notifications'
 
 type AppUser = {
@@ -459,10 +437,10 @@ async function sendHRLeaveDecisionEmail({
       success: true,
       message: `Notifikasi email diproses untuk ${recipient.email}.`,
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     return {
       success: false,
-      message: error?.message || 'Email notifikasi gagal terkirim.',
+      message: readErrorMessage(error) || 'Email notifikasi gagal terkirim.',
     }
   }
 }
@@ -523,10 +501,10 @@ async function sendHRLeaveCancellationEmail({
       success: true,
       message: `Notifikasi email diproses untuk ${recipient.email}.`,
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     return {
       success: false,
-      message: error?.message || 'Email notifikasi pembatalan gagal terkirim.',
+      message: readErrorMessage(error) || 'Email notifikasi pembatalan gagal terkirim.',
     }
   }
 }
@@ -591,10 +569,10 @@ async function sendHRPHLDecisionEmail({
       success: true,
       message: `Notifikasi email diproses untuk ${recipient.email}.`,
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     return {
       success: false,
-      message: error?.message || 'Email notifikasi gagal terkirim.',
+      message: readErrorMessage(error) || 'Email notifikasi gagal terkirim.',
     }
   }
 }
@@ -659,10 +637,10 @@ async function sendHRPHLCancellationEmail({
       success: true,
       message: `Notifikasi email diproses untuk ${recipient.email}.`,
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     return {
       success: false,
-      message: error?.message || 'Email notifikasi pembatalan PHL gagal terkirim.',
+      message: readErrorMessage(error) || 'Email notifikasi pembatalan PHL gagal terkirim.',
     }
   }
 }
@@ -945,8 +923,9 @@ export default function HRLeavePage() {
     })
   }, [legacyPHLClaims, searchKeyword])
 
+  const onInitialLoad = useEffectEvent(fetchData)
   useEffect(() => {
-    fetchData()
+    onInitialLoad()
   }, [])
 
   async function fetchData(options?: { preserveMessages?: boolean }) {
@@ -1057,8 +1036,8 @@ export default function HRLeavePage() {
         String(a.full_name || '').localeCompare(String(b.full_name || ''), 'id'),
       )
       setLeaveBalanceLifecycle(rows)
-    } catch (error: any) {
-      console.warn('Leave lifecycle summary warning:', error?.message || error)
+    } catch (error: unknown) {
+      console.warn('Leave lifecycle summary warning:', readErrorMessage(error) || error)
       setLeaveBalanceLifecycle([])
     }
   }
@@ -1185,9 +1164,9 @@ export default function HRLeavePage() {
           notification
         )
       )
-    } catch (error: any) {
+    } catch (error: unknown) {
       setErrorMessage(
-        error?.message ||
+        readErrorMessage(error) ||
           'Klaim PHL gagal disetujui. Pastikan SQL atomic workflow PHL sudah dijalankan.'
       )
     } finally {
@@ -1230,8 +1209,8 @@ export default function HRLeavePage() {
       ))
       setExceptionPHLRecord(null)
       setExceptionPHLReason('')
-    } catch (error: any) {
-      setErrorMessage(error?.message || 'Pengecualian gagal. Pastikan SQL V3.7.4 telah dijalankan.')
+    } catch (error: unknown) {
+      setErrorMessage(readErrorMessage(error) || 'Pengecualian gagal. Pastikan SQL V3.7.4 telah dijalankan.')
     } finally {
       setProcessingId('')
       await fetchData({ preserveMessages: true })
@@ -1287,9 +1266,9 @@ export default function HRLeavePage() {
 
       setRejectPHLRecord(null)
       setRejectPHLReason('')
-    } catch (error: any) {
+    } catch (error: unknown) {
       setErrorMessage(
-        error?.message ||
+        readErrorMessage(error) ||
           'Klaim PHL gagal ditolak. Pastikan SQL atomic workflow PHL sudah dijalankan.'
       )
     } finally {
@@ -1402,11 +1381,11 @@ export default function HRLeavePage() {
 
       setCancelPHLRecord(null)
       setCancelPHLReason('')
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Atomic PHL cancellation error:', error)
 
       setErrorMessage(
-        error?.message ||
+        readErrorMessage(error) ||
           'Pembatalan klaim PHL gagal. Status dan seluruh saldo tetap seperti semula.'
       )
     } finally {
@@ -1455,9 +1434,9 @@ export default function HRLeavePage() {
 
       setEmployeePHLReviewTarget(null)
       setEmployeePHLReviewNote('')
-    } catch (error: any) {
+    } catch (error: unknown) {
       setErrorMessage(
-        error?.message ||
+        readErrorMessage(error) ||
           'Gagal mencatat review rekonsiliasi PHL.'
       )
     } finally {
@@ -1505,9 +1484,9 @@ export default function HRLeavePage() {
 
       setLegacyPHLReviewTarget(null)
       setLegacyPHLReviewNote('')
-    } catch (error: any) {
+    } catch (error: unknown) {
       setErrorMessage(
-        error?.message ||
+        readErrorMessage(error) ||
           'Gagal mencatat review klaim legacy PHL.'
       )
     } finally {
@@ -1593,7 +1572,7 @@ export default function HRLeavePage() {
           hrName: approvedBy,
           note: approvalNote,
         })
-      } catch (notificationError: any) {
+      } catch (notificationError: unknown) {
         console.warn(
           'HR leave approval notification warning:',
           notificationError
@@ -1602,7 +1581,7 @@ export default function HRLeavePage() {
         notification = {
           success: false,
           message:
-            notificationError?.message ||
+            readErrorMessage(notificationError) ||
             'Email notifikasi belum berhasil dikirim.',
         }
       }
@@ -1610,11 +1589,11 @@ export default function HRLeavePage() {
       setSuccessMessage(
         appendNotificationText(baseMessage, notification)
       )
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Atomic HR leave approval error:', error)
 
       setErrorMessage(
-        error?.message ||
+        readErrorMessage(error) ||
           'Approval final HR gagal. Tidak ada status, saldo, atau data absensi yang diubah.'
       )
     } finally {
@@ -1712,11 +1691,11 @@ export default function HRLeavePage() {
 
       setCancelLeaveRecord(null)
       setCancelLeaveReason('')
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Atomic HR leave cancellation error:', error)
 
       setErrorMessage(
-        error?.message ||
+        readErrorMessage(error) ||
           'Pembatalan gagal. Status, saldo, dan data absensi tidak diubah.'
       )
     } finally {
@@ -1938,19 +1917,19 @@ export default function HRLeavePage() {
                   {filteredPendingLeaveRequests.length + filteredPendingPHLClaims.length} outstanding
                 </span>
               </div>
-              <p className="mt-2 max-w-2xl text-sm leading-6 text-[#6e6e73]">
+              <p className="mt-2 max-w-2xl text-sm leading-6 harmony-text-secondary">
                 Seluruh persetujuan Cuti/Izin dan klaim PHL yang masih outstanding ditampilkan dalam satu antrean. Saldo, audit, dan riwayat tersedia di panel yang sama tanpa berpindah menu.
               </p>
             </div>
 
             <div className="flex w-full flex-col gap-3 md:w-auto md:flex-row md:items-center">
               <div className="flex min-h-11 w-full items-center gap-3 rounded-[16px] border border-black/[0.07] bg-[#f6f7f9] px-4 md:w-[340px]">
-                <Search size={17} className="shrink-0 text-[#8a8f98]" />
+                <Search size={17} className="shrink-0 harmony-text-muted" />
                 <input
                   value={searchKeyword}
                   onChange={(event) => setSearchKeyword(event.target.value)}
                   placeholder="Cari nama, unit, jenis, job pending..."
-                  className="min-h-10 w-full border-0 bg-transparent text-sm outline-none shadow-none placeholder:text-[#9a9aa0]"
+                  className="min-h-10 w-full border-0 bg-transparent text-sm outline-none shadow-none harmony-placeholder-muted"
                 />
               </div>
 
@@ -1980,7 +1959,7 @@ export default function HRLeavePage() {
           </div>
 
           {loading && (
-            <div className="flex items-center gap-3 p-6 text-sm text-[#6e6e73]">
+            <div className="flex items-center gap-3 p-6 text-sm harmony-text-secondary">
               <Loader2 size={18} className="animate-spin" />
               Memuat data cuti, izin, dan PHL...
             </div>
@@ -2266,14 +2245,14 @@ function UnifiedApprovalQueue({
         <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
           <div>
             <div className="flex flex-wrap items-center gap-2">
-              <h2 className="text-xl font-bold tracking-[-0.02em] text-[#1d1d1f]">
+              <h2 className="text-xl font-bold tracking-[-0.02em] harmony-text-primary">
                 Outstanding Persetujuan
               </h2>
               <span className="rounded-full bg-orange-50 px-3 py-1 text-xs font-bold text-orange-700">
                 {queue.length} perlu dipantau
               </span>
             </div>
-            <p className="mt-2 max-w-3xl text-sm leading-6 text-[#6e6e73]">
+            <p className="mt-2 max-w-3xl text-sm leading-6 harmony-text-secondary">
               Cuti/Izin dan klaim PHL digabung dalam satu antrean. HR dapat melihat item yang masih menunggu atasan maupun yang sudah siap diproses tanpa berpindah tab.
             </p>
           </div>
@@ -2335,21 +2314,21 @@ function UnifiedApprovalQueue({
                       <span className="inline-flex rounded-full bg-blue-50 px-3 py-1 text-[11px] font-bold text-blue-700">
                         CUTI / IZIN
                       </span>
-                      <p className="max-w-[180px] font-semibold text-[#1d1d1f]">
+                      <p className="max-w-[180px] font-semibold harmony-text-primary">
                         {record.leave_type || record.request_type || '-'}
                       </p>
                     </div>
                   </td>
-                  <td className="px-5 py-4 text-sm font-semibold text-[#1d1d1f]">
+                  <td className="px-5 py-4 text-sm font-semibold harmony-text-primary">
                     {formatDisplayDate(record.start_date || '')}
-                    <span className="mx-1 text-[#86868b]">–</span>
+                    <span className="mx-1 harmony-text-muted">–</span>
                     {formatDisplayDate(record.end_date || '')}
                   </td>
-                  <td className="px-5 py-4 text-sm font-bold text-[#1d1d1f]">
+                  <td className="px-5 py-4 text-sm font-bold harmony-text-primary">
                     {record.total_days || 0} hari
                   </td>
                   <td className="px-5 py-4">
-                    <p className="mb-2 line-clamp-2 max-w-[260px] text-sm leading-6 text-[#6e6e73]">
+                    <p className="mb-2 line-clamp-2 max-w-[260px] text-sm leading-6 harmony-text-secondary">
                       {record.reason || '-'}
                     </p>
                     <JobPendingPreview
@@ -2367,7 +2346,7 @@ function UnifiedApprovalQueue({
                     <button
                       type="button"
                       onClick={() => onLeaveDetail(record)}
-                      className="inline-flex min-h-9 items-center gap-2 rounded-2xl bg-[#e8f2ff] px-4 text-xs font-bold text-[#0059b8]"
+                      className="inline-flex min-h-9 items-center gap-2 rounded-2xl bg-[#e8f2ff] px-4 text-xs font-bold harmony-text-link"
                     >
                       <FileText size={15} />
                       Detail
@@ -2433,17 +2412,17 @@ function UnifiedApprovalQueue({
                     <span className="inline-flex rounded-full bg-orange-50 px-3 py-1 text-[11px] font-bold text-orange-700">
                       KLAIM PHL
                     </span>
-                    <p className="text-xs font-semibold text-[#6e6e73]">Approve normal: saldo FIFO aktif · Pengecualian: tanpa debit</p>
+                    <p className="text-xs font-semibold harmony-text-secondary">Approve normal: saldo FIFO aktif · Pengecualian: tanpa debit</p>
                   </div>
                 </td>
-                <td className="px-5 py-4 text-sm font-semibold text-[#1d1d1f]">
+                <td className="px-5 py-4 text-sm font-semibold harmony-text-primary">
                   {formatDisplayDate(record.phl_date || record.valid_from || '')}
                 </td>
-                <td className="px-5 py-4 text-sm font-bold text-[#1d1d1f]">
+                <td className="px-5 py-4 text-sm font-bold harmony-text-primary">
                   {record.used_days || record.balance_days || 0} hari
                 </td>
                 <td className="px-5 py-4">
-                  <p className="mb-2 line-clamp-2 max-w-[260px] text-sm leading-6 text-[#6e6e73]">
+                  <p className="mb-2 line-clamp-2 max-w-[260px] text-sm leading-6 harmony-text-secondary">
                     {record.reason || record.notes || '-'}
                   </p>
                   <JobPendingPreview
@@ -2461,7 +2440,7 @@ function UnifiedApprovalQueue({
                   <button
                     type="button"
                     onClick={() => onPHLDetail(record)}
-                    className="inline-flex min-h-9 items-center gap-2 rounded-2xl bg-[#e8f2ff] px-4 text-xs font-bold text-[#0059b8]"
+                    className="inline-flex min-h-9 items-center gap-2 rounded-2xl bg-[#e8f2ff] px-4 text-xs font-bold harmony-text-link"
                   >
                     <FileText size={15} />
                     Detail
@@ -2507,7 +2486,7 @@ function UnifiedApprovalQueue({
                             ? 'Menunggu atasan'
                             : 'Menunggu proses'}
                         </span>
-                        <span className="rounded-full bg-[#f5f5f7] px-3 py-2 text-[11px] font-bold text-[#86868b]">
+                        <span className="rounded-full bg-[#f5f5f7] px-3 py-2 text-[11px] font-bold harmony-text-muted">
                           Audit terkunci
                         </span>
                       </>
@@ -2563,15 +2542,15 @@ function UnifiedDashboardSection({
     <details id={id} className="group border-t border-black/5">
       <summary className="flex cursor-pointer list-none items-center justify-between gap-4 p-5 transition hover:bg-[#f8f8fa] [&::-webkit-details-marker]:hidden">
         <div className="flex min-w-0 items-start gap-3">
-          <span className="mt-0.5 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#f5f5f7] text-[#1d1d1f]">
+          <span className="mt-0.5 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#f5f5f7] harmony-text-primary">
             {icon}
           </span>
           <div className="min-w-0">
-            <h3 className="font-bold text-[#1d1d1f]">{title}</h3>
-            <p className="mt-1 text-sm leading-6 text-[#6e6e73]">{description}</p>
+            <h3 className="font-bold harmony-text-primary">{title}</h3>
+            <p className="mt-1 text-sm leading-6 harmony-text-secondary">{description}</p>
           </div>
         </div>
-        <span className="inline-flex shrink-0 rounded-full bg-[#f5f5f7] px-3 py-2 text-xs font-bold text-[#6e6e73] group-open:bg-[#1d1d1f] group-open:text-white">
+        <span className="inline-flex shrink-0 rounded-full bg-[#f5f5f7] px-3 py-2 text-xs font-bold harmony-text-secondary group-open:bg-[#1d1d1f] group-open:text-white">
           <span className="group-open:hidden">Buka</span>
           <span className="hidden group-open:inline">Tutup</span>
         </span>
@@ -2658,14 +2637,14 @@ function LeaveBalanceLifecycleTab({
                 className="rounded-[26px] border border-black/5 bg-white p-4 shadow-sm"
               >
                 <div className="flex items-start gap-3">
-                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#e8f2ff] text-[#007aff]">
+                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#e8f2ff] harmony-text-link">
                     <UserRound size={18} />
                   </div>
                   <div className="min-w-0">
-                    <p className="font-bold text-[#1d1d1f]">
+                    <p className="font-bold harmony-text-primary">
                       {item.full_name || '-'}
                     </p>
-                    <p className="mt-1 text-xs text-[#6e6e73]">
+                    <p className="mt-1 text-xs harmony-text-secondary">
                       {item.employee_number || '-'} · {item.department || '-'}
                     </p>
                   </div>
@@ -2703,7 +2682,7 @@ function LeaveBalanceLifecycleTab({
                   />
                 </div>
 
-                <div className="mt-3 rounded-2xl bg-[#f5f5f7]/80 p-3 text-xs leading-5 text-[#6e6e73]">
+                <div className="mt-3 rounded-2xl bg-[#f5f5f7]/80 p-3 text-xs leading-5 harmony-text-secondary">
                   <p>
                     Matang terakhir: <strong>{formatDisplayDate(item.latest_matured_at || '')}</strong>
                   </p>
@@ -2721,7 +2700,7 @@ function LeaveBalanceLifecycleTab({
           <div className="hidden overflow-x-auto 2xl:block">
             <table className="min-w-[1580px] w-full border-collapse text-left text-[12px]">
               <thead>
-                <tr className="border-b border-black/5 bg-[#f5f5f7]/90 text-xs uppercase tracking-wide text-[#6e6e73]">
+                <tr className="border-b border-black/5 bg-[#f5f5f7]/90 text-xs uppercase tracking-wide harmony-text-secondary">
                   <th className="px-4 py-3">Karyawan</th>
                   <th className="px-4 py-3">Cuti Matang</th>
                   <th className="px-4 py-3">Postpone Aktif</th>
@@ -2741,23 +2720,23 @@ function LeaveBalanceLifecycleTab({
                     className="border-b border-black/5 hover:bg-[#f8f8fa]"
                   >
                     <td className="px-4 py-4 align-top">
-                      <p className="font-bold text-[#1d1d1f]">
+                      <p className="font-bold harmony-text-primary">
                         {item.full_name || '-'}
                       </p>
-                      <p className="mt-1 text-xs text-[#6e6e73]">
+                      <p className="mt-1 text-xs harmony-text-secondary">
                         {item.employee_number || '-'} · {item.department || '-'}
                       </p>
-                      <p className="text-xs text-[#86868b]">
+                      <p className="text-xs harmony-text-muted">
                         {item.position_name || '-'}
                       </p>
                     </td>
-                    <td className="px-4 py-4 align-top font-bold text-[#0059b8]">
+                    <td className="px-4 py-4 align-top font-bold harmony-text-link">
                       {formatNumber(item.annual_regular_days)} hari
                     </td>
-                    <td className="px-4 py-4 align-top font-bold text-[#7b2cbf]">
+                    <td className="px-4 py-4 align-top font-bold harmony-text-violet">
                       {formatNumber(item.postpone_active_days)} hari
                     </td>
-                    <td className="px-4 py-4 align-top font-semibold text-[#0059b8]">
+                    <td className="px-4 py-4 align-top font-semibold harmony-text-link">
                       {formatSignedNumber(item.postpone_manual_net_days)} hari
                     </td>
                     <td className="px-4 py-4 align-top">
@@ -2810,13 +2789,13 @@ function BalanceBox({
 }) {
   return (
     <div className="rounded-2xl bg-[#f5f5f7]/80 p-3">
-      <p className="text-[10px] font-bold uppercase tracking-wide text-[#86868b]">
+      <p className="text-[10px] font-bold uppercase tracking-wide harmony-text-muted">
         {label}
       </p>
       <p
         className={[
           'mt-1 text-sm',
-          strong ? 'font-bold text-green-700' : 'font-semibold text-[#1d1d1f]',
+          strong ? 'font-bold text-green-700' : 'font-semibold harmony-text-primary',
         ].join(' ')}
       >
         {value}
@@ -2934,11 +2913,11 @@ function PHLBalanceTab({
               />
             </td>
 
-            <td className="px-5 py-4 text-sm font-semibold text-[#1d1d1f]">
+            <td className="px-5 py-4 text-sm font-semibold harmony-text-primary">
               {formatDisplayDate(item.phl_date || '')}
             </td>
 
-            <td className="px-5 py-4 text-sm text-[#1d1d1f]">
+            <td className="px-5 py-4 text-sm harmony-text-primary">
               {formatDisplayDate(item.valid_from || item.phl_date || '')} - {formatDisplayDate(item.expired_at || '')}
             </td>
 
@@ -2954,7 +2933,7 @@ function PHLBalanceTab({
               <button
                 type="button"
                 onClick={() => onDetail(item)}
-                className="inline-flex min-h-9 items-center gap-2 rounded-2xl bg-[#f7edfc] px-4 text-xs font-bold text-[#7b2cbf]"
+                className="inline-flex min-h-9 items-center gap-2 rounded-2xl bg-[#f7edfc] px-4 text-xs font-bold harmony-text-violet"
               >
                 <FileText size={15} />
                 Detail
@@ -2963,7 +2942,7 @@ function PHLBalanceTab({
 
             <td className="px-5 py-4">
               {normalizeStatus(item.status) === 'approved' || Number(item.used_days || 0) > 0 ? (
-                <span className="rounded-full bg-[#f5f5f7] px-3 py-2 text-[11px] font-bold text-[#86868b]">
+                <span className="rounded-full bg-[#f5f5f7] px-3 py-2 text-[11px] font-bold harmony-text-muted">
                   Saldo terkunci
                 </span>
               ) : (
@@ -3104,7 +3083,7 @@ function PHLReconciliationTab({
                   tone="green"
                 />
 
-                <td className="px-5 py-4 text-sm font-semibold text-[#1d1d1f]">
+                <td className="px-5 py-4 text-sm font-semibold harmony-text-primary">
                   {item.manual_phl_balance === null ||
                   item.manual_phl_balance === undefined
                     ? '-'
@@ -3132,8 +3111,8 @@ function PHLReconciliationTab({
                   tone="orange"
                 />
 
-                <td className="px-5 py-4 text-sm leading-6 text-[#6e6e73]">
-                  <div className="font-semibold text-[#1d1d1f]">
+                <td className="px-5 py-4 text-sm leading-6 harmony-text-secondary">
+                  <div className="font-semibold harmony-text-primary">
                     {formatPHLNumber(item.total_earned_days)} earned
                   </div>
                   <div>
@@ -3141,8 +3120,8 @@ function PHLReconciliationTab({
                   </div>
                 </td>
 
-                <td className="px-5 py-4 text-sm leading-6 text-[#6e6e73]">
-                  <div className="font-semibold text-[#1d1d1f]">
+                <td className="px-5 py-4 text-sm leading-6 harmony-text-secondary">
+                  <div className="font-semibold harmony-text-primary">
                     {Number(item.approved_claim_count || 0)} approved
                   </div>
                   <div>
@@ -3150,8 +3129,8 @@ function PHLReconciliationTab({
                   </div>
                 </td>
 
-                <td className="px-5 py-4 text-sm leading-6 text-[#6e6e73]">
-                  <div className="font-semibold text-[#1d1d1f]">
+                <td className="px-5 py-4 text-sm leading-6 harmony-text-secondary">
+                  <div className="font-semibold harmony-text-primary">
                     {legacyCount} gap
                   </div>
                   <div>
@@ -3163,10 +3142,10 @@ function PHLReconciliationTab({
                   <PHLReconciliationBadge status={status} />
                 </td>
 
-                <td className="px-5 py-4 text-sm leading-6 text-[#6e6e73]">
+                <td className="px-5 py-4 text-sm leading-6 harmony-text-secondary">
                   {item.last_reviewed_at ? (
                     <>
-                      <div className="font-semibold text-[#1d1d1f]">
+                      <div className="font-semibold harmony-text-primary">
                         {new Date(item.last_reviewed_at).toLocaleString('id-ID')}
                       </div>
                       <div>{item.last_reviewed_by || '-'}</div>
@@ -3236,7 +3215,7 @@ function PHLReconciliationTab({
                   />
                 </td>
 
-                <td className="px-5 py-4 text-sm font-semibold text-[#1d1d1f]">
+                <td className="px-5 py-4 text-sm font-semibold harmony-text-primary">
                   {formatDisplayDate(item.phl_date || '')}
                 </td>
 
@@ -3248,8 +3227,8 @@ function PHLReconciliationTab({
                 />
                 <NumberCell value={item.tracking_gap_days || 0} tone="orange" />
 
-                <td className="px-5 py-4 text-sm leading-6 text-[#6e6e73]">
-                  <div className="font-semibold text-[#1d1d1f]">
+                <td className="px-5 py-4 text-sm leading-6 harmony-text-secondary">
+                  <div className="font-semibold harmony-text-primary">
                     {item.hr_approved_by || '-'}
                   </div>
                   <div>
@@ -3272,7 +3251,7 @@ function PHLReconciliationTab({
                   </span>
                 </td>
 
-                <td className="px-5 py-4 text-sm leading-6 text-[#6e6e73]">
+                <td className="px-5 py-4 text-sm leading-6 harmony-text-secondary">
                   {item.legacy_review_note || '-'}
                 </td>
 
@@ -3310,7 +3289,7 @@ function PHLReconciliationBadge({ status }: { status: string }) {
     },
   }[status] || {
     label: status || 'Belum Terdata',
-    className: 'bg-[#f5f5f7] text-[#6e6e73]',
+    className: 'bg-[#f5f5f7] harmony-text-secondary',
   }
 
   return (
@@ -3367,11 +3346,11 @@ function HistoryTab({
               />
             </td>
 
-            <td className="px-5 py-4 font-semibold text-[#1d1d1f]">
+            <td className="px-5 py-4 font-semibold harmony-text-primary">
               {item.leave_type || item.request_type || 'Cuti/Izin'}
             </td>
 
-            <td className="px-5 py-4 text-sm text-[#1d1d1f]">
+            <td className="px-5 py-4 text-sm harmony-text-primary">
               {formatDisplayDate(item.start_date || '')} - {formatDisplayDate(item.end_date || '')}
             </td>
 
@@ -3387,7 +3366,7 @@ function HistoryTab({
               <button
                 type="button"
                 onClick={() => onLeaveDetail(item)}
-                className="inline-flex min-h-9 items-center gap-2 rounded-2xl bg-[#e8f2ff] px-4 text-xs font-bold text-[#0059b8]"
+                className="inline-flex min-h-9 items-center gap-2 rounded-2xl bg-[#e8f2ff] px-4 text-xs font-bold harmony-text-link"
               >
                 <FileText size={15} />
                 Detail
@@ -3415,11 +3394,11 @@ function HistoryTab({
               />
             </td>
 
-            <td className="px-5 py-4 font-semibold text-[#1d1d1f]">
+            <td className="px-5 py-4 font-semibold harmony-text-primary">
               Klaim PHL
             </td>
 
-            <td className="px-5 py-4 text-sm text-[#1d1d1f]">
+            <td className="px-5 py-4 text-sm harmony-text-primary">
               {formatDisplayDate(item.phl_date || '')}
             </td>
 
@@ -3438,7 +3417,7 @@ function HistoryTab({
               <button
                 type="button"
                 onClick={() => onPHLDetail(item)}
-                className="inline-flex min-h-9 items-center gap-2 rounded-2xl bg-[#e8f2ff] px-4 text-xs font-bold text-[#0059b8]"
+                className="inline-flex min-h-9 items-center gap-2 rounded-2xl bg-[#e8f2ff] px-4 text-xs font-bold harmony-text-link"
               >
                 <FileText size={15} />
                 Detail
@@ -3449,7 +3428,7 @@ function HistoryTab({
               {['approved', 'cancelled', 'canceled'].includes(
                 normalizeStatus(item.hr_status || item.status)
               ) || Number(item.used_days || 0) > 0 ? (
-                <span className="rounded-full bg-[#f5f5f7] px-3 py-2 text-[11px] font-bold text-[#86868b]">
+                <span className="rounded-full bg-[#f5f5f7] px-3 py-2 text-[11px] font-bold harmony-text-muted">
                   Audit tersimpan
                 </span>
               ) : (
@@ -3669,11 +3648,11 @@ function DeleteConfirmModal({
           </div>
 
           <div className="rounded-[24px] border border-black/5 bg-[#f5f5f7]/80 p-4">
-            <p className="text-xs font-bold uppercase tracking-wide text-[#86868b]">
+            <p className="text-xs font-bold uppercase tracking-wide harmony-text-muted">
               Catatan
             </p>
 
-            <p className="mt-2 text-sm leading-6 text-[#1d1d1f]">
+            <p className="mt-2 text-sm leading-6 harmony-text-primary">
               Aksi ini tidak menggunakan pop-up browser, sehingga tampilan tetap profesional saat aplikasi sudah di-deploy.
             </p>
           </div>
@@ -3683,7 +3662,7 @@ function DeleteConfirmModal({
               type="button"
               onClick={onClose}
               disabled={processing}
-              className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-black/5 bg-white px-5 text-sm font-bold text-[#1d1d1f] shadow-sm transition hover:bg-[#f5f5f7] disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-black/5 bg-white px-5 text-sm font-bold harmony-text-primary shadow-sm transition hover:bg-[#f5f5f7] disabled:cursor-not-allowed disabled:opacity-60"
             >
               Batal
             </button>
@@ -4219,15 +4198,15 @@ function HandoverDetailBox({
   return (
     <div className="mt-5 rounded-[28px] border border-black/5 bg-[#f5f5f7]/80 p-5">
       <div className="mb-4 flex items-center gap-2">
-        <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#e8f2ff] text-[#007aff]">
+        <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#e8f2ff] harmony-text-link">
           <BriefcaseBusiness size={18} />
         </div>
 
         <div>
-          <h3 className="text-base font-semibold text-[#1d1d1f]">
+          <h3 className="text-base font-semibold harmony-text-primary">
             Job Pending / Serah Terima Pekerjaan
           </h3>
-          <p className="text-xs leading-5 text-[#6e6e73]">
+          <p className="text-xs leading-5 harmony-text-secondary">
             Informasi pekerjaan yang perlu diteruskan selama karyawan tidak hadir.
           </p>
         </div>
@@ -4240,25 +4219,25 @@ function HandoverDetailBox({
         />
 
         <div className="rounded-[20px] border border-black/5 bg-white p-4">
-          <p className="text-xs font-bold uppercase tracking-wide text-[#6e6e73]">
+          <p className="text-xs font-bold uppercase tracking-wide harmony-text-secondary">
             Detail Job Pending
           </p>
 
-          <p className="mt-2 whitespace-pre-line text-sm leading-6 text-[#1d1d1f]">
+          <p className="mt-2 whitespace-pre-line text-sm leading-6 harmony-text-primary">
             {detail || '-'}
           </p>
         </div>
 
         <div className="rounded-[20px] border border-black/5 bg-white p-4">
-          <p className="text-xs font-bold uppercase tracking-wide text-[#6e6e73]">
+          <p className="text-xs font-bold uppercase tracking-wide harmony-text-secondary">
             Ditujukan Kepada / Pengganti Sementara
           </p>
 
-          <p className="mt-2 text-sm font-semibold text-[#1d1d1f]">
+          <p className="mt-2 text-sm font-semibold harmony-text-primary">
             {handoverName || 'Nama pengganti belum terhubung'}
           </p>
 
-          <p className="mt-1 text-xs leading-5 text-[#6e6e73]">
+          <p className="mt-1 text-xs leading-5 harmony-text-secondary">
             {handoverMeta}
           </p>
         </div>
@@ -4361,7 +4340,7 @@ function JobPendingPreview({
 }) {
   if (!summary && !handoverName) {
     return (
-      <span className="text-xs font-semibold text-[#86868b]">
+      <span className="text-xs font-semibold harmony-text-muted">
         -
       </span>
     )
@@ -4369,11 +4348,11 @@ function JobPendingPreview({
 
   return (
     <div className="max-w-[240px] rounded-2xl bg-[#f5f5f7] px-3 py-2">
-      <p className="line-clamp-2 text-xs font-semibold leading-5 text-[#1d1d1f]">
+      <p className="line-clamp-2 text-xs font-semibold leading-5 harmony-text-primary">
         {summary || '-'}
       </p>
 
-      <p className="mt-1 line-clamp-1 text-[11px] leading-4 text-[#6e6e73]">
+      <p className="mt-1 line-clamp-1 text-[11px] leading-4 harmony-text-secondary">
         Ke: {handoverName || 'Nama pengganti belum terhubung'}
       </p>
     </div>
@@ -4389,11 +4368,11 @@ function ContentBox({
 }) {
   return (
     <div className="mt-5 rounded-[24px] border border-black/5 bg-[#f5f5f7]/70 p-5">
-      <p className="text-xs font-bold uppercase tracking-wide text-[#6e6e73]">
+      <p className="text-xs font-bold uppercase tracking-wide harmony-text-secondary">
         {title}
       </p>
 
-      <p className="mt-2 whitespace-pre-line text-sm leading-6 text-[#1d1d1f]">
+      <p className="mt-2 whitespace-pre-line text-sm leading-6 harmony-text-primary">
         {content}
       </p>
     </div>
@@ -4410,15 +4389,15 @@ function EmptyState({
   return (
     <div className="p-6">
       <div className="rounded-[28px] border border-dashed border-black/10 bg-[#f5f5f7]/70 p-8 text-center">
-        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-3xl bg-white text-[#007aff] shadow-sm">
+        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-3xl bg-white harmony-text-link shadow-sm">
           <FileText size={24} />
         </div>
 
-        <h3 className="mt-5 text-lg font-semibold text-[#1d1d1f]">
+        <h3 className="mt-5 text-lg font-semibold harmony-text-primary">
           {title}
         </h3>
 
-        <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-[#6e6e73]">
+        <p className="mx-auto mt-2 max-w-xl text-sm leading-6 harmony-text-secondary">
           {description}
         </p>
       </div>
@@ -4435,11 +4414,11 @@ function SectionIntro({
 }) {
   return (
     <div className="border-b border-black/5 p-6">
-      <h3 className="text-lg font-semibold text-[#1d1d1f]">
+      <h3 className="text-lg font-semibold harmony-text-primary">
         {title}
       </h3>
 
-      <p className="mt-1 text-sm leading-6 text-[#6e6e73]">
+      <p className="mt-1 text-sm leading-6 harmony-text-secondary">
         {description}
       </p>
     </div>
@@ -4467,15 +4446,15 @@ function DataTable({
     return (
       <div className="p-6">
         <div className="rounded-[28px] border border-dashed border-black/10 bg-[#f5f5f7]/70 p-8 text-center">
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-3xl bg-white text-[#007aff] shadow-sm">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-3xl bg-white harmony-text-link shadow-sm">
             <FileText size={24} />
           </div>
 
-          <h3 className="mt-5 text-lg font-semibold text-[#1d1d1f]">
+          <h3 className="mt-5 text-lg font-semibold harmony-text-primary">
             {emptyTitle}
           </h3>
 
-          <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-[#6e6e73]">
+          <p className="mx-auto mt-2 max-w-xl text-sm leading-6 harmony-text-secondary">
             {emptyDescription}
           </p>
         </div>
@@ -4490,7 +4469,7 @@ function DataTable({
         style={{ minWidth }}
       >
         <thead>
-          <tr className="border-b border-black/5 bg-[#f5f5f7]/90 text-xs uppercase tracking-wide text-[#6e6e73]">
+          <tr className="border-b border-black/5 bg-[#f5f5f7]/90 text-xs uppercase tracking-wide harmony-text-secondary">
             {headers.map((header) => (
               <th key={header} className="px-5 py-4 font-semibold">
                 {header}
@@ -4523,11 +4502,11 @@ function ModalShell({
       <div className="flex max-h-[92vh] w-full max-w-4xl flex-col overflow-hidden rounded-[32px] bg-white shadow-[0_30px_90px_rgba(0,0,0,0.24)]">
         <div className="flex items-start justify-between gap-4 border-b border-black/5 p-6">
           <div>
-            <h2 className="text-xl font-semibold text-[#1d1d1f]">
+            <h2 className="text-xl font-semibold harmony-text-primary">
               {title}
             </h2>
 
-            <p className="mt-1 text-sm leading-6 text-[#6e6e73]">
+            <p className="mt-1 text-sm leading-6 harmony-text-secondary">
               {description}
             </p>
           </div>
@@ -4535,7 +4514,7 @@ function ModalShell({
           <button
             type="button"
             onClick={onClose}
-            className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#f5f5f7] text-[#1d1d1f]"
+            className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#f5f5f7] harmony-text-primary"
           >
             <X size={18} />
           </button>
@@ -4582,16 +4561,16 @@ function MiniPanel({
     <div className="rounded-[24px] border border-black/5 bg-white/70 p-5 shadow-sm">
       <div className="flex items-center justify-between gap-4">
         <div>
-          <p className="text-sm text-[#6e6e73]">
+          <p className="text-sm harmony-text-secondary">
             {title}
           </p>
 
-          <h4 className="mt-2 text-xl font-semibold text-[#1d1d1f]">
+          <h4 className="mt-2 text-xl font-semibold harmony-text-primary">
             {value}
           </h4>
         </div>
 
-        <div className="rounded-2xl bg-[#e8f2ff] p-3 text-[#007aff]">
+        <div className="rounded-2xl bg-[#e8f2ff] p-3 harmony-text-link">
           {icon}
         </div>
       </div>
@@ -4608,16 +4587,16 @@ function EmployeeCell({
 }) {
   return (
     <div className="flex items-center gap-3">
-      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#f5f5f7] text-[#007aff]">
+      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#f5f5f7] harmony-text-link">
         <UserRound size={18} />
       </div>
 
       <div className="min-w-0">
-        <p className="truncate font-semibold text-[#1d1d1f]">
+        <p className="truncate font-semibold harmony-text-primary">
           {name}
         </p>
 
-        <p className="mt-1 line-clamp-1 text-xs text-[#6e6e73]">
+        <p className="mt-1 line-clamp-1 text-xs harmony-text-secondary">
           {meta}
         </p>
       </div>
@@ -4641,7 +4620,7 @@ function SmallActionButton({
   const className = {
     green: 'bg-green-50 text-green-700 hover:bg-green-100',
     red: 'bg-red-50 text-red-700 hover:bg-red-100',
-    blue: 'bg-[#e8f2ff] text-[#0059b8] hover:bg-blue-100',
+    blue: 'bg-[#e8f2ff] harmony-text-link hover:bg-blue-100',
     orange: 'bg-orange-50 text-orange-700 hover:bg-orange-100',
   }[tone]
 
@@ -4673,7 +4652,7 @@ function PHLBalanceBox({
   const className = {
     green: 'bg-green-50 text-green-700',
     orange: 'bg-orange-50 text-orange-700',
-    purple: 'bg-[#f7edfc] text-[#7b2cbf]',
+    purple: 'bg-[#f7edfc] harmony-text-violet',
   }[tone]
 
   return (
@@ -4698,8 +4677,8 @@ function NumberCell({
   const className = {
     green: 'bg-green-50 text-green-700',
     orange: 'bg-orange-50 text-orange-700',
-    purple: 'bg-[#f7edfc] text-[#7b2cbf]',
-    blue: 'bg-[#e8f2ff] text-[#007aff]',
+    purple: 'bg-[#f7edfc] harmony-text-violet',
+    blue: 'bg-[#e8f2ff] harmony-text-link',
   }[tone]
 
   return (
@@ -4720,11 +4699,11 @@ function InfoBox({
 }) {
   return (
     <div className="rounded-[20px] border border-black/5 bg-white p-4">
-      <p className="text-xs font-bold uppercase tracking-wide text-[#6e6e73]">
+      <p className="text-xs font-bold uppercase tracking-wide harmony-text-secondary">
         {label}
       </p>
 
-      <p className="mt-2 whitespace-pre-line text-sm font-semibold leading-6 text-[#1d1d1f]">
+      <p className="mt-2 whitespace-pre-line text-sm font-semibold leading-6 harmony-text-primary">
         {value}
       </p>
     </div>
@@ -4739,7 +4718,7 @@ function WorkflowTextBadge({ label }: { label: string }) {
       : normalized.includes('ditolak') || normalized.includes('dibatalkan')
         ? 'bg-red-50 text-red-700'
         : normalized.includes('hr')
-          ? 'bg-[#e8f2ff] text-[#0059b8]'
+          ? 'bg-[#e8f2ff] harmony-text-link'
           : 'bg-orange-50 text-orange-700'
 
   return (
@@ -4769,7 +4748,7 @@ function StatusBadge({
             normalized === 'waiting_supervisor' ||
             normalized === 'waiting_hr'
           ? 'bg-orange-50 text-orange-700'
-          : 'bg-[#f5f5f7] text-[#6e6e73]'
+          : 'bg-[#f5f5f7] harmony-text-secondary'
 
   return (
     <span className={`inline-flex rounded-full px-3 py-1 text-xs font-bold ${className}`}>

@@ -1,5 +1,7 @@
 'use client'
 
+
+import { readErrorMessage } from '@/lib/error-utils'
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { FileText, Plus } from 'lucide-react'
@@ -17,12 +19,16 @@ export default function EmployeeClaimsPage() {
       const data = await remedFetch<{ claims: RemedClaim[] }>('/api/remed/claims')
       setClaims(data.claims || [])
       setMessage('')
-    } catch (error: any) {
-      setMessage(error?.message || 'Gagal memuat klaim.')
+    } catch (error: unknown) {
+      setMessage(readErrorMessage(error) || 'Gagal memuat klaim.')
     }
   }
 
-  useEffect(() => { void load() }, [])
+  useEffect(() => {
+    let active = true
+    queueMicrotask(() => { if (active) void load() })
+    return () => { active = false }
+  }, [])
 
   async function cancel(claim: RemedClaim) {
     const reason = window.prompt(
@@ -52,8 +58,8 @@ export default function EmployeeClaimsPage() {
           `Klaim berhasil dibatalkan, tetapi email pembatalan belum terkirim lengkap: ${notification.message || 'cek konfigurasi notifikasi.'}`,
         )
       }
-    } catch (error: any) {
-      window.alert(error?.message || 'Gagal membatalkan klaim.')
+    } catch (error: unknown) {
+      window.alert(readErrorMessage(error) || 'Gagal membatalkan klaim.')
     }
   }
 

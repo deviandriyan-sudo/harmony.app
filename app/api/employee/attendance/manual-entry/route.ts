@@ -1,3 +1,5 @@
+
+import { readErrorMessage } from '@/lib/error-utils'
 import { NextRequest, NextResponse } from "next/server";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
@@ -73,7 +75,7 @@ function getPeriodRange(periodMonth: string) {
   };
 }
 
-function isPeriodReadOnly(confirmation: any) {
+function isPeriodReadOnly(confirmation: { supervisor_status?: string | null; hr_status?: string | null; is_locked?: boolean | null } | null) {
   const supervisor = normalize(confirmation?.supervisor_status);
   const hr = normalize(confirmation?.hr_status);
 
@@ -86,7 +88,7 @@ function isPeriodReadOnly(confirmation: any) {
   );
 }
 
-function isRowReadOnly(log: any) {
+function isRowReadOnly(log: { supervisor_approval_status?: string | null; hr_approval_status?: string | null; hr_final_status?: string | null; is_locked?: boolean | null } | null) {
   const supervisor = normalize(log?.supervisor_approval_status);
   const hrApproval = normalize(log?.hr_approval_status);
   const hrFinal = normalize(log?.hr_final_status);
@@ -173,7 +175,7 @@ async function resolveIdentity(
     };
   }
 
-  let appUser: any = null;
+  let appUser: { employee_id?: string | null; is_active?: boolean | null; email?: string | null } | null = null;
 
   const byId = await admin
     .from("app_users")
@@ -446,13 +448,13 @@ export async function GET(request: NextRequest) {
         },
       },
     );
-  } catch (error: any) {
+  } catch (error: unknown) {
     return NextResponse.json(
       {
         success: false,
 
         error:
-          error?.message ||
+          readErrorMessage(error) ||
           "Terjadi kesalahan saat membaca absensi manual.",
       },
       {
@@ -880,7 +882,7 @@ export async function POST(request: NextRequest) {
         "employee_live_manual";
     }
 
-    let saved: any = null;
+    let saved: { id?: string } | null = null;
 
     if (existing?.id) {
       const {
@@ -1022,13 +1024,13 @@ export async function POST(request: NextRequest) {
         },
       },
     );
-  } catch (error: any) {
+  } catch (error: unknown) {
     return NextResponse.json(
       {
         success: false,
 
         error:
-          error?.message ||
+          readErrorMessage(error) ||
           "Terjadi kesalahan saat menyimpan absensi manual.",
       },
       {

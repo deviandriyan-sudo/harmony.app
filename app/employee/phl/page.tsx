@@ -1,20 +1,10 @@
 'use client'
 
+
+import { readErrorMessage } from '@/lib/error-utils'
 import { useEffect, useMemo, useState } from 'react'
 import type { FormEvent, ReactNode } from 'react'
-import {
-  AlertTriangle,
-  CalendarDays,
-  CheckCircle2,
-  Clock3,
-  FilePlus2,
-  FileText,
-  Loader2,
-  RefreshCcw,
-  ShieldCheck,
-  WalletCards,
-  XCircle,
-} from 'lucide-react'
+import { AlertTriangle, CheckCircle2, Clock3, FilePlus2, FileText, Loader2, RefreshCcw, ShieldCheck, WalletCards, XCircle } from 'lucide-react'
 
 import { HarmonyPendingAttachmentPicker } from '@/components/attachments/HarmonyAttachments'
 import { Topbar } from '@/components/layout/Topbar'
@@ -72,8 +62,8 @@ export default function EmployeePHLPage() {
       ])
       setRequests(requestRows)
       if (!balanceResult.error) setBalance((balanceResult.data || null) as BalanceSummary | null)
-    } catch (error: any) {
-      setMessage({ type: 'error', text: error?.message || 'Data PHL gagal dimuat.' })
+    } catch (error: unknown) {
+      setMessage({ type: 'error', text: readErrorMessage(error) || 'Data PHL gagal dimuat.' })
     } finally {
       setLoading(false)
     }
@@ -117,8 +107,8 @@ export default function EmployeePHLPage() {
           : `Pengajuan PHL tersimpan dan langsung dikirim ke atasan.${attendanceNote}`,
       })
       await load()
-    } catch (error: any) {
-      setMessage({ type: 'error', text: error?.message || 'Pengajuan PHL gagal dikirim.' })
+    } catch (error: unknown) {
+      setMessage({ type: 'error', text: readErrorMessage(error) || 'Pengajuan PHL gagal dikirim.' })
     } finally {
       setSubmitting(false)
     }
@@ -131,8 +121,8 @@ export default function EmployeePHLPage() {
       await cancelPHLWorkRequest(item.id, note)
       setMessage({ type: 'success', text: 'Pengajuan PHL berhasil dibatalkan.' })
       await load()
-    } catch (error: any) {
-      setMessage({ type: 'error', text: error?.message || 'Pengajuan PHL gagal dibatalkan.' })
+    } catch (error: unknown) {
+      setMessage({ type: 'error', text: readErrorMessage(error) || 'Pengajuan PHL gagal dibatalkan.' })
     }
   }
 
@@ -182,12 +172,12 @@ export default function EmployeePHLPage() {
         <div className="grid gap-6 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
           <form onSubmit={handleSubmit} className="harmony-card p-5 sm:p-6">
             <div className="mb-5 flex items-start gap-3">
-              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#e8f2ff] text-[#007aff]">
+              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#e8f2ff] harmony-text-link">
                 <FilePlus2 size={20} />
               </div>
               <div>
-                <h2 className="text-lg font-semibold text-[#1d1d1f]">Ajukan PHL</h2>
-                <p className="mt-1 text-sm leading-6 text-[#6e6e73]">Weekday, weekend, maupun hari libur diperbolehkan. Pengajuan periode lama tetap bisa dilakukan selama belum melewati 90 hari. Jika absensi lama belum memiliki clock-in/out, jam pada form + Surat Tugas akan diverifikasi atasan dan otomatis disinkronkan ke absensi setelah approval.</p>
+                <h2 className="text-lg font-semibold harmony-text-primary">Ajukan PHL</h2>
+                <p className="mt-1 text-sm leading-6 harmony-text-secondary">Weekday, weekend, maupun hari libur diperbolehkan. Pengajuan periode lama tetap bisa dilakukan selama belum melewati 90 hari. Jika absensi lama belum memiliki clock-in/out, jam pada form + Surat Tugas akan diverifikasi atasan dan otomatis disinkronkan ke absensi setelah approval.</p>
               </div>
             </div>
 
@@ -265,23 +255,23 @@ export default function EmployeePHLPage() {
           <div className="harmony-card overflow-hidden p-0">
             <div className="flex items-center justify-between gap-3 border-b border-black/5 p-5 sm:p-6">
               <div>
-                <h2 className="text-lg font-semibold text-[#1d1d1f]">Riwayat Pengajuan</h2>
-                <p className="mt-1 text-sm text-[#6e6e73]">Saldo otomatis bertambah setelah status Approved.</p>
+                <h2 className="text-lg font-semibold harmony-text-primary">Riwayat Pengajuan</h2>
+                <p className="mt-1 text-sm harmony-text-secondary">Saldo otomatis bertambah setelah status Approved.</p>
               </div>
               <button
                 type="button"
                 onClick={() => void load()}
                 disabled={loading}
-                className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-[#f5f5f7] text-[#007aff] disabled:opacity-50"
+                className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-[#f5f5f7] harmony-text-link disabled:opacity-50"
               >
                 <RefreshCcw size={18} className={loading ? 'animate-spin' : ''} />
               </button>
             </div>
 
             {loading ? (
-              <div className="flex items-center gap-3 p-6 text-sm text-[#6e6e73]"><Loader2 size={18} className="animate-spin" />Memuat pengajuan...</div>
+              <div className="flex items-center gap-3 p-6 text-sm harmony-text-secondary"><Loader2 size={18} className="animate-spin" />Memuat pengajuan...</div>
             ) : requests.length === 0 ? (
-              <div className="p-8 text-center text-sm text-[#86868b]">Belum ada pengajuan PHL.</div>
+              <div className="p-8 text-center text-sm harmony-text-muted">Belum ada pengajuan PHL.</div>
             ) : (
               <div className="divide-y divide-black/5">
                 {requests.map((item) => (
@@ -290,11 +280,11 @@ export default function EmployeePHLPage() {
                       <div className="min-w-0">
                         <div className="flex flex-wrap items-center gap-2">
                           <StatusBadge status={item.status} />
-                          <span className="rounded-full bg-[#f5f5f7] px-3 py-1 text-xs font-bold text-[#6e6e73]">{dayTypeLabel(item.work_day_type)}</span>
+                          <span className="rounded-full bg-[#f5f5f7] px-3 py-1 text-xs font-bold harmony-text-secondary">{dayTypeLabel(item.work_day_type)}</span>
                           {item.origin === 'legacy_attendance' && <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-bold text-amber-700">Migrasi Absensi Lama</span>}
                         </div>
-                        <h3 className="mt-3 text-base font-semibold text-[#1d1d1f]">{item.work_purpose}</h3>
-                        <p className="mt-2 text-sm text-[#6e6e73]">{formatDate(item.work_date)} · {item.work_start_time.slice(0, 5)}–{item.work_end_time.slice(0, 5)}</p>
+                        <h3 className="mt-3 text-base font-semibold harmony-text-primary">{item.work_purpose}</h3>
+                        <p className="mt-2 text-sm harmony-text-secondary">{formatDate(item.work_date)} · {item.work_start_time.slice(0, 5)}–{item.work_end_time.slice(0, 5)}</p>
                       </div>
                       {item.status === 'pending_supervisor' && (
                         <button
@@ -321,7 +311,7 @@ export default function EmployeePHLPage() {
                             href={attachment.signed_url || '#'}
                             target="_blank"
                             rel="noreferrer"
-                            className="inline-flex items-center gap-2 rounded-xl bg-[#f5f5f7] px-3 py-2 text-xs font-bold text-[#0059b8]"
+                            className="inline-flex items-center gap-2 rounded-xl bg-[#f5f5f7] px-3 py-2 text-xs font-bold harmony-text-link"
                           >
                             <FileText size={14} /> {attachment.file_name}
                           </a>
@@ -330,7 +320,7 @@ export default function EmployeePHLPage() {
                     )}
 
                     {item.supervisor_note && (
-                      <p className="mt-4 rounded-2xl bg-[#f5f5f7] p-3 text-xs leading-5 text-[#6e6e73]">Catatan atasan: <strong>{item.supervisor_note}</strong></p>
+                      <p className="mt-4 rounded-2xl bg-[#f5f5f7] p-3 text-xs leading-5 harmony-text-secondary">Catatan atasan: <strong>{item.supervisor_note}</strong></p>
                     )}
                     {item.status === 'approved' && item.expired_at && (
                       <p className="mt-3 text-xs font-semibold text-green-700">Saldo berlaku sampai {formatDate(item.expired_at)}.</p>
@@ -358,7 +348,7 @@ function Metric({ label, value }: { label: string; value: string }) {
 function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
     <label className="block">
-      <span className="mb-2 block text-xs font-bold uppercase tracking-wide text-[#86868b]">{label}</span>
+      <span className="mb-2 block text-xs font-bold uppercase tracking-wide harmony-text-muted">{label}</span>
       {children}
     </label>
   )
@@ -367,8 +357,8 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
 function Info({ label, value, icon }: { label: string; value: string; icon: ReactNode }) {
   return (
     <div className="rounded-2xl bg-[#f5f5f7] p-3">
-      <div className="flex items-center gap-2 text-[#007aff]">{icon}<span className="text-[11px] font-bold uppercase tracking-wide text-[#86868b]">{label}</span></div>
-      <p className="mt-2 text-sm font-bold text-[#1d1d1f]">{value}</p>
+      <div className="flex items-center gap-2 harmony-text-link">{icon}<span className="text-[11px] font-bold uppercase tracking-wide harmony-text-muted">{label}</span></div>
+      <p className="mt-2 text-sm font-bold harmony-text-primary">{value}</p>
     </div>
   )
 }

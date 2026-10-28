@@ -1,5 +1,7 @@
 'use client'
 
+
+import { readErrorMessage } from '@/lib/error-utils'
 import {
   useEffect,
   useMemo,
@@ -729,13 +731,13 @@ async function notifyPostponeDecisionByEmail({
       message:
         `Notifikasi email diproses untuk ${recipientEmail}.`,
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     return {
       success:
         false,
 
       message:
-        error?.message ||
+        readErrorMessage(error) ||
         'Email notifikasi gagal dikirim.',
     }
   }
@@ -1011,7 +1013,7 @@ export default function HRLeavePostponePage() {
           []
         ) as LeavePostponeRequest[],
       )
-    } catch (error: any) {
+    } catch (error: unknown) {
       setMessage({
         type:
           'error',
@@ -1138,7 +1140,7 @@ export default function HRLeavePostponePage() {
       })
 
       await fetchData()
-    } catch (error: any) {
+    } catch (error: unknown) {
       setMessage({
         type:
           'error',
@@ -1272,7 +1274,7 @@ export default function HRLeavePostponePage() {
       })
 
       await fetchData()
-    } catch (error: any) {
+    } catch (error: unknown) {
       setMessage({
         type:
           'error',
@@ -1402,7 +1404,7 @@ export default function HRLeavePostponePage() {
       })
 
       await fetchData()
-    } catch (error: any) {
+    } catch (error: unknown) {
       setMessage({
         type:
           'error',
@@ -1507,12 +1509,12 @@ export default function HRLeavePostponePage() {
           <div className="border-b border-slate-100 p-5 sm:p-6">
             <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
               <div>
-                <h2 className="text-lg font-bold text-[#1d1d1f]">
+                <h2 className="text-lg font-bold harmony-text-primary">
                   Daftar Pengajuan
                   Postpone
                 </h2>
 
-                <p className="mt-1 text-sm leading-6 text-[#6e6e73]">
+                <p className="mt-1 text-sm leading-6 harmony-text-secondary">
                   HR hanya bisa final
                   approve setelah
                   seluruh approval
@@ -1649,7 +1651,7 @@ export default function HRLeavePostponePage() {
             </div>
           ) : filteredPostpones.length ===
             0 ? (
-            <div className="p-10 text-center text-sm text-[#6e6e73]">
+            <div className="p-10 text-center text-sm harmony-text-secondary">
               Data postpone cuti
               tidak ditemukan.
             </div>
@@ -1781,11 +1783,11 @@ function SummaryCard({
     <div className="rounded-[24px] border border-black/5 bg-white p-5 shadow-sm">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <p className="text-xs font-bold uppercase tracking-wide text-[#6e6e73]">
+          <p className="text-xs font-bold uppercase tracking-wide harmony-text-secondary">
             {title}
           </p>
 
-          <p className="mt-2 text-2xl font-black text-[#1d1d1f]">
+          <p className="mt-2 text-2xl font-black harmony-text-primary">
             {value}
           </p>
         </div>
@@ -1870,12 +1872,12 @@ function PostponeRow({
   return (
     <tr className="border-b border-slate-100 align-top transition hover:bg-slate-50">
       <td className="px-5 py-4">
-        <div className="font-bold text-[#1d1d1f]">
+        <div className="font-bold harmony-text-primary">
           {item.full_name ||
             '-'}
         </div>
 
-        <div className="mt-1 text-xs text-[#6e6e73]">
+        <div className="mt-1 text-xs harmony-text-secondary">
           {item.employee_number ||
             '-'}{' '}
           ·{' '}
@@ -1892,14 +1894,14 @@ function PostponeRow({
       </td>
 
       <td className="px-5 py-4">
-        <div className="text-sm font-semibold text-[#1d1d1f]">
+        <div className="text-sm font-semibold harmony-text-primary">
           End:{' '}
           {formatDate(
             item.old_cycle_end,
           )}
         </div>
 
-        <div className="mt-1 text-xs text-[#6e6e73]">
+        <div className="mt-1 text-xs harmony-text-secondary">
           Deadline:{' '}
           {formatDate(
             item.postpone_deadline,
@@ -1924,7 +1926,7 @@ function PostponeRow({
       </td>
 
       <td className="px-5 py-4">
-        <div className="mb-1 text-xs text-[#6e6e73]">
+        <div className="mb-1 text-xs harmony-text-secondary">
           {item.supervisor_1 ||
             '-'}
         </div>
@@ -1937,7 +1939,7 @@ function PostponeRow({
       </td>
 
       <td className="px-5 py-4">
-        <div className="mb-1 text-xs text-[#6e6e73]">
+        <div className="mb-1 text-xs harmony-text-secondary">
           {item.supervisor_2 ||
             '-'}
         </div>
@@ -2104,12 +2106,12 @@ function PostponeMobileCard({
     <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="font-bold text-[#1d1d1f]">
+          <p className="font-bold harmony-text-primary">
             {item.full_name ||
               '-'}
           </p>
 
-          <p className="mt-1 text-xs text-[#6e6e73]">
+          <p className="mt-1 text-xs harmony-text-secondary">
             {item.employee_number ||
               '-'}{' '}
             ·{' '}

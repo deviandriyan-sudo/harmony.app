@@ -134,7 +134,7 @@ export async function getRemedSignatureManagement(admin: SupabaseClient) {
   for (const row of (profiles || []) as RemedSignatureProfileRow[]) profileMap.set(row.employee_id, row)
 
   const rows = await Promise.all(
-    (employees || []).map(async (employee: any) => {
+    (employees || []).map(async (employee) => {
       const profile = profileMap.get(employee.id) || null
       const resolved = await createSignatureUrl(admin, profile)
       return {

@@ -1,5 +1,7 @@
 'use client'
 
+
+import { readErrorMessage } from '@/lib/error-utils'
 import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
 import {
@@ -65,9 +67,9 @@ export default function HRAttendanceSyncPage() {
   const [dataset, setDataset] = useState<AttendanceReportingDataset | null>(null)
   const [audits, setAudits] = useState<SyncAuditRow[]>([])
   const [loading, setLoading] = useState(true)
-  const [reconciling, setReconciling] = useState(false)
+  const [reconciling] = useState(false)
   const [message, setMessage] = useState<SyncMessage | null>(null)
-  const [lastResult, setLastResult] = useState<ReconcileResult | null>(null)
+  const [, setLastResult] = useState<ReconcileResult | null>(null)
   const [auditAvailable, setAuditAvailable] = useState(true)
 
   const range = useMemo(() => getCutoffRange(periodMonth), [periodMonth])
@@ -145,12 +147,12 @@ export default function HRAttendanceSyncPage() {
         setAuditAvailable(true)
         setAudits((auditResult.data || []) as SyncAuditRow[])
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       setDataset(null)
       setAudits([])
       setMessage({
         type: 'error',
-        text: error?.message || 'Data sinkronisasi gagal dibaca.',
+        text: readErrorMessage(error) || 'Data sinkronisasi gagal dibaca.',
       })
     } finally {
       if (showLoading) setLoading(false)
@@ -229,8 +231,8 @@ export default function HRAttendanceSyncPage() {
                 <ShieldCheck size={20} />
               </div>
               <div>
-                <h2 className="text-lg font-bold text-[#1d1d1f]">Alur normal sekarang</h2>
-                <p className="mt-1 text-sm leading-6 text-[#6e6e73]">
+                <h2 className="text-lg font-bold harmony-text-primary">Alur normal sekarang</h2>
+                <p className="mt-1 text-sm leading-6 harmony-text-secondary">
                   HR tidak perlu membuka halaman ini setiap periode. Auto Sync berjalan mengikuti approval/reversal sumber data.
                 </p>
               </div>
@@ -262,8 +264,8 @@ export default function HRAttendanceSyncPage() {
                 <RotateCcw size={20} />
               </div>
               <div>
-                <h2 className="text-lg font-bold text-[#1d1d1f]">Recovery Tool</h2>
-                <p className="mt-1 text-sm leading-6 text-[#6e6e73]">
+                <h2 className="text-lg font-bold harmony-text-primary">Recovery Tool</h2>
+                <p className="mt-1 text-sm leading-6 harmony-text-secondary">
                   Recovery periode lama tidak lagi menjalankan Auto-PHL. Saldo PHL baru hanya boleh berasal dari pengajuan PHL terpisah yang disetujui atasan.
                 </p>
               </div>
@@ -287,7 +289,7 @@ export default function HRAttendanceSyncPage() {
               type="button"
               onClick={() => fetchData()}
               disabled={reconciling || loading}
-              className="mt-3 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-[18px] border border-black/10 bg-white px-5 text-sm font-bold text-[#1d1d1f] disabled:opacity-50"
+              className="mt-3 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-[18px] border border-black/10 bg-white px-5 text-sm font-bold harmony-text-primary disabled:opacity-50"
             >
               <RefreshCcw size={17} /> Refresh Monitoring
             </button>
@@ -305,28 +307,28 @@ export default function HRAttendanceSyncPage() {
         <section className="harmony-card overflow-hidden">
           <div className="flex flex-col gap-3 border-b border-black/5 p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
             <div>
-              <h2 className="text-lg font-bold text-[#1d1d1f]">Audit Auto Sync</h2>
-              <p className="mt-1 text-sm text-[#6e6e73]">
+              <h2 className="text-lg font-bold harmony-text-primary">Audit Auto Sync</h2>
+              <p className="mt-1 text-sm harmony-text-secondary">
                 30 aktivitas terbaru pada periode {range.label}.
               </p>
             </div>
-            <div className="inline-flex items-center gap-2 rounded-full bg-[#f5f5f7] px-3 py-2 text-xs font-bold text-[#6e6e73]">
+            <div className="inline-flex items-center gap-2 rounded-full bg-[#f5f5f7] px-3 py-2 text-xs font-bold harmony-text-secondary">
               <ShieldCheck size={15} /> {audits.length} event
             </div>
           </div>
 
           {loading ? (
-            <div className="flex items-center gap-3 p-6 text-sm text-[#6e6e73]">
+            <div className="flex items-center gap-3 p-6 text-sm harmony-text-secondary">
               <Loader2 size={18} className="animate-spin" /> Memuat monitoring...
             </div>
           ) : audits.length === 0 ? (
-            <div className="p-8 text-center text-sm leading-6 text-[#6e6e73]">
+            <div className="p-8 text-center text-sm leading-6 harmony-text-secondary">
               Belum ada audit pada periode ini. Ini normal jika migration baru dipasang dan belum ada approval/recovery baru.
             </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="min-w-[980px] w-full text-left text-sm">
-                <thead className="bg-[#f5f5f7] text-[11px] uppercase tracking-wide text-[#86868b]">
+                <thead className="bg-[#f5f5f7] text-[11px] uppercase tracking-wide harmony-text-muted">
                   <tr>
                     <th className="px-5 py-3">Waktu</th>
                     <th className="px-5 py-3">Source</th>
@@ -339,12 +341,12 @@ export default function HRAttendanceSyncPage() {
                 <tbody className="divide-y divide-black/5">
                   {audits.map((audit) => (
                     <tr key={audit.id} className="align-top">
-                      <td className="whitespace-nowrap px-5 py-4 text-xs text-[#6e6e73]">
+                      <td className="whitespace-nowrap px-5 py-4 text-xs harmony-text-secondary">
                         {formatDateTime(audit.created_at)}
                       </td>
                       <td className="px-5 py-4">
-                        <div className="font-bold text-[#1d1d1f]">{audit.source_table || '-'}</div>
-                        <div className="mt-1 max-w-[190px] truncate text-[11px] text-[#86868b]">
+                        <div className="font-bold harmony-text-primary">{audit.source_table || '-'}</div>
+                        <div className="mt-1 max-w-[190px] truncate text-[11px] harmony-text-muted">
                           {audit.source_id || audit.employee_id || '-'}
                         </div>
                       </td>
@@ -354,10 +356,10 @@ export default function HRAttendanceSyncPage() {
                       <td className="px-5 py-4">
                         <ResultPill value={audit.result_status} />
                       </td>
-                      <td className="max-w-[360px] px-5 py-4 text-xs leading-5 text-[#6e6e73]">
+                      <td className="max-w-[360px] px-5 py-4 text-xs leading-5 harmony-text-secondary">
                         {audit.message || '-'}
                       </td>
-                      <td className="px-5 py-4 text-xs text-[#6e6e73]">
+                      <td className="px-5 py-4 text-xs harmony-text-secondary">
                         {audit.actor_email || 'System'}
                       </td>
                     </tr>
@@ -412,8 +414,8 @@ function Metric({
 }) {
   return (
     <div className="rounded-[22px] border border-black/5 bg-white p-5 shadow-sm">
-      <p className="text-[10px] font-bold uppercase tracking-wide text-[#86868b]">{label}</p>
-      <p className={`mt-2 text-3xl font-bold ${warning ? 'text-orange-600' : 'text-[#1d1d1f]'}`}>
+      <p className="text-[10px] font-bold uppercase tracking-wide harmony-text-muted">{label}</p>
+      <p className={`mt-2 text-3xl font-bold ${warning ? 'text-orange-600' : 'harmony-text-primary'}`}>
         {value}
       </p>
     </div>
@@ -426,32 +428,15 @@ function FlowRow({ title, text }: { title: string; text: string }) {
       <div className="flex items-start gap-3">
         <CheckCircle2 size={17} className="mt-0.5 shrink-0 text-emerald-600" />
         <div>
-          <p className="text-sm font-bold text-[#1d1d1f]">{title}</p>
-          <p className="mt-1 text-xs leading-5 text-[#6e6e73]">{text}</p>
+          <p className="text-sm font-bold harmony-text-primary">{title}</p>
+          <p className="mt-1 text-xs leading-5 harmony-text-secondary">{text}</p>
         </div>
       </div>
     </div>
   )
 }
 
-function ResultLine({
-  label,
-  value,
-  error,
-}: {
-  label: string
-  value?: number
-  error?: number
-}) {
-  return (
-    <div className="flex items-center justify-between gap-4">
-      <span>{label}</span>
-      <span className="font-bold">
-        {value ?? 0} processed · {error ?? 0} error
-      </span>
-    </div>
-  )
-}
+
 
 function MessageBox({ type, text }: SyncMessage) {
   const className =
@@ -495,11 +480,7 @@ function normalize(value: unknown) {
   return String(value || '').trim().toLowerCase()
 }
 
-function isApproved(value: unknown) {
-  return ['approved', 'approve', 'finalized', 'final', 'hr_approved', 'disetujui'].includes(
-    normalize(value),
-  )
-}
+
 
 function formatDateTime(value?: string | null) {
   if (!value) return '-'

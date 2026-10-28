@@ -1,39 +1,11 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+
+import { readErrorMessage } from '@/lib/error-utils'
+import { useEffectEvent, useEffect, useMemo, useState } from 'react'
 import type { FormEvent, ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import {
-  BadgeCheck,
-  Briefcase,
-  Building2,
-  CalendarClock,
-  Clock3,
-  History,
-  Eye,
-  Fingerprint,
-  GitBranch,
-  HeartHandshake,
-  Mail,
-  Loader2,
-  MapPin,
-  Minus,
-  Pencil,
-  Plus,
-  Power,
-  RefreshCcw,
-  Save,
-  Search,
-  ShieldCheck,
-  Sparkles,
-  Trash2,
-  UserCheck,
-  UserPlus,
-  UserRound,
-  Users,
-  WalletCards,
-  X,
-} from 'lucide-react'
+import { BadgeCheck, Briefcase, Building2, CalendarClock, Clock3, History, Eye, Fingerprint, GitBranch, HeartHandshake, Mail, Loader2, MapPin, Minus, Pencil, Plus, Power, RefreshCcw, Save, Search, ShieldCheck, Sparkles, Trash2, UserPlus, UserRound, Users, WalletCards, X } from 'lucide-react'
 
 import { Topbar } from '@/components/layout/Topbar'
 import {
@@ -71,6 +43,18 @@ type Employee = {
   updated_at?: string | null
 }
 
+type MasterSource = Record<string, unknown> & {
+  id?: string
+  is_active?: boolean | null
+  option_type?: string
+}
+
+type PHLLot = Record<string, unknown> & {
+  remaining_days?: number | null
+  expired_at?: string | null
+  reason?: string | null
+}
+
 type ProfileUpdateLog = {
   id: string
   employee_id: string | null
@@ -79,8 +63,8 @@ type ProfileUpdateLog = {
   email: string | null
   updated_by: string | null
   update_source: string | null
-  old_data: Record<string, any> | null
-  new_data: Record<string, any> | null
+  old_data: Record<string, unknown> | null
+  new_data: Record<string, unknown> | null
   created_at: string | null
 }
 
@@ -423,8 +407,9 @@ export default function HREmployeesPage() {
   const [successMessage, setSuccessMessage] = useState('')
   const [form, setForm] = useState<EmployeeForm>(initialForm)
 
+  const onEmployeesLoad = useEffectEvent(fetchEmployees)
   useEffect(() => {
-    fetchEmployees()
+    onEmployeesLoad()
   }, [])
 
   function normalizeMasterType(value: unknown): 'department' | 'position' | null {
@@ -455,7 +440,7 @@ export default function HREmployeesPage() {
     return null
   }
 
-  function getMasterName(row: any) {
+  function getMasterName(row: MasterSource) {
     return String(
       row?.name ||
         row?.option_value ||
@@ -480,9 +465,9 @@ export default function HREmployeesPage() {
     employeesRows,
     assignmentRows,
   }: {
-    masterRows: any[]
-    departmentRows: any[]
-    positionRows: any[]
+    masterRows: MasterSource[]
+    departmentRows: MasterSource[]
+    positionRows: MasterSource[]
     employeesRows: Employee[]
     assignmentRows: EmployeeAssignment[]
   }) {
@@ -645,8 +630,8 @@ export default function HREmployeesPage() {
           assignmentRows,
         })
       )
-    } catch (error: any) {
-      setErrorMessage(error?.message || 'Gagal memuat data karyawan.')
+    } catch (error: unknown) {
+      setErrorMessage(readErrorMessage(error) || 'Gagal memuat data karyawan.')
       setEmployees([])
       setMasterOptions([])
       setAssignments([])
@@ -706,10 +691,10 @@ export default function HREmployeesPage() {
 
       if (error) throw error
       setAnnualLeaveDebtDetail((data || null) as AnnualLeaveDebtDetail | null)
-    } catch (error: any) {
+    } catch (error: unknown) {
       setAnnualLeaveDebtDetail(null)
       setErrorMessage(
-        error?.message ||
+        readErrorMessage(error) ||
           'Detail hutang cuti gagal dimuat. Saldo cuti, postpone, dan PHL tidak diubah.'
       )
     } finally {
@@ -796,9 +781,9 @@ export default function HREmployeesPage() {
       })
 
       await fetchAnnualLeaveDebtDetail(editingEmployeeId)
-    } catch (error: any) {
+    } catch (error: unknown) {
       setErrorMessage(
-        error?.message ||
+        readErrorMessage(error) ||
           'Penyesuaian hutang cuti gagal. Saldo cuti saat ini tidak diubah.'
       )
     } finally {
@@ -879,12 +864,12 @@ export default function HREmployeesPage() {
           ),
         }))
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       setLeaveBalanceSummary(null)
       setFlexiblePostponeCycles([])
       setPostponeAdjustments([])
       setErrorMessage(
-        error?.message ||
+        readErrorMessage(error) ||
           'Lifecycle cuti/postpone gagal dimuat. Data PHL dan data karyawan lain tidak diubah.'
       )
     } finally {
@@ -981,8 +966,8 @@ export default function HREmployeesPage() {
         fetchEmployeePostponeDetail(editingEmployeeId),
         fetchEmployees(),
       ])
-    } catch (error: any) {
-      setErrorMessage(error?.message || 'Gagal memproses postpone manual HR.')
+    } catch (error: unknown) {
+      setErrorMessage(readErrorMessage(error) || 'Gagal memproses postpone manual HR.')
     } finally {
       setSavingPostpone(false)
     }
@@ -1041,34 +1026,34 @@ export default function HREmployeesPage() {
           .limit(30),
       ])
 
-      const summary = (summaryResponse.data || {}) as Record<string, any>
-      const employeeRow = (employeeResponse.data || {}) as Record<string, any>
-      const lotsRaw = Array.isArray(lotsResponse.data) ? lotsResponse.data : []
+      const summary = (summaryResponse.data || {}) as Record<string, unknown>
+      const employeeRow = (employeeResponse.data || {}) as Record<string, unknown>
+      const lotsRaw: PHLLot[] = Array.isArray(lotsResponse.data) ? lotsResponse.data : []
       const adjustmentsRaw = Array.isArray(adjustmentsResponse.data)
         ? adjustmentsResponse.data
         : []
 
       const today = getTodayISO()
 
-      const activeLots = lotsRaw.filter((row: any) => {
+      const activeLots = lotsRaw.filter((row: PHLLot) => {
         const remaining = Number(row.remaining_days || 0)
         const expiredAt = String(row.expired_at || '')
         return remaining > 0 && (!expiredAt || expiredAt >= today)
       })
 
-      const expiredLots = lotsRaw.filter((row: any) => {
+      const expiredLots = lotsRaw.filter((row: PHLLot) => {
         const remaining = Number(row.remaining_days || 0)
         const expiredAt = String(row.expired_at || '')
         return remaining > 0 && Boolean(expiredAt) && expiredAt < today
       })
 
       const activeLedgerBalance = activeLots.reduce(
-        (sum: number, row: any) => sum + Number(row.remaining_days || 0),
+        (sum: number, row: PHLLot) => sum + Number(row.remaining_days || 0),
         0
       )
 
       const expiredBalance = expiredLots.reduce(
-        (sum: number, row: any) => sum + Number(row.remaining_days || 0),
+        (sum: number, row: PHLLot) => sum + Number(row.remaining_days || 0),
         0
       )
 
@@ -1083,20 +1068,20 @@ export default function HREmployeesPage() {
 
       const legacyBalance = Math.max(activeBalance - activeLedgerBalance, 0)
 
-      const expiringLots = activeLots.filter((row: any) => {
+      const expiringLots = activeLots.filter((row: PHLLot) => {
         if (!row.expired_at) return false
         const diff = daysBetweenISO(today, String(row.expired_at))
         return diff >= 0 && diff <= 30
       })
 
       const expiring30Days = expiringLots.reduce(
-        (sum: number, row: any) => sum + Number(row.remaining_days || 0),
+        (sum: number, row: PHLLot) => sum + Number(row.remaining_days || 0),
         0
       )
 
       const nextExpiry =
         activeLots
-          .map((row: any) => String(row.expired_at || ''))
+          .map((row: PHLLot) => String(row.expired_at || ''))
           .filter(Boolean)
           .sort()[0] || null
 
@@ -1112,7 +1097,7 @@ export default function HREmployeesPage() {
         expiring_30_days: expiring30Days,
         next_expiry: nextExpiry,
         expiry_rule_days: 90,
-        lots: lotsRaw.map((row: any) => ({
+        lots: lotsRaw.map((row: PHLLot) => ({
           ...row,
           description: row.reason || null,
           is_expired:
@@ -1137,11 +1122,11 @@ export default function HREmployeesPage() {
           error.message
         )
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Pertahankan saldo yang sudah ada pada form; jangan ubah menjadi 0.
       setPHLBalanceDetail(null)
       setErrorMessage(
-        error?.message ||
+        readErrorMessage(error) ||
           'Detail saldo PHL gagal dimuat. Saldo utama tetap ditampilkan dari data karyawan.'
       )
     } finally {
@@ -1269,9 +1254,9 @@ export default function HREmployeesPage() {
         fetchEmployeePHLBalanceDetail(editingEmployeeId),
         fetchEmployees(),
       ])
-    } catch (error: any) {
+    } catch (error: unknown) {
       setErrorMessage(
-        error?.message ||
+        readErrorMessage(error) ||
           'Penyesuaian saldo PHL gagal. Tidak ada perubahan saldo yang disimpan.'
       )
     } finally {
@@ -1459,9 +1444,10 @@ export default function HREmployeesPage() {
   const updatedPersonalData = employees.filter((employee) => Boolean(employee.personal_updated_at)).length
   const activeAssignments = assignments.filter((assignment) => assignment.is_active !== false).length
 
-  function isMissingTableError(error: any) {
+  function isMissingTableError(error: unknown) {
+    const issue = error && typeof error === 'object' ? error as Record<string, unknown> : {}
     const message = String(
-      error?.message || error?.details || error?.hint || error?.code || ''
+      issue.message || issue.details || issue.hint || issue.code || ''
     ).toLowerCase()
 
     return (
@@ -1620,8 +1606,8 @@ export default function HREmployeesPage() {
 
       setSuccessMessage(optionType === 'department' ? 'Departemen berhasil ditambahkan ke dropdown.' : 'Jabatan berhasil ditambahkan ke dropdown.')
       await fetchEmployees()
-    } catch (error: any) {
-      setErrorMessage(error?.message || 'Gagal menambahkan pilihan dropdown.')
+    } catch (error: unknown) {
+      setErrorMessage(readErrorMessage(error) || 'Gagal menambahkan pilihan dropdown.')
     } finally {
       setSavingOptionType(null)
     }
@@ -1642,8 +1628,8 @@ export default function HREmployeesPage() {
       setSelectedMasterOptionIds((current) => current.filter((id) => id !== option.id))
       setSuccessMessage(`${option.option_value} berhasil dihapus dari dropdown.`)
       await fetchEmployees()
-    } catch (error: any) {
-      setErrorMessage(error?.message || 'Gagal menghapus pilihan dropdown.')
+    } catch (error: unknown) {
+      setErrorMessage(readErrorMessage(error) || 'Gagal menghapus pilihan dropdown.')
     } finally {
       setDeletingOptionId(null)
     }
@@ -1698,8 +1684,8 @@ export default function HREmployeesPage() {
       setSelectedMasterOptionIds([])
       setSuccessMessage(`${selectedOptions.length} pilihan berhasil dihapus dari dropdown.`)
       await fetchEmployees()
-    } catch (error: any) {
-      setErrorMessage(error?.message || 'Gagal menghapus pilihan dropdown secara massal.')
+    } catch (error: unknown) {
+      setErrorMessage(readErrorMessage(error) || 'Gagal menghapus pilihan dropdown secara massal.')
     } finally {
       setBulkDeletingOptions(false)
     }
@@ -1788,8 +1774,8 @@ export default function HREmployeesPage() {
 
       resetForm()
       await fetchEmployees()
-    } catch (error: any) {
-      setErrorMessage(error?.message || 'Gagal menyimpan data karyawan.')
+    } catch (error: unknown) {
+      setErrorMessage(readErrorMessage(error) || 'Gagal menyimpan data karyawan.')
     } finally {
       setSaving(false)
     }
@@ -1847,8 +1833,8 @@ export default function HREmployeesPage() {
       setAssignmentForm(initialAssignmentForm)
       setSuccessMessage('Penugasan tambahan berhasil ditambahkan.')
       await fetchEmployees()
-    } catch (error: any) {
-      setErrorMessage(error?.message || 'Gagal menambahkan penugasan tambahan.')
+    } catch (error: unknown) {
+      setErrorMessage(readErrorMessage(error) || 'Gagal menambahkan penugasan tambahan.')
     } finally {
       setSavingAssignment(false)
     }
@@ -1873,8 +1859,8 @@ export default function HREmployeesPage() {
 
       setSuccessMessage('Penugasan tambahan berhasil dihapus dari karyawan.')
       await fetchEmployees()
-    } catch (error: any) {
-      setErrorMessage(error?.message || 'Gagal menghapus penugasan tambahan.')
+    } catch (error: unknown) {
+      setErrorMessage(readErrorMessage(error) || 'Gagal menghapus penugasan tambahan.')
     } finally {
       setDeletingAssignmentId(null)
     }
@@ -1976,10 +1962,10 @@ export default function HREmployeesPage() {
           <div className="harmony-card overflow-hidden">
             <div className="flex flex-col gap-2 border-b border-black/5 p-5 md:flex-row md:items-center md:justify-between">
               <div className="min-w-0">
-                <h2 className="truncate text-lg font-semibold text-[#1d1d1f]">Update Data Pribadi Terbaru</h2>
-                <p className="mt-1 text-sm text-[#6e6e73]">Ringkasan perubahan dari Employee Settings.</p>
+                <h2 className="truncate text-lg font-semibold harmony-text-primary">Update Data Pribadi Terbaru</h2>
+                <p className="mt-1 text-sm harmony-text-secondary">Ringkasan perubahan dari Employee Settings.</p>
               </div>
-              <span className="w-fit rounded-full bg-[#e8f2ff] px-3 py-1 text-xs font-bold text-[#0059b8]">
+              <span className="w-fit rounded-full bg-[#e8f2ff] px-3 py-1 text-xs font-bold harmony-text-link">
                 {profileLogs.length} update terakhir
               </span>
             </div>
@@ -1996,8 +1982,8 @@ export default function HREmployeesPage() {
         <div className="harmony-card harmony-slide-up overflow-hidden">
           <div className="flex flex-col gap-4 border-b border-black/5 p-5 xl:flex-row xl:items-center xl:justify-between">
             <div className="min-w-0">
-              <h2 className="truncate text-lg font-semibold text-[#1d1d1f]">Master Employee</h2>
-              <p className="mt-1 text-sm text-[#6e6e73]">
+              <h2 className="truncate text-lg font-semibold harmony-text-primary">Master Employee</h2>
+              <p className="mt-1 text-sm harmony-text-secondary">
                 Homebase karyawan disimpan di departemen dan jabatan utama. Jabatan rangkap disimpan sebagai penugasan tambahan.
               </p>
             </div>
@@ -2016,12 +2002,12 @@ export default function HREmployeesPage() {
 
           <div className="grid gap-3 border-b border-black/5 bg-white/35 p-5 xl:grid-cols-[1fr_190px_220px_220px]">
             <div className="flex min-h-11 min-w-0 items-center gap-3 rounded-2xl border border-black/5 bg-[#f5f5f7]/85 px-4 shadow-sm transition focus-within:border-[#007aff]/40 focus-within:bg-white focus-within:shadow-md">
-              <Search size={18} className="shrink-0 text-[#6e6e73]" />
+              <Search size={18} className="shrink-0 harmony-text-secondary" />
               <input
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
                 placeholder="Cari nama, NIP, PIN, email, unit, jabatan..."
-                className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-[#86868b]"
+                className="min-w-0 flex-1 bg-transparent text-sm outline-none harmony-placeholder-muted"
               />
             </div>
 
@@ -2043,7 +2029,7 @@ export default function HREmployeesPage() {
             </select>
           </div>
 
-          {loading && <div className="p-6 text-sm text-[#6e6e73]">Loading data karyawan...</div>}
+          {loading && <div className="p-6 text-sm harmony-text-secondary">Loading data karyawan...</div>}
 
           {!loading && (
             <div className="space-y-3 p-5">
@@ -2060,11 +2046,11 @@ export default function HREmployeesPage() {
 
               {filteredEmployees.length === 0 && (
                 <div className="p-8 text-center">
-                  <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-3xl bg-[#f5f5f7] text-[#007aff]">
+                  <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-3xl bg-[#f5f5f7] harmony-text-link">
                     <Users size={24} />
                   </div>
-                  <h3 className="mt-4 font-semibold text-[#1d1d1f]">Data karyawan tidak ditemukan</h3>
-                  <p className="mt-1 text-sm text-[#6e6e73]">Coba ubah keyword pencarian, status, departemen, atau filter sinkronisasi.</p>
+                  <h3 className="mt-4 font-semibold harmony-text-primary">Data karyawan tidak ditemukan</h3>
+                  <p className="mt-1 text-sm harmony-text-secondary">Coba ubah keyword pencarian, status, departemen, atau filter sinkronisasi.</p>
                 </div>
               )}
             </div>
@@ -2158,14 +2144,14 @@ function MasterOptionsLauncher({
     <div className="harmony-card overflow-hidden p-5">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div className="min-w-0">
-          <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-[#e8f2ff] px-3 py-1 text-xs font-bold text-[#0059b8]">
+          <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-[#e8f2ff] px-3 py-1 text-xs font-bold harmony-text-link">
             <GitBranch size={13} />
             Master Dropdown Organisasi
           </div>
-          <h2 className="text-lg font-semibold text-[#1d1d1f]">
+          <h2 className="text-lg font-semibold harmony-text-primary">
             Kelola Departemen & Jabatan
           </h2>
-          <p className="mt-1 text-sm leading-6 text-[#6e6e73]">
+          <p className="mt-1 text-sm leading-6 harmony-text-secondary">
             Opsi dropdown dipindahkan ke modal supaya halaman data karyawan tetap ringkas.
           </p>
         </div>
@@ -2237,14 +2223,14 @@ function MasterOptionsModal({
       <div className="harmony-hr-edit-modal flex max-h-[94dvh] w-full max-w-[1050px] flex-col overflow-hidden rounded-[26px] border border-white/85 shadow-[0_30px_90px_rgba(23,54,103,0.22)]">
         <div className="flex min-w-0 items-start justify-between gap-4 border-b border-black/5 p-6">
           <div className="min-w-0">
-            <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-[#e8f2ff] px-3 py-1.5 text-xs font-bold text-[#0059b8]">
+            <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-[#e8f2ff] px-3 py-1.5 text-xs font-bold harmony-text-link">
               <GitBranch size={14} />
               Master Dropdown Organisasi
             </div>
-            <h2 className="text-xl font-semibold text-[#1d1d1f]">
+            <h2 className="text-xl font-semibold harmony-text-primary">
               Departemen & Jabatan
             </h2>
-            <p className="mt-1 max-w-3xl text-sm leading-6 text-[#6e6e73]">
+            <p className="mt-1 max-w-3xl text-sm leading-6 harmony-text-secondary">
               Tambah opsi manual atau centang beberapa pilihan untuk menghapus sekaligus. Hapus di sini hanya menonaktifkan pilihan dropdown, bukan mengubah data karyawan lama.
             </p>
           </div>
@@ -2252,7 +2238,7 @@ function MasterOptionsModal({
           <button
             type="button"
             onClick={onClose}
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#f5f5f7] text-[#1d1d1f]"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#f5f5f7] harmony-text-primary"
           >
             <X size={18} />
           </button>
@@ -2260,13 +2246,13 @@ function MasterOptionsModal({
 
         <div className="flex flex-col gap-3 border-b border-black/5 bg-[#f5f5f7]/70 p-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="rounded-full bg-white px-3 py-1 text-xs font-bold text-[#1d1d1f] shadow-sm">
+            <span className="rounded-full bg-white px-3 py-1 text-xs font-bold harmony-text-primary shadow-sm">
               {departmentOptions.length} departemen
             </span>
-            <span className="rounded-full bg-white px-3 py-1 text-xs font-bold text-[#1d1d1f] shadow-sm">
+            <span className="rounded-full bg-white px-3 py-1 text-xs font-bold harmony-text-primary shadow-sm">
               {positionOptions.length} jabatan
             </span>
-            <span className="rounded-full bg-[#e8f2ff] px-3 py-1 text-xs font-bold text-[#0059b8]">
+            <span className="rounded-full bg-[#e8f2ff] px-3 py-1 text-xs font-bold harmony-text-link">
               {totalSelected} pilihan dicentang
             </span>
           </div>
@@ -2362,10 +2348,10 @@ function OptionPanel({
     <div className="rounded-[28px] border border-black/5 bg-[#f5f5f7]/70 p-5">
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
-          <div className="rounded-2xl bg-white p-3 text-[#007aff] shadow-sm">{icon}</div>
+          <div className="rounded-2xl bg-white p-3 harmony-text-link shadow-sm">{icon}</div>
           <div>
-            <h3 className="font-semibold text-[#1d1d1f]">{title}</h3>
-            <p className="text-xs text-[#6e6e73]">
+            <h3 className="font-semibold harmony-text-primary">{title}</h3>
+            <p className="text-xs harmony-text-secondary">
               {selectedCount} dari {options.length} pilihan dicentang.
             </p>
           </div>
@@ -2375,9 +2361,9 @@ function OptionPanel({
           type="button"
           onClick={onToggleAll}
           disabled={options.length === 0}
-          className="inline-flex min-h-9 items-center justify-center gap-2 rounded-2xl border border-black/5 bg-white px-3 text-xs font-bold text-[#1d1d1f] shadow-sm transition hover:bg-[#f5f5f7] disabled:cursor-not-allowed disabled:opacity-50"
+          className="inline-flex min-h-9 items-center justify-center gap-2 rounded-2xl border border-black/5 bg-white px-3 text-xs font-bold harmony-text-primary shadow-sm transition hover:bg-[#f5f5f7] disabled:cursor-not-allowed disabled:opacity-50"
         >
-          <span className="flex h-4 w-4 items-center justify-center rounded-md border border-[#007aff]/40 bg-white text-[10px] text-[#007aff]">
+          <span className="flex h-4 w-4 items-center justify-center rounded-md border border-[#007aff]/40 bg-white text-[10px] harmony-text-link">
             {allSelected ? '✓' : ''}
           </span>
           {allSelected ? 'Batal Semua' : 'Centang Semua'}
@@ -2404,7 +2390,7 @@ function OptionPanel({
 
       <div className="mt-4 max-h-[430px] space-y-2 overflow-y-auto pr-1">
         {options.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-black/10 bg-white px-4 py-3 text-sm font-semibold text-[#6e6e73]">
+          <div className="rounded-2xl border border-dashed border-black/10 bg-white px-4 py-3 text-sm font-semibold harmony-text-secondary">
             Belum ada pilihan aktif.
           </div>
         ) : (
@@ -2428,7 +2414,7 @@ function OptionPanel({
                     'flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border text-xs font-bold transition',
                     checked
                       ? 'border-[#007aff] bg-[#007aff] text-white'
-                      : 'border-[#007aff]/35 bg-white text-[#007aff]',
+                      : 'border-[#007aff]/35 bg-white harmony-text-link',
                   ].join(' ')}
                   title={checked ? 'Batalkan pilihan' : 'Centang pilihan'}
                 >
@@ -2440,7 +2426,7 @@ function OptionPanel({
                   onClick={() => onToggleSelection(option.id)}
                   className="min-w-0 flex-1 text-left"
                 >
-                  <span className="block break-words text-sm font-bold text-[#1d1d1f]">
+                  <span className="block break-words text-sm font-bold harmony-text-primary">
                     {option.option_value}
                   </span>
                 </button>
@@ -2466,10 +2452,10 @@ function OptionPanel({
 function MiniStat({ label, value }: { label: string; value: string }) {
   return (
     <div className="harmony-employee-mini-stat rounded-2xl bg-[#f5f5f7] px-4 py-3">
-      <p className="text-[11px] font-bold uppercase tracking-wide text-[#86868b]">
+      <p className="text-[11px] font-bold uppercase tracking-wide harmony-text-muted">
         {label}
       </p>
-      <p className="mt-1 text-lg font-semibold text-[#1d1d1f]">
+      <p className="mt-1 text-lg font-semibold harmony-text-primary">
         {value}
       </p>
     </div>
@@ -2478,7 +2464,7 @@ function MiniStat({ label, value }: { label: string; value: string }) {
 
 function EmployeeCompactCard({ employee, assignmentCount, onDetail, onEdit, onToggleActive }: { employee: Employee; assignmentCount: number; onDetail: () => void; onEdit: () => void; onToggleActive: () => void }) {
   return (
-    <div className="rounded-[28px] border border-black/5 bg-white/70 p-4 shadow-sm transition hover:-translate-y-0.5 hover:bg-white hover:shadow-md">
+    <div className="harmony-employee-directory-card rounded-[28px] border border-black/5 bg-white/70 p-4 shadow-sm transition hover:-translate-y-0.5 hover:bg-white hover:shadow-md">
       <div className="grid min-w-0 gap-4 xl:grid-cols-[1fr_270px_260px_auto] xl:items-center">
         <div className="flex min-w-0 items-center gap-4">
           <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#1d1d1f] text-sm font-bold text-white shadow-sm">
@@ -2487,13 +2473,13 @@ function EmployeeCompactCard({ employee, assignmentCount, onDetail, onEdit, onTo
 
           <div className="min-w-0">
             <div className="flex min-w-0 flex-wrap items-center gap-2">
-              <h3 className="max-w-full truncate text-base font-semibold text-[#1d1d1f]">{employee.full_name || '-'}</h3>
+              <h3 className="max-w-full truncate text-base font-semibold harmony-text-primary">{employee.full_name || '-'}</h3>
               <StatusBadge active={employee.is_active !== false} />
-              {assignmentCount > 0 && <span className="shrink-0 rounded-full bg-[#f7edfc] px-2.5 py-1 text-[11px] font-bold text-[#7b2cbf]">{assignmentCount} rangkap</span>}
+              {assignmentCount > 0 && <span className="shrink-0 rounded-full bg-[#f7edfc] px-2.5 py-1 text-[11px] font-bold harmony-text-violet">{assignmentCount} rangkap</span>}
               {employee.personal_updated_at && <span className="shrink-0 rounded-full bg-green-50 px-2.5 py-1 text-[11px] font-bold text-green-700">Personal updated</span>}
             </div>
 
-            <div className="mt-1 flex min-w-0 flex-wrap items-center gap-2 text-xs text-[#6e6e73]">
+            <div className="mt-1 flex min-w-0 flex-wrap items-center gap-2 text-xs harmony-text-secondary">
               <span className="max-w-[120px] truncate">{employee.employee_number || '-'}</span>
               <span className="h-1 w-1 shrink-0 rounded-full bg-[#c7c7cc]" />
               <span className="max-w-[120px] truncate">{formatEmploymentStatus(employee.employment_status)}</span>
@@ -2503,28 +2489,28 @@ function EmployeeCompactCard({ employee, assignmentCount, onDetail, onEdit, onTo
           </div>
         </div>
 
-        <div className="min-w-0 rounded-2xl bg-[#f5f5f7]/80 px-4 py-3">
-          <p className="text-[11px] font-bold uppercase tracking-wide text-[#86868b]">Homebase Utama</p>
-          <p className="mt-1 break-words text-sm font-semibold text-[#1d1d1f]">{employee.department || '-'}</p>
-          <p className="mt-1 break-words text-xs text-[#6e6e73]">{employee.position || '-'}</p>
+        <div className="harmony-employee-homebase min-w-0 rounded-2xl bg-[#f5f5f7]/80 px-4 py-3">
+          <p className="text-[11px] font-bold uppercase tracking-wide harmony-text-muted">Homebase Utama</p>
+          <p className="mt-1 break-words text-sm font-semibold harmony-text-primary">{employee.department || '-'}</p>
+          <p className="mt-1 break-words text-xs harmony-text-secondary">{employee.position || '-'}</p>
         </div>
 
-        <div className="flex min-w-0 flex-wrap gap-2">
+        <div className="harmony-employee-compact-balances flex min-w-0 flex-wrap gap-2">
           <SmallBadge icon={<Fingerprint size={13} />} label={employee.machine_pin || '-'} />
           <SmallBadge icon={<WalletCards size={13} />} label={`Cuti ${employee.annual_leave_balance || 0}`} />
           <SmallBadge icon={<WalletCards size={13} />} label={`PHL ${employee.phl_balance || 0}`} />
         </div>
 
         <div className="flex shrink-0 flex-wrap justify-start gap-2 xl:justify-end">
-          <button type="button" onClick={onDetail} className="inline-flex min-h-9 items-center justify-center gap-2 rounded-2xl bg-[#e8f2ff] px-4 text-xs font-bold text-[#0059b8] transition hover:bg-blue-100">
+          <button type="button" onClick={onDetail} className="harmony-employee-detail-action inline-flex min-h-9 items-center justify-center gap-2 rounded-2xl bg-[#e8f2ff] px-4 text-xs font-bold harmony-text-link transition hover:bg-blue-100">
             <Eye size={15} />
             Detail
           </button>
-          <button type="button" onClick={onEdit} className="inline-flex min-h-9 items-center justify-center gap-2 rounded-2xl border border-black/5 bg-white px-4 text-xs font-bold text-[#1d1d1f] shadow-sm transition hover:bg-[#f5f5f7]">
+          <button type="button" onClick={onEdit} className="harmony-employee-edit-action inline-flex min-h-9 items-center justify-center gap-2 rounded-2xl border border-black/5 bg-white px-4 text-xs font-bold harmony-text-primary shadow-sm transition hover:bg-[#f5f5f7]">
             <Pencil size={15} />
             Edit
           </button>
-          <button type="button" onClick={onToggleActive} className={['flex h-9 w-9 items-center justify-center rounded-2xl transition', employee.is_active === false ? 'bg-green-50 text-green-700 hover:bg-green-100' : 'bg-red-50 text-red-700 hover:bg-red-100'].join(' ')}>
+          <button type="button" onClick={onToggleActive} aria-label={employee.is_active === false ? "Aktifkan karyawan" : "Nonaktifkan karyawan"} title={employee.is_active === false ? "Aktifkan karyawan" : "Nonaktifkan karyawan"} className={['harmony-employee-power-action flex h-9 w-9 items-center justify-center rounded-2xl transition', employee.is_active === false ? 'bg-green-50 text-green-700 hover:bg-green-100' : 'bg-red-50 text-red-700 hover:bg-red-100'].join(' ')}>
             <Power size={15} />
           </button>
         </div>
@@ -2543,11 +2529,11 @@ function EmployeeDetailModal({ employee, assignments, employees, onClose, onEdit
               {getInitials(employee.full_name || '-')}
             </div>
             <div className="min-w-0">
-              <h2 className="truncate text-xl font-semibold text-[#1d1d1f]">{employee.full_name || '-'}</h2>
-              <p className="mt-1 truncate text-sm text-[#6e6e73]">{employee.employee_number || '-'} · {employee.department || '-'} · {employee.position || '-'}</p>
+              <h2 className="truncate text-xl font-semibold harmony-text-primary">{employee.full_name || '-'}</h2>
+              <p className="mt-1 truncate text-sm harmony-text-secondary">{employee.employee_number || '-'} · {employee.department || '-'} · {employee.position || '-'}</p>
             </div>
           </div>
-          <button type="button" onClick={onClose} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#f5f5f7] text-[#1d1d1f]">
+          <button type="button" onClick={onClose} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#f5f5f7] harmony-text-primary">
             <X size={18} />
           </button>
         </div>
@@ -2584,7 +2570,7 @@ function EmployeeDetailModal({ employee, assignments, employees, onClose, onEdit
 
             <DetailSection title="Jabatan & Penugasan Tambahan" icon={<Briefcase size={18} />} wide>
               {assignments.length === 0 ? (
-                <div className="rounded-2xl border border-dashed border-black/10 bg-white p-5 text-sm font-semibold text-[#6e6e73]">
+                <div className="rounded-2xl border border-dashed border-black/10 bg-white p-5 text-sm font-semibold harmony-text-secondary">
                   Belum ada jabatan rangkap atau penugasan tambahan aktif.
                 </div>
               ) : (
@@ -2723,14 +2709,14 @@ function EmployeeFormModal({
       <div className="harmony-hr-edit-modal flex max-h-[94dvh] w-full max-w-[1050px] flex-col overflow-hidden rounded-[26px] border border-white/85 shadow-[0_30px_90px_rgba(23,54,103,0.22)]">
         <div className="flex min-w-0 items-start justify-between gap-4 border-b border-black/5 p-6">
           <div className="min-w-0">
-            <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-[#e8f2ff] px-3 py-1.5 text-xs font-bold text-[#0059b8]">
+            <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-[#e8f2ff] px-3 py-1.5 text-xs font-bold harmony-text-link">
               <Sparkles size={14} />
               Employee Master
             </div>
-            <h2 className="truncate text-xl font-semibold text-[#1d1d1f]">{editingEmployeeId ? 'Edit Karyawan' : 'Tambah Karyawan'}</h2>
+            <h2 className="truncate text-xl font-semibold harmony-text-primary">{editingEmployeeId ? 'Edit Karyawan' : 'Tambah Karyawan'}</h2>
             <p className="mt-1 text-xs text-[#52657f]">Buka kategori yang perlu diubah, lalu simpan.</p>
           </div>
-          <button type="button" onClick={onClose} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#f5f5f7] text-[#1d1d1f]">
+          <button type="button" onClick={onClose} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#f5f5f7] harmony-text-primary">
             <X size={18} />
           </button>
         </div>
@@ -2897,8 +2883,8 @@ function ReadOnlyBalanceField({
   return (
     <div className="rounded-[22px] border border-black/5 bg-[#f5f5f7] p-4">
       <span className="harmony-label">{label}</span>
-      <div className="mt-1 text-lg font-bold text-[#1d1d1f]">{value}</div>
-      <p className="mt-1 text-xs leading-5 text-[#6e6e73]">{description}</p>
+      <div className="mt-1 text-lg font-bold harmony-text-primary">{value}</div>
+      <p className="mt-1 text-xs leading-5 harmony-text-secondary">{description}</p>
     </div>
   )
 }
@@ -2933,8 +2919,8 @@ function AnnualLeaveDebtSection({
             <CalendarClock size={19} />
           </div>
           <div>
-            <h3 className="font-semibold text-[#1d1d1f]">Hutang Cuti</h3>
-            <p className="mt-1 max-w-3xl text-sm leading-6 text-[#6e6e73]">
+            <h3 className="font-semibold harmony-text-primary">Hutang Cuti</h3>
+            <p className="mt-1 max-w-3xl text-sm leading-6 harmony-text-secondary">
               Hutang baru menambahkan saldo cuti sementara agar dapat dipakai sekarang, lalu dibayar otomatis dari hak cuti tahunan periode berikutnya. Hutang legacy yang sudah pernah diberikan sebelumnya tidak ditambahkan ulang.
             </p>
           </div>
@@ -2946,11 +2932,11 @@ function AnnualLeaveDebtSection({
       </div>
 
       {!editingEmployeeId ? (
-        <div className="mt-5 rounded-2xl border border-dashed border-amber-200 bg-white/70 p-5 text-sm text-[#6e6e73]">
+        <div className="mt-5 rounded-2xl border border-dashed border-amber-200 bg-white/70 p-5 text-sm harmony-text-secondary">
           Simpan karyawan terlebih dahulu untuk mengelola hutang cuti.
         </div>
       ) : loading ? (
-        <div className="mt-5 flex items-center gap-3 rounded-2xl bg-white p-5 text-sm text-[#6e6e73]">
+        <div className="mt-5 flex items-center gap-3 rounded-2xl bg-white p-5 text-sm harmony-text-secondary">
           <Loader2 size={18} className="animate-spin" />
           Memuat hutang cuti...
         </div>
@@ -3000,10 +2986,10 @@ function AnnualLeaveDebtSection({
 
               <div className="rounded-[22px] border border-black/5 bg-[#f5f5f7] p-4">
                 <span className="harmony-label">Dampak Saldo Saat Ini</span>
-                <div className="mt-1 font-bold text-[#1d1d1f]">
+                <div className="mt-1 font-bold harmony-text-primary">
                   {form.action === 'add' ? `+${Number(form.days || 0)} hari sementara` : 'Tidak otomatis berubah'}
                 </div>
-                <p className="mt-1 text-xs leading-5 text-[#6e6e73]">
+                <p className="mt-1 text-xs leading-5 harmony-text-secondary">
                   {form.action === 'add'
                     ? 'Hutang baru langsung menambah saldo cuti. Nilainya akan dibebankan ke annual cycle berikutnya.'
                     : 'Pengurangan berarti koreksi/ampunan hutang. Saldo advance yang sudah diberikan tidak ditarik kembali otomatis.'}
@@ -3035,32 +3021,32 @@ function AnnualLeaveDebtSection({
 
           {(detail?.debts?.length || 0) > 0 && (
             <div className="rounded-[24px] border border-black/5 bg-white p-5">
-              <h4 className="text-sm font-bold text-[#1d1d1f]">Riwayat Hutang Cuti</h4>
+              <h4 className="text-sm font-bold harmony-text-primary">Riwayat Hutang Cuti</h4>
               <div className="mt-3 space-y-2">
                 {(detail?.debts || []).slice(0, 8).map((item) => (
                   <div key={item.id} className="rounded-2xl bg-[#f8f8fa] p-4">
                     <div className="flex flex-wrap items-center justify-between gap-2">
-                      <div className="font-semibold text-[#1d1d1f]">
+                      <div className="font-semibold harmony-text-primary">
                         {Number(item.original_days || 0)} hari · Sisa {Number(item.remaining_days || 0)} hari
                       </div>
                       <div className="flex flex-wrap gap-2">
-                        <span className="rounded-full bg-white px-2.5 py-1 text-[10px] font-bold uppercase text-[#6e6e73]">
+                        <span className="rounded-full bg-white px-2.5 py-1 text-[10px] font-bold uppercase harmony-text-secondary">
                           {item.origin === 'legacy_existing_credit' ? 'LEGACY' : 'HUTANG BARU'}
                         </span>
-                        <span className="rounded-full bg-white px-2.5 py-1 text-[10px] font-bold uppercase text-[#6e6e73]">
+                        <span className="rounded-full bg-white px-2.5 py-1 text-[10px] font-bold uppercase harmony-text-secondary">
                           {item.status.replace('_', ' ')}
                         </span>
                       </div>
                     </div>
-                    <div className="mt-2 text-xs leading-5 text-[#6e6e73]">
+                    <div className="mt-2 text-xs leading-5 harmony-text-secondary">
                       Target maturity: {formatDate(item.apply_from_maturity)} · Oleh {item.created_by_email || '-'} · {formatDateTime(item.created_at)}
                     </div>
-                    <div className="mt-1 text-xs leading-5 text-[#6e6e73]">
+                    <div className="mt-1 text-xs leading-5 harmony-text-secondary">
                       {item.origin === 'legacy_existing_credit'
                         ? `Saldo advance sudah diberikan sebelum fitur ini. Normalisasi maturity: ${Number(item.legacy_normalization_days || 0)} hari.`
                         : `Saldo advance diberikan oleh sistem: ${Number(item.credit_granted_days || 0)} hari.`}
                     </div>
-                    <div className="mt-1 text-xs leading-5 text-[#3a3a3c]">{item.reason}</div>
+                    <div className="mt-1 text-xs leading-5 harmony-text-primary">{item.reason}</div>
                   </div>
                 ))}
               </div>
@@ -3125,8 +3111,8 @@ function PostponeAdjustmentSection({
             <CalendarClock size={19} />
           </div>
           <div className="min-w-0">
-            <h3 className="font-semibold text-[#1d1d1f]">Penyesuaian Postpone Manual HR</h3>
-            <p className="mt-1 text-sm leading-6 text-[#6e6e73]">
+            <h3 className="font-semibold harmony-text-primary">Penyesuaian Postpone Manual HR</h3>
+            <p className="mt-1 text-sm leading-6 harmony-text-secondary">
               HR dapat menambah postpone tanpa mengikuti batas cycle karyawan. HR menentukan jumlah hari,
               tanggal mulai berlaku, dan tanggal expired. Pengajuan postpone oleh karyawan tetap mengikuti
               cycle, H-7, saldo sumber, dan approval existing.
@@ -3146,7 +3132,7 @@ function PostponeAdjustmentSection({
       ) : loading ? (
         <div className="mt-5 flex min-h-32 items-center justify-center gap-3 rounded-[22px] border border-black/5 bg-white">
           <Loader2 size={20} className="animate-spin text-[#7c3aed]" />
-          <span className="text-sm font-semibold text-[#6e6e73]">Memuat lifecycle cuti...</span>
+          <span className="text-sm font-semibold harmony-text-secondary">Memuat lifecycle cuti...</span>
         </div>
       ) : (
         <>
@@ -3256,7 +3242,7 @@ function PostponeAdjustmentSection({
 
           {adjustments.length > 0 && (
             <div className="mt-5 rounded-[24px] border border-black/5 bg-white p-5">
-              <div className="mb-3 flex items-center gap-2 font-semibold text-[#1d1d1f]">
+              <div className="mb-3 flex items-center gap-2 font-semibold harmony-text-primary">
                 <History size={17} />
                 Audit Postpone Terbaru
               </div>
@@ -3264,10 +3250,10 @@ function PostponeAdjustmentSection({
                 {adjustments.slice(0, 8).map((item) => (
                   <div
                     key={item.id}
-                    className="flex flex-col gap-1 rounded-2xl bg-[#f8f8fa] px-4 py-3 text-xs text-[#6e6e73] sm:flex-row sm:items-center sm:justify-between"
+                    className="flex flex-col gap-1 rounded-2xl bg-[#f8f8fa] px-4 py-3 text-xs harmony-text-secondary sm:flex-row sm:items-center sm:justify-between"
                   >
                     <span>
-                      <strong className="text-[#1d1d1f]">
+                      <strong className="harmony-text-primary">
                         {Number(item.delta_days || 0) >= 0 ? '+' : ''}
                         {Number(item.delta_days || 0)} hari
                       </strong>{' '}
@@ -3327,12 +3313,12 @@ function PHLBalanceAdjustmentSection({
     <div className="rounded-[28px] border border-[#d6e8ff] bg-gradient-to-br from-[#f8fbff] to-white p-5 shadow-sm">
       <div className="flex flex-col gap-3 border-b border-black/5 pb-5 md:flex-row md:items-start md:justify-between">
         <div className="flex min-w-0 items-start gap-3">
-          <div className="rounded-2xl bg-[#e8f2ff] p-3 text-[#0059b8]">
+          <div className="rounded-2xl bg-[#e8f2ff] p-3 harmony-text-link">
             <CalendarClock size={19} />
           </div>
           <div className="min-w-0">
-            <h3 className="font-semibold text-[#1d1d1f]">Penyesuaian Saldo PHL</h3>
-            <p className="mt-1 text-sm leading-6 text-[#6e6e73]">
+            <h3 className="font-semibold harmony-text-primary">Penyesuaian Saldo PHL</h3>
+            <p className="mt-1 text-sm leading-6 harmony-text-secondary">
               Setiap penyesuaian manual HR wajib memiliki evidence. Saldo tambahan tetap wajib memiliki tanggal pelaksanaan dan masa berlaku otomatis 90 hari. Pengurangan mengambil saldo yang paling cepat expired.
             </p>
           </div>
@@ -3350,8 +3336,8 @@ function PHLBalanceAdjustmentSection({
         </div>
       ) : loading ? (
         <div className="mt-5 flex min-h-32 items-center justify-center gap-3 rounded-[22px] border border-black/5 bg-white">
-          <Loader2 size={20} className="animate-spin text-[#007aff]" />
-          <span className="text-sm font-semibold text-[#6e6e73]">Memuat ledger PHL...</span>
+          <Loader2 size={20} className="animate-spin harmony-text-link" />
+          <span className="text-sm font-semibold harmony-text-secondary">Memuat ledger PHL...</span>
         </div>
       ) : (
         <>
@@ -3393,11 +3379,11 @@ function PHLBalanceAdjustmentSection({
                 <p className="text-xs font-bold uppercase tracking-[0.08em] text-[#5f6b7a]">
                   Saldo PHL Tersedia Saat Ini
                 </p>
-                <p className="mt-1 text-3xl font-bold tracking-tight text-[#0059b8]">
+                <p className="mt-1 text-3xl font-bold tracking-tight harmony-text-link">
                   {displayedAvailableBalance} hari
                 </p>
               </div>
-              <p className="max-w-xl text-xs leading-5 text-[#6e6e73]">
+              <p className="max-w-xl text-xs leading-5 harmony-text-secondary">
                 Nilai ini berasal dari saldo PHL aktif yang belum expired ditambah saldo legacy yang masih tersedia.
               </p>
             </div>
@@ -3546,11 +3532,11 @@ function PHLSummaryMiniCard({
 }) {
   return (
     <div className="rounded-[22px] border border-black/5 bg-white p-4 shadow-sm">
-      <div className="text-xs font-bold uppercase tracking-[0.08em] text-[#86868b]">
+      <div className="text-xs font-bold uppercase tracking-[0.08em] harmony-text-muted">
         {title}
       </div>
-      <div className="mt-2 text-xl font-bold text-[#1d1d1f]">{value}</div>
-      <div className="mt-1 text-xs text-[#6e6e73]">{description}</div>
+      <div className="mt-2 text-xl font-bold harmony-text-primary">{value}</div>
+      <div className="mt-1 text-xs harmony-text-secondary">{description}</div>
     </div>
   )
 }
@@ -3559,29 +3545,29 @@ function PHLLotHistory({ lots }: { lots: PHLBalanceLot[] }) {
   return (
     <div className="overflow-hidden rounded-[24px] border border-black/5 bg-white">
       <div className="flex items-center gap-3 border-b border-black/5 p-4">
-        <CalendarClock size={17} className="text-[#007aff]" />
+        <CalendarClock size={17} className="harmony-text-link" />
         <div>
-          <h4 className="text-sm font-bold text-[#1d1d1f]">Saldo Berdasarkan Tanggal PHL</h4>
-          <p className="mt-0.5 text-xs text-[#6e6e73]">Maksimal 50 lot terbaru.</p>
+          <h4 className="text-sm font-bold harmony-text-primary">Saldo Berdasarkan Tanggal PHL</h4>
+          <p className="mt-0.5 text-xs harmony-text-secondary">Maksimal 50 lot terbaru.</p>
         </div>
       </div>
 
       <div className="max-h-80 overflow-y-auto">
         {lots.length === 0 ? (
-          <div className="p-5 text-sm text-[#6e6e73]">Belum ada saldo PHL bertanggal.</div>
+          <div className="p-5 text-sm harmony-text-secondary">Belum ada saldo PHL bertanggal.</div>
         ) : (
           <div className="divide-y divide-black/5">
             {lots.map((lot) => (
               <div key={lot.id} className="grid gap-3 p-4 sm:grid-cols-[1fr_auto]">
                 <div className="min-w-0">
-                  <div className="font-semibold text-[#1d1d1f]">
+                  <div className="font-semibold harmony-text-primary">
                     PHL {formatDate(lot.phl_date)}
                   </div>
-                  <div className="mt-1 text-xs leading-5 text-[#6e6e73]">
+                  <div className="mt-1 text-xs leading-5 harmony-text-secondary">
                     {lot.description || lot.reason || lot.notes || 'Saldo PHL'}
                   </div>
                   <div className="mt-2 flex flex-wrap gap-2 text-[11px] font-bold">
-                    <span className="rounded-full bg-[#e8f2ff] px-2.5 py-1 text-[#0059b8]">
+                    <span className="rounded-full bg-[#e8f2ff] px-2.5 py-1 harmony-text-link">
                       Total {Number(lot.balance_days || 0)}
                     </span>
                     <span className="rounded-full bg-orange-50 px-2.5 py-1 text-orange-700">
@@ -3610,7 +3596,7 @@ function PHLLotHistory({ lots }: { lots: PHLBalanceLot[] }) {
                         ? 'Tanpa expired'
                         : `${lot.days_to_expiry} hari lagi`}
                   </div>
-                  <div className="mt-2 text-xs font-semibold text-[#6e6e73]">
+                  <div className="mt-2 text-xs font-semibold harmony-text-secondary">
                     Expired {formatDate(lot.expired_at)}
                   </div>
                 </div>
@@ -3631,16 +3617,16 @@ function PHLAdjustmentHistory({
   return (
     <div className="overflow-hidden rounded-[24px] border border-black/5 bg-white">
       <div className="flex items-center gap-3 border-b border-black/5 p-4">
-        <History size={17} className="text-[#7b2cbf]" />
+        <History size={17} className="harmony-text-violet" />
         <div>
-          <h4 className="text-sm font-bold text-[#1d1d1f]">Riwayat Penyesuaian HR</h4>
-          <p className="mt-0.5 text-xs text-[#6e6e73]">Maksimal 30 transaksi terbaru.</p>
+          <h4 className="text-sm font-bold harmony-text-primary">Riwayat Penyesuaian HR</h4>
+          <p className="mt-0.5 text-xs harmony-text-secondary">Maksimal 30 transaksi terbaru.</p>
         </div>
       </div>
 
       <div className="max-h-80 overflow-y-auto">
         {adjustments.length === 0 ? (
-          <div className="p-5 text-sm text-[#6e6e73]">Belum ada penyesuaian saldo oleh HR.</div>
+          <div className="p-5 text-sm harmony-text-secondary">Belum ada penyesuaian saldo oleh HR.</div>
         ) : (
           <div className="divide-y divide-black/5">
             {adjustments.map((adjustment) => (
@@ -3659,38 +3645,38 @@ function PHLAdjustmentHistory({
                         {adjustment.action === 'add' ? 'Tambah' : 'Kurangi'}{' '}
                         {Number(adjustment.days || 0)} hari
                       </span>
-                      <span className="text-xs font-semibold text-[#6e6e73]">
+                      <span className="text-xs font-semibold harmony-text-secondary">
                         {adjustment.created_at ? formatDateTime(adjustment.created_at) : '-'}
                       </span>
                     </div>
                     {adjustment.description && (
-                      <p className="mt-2 text-sm font-semibold leading-6 text-[#1d1d1f]">
+                      <p className="mt-2 text-sm font-semibold leading-6 harmony-text-primary">
                         {adjustment.description}
                       </p>
                     )}
-                    <p className="mt-1 text-xs leading-5 text-[#6e6e73]">
+                    <p className="mt-1 text-xs leading-5 harmony-text-secondary">
                       Alasan HR: {adjustment.reason || '-'}
                     </p>
-                    <p className="mt-1 text-xs text-[#6e6e73]">
+                    <p className="mt-1 text-xs harmony-text-secondary">
                       Oleh {adjustment.actor_email || 'HR Administrator'}
                     </p>
                   </div>
 
-                  <div className="shrink-0 rounded-2xl bg-[#f5f5f7] px-3 py-2 text-xs font-bold text-[#1d1d1f]">
+                  <div className="shrink-0 rounded-2xl bg-[#f5f5f7] px-3 py-2 text-xs font-bold harmony-text-primary">
                     {Number(adjustment.balance_before || 0)} →{' '}
                     {Number(adjustment.balance_after || 0)} hari
                   </div>
                 </div>
 
                 {adjustment.action === 'add' && (
-                  <div className="mt-2 text-xs font-semibold text-[#6e6e73]">
+                  <div className="mt-2 text-xs font-semibold harmony-text-secondary">
                     PHL {formatDate(adjustment.phl_date)} · Expired{' '}
                     {formatDate(adjustment.expired_at)}
                   </div>
                 )}
 
                 <div className="mt-3 rounded-2xl border border-black/5 bg-[#fafafa] p-3">
-                  <div className="mb-2 text-[11px] font-bold uppercase tracking-[0.08em] text-[#86868b]">
+                  <div className="mb-2 text-[11px] font-bold uppercase tracking-[0.08em] harmony-text-muted">
                     Evidence
                   </div>
                   <HarmonyAttachmentViewer
@@ -3737,10 +3723,10 @@ function AssignmentSection({
   return (
     <div className="rounded-[26px] border border-black/5 bg-white/60 p-5 shadow-sm">
       <div className="mb-5 flex items-start gap-3">
-        <div className="rounded-2xl bg-[#f7edfc] p-3 text-[#7b2cbf]"><Briefcase size={18} /></div>
+        <div className="rounded-2xl bg-[#f7edfc] p-3 harmony-text-violet"><Briefcase size={18} /></div>
         <div className="min-w-0">
-          <h3 className="font-semibold text-[#1d1d1f]">Jabatan & Penugasan Tambahan</h3>
-          <p className="mt-1 text-sm leading-6 text-[#6e6e73]">
+          <h3 className="font-semibold harmony-text-primary">Jabatan & Penugasan Tambahan</h3>
+          <p className="mt-1 text-sm leading-6 harmony-text-secondary">
             Gunakan ini untuk dosen yang merangkap kepala unit, staf unit, koordinator, atau jabatan struktural tambahan. Data utama karyawan tetap menjadi homebase.
           </p>
         </div>
@@ -3753,9 +3739,9 @@ function AssignmentSection({
       ) : (
         <div className="space-y-5">
           <div>
-            <h4 className="mb-3 text-sm font-bold text-[#1d1d1f]">Penugasan Aktif</h4>
+            <h4 className="mb-3 text-sm font-bold harmony-text-primary">Penugasan Aktif</h4>
             {assignments.length === 0 ? (
-              <div className="rounded-[24px] border border-dashed border-black/10 bg-[#f5f5f7]/70 p-5 text-sm font-semibold text-[#6e6e73]">
+              <div className="rounded-[24px] border border-dashed border-black/10 bg-[#f5f5f7]/70 p-5 text-sm font-semibold harmony-text-secondary">
                 Belum ada penugasan tambahan untuk karyawan ini.
               </div>
             ) : (
@@ -3774,7 +3760,7 @@ function AssignmentSection({
           </div>
 
           <div className="rounded-[24px] border border-black/5 bg-[#f5f5f7]/80 p-4">
-            <h4 className="mb-4 text-sm font-bold text-[#1d1d1f]">Tambah Penugasan Baru</h4>
+            <h4 className="mb-4 text-sm font-bold harmony-text-primary">Tambah Penugasan Baru</h4>
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
               <OrganizationOptionField
                 label="Departemen Penugasan"
@@ -3821,11 +3807,11 @@ function AssignmentManageCard({ assignment, employees, deleting, onDelete }: { a
     <div className="rounded-[24px] border border-black/5 bg-white p-4 shadow-sm">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <span className="inline-flex rounded-full bg-[#f7edfc] px-3 py-1 text-[11px] font-bold text-[#7b2cbf]">
+          <span className="inline-flex rounded-full bg-[#f7edfc] px-3 py-1 text-[11px] font-bold harmony-text-violet">
             {formatAssignmentType(assignment.assignment_type)}
           </span>
-          <h4 className="mt-3 break-words text-sm font-bold text-[#1d1d1f]">{assignment.assignment_position || '-'}</h4>
-          <p className="mt-1 break-words text-xs font-semibold text-[#6e6e73]">{assignment.assignment_department || '-'}</p>
+          <h4 className="mt-3 break-words text-sm font-bold harmony-text-primary">{assignment.assignment_position || '-'}</h4>
+          <p className="mt-1 break-words text-xs font-semibold harmony-text-secondary">{assignment.assignment_department || '-'}</p>
         </div>
         <button
           type="button"
@@ -3836,7 +3822,7 @@ function AssignmentManageCard({ assignment, employees, deleting, onDelete }: { a
           <Trash2 size={15} />
         </button>
       </div>
-      <div className="mt-3 grid gap-2 text-xs text-[#6e6e73]">
+      <div className="mt-3 grid gap-2 text-xs harmony-text-secondary">
         <p><strong>Atasan 1:</strong> {getSupervisorLabel(assignment.supervisor_1, employees)}</p>
         <p><strong>Atasan 2:</strong> {getSupervisorLabel(assignment.supervisor_2, employees)}</p>
         <p><strong>Periode:</strong> {formatDisplayDate(assignment.start_date || '')} - {assignment.end_date ? formatDisplayDate(assignment.end_date) : 'Aktif'}</p>
@@ -3851,21 +3837,21 @@ function AssignmentDetailCard({ assignment, employees }: { assignment: EmployeeA
     <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-black/5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
-          <span className="inline-flex rounded-full bg-[#f7edfc] px-3 py-1 text-[11px] font-bold text-[#7b2cbf]">
+          <span className="inline-flex rounded-full bg-[#f7edfc] px-3 py-1 text-[11px] font-bold harmony-text-violet">
             {formatAssignmentType(assignment.assignment_type)}
           </span>
-          <h4 className="mt-3 break-words text-sm font-bold text-[#1d1d1f]">{assignment.assignment_position || '-'}</h4>
-          <p className="mt-1 break-words text-xs font-semibold text-[#6e6e73]">{assignment.assignment_department || '-'}</p>
+          <h4 className="mt-3 break-words text-sm font-bold harmony-text-primary">{assignment.assignment_position || '-'}</h4>
+          <p className="mt-1 break-words text-xs font-semibold harmony-text-secondary">{assignment.assignment_department || '-'}</p>
         </div>
-        <div className="rounded-2xl bg-[#f5f5f7] px-4 py-3 text-xs font-semibold text-[#6e6e73]">
+        <div className="rounded-2xl bg-[#f5f5f7] px-4 py-3 text-xs font-semibold harmony-text-secondary">
           {formatDisplayDate(assignment.start_date || '')} - {assignment.end_date ? formatDisplayDate(assignment.end_date) : 'Aktif'}
         </div>
       </div>
-      <div className="mt-3 grid gap-2 text-xs text-[#6e6e73] sm:grid-cols-2">
+      <div className="mt-3 grid gap-2 text-xs harmony-text-secondary sm:grid-cols-2">
         <p><strong>Atasan 1:</strong> {getSupervisorLabel(assignment.supervisor_1, employees)}</p>
         <p><strong>Atasan 2:</strong> {getSupervisorLabel(assignment.supervisor_2, employees)}</p>
       </div>
-      {assignment.notes && <p className="mt-3 text-xs leading-5 text-[#6e6e73]"><strong>Catatan:</strong> {assignment.notes}</p>}
+      {assignment.notes && <p className="mt-3 text-xs leading-5 harmony-text-secondary"><strong>Catatan:</strong> {assignment.notes}</p>}
     </div>
   )
 }
@@ -3876,9 +3862,9 @@ function ProfileUpdateCard({ log }: { log: ProfileUpdateLog }) {
       <div className="flex min-w-0 items-start gap-3">
         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#1d1d1f] text-xs font-bold text-white">{getInitials(log.full_name || '-')}</div>
         <div className="min-w-0">
-          <p className="truncate text-sm font-bold text-[#1d1d1f]">{log.full_name || '-'}</p>
-          <p className="mt-1 truncate text-xs text-[#6e6e73]">{log.employee_number || '-'} · {log.email || '-'}</p>
-          <p className="mt-2 text-xs font-semibold text-[#007aff]">{formatDateTime(log.created_at || '')}</p>
+          <p className="truncate text-sm font-bold harmony-text-primary">{log.full_name || '-'}</p>
+          <p className="mt-1 truncate text-xs harmony-text-secondary">{log.employee_number || '-'} · {log.email || '-'}</p>
+          <p className="mt-2 text-xs font-semibold harmony-text-link">{formatDateTime(log.created_at || '')}</p>
         </div>
       </div>
     </div>
@@ -3902,8 +3888,8 @@ function DetailSection({ title, icon, children, wide = false }: { title: string;
   return (
     <div className={`min-w-0 rounded-[26px] border border-black/5 bg-[#f5f5f7]/70 p-5 ${wide ? 'xl:col-span-2 2xl:col-span-2' : ''}`}>
       <div className="mb-4 flex min-w-0 items-center gap-2">
-        <div className="shrink-0 rounded-2xl bg-white p-2 text-[#007aff] shadow-sm">{icon}</div>
-        <h3 className="truncate font-semibold text-[#1d1d1f]">{title}</h3>
+        <div className="shrink-0 rounded-2xl bg-white p-2 harmony-text-link shadow-sm">{icon}</div>
+        <h3 className="truncate font-semibold harmony-text-primary">{title}</h3>
       </div>
       <div className="space-y-3">{children}</div>
     </div>
@@ -3913,11 +3899,11 @@ function DetailSection({ title, icon, children, wide = false }: { title: string;
 function DetailItem({ label, value, long = false }: { label: string; value?: string | number | null; long?: boolean }) {
   return (
     <div className={long ? 'min-w-0 rounded-2xl bg-white p-4' : 'grid min-w-0 grid-cols-1 gap-1.5 rounded-2xl bg-white px-4 py-3 sm:grid-cols-[145px_minmax(0,1fr)] sm:items-start sm:gap-4'}>
-      <p className="text-[11px] font-bold uppercase tracking-wide text-[#86868b]">
+      <p className="text-[11px] font-bold uppercase tracking-wide harmony-text-muted">
         {label}
       </p>
 
-      <p className={`${long ? 'mt-2 text-left leading-6' : 'text-left sm:text-right'} min-w-0 break-words text-sm font-semibold leading-6 text-[#1d1d1f]`}>
+      <p className={`${long ? 'mt-2 text-left leading-6' : 'text-left sm:text-right'} min-w-0 break-words text-sm font-semibold leading-6 harmony-text-primary`}>
         {value || '-'}
       </p>
     </div>
@@ -3926,11 +3912,11 @@ function DetailItem({ label, value, long = false }: { label: string; value?: str
 
 function SummaryCard({ title, value, description, icon, tone }: { title: string; value: string; description: string; icon: ReactNode; tone: 'blue' | 'green' | 'orange' | 'purple' | 'cyan' | 'red' | 'indigo' }) {
   const toneClass = {
-    blue: 'text-[#007aff] bg-[#e8f2ff]',
-    green: 'text-[#168034] bg-[#eaf8ee]',
-    orange: 'text-[#b35b00] bg-[#fff4e5]',
-    purple: 'text-[#7b2cbf] bg-[#f7edfc]',
-    cyan: 'text-[#0077a3] bg-[#e8f8ff]',
+    blue: 'harmony-text-link bg-[#e8f2ff]',
+    green: 'harmony-text-success bg-[#eaf8ee]',
+    orange: 'harmony-text-warning bg-[#fff4e5]',
+    purple: 'harmony-text-violet bg-[#f7edfc]',
+    cyan: 'harmony-text-link bg-[#e8f8ff]',
     red: 'text-red-700 bg-red-50',
     indigo: 'text-indigo-700 bg-indigo-50',
   }[tone]
@@ -3939,15 +3925,15 @@ function SummaryCard({ title, value, description, icon, tone }: { title: string;
     <div data-tone={tone} className="harmony-metric-card harmony-slide-up min-w-0 p-5">
       <div className="flex min-w-0 items-start justify-between gap-4">
         <div className="min-w-0 flex-1">
-          <p className="break-words text-sm font-semibold leading-5 text-[#6e6e73]">
+          <p className="break-words text-sm font-semibold leading-5 harmony-text-secondary">
             {title}
           </p>
 
-          <h3 className="mt-2 break-words text-3xl font-semibold tracking-tight text-[#1d1d1f]">
+          <h3 className="mt-2 break-words text-3xl font-semibold tracking-tight harmony-text-primary">
             {value}
           </h3>
 
-          <p className="mt-1 break-words text-xs leading-5 text-[#86868b]">
+          <p className="mt-1 break-words text-xs leading-5 harmony-text-muted">
             {description}
           </p>
         </div>
@@ -3962,7 +3948,7 @@ function SummaryCard({ title, value, description, icon, tone }: { title: string;
 
 function SmallBadge({ icon, label }: { icon: ReactNode; label: string }) {
   return (
-    <span className="inline-flex max-w-full items-center gap-1.5 rounded-full bg-[#f5f5f7] px-3 py-1 text-xs font-bold text-[#1d1d1f] ring-1 ring-black/5">
+    <span className="inline-flex max-w-full items-center gap-1.5 rounded-full bg-[#f5f5f7] px-3 py-1 text-xs font-bold harmony-text-primary ring-1 ring-black/5">
       <span className="shrink-0">{icon}</span>
       <span className="truncate">{label}</span>
     </span>

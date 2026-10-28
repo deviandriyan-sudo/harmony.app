@@ -1,22 +1,10 @@
 'use client'
 
+
+import { readErrorMessage } from '@/lib/error-utils'
 import Link from 'next/link'
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
-import {
-  AlertTriangle,
-  CalendarDays,
-  CheckCircle2,
-  Clock3,
-  FileText,
-  Fingerprint,
-  History,
-  Plane,
-  RefreshCcw,
-  Settings,
-  ShieldCheck,
-  Sparkles,
-  WalletCards,
-} from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { AlertTriangle, CalendarDays, CheckCircle2, Clock3, Fingerprint, History, RefreshCcw, WalletCards } from 'lucide-react'
 
 import { TodayTeamAvailability } from '@/components/employee/TodayTeamAvailability'
 import { Topbar } from '@/components/layout/Topbar'
@@ -219,7 +207,7 @@ export default function EmployeeDashboardPage() {
       const canonicalPendingCount = [
         ...(pendingLeaveResponse.data || []),
         ...(pendingPHLResponse.data || []),
-      ].filter((row: any) => isWorkflowPending(row)).length
+      ].filter((row) => isWorkflowPending(row)).length
 
       setPendingRequestCount(canonicalPendingCount)
 
@@ -277,7 +265,7 @@ export default function EmployeeDashboardPage() {
         setDebtNextMaturity(null)
       }
 
-      const leaveItems: RequestItem[] = (leaveResponse.data || []).map((row: any) => ({
+      const leaveItems: RequestItem[] = (leaveResponse.data || []).map((row) => ({
         id: row.id,
         type: 'leave',
         label: row.leave_type || labelRequestType(row.request_type),
@@ -290,7 +278,7 @@ export default function EmployeeDashboardPage() {
         createdAt: String(row.created_at || ''),
       }))
 
-      const phlItems: RequestItem[] = (phlResponse.data || []).map((row: any) => ({
+      const phlItems: RequestItem[] = (phlResponse.data || []).map((row) => ({
         id: row.id,
         type: 'phl',
         label: 'Klaim PHL',
@@ -310,8 +298,8 @@ export default function EmployeeDashboardPage() {
           .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
           .slice(0, 10),
       )
-    } catch (error: any) {
-      setMessage(error?.message || 'Dashboard employee gagal dimuat.')
+    } catch (error: unknown) {
+      setMessage(readErrorMessage(error) || 'Dashboard employee gagal dimuat.')
     } finally {
       setLoading(false)
       setRefreshing(false)
@@ -368,33 +356,7 @@ export default function EmployeeDashboardPage() {
   )
 }
 
-function RequestTypeIcon({
-  type,
-}: {
-  type: RequestItem['type']
-}) {
-  if (type === 'debt') {
-    return (
-      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-orange-50 text-orange-700">
-        <History size={17} />
-      </div>
-    )
-  }
 
-  if (type === 'phl') {
-    return (
-      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-violet-50 text-violet-700">
-        <Plane size={17} />
-      </div>
-    )
-  }
-
-  return (
-    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-blue-50 text-blue-700">
-      <FileText size={17} />
-    </div>
-  )
-}
 
 function labelDebtStatus(value: unknown) {
   const status = normalizeStatus(value)
@@ -444,10 +406,7 @@ function Status({ status }: { status: string }) {
     </span>
   )
 }
-function Metric({ title, value, description, icon, tone }: { title: string; value: string; description: string; icon: ReactNode; tone: 'blue'|'purple'|'green'|'orange' }) {
-  const map = { blue: 'bg-blue-50 text-blue-700', purple: 'bg-violet-50 text-violet-700', green: 'bg-green-50 text-green-700', orange: 'bg-orange-50 text-orange-700' }
-  return <div className="harmony-card p-5"><div className={`flex h-10 w-10 items-center justify-center rounded-2xl ${map[tone]}`}>{icon}</div><p className="mt-4 text-xs font-bold uppercase tracking-wide text-[#86868b]">{title}</p><p className="mt-1 text-3xl font-semibold tracking-tight text-[#1d1d1f]">{value}</p><p className="mt-1 text-xs leading-5 text-[#6e6e73]">{description}</p></div>
-}
-function MiniInfo({ label, value }: { label: string; value: string }) { return <div className="rounded-2xl bg-black/10 p-3"><p className="text-[10px] font-bold text-white/40">{label}</p><p className="mt-1 truncate font-semibold text-white/90">{value}</p></div> }
-function InfoRow({ label, value }: { label: string; value: string }) { return <div className="flex items-center justify-between gap-3 rounded-2xl bg-[#f5f5f7] px-4 py-3"><span className="text-xs font-semibold text-[#6e6e73]">{label}</span><span className="text-right text-xs font-bold text-[#1d1d1f]">{value}</span></div> }
-function EmptyRow({ text }: { text: string }) { return <div className="p-6 text-center text-sm text-[#6e6e73]">{text}</div> }
+
+
+function InfoRow({ label, value }: { label: string; value: string }) { return <div className="flex items-center justify-between gap-3 rounded-2xl bg-[#f5f5f7] px-4 py-3"><span className="text-xs font-semibold harmony-text-secondary">{label}</span><span className="text-right text-xs font-bold harmony-text-primary">{value}</span></div> }
+function EmptyRow({ text }: { text: string }) { return <div className="p-6 text-center text-sm harmony-text-secondary">{text}</div> }

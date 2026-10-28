@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import type { SupabaseClient } from '@supabase/supabase-js'
 
 import {
   harmonyApiError,
@@ -73,7 +74,38 @@ function durationBetween(start: unknown, end: unknown) {
   return difference > 0 ? difference : difference + 24 * 60
 }
 
-function attendanceDuration(row: any) {
+type PHLIdentityRow = {
+  id?: string | null
+  employee_id?: string | null
+  employee_number?: string | null
+  machine_pin?: string | null
+  full_name?: string | null
+  department?: string | null
+  attendance_date?: string | null
+  phl_date?: string | null
+  work_date?: string | null
+  work_duration_minutes?: number | null
+  manual_check_in?: string | null
+  requested_check_in?: string | null
+  check_in?: string | null
+  manual_check_out?: string | null
+  requested_check_out?: string | null
+  check_out?: string | null
+}
+
+type EmployeeIdentityRow = {
+  id: string
+  employee_number?: string | null
+  machine_pin?: string | null
+  full_name?: string | null
+  department?: string | null
+  supervisor_1?: string | null
+  supervisor_2?: string | null
+}
+
+type PHLWorkRow = { id: string; [key: string]: unknown }
+
+function attendanceDuration(row: PHLIdentityRow | null) {
   const direct = Number(row?.work_duration_minutes || 0)
   const directMinutes = Number.isFinite(direct) && direct > 0 ? direct : 0
 
@@ -150,7 +182,7 @@ function historicalDateVariants(workDate: string) {
   return [workDate, `${match[3]}/${match[2]}/${match[1]}`, `${match[3]}-${match[2]}-${match[1]}`]
 }
 
-function identityScore(row: any, employee: any) {
+function identityScore(row: PHLIdentityRow | null, employee: EmployeeIdentityRow | null) {
   let score = 0
   if (sameIdentity(row?.employee_id, employee?.id)) score += 100
   if (sameIdentity(row?.employee_number, employee?.employee_number)) score += 60
@@ -166,7 +198,7 @@ function identityScore(row: any, employee: any) {
   return score
 }
 
-function bestIdentityMatch(rows: any[], employee: any, workDate: string) {
+function bestIdentityMatch(rows: PHLIdentityRow[], employee: EmployeeIdentityRow, workDate: string) {
   return rows
     .filter((row) => canonicalDate(row?.attendance_date ?? row?.phl_date ?? row?.work_date) === workDate)
     .map((row) => ({ row, score: identityScore(row, employee) }))
@@ -174,12 +206,12 @@ function bestIdentityMatch(rows: any[], employee: any, workDate: string) {
     .sort((a, b) => b.score - a.score)[0]?.row || null
 }
 
-async function findAttendanceForDate(admin: any, employee: any, workDate: string) {
+async function findAttendanceForDate(admin: SupabaseClient, employee: EmployeeIdentityRow, workDate: string) {
   const select = 'id,employee_id,employee_number,machine_pin,full_name,department,attendance_date,check_in,check_out,manual_check_in,manual_check_out,requested_check_in,requested_check_out,work_duration_minutes,updated_at,deleted_at'
-  const collected: any[] = []
+  const collected: PHLIdentityRow[] = []
   const seen = new Set<string>()
 
-  const addRows = (rows: any[] | null | undefined) => {
+  const addRows = (rows: PHLIdentityRow[] | null | undefined) => {
     for (const row of rows || []) {
       const key = clean(row?.id) || `${clean(row?.employee_id)}|${clean(row?.machine_pin)}|${clean(row?.attendance_date)}`
       if (seen.has(key)) continue
@@ -233,12 +265,12 @@ async function findAttendanceForDate(admin: any, employee: any, workDate: string
   return null
 }
 
-async function findApprovedCreditForDate(admin: any, employee: any, workDate: string) {
+async function findApprovedCreditForDate(admin: SupabaseClient, employee: EmployeeIdentityRow, workDate: string) {
   const select = 'id,employee_id,employee_number,machine_pin,full_name,department,phl_date,status,source,created_at'
-  const collected: any[] = []
+  const collected: PHLIdentityRow[] = []
   const seen = new Set<string>()
 
-  const addRows = (rows: any[] | null | undefined) => {
+  const addRows = (rows: PHLIdentityRow[] | null | undefined) => {
     for (const row of rows || []) {
       const key = clean(row?.id) || `${clean(row?.employee_id)}|${clean(row?.machine_pin)}|${clean(row?.phl_date)}`
       if (seen.has(key)) continue
@@ -297,7 +329,7 @@ async function findApprovedCreditForDate(admin: any, employee: any, workDate: st
   return null
 }
 
-async function findActiveWorkRequestForDate(admin: any, employee: any, workDate: string) {
+async function findActiveWorkRequestForDate(admin: SupabaseClient, employee: EmployeeIdentityRow, workDate: string) {
   const identityQueries: Array<[string, string]> = [
     ['employee_id', clean(employee?.id)],
     ['employee_number', clean(employee?.employee_number)],
@@ -315,16 +347,16 @@ async function findActiveWorkRequestForDate(admin: any, employee: any, workDate:
 
     if (error) throw error
     const matched = (data || [])
-      .map((row: any) => ({ row, score: identityScore(row, employee) }))
-      .filter(({ score }: any) => score >= 15)
-      .sort((a: any, b: any) => b.score - a.score)[0]?.row
+      .map((row) => ({ row, score: identityScore(row, employee) }))
+      .filter(({ score }) => score >= 15)
+      .sort((a, b) => b.score - a.score)[0]?.row
     if (matched) return matched
   }
 
   return null
 }
 
-async function hasConfiguredSupervisor(admin: any, employee: any) {
+async function hasConfiguredSupervisor(admin: SupabaseClient, employee: EmployeeIdentityRow) {
   if (clean(employee?.supervisor_1) || clean(employee?.supervisor_2)) return true
 
   const { data, error } = await admin
@@ -336,7 +368,7 @@ async function hasConfiguredSupervisor(admin: any, employee: any) {
   if (error) throw error
 
   const today = todayWita()
-  return (data || []).some((row: any) => {
+  return (data || []).some((row) => {
     if (row.is_primary === true) return false
     const start = clean(row.start_date).slice(0, 10)
     const end = clean(row.end_date).slice(0, 10)
@@ -346,7 +378,7 @@ async function hasConfiguredSupervisor(admin: any, employee: any) {
   })
 }
 
-async function findHolidayForDate(admin: any, workDate: string) {
+async function findHolidayForDate(admin: SupabaseClient, workDate: string) {
   const { data, error } = await admin
     .from('holidays')
     .select('holiday_date,holiday_name,holiday_type,is_active')
@@ -354,10 +386,10 @@ async function findHolidayForDate(admin: any, workDate: string) {
     .limit(500)
 
   if (error) throw error
-  return (data || []).find((row: any) => canonicalDate(row.holiday_date) === workDate) || null
+  return (data || []).find((row) => canonicalDate(row.holiday_date) === workDate) || null
 }
 
-async function withAttachments(admin: any, rows: any[]) {
+async function withAttachments(admin: SupabaseClient, rows: PHLWorkRow[]) {
   if (!rows.length) return rows
 
   const ids = rows.map((row) => row.id)
@@ -369,7 +401,7 @@ async function withAttachments(admin: any, rows: any[]) {
 
   if (error) throw error
 
-  const grouped = new Map<string, any[]>()
+  const grouped = new Map<string, Array<Record<string, unknown>>>()
 
   for (const attachment of attachments || []) {
     let signedUrl: string | null = attachment.legacy_file_url || null
@@ -624,9 +656,9 @@ export async function POST(request: NextRequest) {
       throw attachmentError
     }
 
-    const notification = await notifyPHLWorkSubmitted(context.admin, inserted).catch((error: any) => ({
+    const notification = await notifyPHLWorkSubmitted(context.admin, inserted).catch((error: unknown) => ({
       ok: false,
-      message: error?.message || 'Email atasan gagal dikirim.',
+      message: (error instanceof Error ? error.message : '') || 'Email atasan gagal dikirim.',
     }))
 
     const [requestWithAttachments] = await withAttachments(context.admin, [inserted])
@@ -704,9 +736,9 @@ export async function DELETE(request: NextRequest) {
       .single()
     if (cancelError) throw cancelError
 
-    const notification = await notifyPHLWorkCancelled(context.admin, cancelled).catch((error: any) => ({
+    const notification = await notifyPHLWorkCancelled(context.admin, cancelled).catch((error: unknown) => ({
       ok: false,
-      message: error?.message || 'Email pembatalan gagal dikirim.',
+      message: (error instanceof Error ? error.message : '') || 'Email pembatalan gagal dikirim.',
     }))
 
     return NextResponse.json({ success: true, request: cancelled, notification })

@@ -1,6 +1,8 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+
+import { readErrorMessage } from '@/lib/error-utils'
+import { useEffectEvent, useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import * as XLSX from 'xlsx'
 import {
@@ -381,39 +383,50 @@ export default function HRAttendanceUploadPage() {
   }
 
   useEffect(() => {
-    fetchData()
+    let active = true
+    // Start session/data loading after the effect setup, avoiding a cascading synchronous render.
+    queueMicrotask(() => { if (active) void fetchData() })
+    return () => { active = false }
   }, [])
+
+  // Preview tetap bereaksi terhadap file, direktori employee, dan jadwal.
+  // Effect Event membaca parser/matcher terbaru tanpa menciptakan loop render.
+  const onRefreshUploadPreview = useEffectEvent(async (file: File, isCurrent: () => boolean) => {
+    const result = await parseAttendanceFile(file)
+    // File, jadwal, atau directory bisa berubah saat pembacaan XLSX berlangsung.
+    // Jangan biarkan preview hasil pembacaan lama menimpa file terbaru.
+    if (!isCurrent()) return
+
+    if (result.error) {
+      setErrorMessage(result.error)
+      return
+    }
+
+    const period = deriveUploadPeriod(result.rows)
+    if (period.error) {
+      setErrorMessage(period.error)
+      setUploadPeriod('')
+      return
+    }
+
+    const matchedRows = buildMatchedPreviewRows(result.rows)
+    if (!isCurrent()) return
+
+    setUploadPeriod(period.label)
+    setParsedTotalRows(result.rows.length)
+    setMatchedPreviewCount(matchedRows.length)
+    setSkippedPreviewCount(result.rows.length - matchedRows.length)
+    setParsePreview(matchedRows.slice(0, 5))
+  })
 
   useEffect(() => {
     if (!selectedFile) return
-
-    const fileToParse: File = selectedFile
-
-    async function refreshPreview(file: File) {
-      const result = await parseAttendanceFile(file)
-
-      if (result.error) {
-        setErrorMessage(result.error)
-        return
-      }
-
-      const period = deriveUploadPeriod(result.rows)
-      if (period.error) {
-        setErrorMessage(period.error)
-        setUploadPeriod('')
-        return
-      }
-
-      const matchedRows = buildMatchedPreviewRows(result.rows)
-
-      setUploadPeriod(period.label)
-      setParsedTotalRows(result.rows.length)
-      setMatchedPreviewCount(matchedRows.length)
-      setSkippedPreviewCount(result.rows.length - matchedRows.length)
-      setParsePreview(matchedRows.slice(0, 5))
-    }
-
-    refreshPreview(fileToParse)
+    let active = true
+    // Scheduling after setup avoids cascading synchronous React renders.
+    queueMicrotask(() => {
+      if (active) void onRefreshUploadPreview(selectedFile, () => active)
+    })
+    return () => { active = false }
   }, [selectedFile, employees, workSchedule])
 
   function resetUploadForm() {
@@ -457,7 +470,7 @@ export default function HRAttendanceUploadPage() {
     return ''
   }
 
-  async function handleFileChange(file: File | null) {
+  function handleFileChange(file: File | null) {
     setErrorMessage('')
     setSuccessMessage('')
     setParsePreview([])
@@ -472,36 +485,15 @@ export default function HRAttendanceUploadPage() {
     }
 
     const validationError = validateFile(file)
-
     if (validationError) {
       setErrorMessage(validationError)
       setSelectedFile(null)
       return
     }
 
+    // Preview parsing is centralized in onRefreshUploadPreview; it also reruns
+    // if the employee directory or default schedule changes.
     setSelectedFile(file)
-
-    const result = await parseAttendanceFile(file)
-
-    if (result.error) {
-      setErrorMessage(result.error)
-      return
-    }
-
-    const period = deriveUploadPeriod(result.rows)
-    if (period.error) {
-      setErrorMessage(period.error)
-      setUploadPeriod('')
-      return
-    }
-
-    const matchedRows = buildMatchedPreviewRows(result.rows)
-
-    setUploadPeriod(period.label)
-    setParsedTotalRows(result.rows.length)
-    setMatchedPreviewCount(matchedRows.length)
-    setSkippedPreviewCount(result.rows.length - matchedRows.length)
-    setParsePreview(matchedRows.slice(0, 5))
   }
 
   async function parseAttendanceFile(file: File) {
@@ -1084,7 +1076,7 @@ export default function HRAttendanceUploadPage() {
     })
   }
 
-  function hasEmployeeProtectedAttendanceData(log: any) {
+  function hasEmployeeProtectedAttendanceData(log: Record<string, unknown> | null | undefined) {
     return Boolean(
       log?.manual_check_in ||
         log?.manual_check_out ||
@@ -1112,7 +1104,7 @@ export default function HRAttendanceUploadPage() {
 
   function mergeFingerprintPayloadWithExisting(
     incoming: AttendanceLogPayload,
-    existing: any,
+    existing: Record<string, unknown> | null | undefined,
   ) {
     if (!existing) {
       return {
@@ -1210,8 +1202,9 @@ export default function HRAttendanceUploadPage() {
     const oldRaw = existing.raw_data && typeof existing.raw_data === 'object' && !Array.isArray(existing.raw_data)
       ? existing.raw_data
       : {}
-    const oldHistory = Array.isArray((oldRaw as any).incremental_uploads)
-      ? (oldRaw as any).incremental_uploads
+    const previousRaw = oldRaw as Record<string, unknown>
+    const oldHistory = Array.isArray(previousRaw.incremental_uploads)
+      ? previousRaw.incremental_uploads
       : []
 
     const merged: Record<string, unknown> = {
@@ -1250,7 +1243,7 @@ export default function HRAttendanceUploadPage() {
             upload_id: incoming.upload_id,
             filled_fields: filledFields,
             imported_at: new Date().toISOString(),
-            source_rows: (incoming.raw_data as any)?.rows || [],
+            source_rows: (incoming.raw_data as Record<string, unknown> | null)?.rows || [],
           },
         ],
       },
@@ -1301,7 +1294,7 @@ export default function HRAttendanceUploadPage() {
         }
       }
 
-      const existingMap = new Map<string, any>()
+      const existingMap = new Map<string, Record<string, unknown>>()
 
       ;(existingRows || []).forEach((row) => {
         existingMap.set(
@@ -1742,9 +1735,9 @@ Data fingerprint dari upload ini akan dilepas. Data manual employee, alasan, app
       )
 
       await fetchData()
-    } catch (error: any) {
+    } catch (error: unknown) {
       setErrorMessage(
-        error?.message ||
+        readErrorMessage(error) ||
           'Gagal menghapus upload dengan mekanisme safe merge.'
       )
     } finally {
@@ -1828,16 +1821,16 @@ Data fingerprint dari upload ini akan dilepas. Data manual employee, alasan, app
         <div className="harmony-card harmony-slide-up overflow-hidden">
           <div className="flex flex-col gap-5 border-b border-black/5 bg-white/55 p-5 lg:flex-row lg:items-center lg:justify-between">
             <div className="min-w-0">
-              <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-[#e8f2ff] px-3 py-1.5 text-xs font-bold text-[#0059b8]">
+              <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-[#e8f2ff] px-3 py-1.5 text-xs font-bold harmony-text-link">
                 <Upload size={14} />
                 Attendance Import
               </div>
 
-              <h2 className="text-lg font-semibold text-[#1d1d1f]">
+              <h2 className="text-lg font-semibold harmony-text-primary">
                 Unggah & Proses Berkas Absensi
               </h2>
 
-              <p className="mt-1 max-w-3xl text-sm leading-6 text-[#6e6e73]">
+              <p className="mt-1 max-w-3xl text-sm leading-6 harmony-text-secondary">
                 Sistem membaca periode cutoff 11–10 secara otomatis dari tanggal di file. Upload berikutnya pada periode yang sama hanya menambahkan tanggal/scan yang masih kosong tanpa menimpa fingerprint yang sudah tersimpan.
               </p>
             </div>
@@ -1885,16 +1878,16 @@ Data fingerprint dari upload ini akan dilepas. Data manual employee, alasan, app
             <div className="flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-[34px] bg-white shadow-[0_30px_90px_rgba(0,0,0,0.24)]">
               <div className="flex min-w-0 items-start justify-between gap-4 border-b border-black/5 p-5 sm:p-6">
                 <div className="min-w-0">
-                  <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-[#e8f2ff] px-3 py-1.5 text-xs font-bold text-[#0059b8]">
+                  <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-[#e8f2ff] px-3 py-1.5 text-xs font-bold harmony-text-link">
                     <CloudUpload size={14} />
                     Upload Absensi
                   </div>
 
-                  <h2 className="text-xl font-semibold text-[#1d1d1f]">
+                  <h2 className="text-xl font-semibold harmony-text-primary">
                     Unggah & Proses Berkas Mesin Absensi
                   </h2>
 
-                  <p className="mt-1 max-w-3xl text-sm leading-6 text-[#6e6e73]">
+                  <p className="mt-1 max-w-3xl text-sm leading-6 harmony-text-secondary">
                     Pilih berkas XLS, XLSX, atau CSV. Periode dibaca otomatis; data existing dipertahankan dan hanya bagian fingerprint yang masih kosong yang akan dilengkapi.
                   </p>
                 </div>
@@ -1903,7 +1896,7 @@ Data fingerprint dari upload ini akan dilepas. Data manual employee, alasan, app
                   type="button"
                   onClick={closeUploadModal}
                   disabled={uploading}
-                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#f5f5f7] text-[#1d1d1f] disabled:cursor-not-allowed disabled:opacity-60"
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#f5f5f7] harmony-text-primary disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   <X size={18} />
                 </button>
@@ -1913,13 +1906,13 @@ Data fingerprint dari upload ini akan dilepas. Data manual employee, alasan, app
                 <div className="space-y-5">
                   <div className="rounded-[28px] border border-black/5 bg-white/65 p-5 shadow-sm backdrop-blur-xl">
                     <div className="mb-4 flex items-center gap-2">
-                      <Settings2 size={18} className="text-[#007aff]" />
-                      <h3 className="font-semibold text-[#1d1d1f]">
+                      <Settings2 size={18} className="harmony-text-link" />
+                      <h3 className="font-semibold harmony-text-primary">
                         Konfirmasi Jam Kerja Reguler
                       </h3>
                     </div>
 
-                    <p className="mb-5 text-sm leading-6 text-[#6e6e73]">
+                    <p className="mb-5 text-sm leading-6 harmony-text-secondary">
                       Sistem akan menggunakan jam kerja default yang aktif pada menu Pengaturan.
                     </p>
 
@@ -1951,10 +1944,10 @@ Data fingerprint dari upload ini akan dilepas. Data manual employee, alasan, app
                       />
 
                       <div className="min-w-0">
-                        <div className="font-semibold text-[#1d1d1f]">
+                        <div className="font-semibold harmony-text-primary">
                           Saya mengonfirmasi bahwa jam kerja reguler sudah benar.
                         </div>
-                        <p className="mt-1 text-sm leading-6 text-[#6e6e73]">
+                        <p className="mt-1 text-sm leading-6 harmony-text-secondary">
                           Sistem akan memproses absensi menggunakan jam kerja {workSchedule.expected_check_in} - {workSchedule.expected_check_out}.
                         </p>
                       </div>
@@ -1969,7 +1962,7 @@ Data fingerprint dari upload ini akan dilepas. Data manual employee, alasan, app
                     <div className="relative">
                       <CalendarDays
                         size={17}
-                        className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[#86868b]"
+                        className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 harmony-text-muted"
                       />
 
                       <input
@@ -2006,7 +1999,7 @@ Data fingerprint dari upload ini akan dilepas. Data manual employee, alasan, app
                         'mb-5 flex h-16 w-16 items-center justify-center rounded-[26px] transition',
                         selectedFile
                           ? 'bg-[#007aff] text-white'
-                          : 'bg-[#e8f2ff] text-[#007aff] group-hover:scale-105',
+                          : 'bg-[#e8f2ff] harmony-text-link group-hover:scale-105',
                       ].join(' ')}
                     >
                       {selectedFile ? (
@@ -2016,17 +2009,17 @@ Data fingerprint dari upload ini akan dilepas. Data manual employee, alasan, app
                       )}
                     </div>
 
-                    <h3 className="max-w-full break-words text-xl font-semibold text-[#1d1d1f]">
+                    <h3 className="max-w-full break-words text-xl font-semibold harmony-text-primary">
                       {selectedFile ? selectedFile.name : 'Pilih berkas absensi'}
                     </h3>
 
-                    <p className="mt-2 max-w-md text-sm leading-6 text-[#6e6e73]">
+                    <p className="mt-2 max-w-md text-sm leading-6 harmony-text-secondary">
                       {selectedFile
                         ? `${formatFileSize(selectedFile.size)} · Berkas siap diproses setelah konfirmasi jam kerja.`
                         : 'Unggah berkas hasil ekspor mesin absensi. Data dengan NIP yang tidak sesuai master karyawan tidak akan diproses.'}
                     </p>
 
-                    <div className="mt-5 inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-xs font-bold text-[#007aff] shadow-sm">
+                    <div className="mt-5 inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-xs font-bold harmony-text-link shadow-sm">
                       <FileText size={14} />
                       XLS / XLSX / CSV · Maksimal 10 MB
                     </div>
@@ -2098,8 +2091,8 @@ function PreviewCard({
   return (
     <div className="rounded-[28px] border border-black/5 bg-white/70 p-5 shadow-sm backdrop-blur-xl">
       <div className="mb-4 flex items-center gap-2">
-        <ScanLine size={18} className="text-[#007aff]" />
-        <h3 className="font-semibold text-[#1d1d1f]">
+        <ScanLine size={18} className="harmony-text-link" />
+        <h3 className="font-semibold harmony-text-primary">
           Pratinjau Data yang Akan Diproses
         </h3>
       </div>
@@ -2112,10 +2105,10 @@ function PreviewCard({
           >
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <p className="break-words font-semibold text-[#1d1d1f]">
+                <p className="break-words font-semibold harmony-text-primary">
                   {row.full_name || '-'}
                 </p>
-                <p className="mt-1 break-words text-xs text-[#6e6e73]">
+                <p className="mt-1 break-words text-xs harmony-text-secondary">
                   {row.department || '-'} · PIN {row.machine_pin}
                 </p>
               </div>
@@ -2135,7 +2128,7 @@ function PreviewCard({
       <div className="hidden overflow-hidden md:block">
         <table className="w-full table-fixed text-left text-xs xl:text-sm">
           <thead>
-            <tr className="border-b border-black/5 text-xs uppercase text-[#6e6e73]">
+            <tr className="border-b border-black/5 text-xs uppercase harmony-text-secondary">
               <th className="w-[28%] py-2 pr-3">Employee</th>
               <th className="w-[14%] py-2 pr-3">Machine PIN</th>
               <th className="w-[15%] py-2 pr-3">Tanggal</th>
@@ -2153,31 +2146,31 @@ function PreviewCard({
                 className="border-b border-black/5"
               >
                 <td className="py-2 pr-3 align-top">
-                  <div className="break-words font-semibold text-[#1d1d1f]">
+                  <div className="break-words font-semibold harmony-text-primary">
                     {row.full_name || '-'}
                   </div>
-                  <div className="mt-1 break-words text-xs text-[#6e6e73]">
+                  <div className="mt-1 break-words text-xs harmony-text-secondary">
                     {row.department || '-'}
                   </div>
                 </td>
 
-                <td className="break-words py-2 pr-3 align-top font-semibold text-[#1d1d1f]">
+                <td className="break-words py-2 pr-3 align-top font-semibold harmony-text-primary">
                   {row.machine_pin}
                 </td>
 
-                <td className="break-words py-2 pr-3 align-top text-[#1d1d1f]">
+                <td className="break-words py-2 pr-3 align-top harmony-text-primary">
                   {row.attendance_date}
                 </td>
 
-                <td className="break-words py-2 pr-3 align-top text-[#1d1d1f]">
+                <td className="break-words py-2 pr-3 align-top harmony-text-primary">
                   {row.check_in || '-'}
                 </td>
 
-                <td className="break-words py-2 pr-3 align-top text-[#1d1d1f]">
+                <td className="break-words py-2 pr-3 align-top harmony-text-primary">
                   {row.check_out || '-'}
                 </td>
 
-                <td className="break-words py-2 pr-3 align-top text-[#1d1d1f]">
+                <td className="break-words py-2 pr-3 align-top harmony-text-primary">
                   {formatDuration(row.work_duration_minutes)}
                 </td>
 
@@ -2190,7 +2183,7 @@ function PreviewCard({
         </table>
       </div>
 
-      <p className="mt-4 text-xs leading-5 text-[#6e6e73]">
+      <p className="mt-4 text-xs leading-5 harmony-text-secondary">
         Pratinjau hanya menampilkan maksimal 5 data yang sesuai dengan database karyawan.
       </p>
     </div>
@@ -2213,19 +2206,19 @@ function UploadHistory({
   const displayUploads = useMemo(() => buildUploadHistoryDisplay(uploads), [uploads])
 
   return (
-    <div className="harmony-card harmony-slide-up overflow-hidden">
+    <div className="harmony-card harmony-slide-up harmony-upload-history overflow-hidden">
       <div className="flex flex-col gap-4 border-b border-black/5 bg-white/55 p-5 lg:flex-row lg:items-center lg:justify-between">
         <div className="min-w-0">
-          <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-[#eaf8ee] px-3 py-1.5 text-xs font-bold text-[#168034]">
+          <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-[#eaf8ee] px-3 py-1.5 text-xs font-bold harmony-text-success">
             <Activity size={14} />
             Upload Record
           </div>
 
-          <h2 className="text-lg font-semibold text-[#1d1d1f]">
+          <h2 className="text-lg font-semibold harmony-text-primary">
             Riwayat Unggahan
           </h2>
 
-          <p className="mt-1 text-sm leading-6 text-[#6e6e73]">
+          <p className="mt-1 text-sm leading-6 harmony-text-secondary">
             Riwayat berkas absensi yang pernah diunggah dan diproses.
           </p>
         </div>
@@ -2241,22 +2234,22 @@ function UploadHistory({
       </div>
 
       {loading && (
-        <div className="p-6 text-sm text-[#6e6e73]">
+        <div className="p-6 text-sm harmony-text-secondary">
           Memuat riwayat unggahan...
         </div>
       )}
 
       {!loading && displayUploads.length === 0 && (
         <div className="p-8 text-center">
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-3xl bg-[#f5f5f7] text-[#007aff]">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-3xl bg-[#f5f5f7] harmony-text-link">
             <Upload size={24} />
           </div>
 
-          <h3 className="mt-4 font-semibold text-[#1d1d1f]">
+          <h3 className="mt-4 font-semibold harmony-text-primary">
             Belum ada berkas absensi
           </h3>
 
-          <p className="mt-1 text-sm text-[#6e6e73]">
+          <p className="mt-1 text-sm harmony-text-secondary">
             Unggah berkas absensi pertama untuk memulai proses import data.
           </p>
         </div>
@@ -2278,7 +2271,7 @@ function UploadHistory({
           <div className="hidden overflow-hidden lg:block">
             <table className="w-full table-fixed border-collapse text-left text-xs xl:text-sm">
               <thead>
-                <tr className="border-b border-black/5 bg-[#f5f5f7]/90 text-xs uppercase tracking-wide text-[#6e6e73]">
+                <tr className="border-b border-black/5 bg-[#f5f5f7]/90 text-xs uppercase tracking-wide harmony-text-secondary">
                   <th className="w-[30%] px-4 py-4 font-semibold">Berkas</th>
                   <th className="w-[19%] px-4 py-4 font-semibold">Periode</th>
                   <th className="w-[10%] px-4 py-4 font-semibold">Ukuran</th>
@@ -2297,30 +2290,30 @@ function UploadHistory({
                   >
                     <td className="px-4 py-3.5 align-top">
                       <div className="flex min-w-0 items-start gap-3">
-                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#e8f2ff] text-[#007aff]">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#e8f2ff] harmony-text-link">
                           <FileSpreadsheet size={19} />
                         </div>
 
                         <div className="min-w-0">
-                          <div className="break-words font-semibold leading-5 text-[#1d1d1f]">
+                          <div className="break-words font-semibold leading-5 harmony-text-primary">
                             {normalizeUploadFileNameDisplay(item)}
                           </div>
-                          <div className="mt-1 line-clamp-2 break-words text-xs leading-5 text-[#6e6e73]">
+                          <div className="mt-1 line-clamp-2 break-words text-xs leading-5 harmony-text-secondary">
                             {item.notes || 'Tidak ada catatan'}
                           </div>
                         </div>
                       </div>
                     </td>
 
-                    <td className="break-words px-4 py-3.5 align-top text-[#1d1d1f]">
+                    <td className="break-words px-4 py-3.5 align-top harmony-text-primary">
                       {normalizeUploadPeriodDisplay(item)}
                     </td>
 
-                    <td className="break-words px-4 py-3.5 align-top text-[#1d1d1f]">
+                    <td className="break-words px-4 py-3.5 align-top harmony-text-primary">
                       {formatFileSize(Number(item.file_size || 0))}
                     </td>
 
-                    <td className="break-words px-4 py-3.5 align-top font-semibold text-[#1d1d1f]">
+                    <td className="break-words px-4 py-3.5 align-top font-semibold harmony-text-primary">
                       {item.total_rows || 0}
                     </td>
 
@@ -2328,7 +2321,7 @@ function UploadHistory({
                       <UploadStatusBadge status={item.status || 'uploaded'} />
                     </td>
 
-                    <td className="break-words px-4 py-3.5 align-top text-[#6e6e73]">
+                    <td className="break-words px-4 py-3.5 align-top harmony-text-secondary">
                       {formatDateTime(item.created_at)}
                     </td>
 
@@ -2362,25 +2355,25 @@ function UploadHistoryCard({
   return (
     <div className="rounded-[26px] border border-black/5 bg-white/75 p-4 shadow-sm">
       <div className="flex items-start gap-3">
-        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#e8f2ff] text-[#007aff]">
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#e8f2ff] harmony-text-link">
           <FileSpreadsheet size={19} />
         </div>
 
         <div className="min-w-0 flex-1">
-          <p className="break-words font-semibold leading-5 text-[#1d1d1f]">
+          <p className="break-words font-semibold leading-5 harmony-text-primary">
             {normalizeUploadFileNameDisplay(item)}
           </p>
 
-          <p className="mt-1 break-words text-xs leading-5 text-[#6e6e73]">
+          <p className="mt-1 break-words text-xs leading-5 harmony-text-secondary">
             {item.notes || 'Tidak ada catatan'}
           </p>
 
           <div className="mt-3 flex flex-wrap gap-2">
             <UploadStatusBadge status={item.status || 'uploaded'} />
-            <span className="inline-flex rounded-full bg-[#f5f5f7] px-3 py-1 text-xs font-bold text-[#1d1d1f]">
+            <span className="inline-flex rounded-full bg-[#f5f5f7] px-3 py-1 text-xs font-bold harmony-text-primary">
               {item.total_rows || 0} baris
             </span>
-            <span className="inline-flex rounded-full bg-[#f5f5f7] px-3 py-1 text-xs font-bold text-[#1d1d1f]">
+            <span className="inline-flex rounded-full bg-[#f5f5f7] px-3 py-1 text-xs font-bold harmony-text-primary">
               {formatFileSize(Number(item.file_size || 0))}
             </span>
           </div>
@@ -2431,17 +2424,18 @@ function UploadActions({
       if (!response.ok || !result?.url) throw new Error(result?.message || 'File tidak dapat dibuka.')
       if (preview && !preview.closed) preview.location.href = result.url
       else window.location.href = result.url
-    } catch (error: any) {
+    } catch (error: unknown) {
       preview?.close()
-      window.alert(error?.message || 'Gagal membuka file absensi.')
+      window.alert(readErrorMessage(error) || 'Gagal membuka file absensi.')
     }
   }
 
   return (
-    <div className="flex justify-center gap-2">
+    <div className="harmony-upload-actions flex justify-center gap-2">
       {item.file_path ? (
         <button type="button" onClick={openPrivateUpload}
-          className="inline-flex h-9 w-9 items-center justify-center rounded-2xl border border-black/5 bg-white text-[#007aff] shadow-sm transition hover:-translate-y-0.5 hover:bg-[#f5f5f7] hover:shadow-md"
+          aria-label="Unduh atau pratinjau berkas absensi"
+          className="harmony-upload-download inline-flex h-9 w-9 items-center justify-center rounded-2xl border border-black/5 bg-white harmony-text-link shadow-sm transition hover:-translate-y-0.5 hover:bg-[#f5f5f7] hover:shadow-md"
           title="Unduh / pratinjau berkas (akses HR sementara)"
         >
           <Download size={15} />
@@ -2453,7 +2447,8 @@ function UploadActions({
         onClick={() => handleDeleteUpload(item)}
         disabled={deletingId === item.id}
         title="Hapus upload dan data absensi terkait"
-        className="inline-flex h-9 w-9 items-center justify-center rounded-2xl bg-red-50 text-red-700 transition hover:-translate-y-0.5 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-60"
+        aria-label="Hapus berkas absensi"
+        className="harmony-upload-delete inline-flex h-9 w-9 items-center justify-center rounded-2xl bg-red-50 text-red-700 transition hover:-translate-y-0.5 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-60"
       >
         <Trash2 size={15} />
       </button>
@@ -2466,16 +2461,16 @@ function ProcessingLogic() {
     <div className="harmony-card harmony-slide-up overflow-hidden">
       <div className="flex flex-col gap-3 border-b border-black/5 bg-white/55 p-5 lg:flex-row lg:items-center lg:justify-between">
         <div className="min-w-0">
-          <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-[#f7edfc] px-3 py-1.5 text-xs font-bold text-[#7b2cbf]">
+          <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-[#f7edfc] px-3 py-1.5 text-xs font-bold harmony-text-violet">
             <Database size={14} />
             Processing Logic
           </div>
 
-          <h2 className="text-lg font-semibold text-[#1d1d1f]">
+          <h2 className="text-lg font-semibold harmony-text-primary">
             Logika Pemrosesan
           </h2>
 
-          <p className="mt-1 text-sm leading-6 text-[#6e6e73]">
+          <p className="mt-1 text-sm leading-6 harmony-text-secondary">
             Alur pemrosesan dibuat menyamping agar ringkas dan mudah dicek oleh HR.
           </p>
         </div>
@@ -2553,25 +2548,25 @@ function SummaryCard({
   tone: 'blue' | 'green' | 'orange' | 'purple'
 }) {
   const toneClass = {
-    blue: 'text-[#007aff] bg-[#e8f2ff]',
-    green: 'text-[#168034] bg-[#eaf8ee]',
-    orange: 'text-[#b35b00] bg-[#fff4e5]',
-    purple: 'text-[#7b2cbf] bg-[#f7edfc]',
+    blue: 'harmony-text-link bg-[#e8f2ff]',
+    green: 'harmony-text-success bg-[#eaf8ee]',
+    orange: 'harmony-text-warning bg-[#fff4e5]',
+    purple: 'harmony-text-violet bg-[#f7edfc]',
   }[tone]
 
   return (
     <div className="harmony-metric-card harmony-slide-up min-w-0 p-5">
       <div className="flex min-w-0 items-start justify-between gap-4">
         <div className="min-w-0 flex-1">
-          <p className="break-words text-sm leading-5 text-[#6e6e73]">
+          <p className="break-words text-sm leading-5 harmony-text-secondary">
             {title}
           </p>
 
-          <h3 className="mt-2 break-words text-2xl font-semibold tracking-tight text-[#1d1d1f]">
+          <h3 className="mt-2 break-words text-2xl font-semibold tracking-tight harmony-text-primary">
             {value}
           </h3>
 
-          <p className="mt-1 break-words text-xs leading-5 text-[#86868b]">
+          <p className="mt-1 break-words text-xs leading-5 harmony-text-muted">
             {description}
           </p>
         </div>
@@ -2593,11 +2588,11 @@ function MiniInfoCard({
 }) {
   return (
     <div className="min-w-0 rounded-[22px] border border-black/5 bg-white/70 p-4 shadow-sm backdrop-blur-xl transition hover:-translate-y-0.5 hover:bg-white hover:shadow-md">
-      <p className="break-words text-xs font-semibold leading-5 text-[#6e6e73]">
+      <p className="break-words text-xs font-semibold leading-5 harmony-text-secondary">
         {title}
       </p>
 
-      <p className="mt-2 break-words text-lg font-semibold leading-6 text-[#1d1d1f]">
+      <p className="mt-2 break-words text-lg font-semibold leading-6 harmony-text-primary">
         {value}
       </p>
     </div>
@@ -2613,11 +2608,11 @@ function MobileInfoBox({
 }) {
   return (
     <div className="rounded-2xl bg-[#f5f5f7]/80 p-3">
-      <p className="text-[11px] font-bold uppercase tracking-wide text-[#86868b]">
+      <p className="text-[11px] font-bold uppercase tracking-wide harmony-text-muted">
         {title}
       </p>
 
-      <p className="mt-1 break-words text-sm font-semibold leading-5 text-[#1d1d1f]">
+      <p className="mt-1 break-words text-sm font-semibold leading-5 harmony-text-primary">
         {value}
       </p>
     </div>
@@ -2643,17 +2638,17 @@ function ProcessItem({
             {number}
           </div>
 
-          <div className="shrink-0 text-[#007aff]">
+          <div className="shrink-0 harmony-text-link">
             {icon}
           </div>
         </div>
 
         <div className="min-w-0">
-          <h3 className="break-words font-semibold leading-5 text-[#1d1d1f]">
+          <h3 className="break-words font-semibold leading-5 harmony-text-primary">
             {title}
           </h3>
 
-          <p className="mt-2 break-words text-sm leading-6 text-[#6e6e73]">
+          <p className="mt-2 break-words text-sm leading-6 harmony-text-secondary">
             {description}
           </p>
         </div>
@@ -2674,7 +2669,7 @@ function StatusBadge({
         ? 'bg-orange-50 text-orange-700'
         : status === 'incomplete'
           ? 'bg-red-50 text-red-700'
-          : 'bg-[#e8f2ff] text-[#0059b8]'
+          : 'bg-[#e8f2ff] harmony-text-link'
 
   return (
     <span className={`inline-flex max-w-full rounded-full px-3 py-1 text-xs font-bold capitalize ${className}`}>

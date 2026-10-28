@@ -52,8 +52,12 @@ export function useHRAttendanceReporting(errorFallback: string) {
 
   useEffect(() => {
     if (!periodReady) return
-    void fetchData()
-    return () => { requestSequence.current += 1 }
+    let active = true
+    queueMicrotask(() => { if (active) void fetchData() })
+    return () => {
+      active = false
+      requestSequence.current += 1
+    }
   }, [fetchData, periodReady])
 
   return {

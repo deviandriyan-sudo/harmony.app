@@ -1,5 +1,7 @@
 'use client'
 
+
+import { readErrorMessage } from '@/lib/error-utils'
 import Image from 'next/image'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
@@ -31,24 +33,6 @@ export default function ResetPasswordPage() {
   const [message, setMessage] = useState('')
   const [messageType, setMessageType] = useState<'error' | 'info'>('info')
 
-  useEffect(() => {
-    checkRecoverySession()
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'PASSWORD_RECOVERY' && session) {
-        setHasRecoverySession(true)
-        setMessage('Silakan masukkan password baru Anda.')
-        setMessageType('info')
-      }
-    })
-
-    return () => {
-      subscription.unsubscribe()
-    }
-  }, [])
-
   async function checkRecoverySession() {
     setCheckingSession(true)
 
@@ -66,10 +50,10 @@ export default function ResetPasswordPage() {
         )
         setMessageType('error')
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error(error)
       setMessage(
-        error?.message ||
+        readErrorMessage(error) ||
           'Gagal memeriksa link reset password. Silakan coba lagi.'
       )
       setMessageType('error')
@@ -77,6 +61,26 @@ export default function ResetPasswordPage() {
       setCheckingSession(false)
     }
   }
+
+  useEffect(() => {
+    let active = true
+    queueMicrotask(() => { if (active) void checkRecoverySession() })
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'PASSWORD_RECOVERY' && session) {
+        setHasRecoverySession(true)
+        setMessage('Silakan masukkan password baru Anda.')
+        setMessageType('info')
+      }
+    })
+
+    return () => {
+      active = false
+      subscription.unsubscribe()
+    }
+  }, [])
 
   async function handleUpdatePassword(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -120,10 +124,10 @@ export default function ResetPasswordPage() {
       setTimeout(() => {
         router.replace('/login')
       }, 1300)
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error(error)
       setMessage(
-        error?.message ||
+        readErrorMessage(error) ||
           'Gagal memperbarui password. Silakan coba lagi.'
       )
       setMessageType('error')
@@ -136,15 +140,15 @@ export default function ResetPasswordPage() {
     return (
       <main className="harmony-public-page flex min-h-screen items-center justify-center bg-[#f5f5f7] p-6">
         <div className="harmony-public-shell w-full max-w-md rounded-[32px] border border-black/5 bg-white p-8 text-center shadow-[0_24px_70px_rgba(15,23,42,0.12)]">
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[#e8f2ff] text-[#007aff]">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[#e8f2ff] harmony-text-link">
             <Loader2 size={26} className="animate-spin" />
           </div>
 
-          <h1 className="mt-5 text-xl font-semibold text-[#1d1d1f]">
+          <h1 className="mt-5 text-xl font-semibold harmony-text-primary">
             Memeriksa Link
           </h1>
 
-          <p className="mt-2 text-sm leading-6 text-[#6e6e73]">
+          <p className="mt-2 text-sm leading-6 harmony-text-secondary">
             Sistem sedang memeriksa sesi reset password.
           </p>
         </div>
@@ -153,7 +157,7 @@ export default function ResetPasswordPage() {
   }
 
   return (
-    <main className="harmony-public-page relative min-h-screen overflow-hidden bg-[#f4f7fb] px-5 py-6 text-[#1d1d1f]">
+    <main className="harmony-public-page relative min-h-screen overflow-hidden bg-[#f4f7fb] px-5 py-6 harmony-text-primary">
       <div className="pointer-events-none absolute -left-32 -top-32 h-96 w-96 rounded-full bg-[#007aff]/20 blur-3xl" />
       <div className="pointer-events-none absolute -bottom-36 right-0 h-[30rem] w-[30rem] rounded-full bg-[#af52de]/20 blur-3xl" />
       <div className="pointer-events-none absolute left-1/2 top-1/3 h-80 w-80 -translate-x-1/2 rounded-full bg-[#34c759]/12 blur-3xl" />
@@ -236,7 +240,7 @@ export default function ResetPasswordPage() {
                   <h1 className="text-3xl font-semibold tracking-tight">
                     HARMONY
                   </h1>
-                  <p className="mt-2 text-sm leading-6 text-[#6e6e73]">
+                  <p className="mt-2 text-sm leading-6 harmony-text-secondary">
                     Reset Password
                   </p>
                 </div>
@@ -245,23 +249,23 @@ export default function ResetPasswordPage() {
               <button
                 type="button"
                 onClick={() => router.replace('/login')}
-                className="mb-6 inline-flex w-fit items-center gap-2 rounded-full bg-[#f5f5f7] px-4 py-2 text-xs font-bold text-[#6e6e73] transition hover:bg-white hover:text-[#1d1d1f]"
+                className="mb-6 inline-flex w-fit items-center gap-2 rounded-full bg-[#f5f5f7] px-4 py-2 text-xs font-bold harmony-text-secondary transition hover:bg-white harmony-hover-text-primary"
               >
                 <ArrowLeft size={14} />
                 Kembali ke Login
               </button>
 
               <div className="mb-8">
-                <div className="inline-flex items-center gap-2 rounded-full bg-[#e8f2ff] px-3 py-1.5 text-xs font-bold text-[#0059b8]">
+                <div className="inline-flex items-center gap-2 rounded-full bg-[#e8f2ff] px-3 py-1.5 text-xs font-bold harmony-text-link">
                   <Lock size={13} />
                   Reset Password
                 </div>
 
-                <h2 className="mt-5 text-3xl font-semibold tracking-tight text-[#1d1d1f] md:text-4xl">
+                <h2 className="mt-5 text-3xl font-semibold tracking-tight harmony-text-primary md:text-4xl">
                   Buat Password Baru
                 </h2>
 
-                <p className="mt-3 text-sm leading-6 text-[#6e6e73]">
+                <p className="mt-3 text-sm leading-6 harmony-text-secondary">
                   Masukkan password baru untuk akun HARMONY Anda.
                 </p>
               </div>
@@ -281,19 +285,19 @@ export default function ResetPasswordPage() {
 
               <form onSubmit={handleUpdatePassword} className="space-y-5">
                 <label className="block">
-                  <span className="text-sm font-semibold text-[#1d1d1f]">
+                  <span className="text-sm font-semibold harmony-text-primary">
                     Password Baru
                   </span>
 
                   <div className="mt-2 flex min-h-13 items-center gap-3 rounded-[22px] border border-black/5 bg-[#f5f5f7]/80 px-4 shadow-sm transition focus-within:border-[#007aff]/40 focus-within:bg-white focus-within:shadow-md">
-                    <Lock size={18} className="text-[#86868b]" />
+                    <Lock size={18} className="harmony-text-muted" />
 
                     <input
                       type={showPassword ? 'text' : 'password'}
                       value={password}
                       onChange={(event) => setPassword(event.target.value)}
                       placeholder="Minimal 8 karakter"
-                      className="min-h-13 w-full bg-transparent text-sm outline-none placeholder:text-[#9a9aa0]"
+                      className="min-h-13 w-full bg-transparent text-sm outline-none harmony-placeholder-muted"
                       autoComplete="new-password"
                       disabled={!hasRecoverySession || loading}
                     />
@@ -301,7 +305,7 @@ export default function ResetPasswordPage() {
                     <button
                       type="button"
                       onClick={() => setShowPassword((prev) => !prev)}
-                      className="flex h-9 w-9 items-center justify-center rounded-2xl text-[#86868b] transition hover:bg-white hover:text-[#1d1d1f]"
+                      className="flex h-9 w-9 items-center justify-center rounded-2xl harmony-text-muted transition hover:bg-white harmony-hover-text-primary"
                     >
                       {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                     </button>
@@ -309,12 +313,12 @@ export default function ResetPasswordPage() {
                 </label>
 
                 <label className="block">
-                  <span className="text-sm font-semibold text-[#1d1d1f]">
+                  <span className="text-sm font-semibold harmony-text-primary">
                     Konfirmasi Password Baru
                   </span>
 
                   <div className="mt-2 flex min-h-13 items-center gap-3 rounded-[22px] border border-black/5 bg-[#f5f5f7]/80 px-4 shadow-sm transition focus-within:border-[#007aff]/40 focus-within:bg-white focus-within:shadow-md">
-                    <Lock size={18} className="text-[#86868b]" />
+                    <Lock size={18} className="harmony-text-muted" />
 
                     <input
                       type={showConfirmPassword ? 'text' : 'password'}
@@ -323,7 +327,7 @@ export default function ResetPasswordPage() {
                         setConfirmPassword(event.target.value)
                       }
                       placeholder="Ulangi password baru"
-                      className="min-h-13 w-full bg-transparent text-sm outline-none placeholder:text-[#9a9aa0]"
+                      className="min-h-13 w-full bg-transparent text-sm outline-none harmony-placeholder-muted"
                       autoComplete="new-password"
                       disabled={!hasRecoverySession || loading}
                     />
@@ -331,7 +335,7 @@ export default function ResetPasswordPage() {
                     <button
                       type="button"
                       onClick={() => setShowConfirmPassword((prev) => !prev)}
-                      className="flex h-9 w-9 items-center justify-center rounded-2xl text-[#86868b] transition hover:bg-white hover:text-[#1d1d1f]"
+                      className="flex h-9 w-9 items-center justify-center rounded-2xl harmony-text-muted transition hover:bg-white harmony-hover-text-primary"
                     >
                       {showConfirmPassword ? (
                         <EyeOff size={18} />
@@ -366,7 +370,7 @@ export default function ResetPasswordPage() {
                 </button>
               </form>
 
-              <p className="mt-10 text-center text-xs leading-5 text-[#86868b]">
+              <p className="mt-10 text-center text-xs leading-5 harmony-text-muted">
                 © {new Date().getFullYear()} HARMONY · Poltek Sinar Mas Berau
                 Coal
               </p>

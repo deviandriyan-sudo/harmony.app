@@ -1,3 +1,5 @@
+
+import { readErrorMessage } from '@/lib/error-utils'
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
@@ -39,7 +41,7 @@ function getPeriodRange(periodMonth: string) {
   };
 }
 
-function isSubmittedOrLocked(confirmation: any) {
+function isSubmittedOrLocked(confirmation: Record<string, unknown> | null) {
   return Boolean(
     confirmation?.is_locked ||
       confirmation?.employee_status === "submitted" ||
@@ -50,7 +52,7 @@ function isSubmittedOrLocked(confirmation: any) {
   );
 }
 
-function hasEmployeeVerificationData(log: any) {
+function hasEmployeeVerificationData(log: Record<string, unknown> | null) {
   return Boolean(
     log?.manual_check_in ||
       log?.manual_check_out ||
@@ -74,7 +76,7 @@ function hasEmployeeVerificationData(log: any) {
   );
 }
 
-function isPureEmployeeManualLog(log: any) {
+function isPureEmployeeManualLog(log: Record<string, unknown> | null) {
   const noMachineData =
     !log?.upload_id &&
     !log?.check_in &&
@@ -182,7 +184,7 @@ export async function POST(request: NextRequest) {
     // --------------------------------------------------------
     // Resolve active app user
     // --------------------------------------------------------
-    let appUser: any = null;
+    let appUser: { employee_id?: string | null; is_active?: boolean | null } | null = null;
 
     const byId = await admin
       .from("app_users")
@@ -462,12 +464,12 @@ export async function POST(request: NextRequest) {
       message:
         "Data verifikasi manual berhasil dibersihkan. Data fingerprint asli dipertahankan.",
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     return NextResponse.json(
       {
         success: false,
         error:
-          error?.message ||
+          readErrorMessage(error) ||
           "Terjadi kesalahan saat mereset verifikasi absensi.",
       },
       { status: 500 },

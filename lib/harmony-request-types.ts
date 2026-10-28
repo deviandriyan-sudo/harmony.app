@@ -713,7 +713,7 @@ function normalizeType(
       Number(item.sort_order || 100),
 
     max_days:
-      item.max_days === null || item.max_days === undefined || item.max_days === ('' as any)
+      item.max_days === null || item.max_days === undefined || String(item.max_days) === ''
         ? null
         : Number(item.max_days),
 

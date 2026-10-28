@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import type { SupabaseClient } from '@supabase/supabase-js'
 
 import { harmonyApiError, requireHarmonyApi } from '@/lib/server/user-api-auth'
 import { isPHLSupervisorOf, notifyPHLWorkDecision } from '@/lib/server/phl-work'
@@ -39,7 +40,33 @@ function durationBetween(start: unknown, end: unknown) {
   return difference > 0 ? difference : difference + 24 * 60
 }
 
-function attendanceDuration(row: any) {
+type PHLAttendanceRow = {
+  work_duration_minutes?: number | null
+  manual_check_in?: string | null
+  requested_check_in?: string | null
+  check_in?: string | null
+  manual_check_out?: string | null
+  requested_check_out?: string | null
+  check_out?: string | null
+}
+
+type PHLWorkRequestRow = {
+  id: string
+  employee_id: string
+  employee_number?: string | null
+  machine_pin?: string | null
+  full_name?: string | null
+  department?: string | null
+  position?: string | null
+  attendance_log_id?: string | null
+  work_date: string
+  work_purpose?: string | null
+  work_start_time?: string | null
+  work_end_time?: string | null
+  requested_work_minutes?: number | null
+}
+
+function attendanceDuration(row: PHLAttendanceRow | null) {
   const direct = Number(row?.work_duration_minutes || 0)
   const directMinutes = Number.isFinite(direct) && direct > 0 ? direct : 0
   const start = row?.manual_check_in || row?.requested_check_in || row?.check_in || null
@@ -52,7 +79,7 @@ function appendNote(existing: unknown, next: string) {
   return current ? `${current}\n${next}` : next
 }
 
-async function findAttendanceForApproval(admin: any, target: any) {
+async function findAttendanceForApproval(admin: SupabaseClient, target: PHLWorkRequestRow) {
   if (target.attendance_log_id) {
     const byId = await admin
       .from('attendance_logs')
@@ -87,7 +114,7 @@ async function findAttendanceForApproval(admin: any, target: any) {
   return null
 }
 
-async function firstEvidenceName(admin: any, requestId: string) {
+async function firstEvidenceName(admin: SupabaseClient, requestId: string) {
   const result = await admin
     .from('phl_work_request_attachments')
     .select('file_name')
@@ -100,8 +127,8 @@ async function firstEvidenceName(admin: any, requestId: string) {
 }
 
 async function syncApprovedPHLToAttendance(
-  admin: any,
-  target: any,
+  admin: SupabaseClient,
+  target: PHLWorkRequestRow,
   supervisorName: string,
   supervisorEmail: string | null,
   supervisorNote: string,
@@ -226,7 +253,7 @@ async function syncApprovedPHLToAttendance(
   }
 }
 
-async function rollbackAttendanceSync(admin: any, snapshot: AttendanceSyncSnapshot | null) {
+async function rollbackAttendanceSync(admin: SupabaseClient, snapshot: AttendanceSyncSnapshot | null) {
   if (!snapshot) return
   if (snapshot.created) {
     await admin.from('attendance_logs').delete().eq('id', snapshot.id)
@@ -364,9 +391,9 @@ export async function POST(
         .single()
       if (reviewedError) throw reviewedError
 
-      const notification = await notifyPHLWorkDecision(reviewed).catch((error: any) => ({
+      const notification = await notifyPHLWorkDecision(reviewed).catch((error: unknown) => ({
         ok: false,
-        message: error?.message || 'Email keputusan PHL gagal dikirim.',
+        message: (error instanceof Error ? error.message : '') || 'Email keputusan PHL gagal dikirim.',
       }))
 
       return NextResponse.json({

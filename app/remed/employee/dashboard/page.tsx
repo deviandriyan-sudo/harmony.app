@@ -1,8 +1,10 @@
 'use client'
 
+
+import { readErrorMessage } from '@/lib/error-utils'
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
-import { Activity, CircleDollarSign, FileClock, HeartPulse, Plus, WalletCards } from 'lucide-react'
+import { Activity, CircleDollarSign, FileClock, WalletCards } from 'lucide-react'
 import { RemedClaimList } from '@/components/remed/RemedClaimList'
 import { RemedStatCard } from '@/components/remed/RemedStatCard'
 import { formatRupiah } from '@/lib/remed'
@@ -19,12 +21,16 @@ export default function RemedEmployeeDashboard() {
     try {
       setError('')
       setData(await remedFetch<DashboardPayload>('/api/remed/dashboard'))
-    } catch (e: any) {
-      setError(e?.message || 'Gagal memuat dashboard Re-Med.')
+    } catch (e: unknown) {
+      setError(readErrorMessage(e) || 'Gagal memuat dashboard Re-Med.')
     }
   }
 
-  useEffect(() => { void load() }, [])
+  useEffect(() => {
+    let active = true
+    queueMicrotask(() => { if (active) void load() })
+    return () => { active = false }
+  }, [])
 
   const ent = data?.entitlement
   const used = Number(ent?.legacy_used || 0) + Number(ent?.current_used || 0)

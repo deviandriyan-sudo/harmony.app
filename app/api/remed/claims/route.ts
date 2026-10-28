@@ -1,3 +1,5 @@
+
+import { readErrorMessage } from '@/lib/error-utils'
 import { randomUUID } from 'crypto'
 import { NextRequest, NextResponse } from 'next/server'
 
@@ -221,12 +223,12 @@ export async function POST(request: NextRequest) {
     let notification = null
     try {
       notification = await notifyRemedClaimSubmitted(ctx.admin, createdClaimId)
-    } catch (notificationError: any) {
+    } catch (notificationError: unknown) {
       notification = {
         ok: false,
         sent: 0,
         failed: 1,
-        message: notificationError?.message || 'Notifikasi email Re-Med gagal diproses.',
+        message: readErrorMessage(notificationError) || 'Notifikasi email Re-Med gagal diproses.',
       }
       console.warn('Re-Med submit email notification warning:', notificationError)
     }

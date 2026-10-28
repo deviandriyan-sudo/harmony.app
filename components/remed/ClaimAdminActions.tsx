@@ -1,5 +1,7 @@
 'use client'
 
+
+import { readErrorMessage } from '@/lib/error-utils'
 import { Loader2, Printer, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
@@ -46,8 +48,8 @@ export function ClaimAdminActions({
       })
       if (result.warning) window.alert(result.warning)
       onDone()
-    } catch (error: any) {
-      window.alert(error?.message || 'Gagal menghapus klaim.')
+    } catch (error: unknown) {
+      window.alert(readErrorMessage(error) || 'Gagal menghapus klaim.')
     } finally {
       setDeleting(false)
     }

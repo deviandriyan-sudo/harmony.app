@@ -1,3 +1,5 @@
+
+import { readErrorMessage } from '@/lib/error-utils'
 import { NextRequest, NextResponse } from 'next/server'
 import { timingSafeEqual } from 'node:crypto'
 import { supabaseAdmin } from '@/lib/supabase-admin'
@@ -37,8 +39,8 @@ export async function GET(request: NextRequest) {
       general.batches++
       if (batch.paused || !batch.claimed || !batch.remaining) break
     }
-  } catch (error: any) {
-    general.error = error?.message || 'Queue umum gagal diproses.'
+  } catch (error: unknown) {
+    general.error = readErrorMessage(error) || 'Queue umum gagal diproses.'
     console.error('HARMONY general notification queue cron failed:', error)
   }
 
@@ -53,8 +55,8 @@ export async function GET(request: NextRequest) {
       attendance.batches++
       if (batch.paused || !batch.claimed || !batch.remaining) break
     }
-  } catch (error: any) {
-    attendance.error = error?.message || 'Queue upload absensi gagal diproses.'
+  } catch (error: unknown) {
+    attendance.error = readErrorMessage(error) || 'Queue upload absensi gagal diproses.'
     console.error('HARMONY attendance queue cron failed:', error)
   }
 

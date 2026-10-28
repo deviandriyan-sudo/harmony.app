@@ -1,34 +1,11 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+
+import { readErrorMessage } from '@/lib/error-utils'
+import { useEffectEvent, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import type { ReactNode } from 'react'
-import {
-  Activity,
-  AlertTriangle,
-  BadgeCheck,
-  CheckCircle2,
-  Copy,
-  DatabaseZap,
-  Eye,
-  EyeOff,
-  KeyRound,
-  Lock,
-  Mail,
-  MailCheck,
-  Power,
-  RefreshCcw,
-  RotateCcw,
-  Save,
-  Search,
-  ShieldCheck,
-  Sparkles,
-  Trash2,
-  UserRound,
-  Users,
-  WalletCards,
-  X,
-} from 'lucide-react'
+import { Activity, AlertTriangle, BadgeCheck, CheckCircle2, Copy, DatabaseZap, Eye, EyeOff, KeyRound, Lock, Mail, MailCheck, Power, RefreshCcw, Save, Search, ShieldCheck, Sparkles, Trash2, UserRound, Users, WalletCards, X } from 'lucide-react'
 
 import { Topbar } from '@/components/layout/Topbar'
 import { changeHarmonyPassword } from '@/lib/account-password'
@@ -173,8 +150,9 @@ export default function HRSettingsPage() {
     })
   }, [employees, employeeSearch])
 
+  const onSettingsLoad = useEffectEvent(fetchAllData)
   useEffect(() => {
-    fetchAllData()
+    onSettingsLoad()
   }, [])
 
   async function fetchAllData() {
@@ -275,7 +253,7 @@ export default function HRSettingsPage() {
   }: {
     actionType: string
     targetEmployee?: Employee | null
-    metadata?: Record<string, any>
+    metadata?: Record<string, unknown>
   }) {
     await supabase
       .from('hr_setting_action_logs')
@@ -494,9 +472,9 @@ export default function HRSettingsPage() {
       // Penting: refresh app_users agar badge "Belum Ada" langsung berubah
       // tanpa perlu reload browser.
       await fetchAppUsers()
-    } catch (error: any) {
+    } catch (error: unknown) {
       setErrorMessage(
-        error?.message ||
+        readErrorMessage(error) ||
           'Terjadi kesalahan saat membuat/sinkronkan akun karyawan.'
       )
     } finally {
@@ -677,14 +655,14 @@ export default function HRSettingsPage() {
           className="group flex flex-col gap-4 rounded-[28px] border border-[#b9dcff] bg-gradient-to-br from-[#f4f9ff] to-white p-5 shadow-sm transition hover:border-[#007aff]/40 hover:shadow-md sm:flex-row sm:items-center sm:justify-between"
         >
           <div className="flex items-start gap-4">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-3xl bg-[#e8f2ff] text-[#007aff]">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-3xl bg-[#e8f2ff] harmony-text-link">
               <MailCheck size={22} />
             </div>
             <div>
-              <p className="text-sm font-bold text-[#1d1d1f]">
+              <p className="text-sm font-bold harmony-text-primary">
                 Diagnostik Email HARMONY
               </p>
-              <p className="mt-1 max-w-3xl text-sm leading-6 text-[#6e6e73]">
+              <p className="mt-1 max-w-3xl text-sm leading-6 harmony-text-secondary">
                 Cek RESEND_API_KEY, sender, status domain Resend, URL production, dan kirim test email dari satu tempat.
               </p>
             </div>
@@ -700,12 +678,12 @@ export default function HRSettingsPage() {
           className="group flex flex-col gap-4 rounded-[28px] border border-[#c9e9dc] bg-gradient-to-br from-[#f2fbf7] to-white p-5 shadow-sm transition hover:border-[#179b68]/40 hover:shadow-md sm:flex-row sm:items-center sm:justify-between"
         >
           <div className="flex items-start gap-4">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-3xl bg-[#e8f7f1] text-[#18794e]">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-3xl bg-[#e8f7f1] harmony-text-success">
               <Activity size={22} />
             </div>
             <div>
-              <p className="text-sm font-bold text-[#1d1d1f]">System Health HARMONY</p>
-              <p className="mt-1 max-w-3xl text-sm leading-6 text-[#6e6e73]">
+              <p className="text-sm font-bold harmony-text-primary">System Health HARMONY</p>
+              <p className="mt-1 max-w-3xl text-sm leading-6 harmony-text-secondary">
                 Aktifkan/nonaktifkan HARMONY saat maintenance sekaligus kontrol email, lalu cek schema, RPC, storage, dan environment production.
               </p>
             </div>
@@ -841,16 +819,16 @@ function AccountPanel({
     <div className="harmony-card overflow-hidden">
       <div className="border-b border-black/5 p-5">
         <div className="flex items-start gap-4">
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-3xl bg-[#e8f2ff] text-[#007aff]">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-3xl bg-[#e8f2ff] harmony-text-link">
             <UserRound size={22} />
           </div>
 
           <div className="min-w-0">
-            <h2 className="text-base font-semibold text-[#1d1d1f]">
+            <h2 className="text-base font-semibold harmony-text-primary">
               Informasi Akun
             </h2>
 
-            <p className="mt-1 text-sm leading-6 text-[#6e6e73]">
+            <p className="mt-1 text-sm leading-6 harmony-text-secondary">
               Akun HR yang sedang aktif.
             </p>
           </div>
@@ -858,7 +836,7 @@ function AccountPanel({
       </div>
 
       {loading ? (
-        <div className="p-5 text-sm text-[#6e6e73]">
+        <div className="p-5 text-sm harmony-text-secondary">
           Memuat informasi akun...
         </div>
       ) : (
@@ -881,12 +859,12 @@ function SecurityNote() {
   return (
     <div className="rounded-[28px] border border-blue-100 bg-[#e8f2ff]/70 p-5">
       <div className="flex items-start gap-4">
-        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white text-[#007aff] shadow-sm">
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white harmony-text-link shadow-sm">
           <Lock size={20} />
         </div>
 
         <div>
-          <h3 className="font-semibold text-[#1d1d1f]">
+          <h3 className="font-semibold harmony-text-primary">
             Catatan Keamanan
           </h3>
 
@@ -937,11 +915,11 @@ function HRPasswordPanel({
           </div>
 
           <div className="min-w-0">
-            <h2 className="text-base font-semibold text-[#1d1d1f]">
+            <h2 className="text-base font-semibold harmony-text-primary">
               Ganti Password HR
             </h2>
 
-            <p className="mt-1 text-sm leading-6 text-[#6e6e73]">
+            <p className="mt-1 text-sm leading-6 harmony-text-secondary">
               Verifikasi password lama sebelum membuat password baru.
             </p>
           </div>
@@ -994,16 +972,16 @@ function EmployeeToolsPanel({
     <div className="harmony-card overflow-hidden">
       <div className="flex flex-col gap-4 border-b border-black/5 p-5 xl:flex-row xl:items-center xl:justify-between">
         <div className="min-w-0">
-          <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-[#e8f2ff] px-3 py-1.5 text-xs font-bold text-[#0059b8]">
+          <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-[#e8f2ff] px-3 py-1.5 text-xs font-bold harmony-text-link">
             <Sparkles size={14} />
             Employee Admin Tools
           </div>
 
-          <h2 className="text-base font-semibold text-[#1d1d1f]">
+          <h2 className="text-base font-semibold harmony-text-primary">
             Pilih Karyawan
           </h2>
 
-          <p className="mt-1 text-sm leading-6 text-[#6e6e73]">
+          <p className="mt-1 text-sm leading-6 harmony-text-secondary">
             Pilih karyawan untuk reset password, reset data dummy, saldo, atau akses.
           </p>
         </div>
@@ -1016,13 +994,13 @@ function EmployeeToolsPanel({
 
       <div className="space-y-4 p-5">
         <div className="flex min-h-12 items-center gap-3 rounded-[18px] border border-black/5 bg-[#f5f5f7]/85 px-4 shadow-sm transition focus-within:border-[#007aff]/40 focus-within:bg-white focus-within:shadow-md">
-          <Search size={18} className="shrink-0 text-[#86868b]" />
+          <Search size={18} className="shrink-0 harmony-text-muted" />
 
           <input
             value={search}
             onChange={(event) => onSearchChange(event.target.value)}
             placeholder="Cari nama, NIP, email, unit..."
-            className="min-h-12 w-full bg-transparent text-sm font-medium text-[#1d1d1f] outline-none placeholder:text-[#9a9aa0]"
+            className="min-h-12 w-full bg-transparent text-sm font-medium harmony-text-primary outline-none harmony-placeholder-muted"
           />
         </div>
 
@@ -1097,16 +1075,16 @@ function EmployeePasswordResetPanel({
     <div className="harmony-card overflow-hidden">
       <div className="border-b border-black/5 p-5">
         <div className="flex items-start gap-4">
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-3xl bg-[#e8f2ff] text-[#007aff]">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-3xl bg-[#e8f2ff] harmony-text-link">
             <KeyRound size={22} />
           </div>
 
           <div className="min-w-0">
-            <h2 className="text-base font-semibold text-[#1d1d1f]">
+            <h2 className="text-base font-semibold harmony-text-primary">
               {hasAppUser ? 'Reset Password Karyawan' : 'Buat Akun & Password Karyawan'}
             </h2>
 
-            <p className="mt-1 text-sm leading-6 text-[#6e6e73]">
+            <p className="mt-1 text-sm leading-6 harmony-text-secondary">
               {hasAppUser
                 ? 'Reset password login Supabase Auth karyawan terpilih.'
                 : 'Karyawan belum memiliki akun login. Saat disimpan, sistem otomatis membuat/sinkronkan Supabase Auth dan app_users.'}
@@ -1199,11 +1177,11 @@ function EmployeeDangerToolsPanel({
           </div>
 
           <div className="min-w-0">
-            <h2 className="text-base font-semibold text-[#1d1d1f]">
+            <h2 className="text-base font-semibold harmony-text-primary">
               Reset & Kontrol Data
             </h2>
 
-            <p className="mt-1 text-sm leading-6 text-[#6e6e73]">
+            <p className="mt-1 text-sm leading-6 harmony-text-secondary">
               Untuk membersihkan data dummy/testing atau mengatur akses.
             </p>
           </div>
@@ -1285,16 +1263,16 @@ function AccountInfoRow({ icon, label, value }: { icon: React.ReactNode; label: 
   return (
     <div className="flex items-center justify-between gap-4 rounded-[22px] border border-black/5 bg-[#f5f5f7]/70 p-4">
       <div className="flex min-w-0 items-center gap-3">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-white text-[#007aff] shadow-sm">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-white harmony-text-link shadow-sm">
           {icon}
         </div>
 
         <div className="min-w-0">
-          <p className="text-xs font-medium text-[#6e6e73]">
+          <p className="text-xs font-medium harmony-text-secondary">
             {label}
           </p>
 
-          <p className="mt-1 truncate text-sm font-semibold text-[#1d1d1f]">
+          <p className="mt-1 truncate text-sm font-semibold harmony-text-primary">
             {value}
           </p>
         </div>
@@ -1307,16 +1285,16 @@ function MiniInfo({ icon, label, value }: { icon: ReactNode; label: string; valu
   return (
     <div className="rounded-[22px] border border-black/5 bg-[#f5f5f7]/70 p-4">
       <div className="flex min-w-0 items-center gap-3">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-white text-[#007aff] shadow-sm">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-white harmony-text-link shadow-sm">
           {icon}
         </div>
 
         <div className="min-w-0">
-          <p className="text-xs font-medium text-[#6e6e73]">
+          <p className="text-xs font-medium harmony-text-secondary">
             {label}
           </p>
 
-          <p className="mt-1 truncate text-sm font-semibold text-[#1d1d1f]">
+          <p className="mt-1 truncate text-sm font-semibold harmony-text-primary">
             {value}
           </p>
         </div>
@@ -1334,11 +1312,11 @@ function DangerActionButton({ icon, title, description, disabled, onClick }: { i
         </div>
 
         <div className="min-w-0">
-          <p className="text-sm font-bold text-[#1d1d1f]">
+          <p className="text-sm font-bold harmony-text-primary">
             {title}
           </p>
 
-          <p className="mt-1 text-xs leading-5 text-[#6e6e73]">
+          <p className="mt-1 text-xs leading-5 harmony-text-secondary">
             {description}
           </p>
         </div>
@@ -1377,11 +1355,11 @@ function PasswordInput({ label, value, show, placeholder, autoComplete, onChange
       </span>
 
       <div className="flex min-h-12 items-center gap-3 rounded-[18px] border border-black/5 bg-[#f5f5f7]/85 px-4 shadow-sm transition focus-within:border-[#007aff]/40 focus-within:bg-white focus-within:shadow-md">
-        <Lock size={18} className="shrink-0 text-[#86868b]" />
+        <Lock size={18} className="shrink-0 harmony-text-muted" />
 
-        <input type={show ? 'text' : 'password'} value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} autoComplete={autoComplete} className="min-h-12 w-full bg-transparent text-sm font-medium text-[#1d1d1f] outline-none placeholder:text-[#9a9aa0]" />
+        <input type={show ? 'text' : 'password'} value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} autoComplete={autoComplete} className="min-h-12 w-full bg-transparent text-sm font-medium harmony-text-primary outline-none harmony-placeholder-muted" />
 
-        <button type="button" onClick={onToggleShow} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl text-[#86868b] transition hover:bg-white hover:text-[#1d1d1f]" aria-label={show ? 'Sembunyikan password' : 'Tampilkan password'}>
+        <button type="button" onClick={onToggleShow} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl harmony-text-muted transition hover:bg-white harmony-hover-text-primary" aria-label={show ? 'Sembunyikan password' : 'Tampilkan password'}>
           {show ? <EyeOff size={18} /> : <Eye size={18} />}
         </button>
       </div>
@@ -1393,7 +1371,7 @@ function PasswordStrengthBox({ passwordStrength }: { passwordStrength: ReturnTyp
   return (
     <div className="rounded-[22px] border border-black/5 bg-[#f5f5f7]/75 p-4">
       <div className="flex items-center justify-between gap-4">
-        <p className="text-xs font-semibold uppercase tracking-wide text-[#6e6e73]">
+        <p className="text-xs font-semibold uppercase tracking-wide harmony-text-secondary">
           Kekuatan Password
         </p>
 

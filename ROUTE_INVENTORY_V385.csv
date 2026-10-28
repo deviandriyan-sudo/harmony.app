@@ -1,0 +1,113 @@
+route,scope,source
+/auth/callback,Auth / public / common,app/auth/callback/page.tsx
+/employee/account/documents,Employee,app/employee/account/documents/page.tsx
+/employee/account,Employee,app/employee/account/page.tsx
+/employee/approvals/[employeeId]/[period],Employee,app/employee/approvals/[employeeId]/[period]/page.tsx
+/employee/approvals/attendance,Employee,app/employee/approvals/attendance/page.tsx
+/employee/approvals/leave,Employee,app/employee/approvals/leave/page.tsx
+/employee/approvals/leave/postpone,Employee,app/employee/approvals/leave/postpone/page.tsx
+/employee/approvals,Employee,app/employee/approvals/page.tsx
+/employee/approvals/phl,Employee,app/employee/approvals/phl/page.tsx
+/employee/attendance,Employee,app/employee/attendance/page.tsx
+/employee/dashboard,Employee,app/employee/dashboard/page.tsx
+/employee/leave,Employee,app/employee/leave/page.tsx
+/employee/leave/postpone,Employee,app/employee/leave/postpone/page.tsx
+/employee/phl,Employee,app/employee/phl/page.tsx
+/employee/requests,Employee,app/employee/requests/page.tsx
+/employee/settings,Employee,app/employee/settings/page.tsx
+/hr/attendance/approvals/[employeeId]/[period],HR,app/hr/attendance/approvals/[employeeId]/[period]/page.tsx
+/hr/attendance/approvals,HR,app/hr/attendance/approvals/page.tsx
+/hr/attendance/audit,HR,app/hr/attendance/audit/page.tsx
+/hr/attendance/data,HR,app/hr/attendance/data/page.tsx
+/hr/attendance/export/history,HR,app/hr/attendance/export/history/page.tsx
+/hr/attendance/export,HR,app/hr/attendance/export/page.tsx
+/hr/attendance/final-report,HR,app/hr/attendance/final-report/page.tsx
+/hr/attendance,HR,app/hr/attendance/page.tsx
+/hr/attendance/sync,HR,app/hr/attendance/sync/page.tsx
+/hr/attendance/upload,HR,app/hr/attendance/upload/page.tsx
+/hr/dashboard,HR,app/hr/dashboard/page.tsx
+/hr/employees,HR,app/hr/employees/page.tsx
+/hr/employees/profile/[employeeId]/documents,HR,app/hr/employees/profile/[employeeId]/documents/page.tsx
+/hr/employees/profile/[employeeId],HR,app/hr/employees/profile/[employeeId]/page.tsx
+/hr/holidays,HR,app/hr/holidays/page.tsx
+/hr/leave/administration,HR,app/hr/leave/administration/page.tsx
+/hr/leave/cycles,HR,app/hr/leave/cycles/page.tsx
+/hr/leave,HR,app/hr/leave/page.tsx
+/hr/leave/postpone,HR,app/hr/leave/postpone/page.tsx
+/hr/phl/balance,HR,app/hr/phl/balance/page.tsx
+/hr/phl,HR,app/hr/phl/page.tsx
+/hr/settings/notifications,HR,app/hr/settings/notifications/page.tsx
+/hr/settings,HR,app/hr/settings/page.tsx
+/hr/settings/system-health,HR,app/hr/settings/system-health/page.tsx
+/hr/users,HR,app/hr/users/page.tsx
+/login,Auth / public / common,app/login/page.tsx
+/,Auth / public / common,app/page.tsx
+/remed/employee/account,Re-Med Employee,app/remed/employee/account/page.tsx
+/remed/employee/claims/new,Re-Med Employee,app/remed/employee/claims/new/page.tsx
+/remed/employee/claims,Re-Med Employee,app/remed/employee/claims/page.tsx
+/remed/employee/dashboard,Re-Med Employee,app/remed/employee/dashboard/page.tsx
+/remed/employee/history,Re-Med Employee,app/remed/employee/history/page.tsx
+/remed/finance/access,Finance,app/remed/finance/access/page.tsx
+/remed/finance/claims/[id]/print,Finance,app/remed/finance/claims/[id]/print/page.tsx
+/remed/finance/claims,Finance,app/remed/finance/claims/page.tsx
+/remed/finance/dashboard,Finance,app/remed/finance/dashboard/page.tsx
+/remed/finance/history,Finance,app/remed/finance/history/page.tsx
+/remed/finance/payments,Finance,app/remed/finance/payments/page.tsx
+/remed/hr/access,Re-Med HR,app/remed/hr/access/page.tsx
+/remed/hr/claims/[id]/print,Re-Med HR,app/remed/hr/claims/[id]/print/page.tsx
+/remed/hr/claims,Re-Med HR,app/remed/hr/claims/page.tsx
+/remed/hr/dashboard,Re-Med HR,app/remed/hr/dashboard/page.tsx
+/remed/hr/employees,Re-Med HR,app/remed/hr/employees/page.tsx
+/remed/hr/history,Re-Med HR,app/remed/hr/history/page.tsx
+/remed/hr/reports,Re-Med HR,app/remed/hr/reports/page.tsx
+/remed/hr/signatures,Re-Med HR,app/remed/hr/signatures/page.tsx
+/remed,Auth / public / common,app/remed/page.tsx
+/reset-password,Auth / public / common,app/reset-password/page.tsx
+/api/account/change-password,API,app/api/account/change-password/route.ts
+/api/attachments,API,app/api/attachments/route.ts
+/api/auth/access,API,app/api/auth/access/route.ts
+/api/cron/attendance-emails,API,app/api/cron/attendance-emails/route.ts
+/api/employee/attendance/manual-entry,API,app/api/employee/attendance/manual-entry/route.ts
+/api/employee/attendance/reset-verification,API,app/api/employee/attendance/reset-verification/route.ts
+/api/employee/leave/postpone,API,app/api/employee/leave/postpone/route.ts
+/api/employee/phl-claims,API,app/api/employee/phl-claims/route.ts
+/api/employee/profile/documents,API,app/api/employee/profile/documents/route.ts
+/api/employee/profile/ptkp-preview,API,app/api/employee/profile/ptkp-preview/route.ts
+/api/employee/profile,API,app/api/employee/profile/route.ts
+/api/health,API,app/api/health/route.ts
+/api/hr/attendance/upload-file,API,app/api/hr/attendance/upload-file/route.ts
+/api/hr/employee-ptkp,API,app/api/hr/employee-ptkp/route.ts
+/api/hr/leave/balance-correction,API,app/api/hr/leave/balance-correction/route.ts
+/api/hr/leave/postpone-adjustments,API,app/api/hr/leave/postpone-adjustments/route.ts
+/api/hr/leave/request-types,API,app/api/hr/leave/request-types/route.ts
+/api/hr/phl-adjustments,API,app/api/hr/phl-adjustments/route.ts
+/api/hr/users/bulk,API,app/api/hr/users/bulk/route.ts
+/api/hr/users/change-email,API,app/api/hr/users/change-email/route.ts
+/api/hr/users/reset-password,API,app/api/hr/users/reset-password/route.ts
+/api/hr/users,API,app/api/hr/users/route.ts
+/api/hr/users/update,API,app/api/hr/users/update/route.ts
+/api/leave/types,API,app/api/leave/types/route.ts
+/api/notifications/attendance-upload,API,app/api/notifications/attendance-upload/route.ts
+/api/notifications/queue,API,app/api/notifications/queue/route.ts
+/api/notifications/send-email,API,app/api/notifications/send-email/route.ts
+/api/notifications/tasks,API,app/api/notifications/tasks/route.ts
+/api/phl/work-requests/[id]/review,API,app/api/phl/work-requests/[id]/review/route.ts
+/api/phl/work-requests,API,app/api/phl/work-requests/route.ts
+/api/remed/attachments/[id],API,app/api/remed/attachments/[id]/route.ts
+/api/remed/claim-types,API,app/api/remed/claim-types/route.ts
+/api/remed/claims/[id]/cancel,API,app/api/remed/claims/[id]/cancel/route.ts
+/api/remed/claims/[id],API,app/api/remed/claims/[id]/route.ts
+/api/remed/claims,API,app/api/remed/claims/route.ts
+/api/remed/dashboard,API,app/api/remed/dashboard/route.ts
+/api/remed/finance/claims/[id]/payment,API,app/api/remed/finance/claims/[id]/payment/route.ts
+/api/remed/finance/claims/[id]/review,API,app/api/remed/finance/claims/[id]/review/route.ts
+/api/remed/history/[claimId],API,app/api/remed/history/[claimId]/route.ts
+/api/remed/history,API,app/api/remed/history/route.ts
+/api/remed/hr/access,API,app/api/remed/hr/access/route.ts
+/api/remed/hr/claims/[id]/review,API,app/api/remed/hr/claims/[id]/review/route.ts
+/api/remed/hr/entitlements,API,app/api/remed/hr/entitlements/route.ts
+/api/remed/reports,API,app/api/remed/reports/route.ts
+/api/remed/session,API,app/api/remed/session/route.ts
+/api/remed/signatures,API,app/api/remed/signatures/route.ts
+/api/remed/uploads/receipts,API,app/api/remed/uploads/receipts/route.ts
+/api/system/status,API,app/api/system/status/route.ts

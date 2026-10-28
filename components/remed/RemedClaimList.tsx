@@ -1,5 +1,7 @@
 'use client'
 
+
+import { readErrorMessage } from '@/lib/error-utils'
 import { ExternalLink, ShieldCheck, TrendingDown, WalletCards } from 'lucide-react'
 import { ClaimStatusBadge } from '@/components/remed/ClaimStatusBadge'
 import { formatRemedDate, formatRupiah } from '@/lib/remed'
@@ -43,12 +45,12 @@ function ClaimBalanceImpact({ claim }: { claim: RemedClaim }) {
 
       <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
         <div className="rounded-[16px] border border-white/80 bg-white/70 p-3">
-          <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-[#8a8f98]">Plafond Dasar</p>
-          <p className="mt-1 text-sm font-bold text-[#202328]">{formatRupiah(entitlement.plafond_total)}</p>
+          <p className="text-[10px] font-bold uppercase tracking-[0.08em] harmony-text-muted">Plafond Dasar</p>
+          <p className="mt-1 text-sm font-bold harmony-text-primary">{formatRupiah(entitlement.plafond_total)}</p>
         </div>
         <div className="rounded-[16px] border border-white/80 bg-white/70 p-3">
-          <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-[#8a8f98]">Sisa Sebelum Klaim Ini</p>
-          <p className="mt-1 text-sm font-bold text-[#202328]">{formatRupiah(availableBeforeClaim)}</p>
+          <p className="text-[10px] font-bold uppercase tracking-[0.08em] harmony-text-muted">Sisa Sebelum Klaim Ini</p>
+          <p className="mt-1 text-sm font-bold harmony-text-primary">{formatRupiah(availableBeforeClaim)}</p>
         </div>
         <div className="rounded-[16px] border border-amber-100/80 bg-amber-50/85 p-3">
           <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-amber-700">{claim.status === 'pending_hr' ? 'Nominal Diajukan' : 'Nominal Disetujui HR'}</p>
@@ -82,13 +84,13 @@ export function RemedClaimList({
     try {
       const payload = await remedFetch<{ url: string }>(`/api/remed/attachments/${id}`)
       window.open(payload.url, '_blank', 'noopener,noreferrer')
-    } catch (error: any) {
-      window.alert(error?.message || 'Gagal membuka lampiran.')
+    } catch (error: unknown) {
+      window.alert(readErrorMessage(error) || 'Gagal membuka lampiran.')
     }
   }
 
   if (!claims.length) {
-    return <div className="rounded-[22px] border border-dashed border-black/10 bg-[#f8f9fb] p-9 text-center text-sm text-[#747982]">Belum ada data klaim.</div>
+    return <div className="rounded-[22px] border border-dashed border-black/10 bg-[#f8f9fb] p-9 text-center text-sm harmony-text-secondary">Belum ada data klaim.</div>
   }
 
   return (
@@ -98,16 +100,16 @@ export function RemedClaimList({
           <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2">
-                <p className="font-bold tracking-[-0.01em] text-[#17181b]">{claim.claim_number}</p>
+                <p className="font-bold tracking-[-0.01em] harmony-text-primary">{claim.claim_number}</p>
                 <ClaimStatusBadge status={claim.status} />
               </div>
-              {showEmployee ? <p className="mt-2 text-sm font-bold text-[#25272c]">{claim.employee?.full_name || '-'}</p> : null}
+              {showEmployee ? <p className="mt-2 text-sm font-bold harmony-text-primary">{claim.employee?.full_name || '-'}</p> : null}
 
-              <div className="mt-3 grid gap-2 rounded-[17px] bg-[#f7f8fa] p-3.5 text-sm text-[#747982] sm:grid-cols-2 lg:grid-cols-4">
-                <p><span className="font-semibold text-[#25272c]">Jenis:</span> {claim.claim_type?.name || '-'}</p>
-                <p><span className="font-semibold text-[#25272c]">Tanggal:</span> {formatRemedDate(claim.treatment_date)}</p>
-                <p><span className="font-semibold text-[#25272c]">Nilai diproses:</span> {formatRupiah(claim.submitted_amount)}</p>
-                <p><span className="font-semibold text-[#25272c]">Disetujui:</span> {claim.approved_amount ? formatRupiah(claim.approved_amount) : '-'}</p>
+              <div className="mt-3 grid gap-2 rounded-[17px] bg-[#f7f8fa] p-3.5 text-sm harmony-text-secondary sm:grid-cols-2 lg:grid-cols-4">
+                <p><span className="font-semibold harmony-text-primary">Jenis:</span> {claim.claim_type?.name || '-'}</p>
+                <p><span className="font-semibold harmony-text-primary">Tanggal:</span> {formatRemedDate(claim.treatment_date)}</p>
+                <p><span className="font-semibold harmony-text-primary">Nilai diproses:</span> {formatRupiah(claim.submitted_amount)}</p>
+                <p><span className="font-semibold harmony-text-primary">Disetujui:</span> {claim.approved_amount ? formatRupiah(claim.approved_amount) : '-'}</p>
               </div>
 
               {claim.receipt_amount != null && Number(claim.receipt_amount) > Number(claim.submitted_amount) ? (
@@ -119,9 +121,9 @@ export function RemedClaimList({
               {showBalanceImpact ? <ClaimBalanceImpact claim={claim} /> : null}
 
               {(claim.provider_name || claim.employee_note) ? (
-                <div className="mt-3 rounded-[17px] border border-black/[0.045] bg-white p-3.5 text-sm text-[#5f646c]">
-                  {claim.provider_name ? <p><span className="font-bold text-[#25272c]">Provider:</span> {claim.provider_name}</p> : null}
-                  {claim.employee_note ? <p className="mt-1"><span className="font-bold text-[#25272c]">Catatan:</span> {claim.employee_note}</p> : null}
+                <div className="mt-3 rounded-[17px] border border-black/[0.045] bg-white p-3.5 text-sm harmony-text-secondary">
+                  {claim.provider_name ? <p><span className="font-bold harmony-text-primary">Provider:</span> {claim.provider_name}</p> : null}
+                  {claim.employee_note ? <p className="mt-1"><span className="font-bold harmony-text-primary">Catatan:</span> {claim.employee_note}</p> : null}
                 </div>
               ) : null}
 
@@ -132,7 +134,7 @@ export function RemedClaimList({
                       key={attachment.id}
                       type="button"
                       onClick={() => openAttachment(attachment.id)}
-                      className="inline-flex min-h-8 items-center gap-1.5 rounded-full border border-black/[0.06] bg-[#f6f7f9] px-3 text-xs font-bold text-[#25272c] transition hover:bg-white"
+                      className="inline-flex min-h-8 items-center gap-1.5 rounded-full border border-black/[0.06] bg-[#f6f7f9] px-3 text-xs font-bold harmony-text-primary transition hover:bg-white"
                     >
                       <ExternalLink size={13} /> {attachment.attachment_kind === 'payment_proof' ? 'Bukti Bayar' : attachment.file_name}
                     </button>

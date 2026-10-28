@@ -2,16 +2,7 @@
 
 import Link from 'next/link'
 import { useMemo, type ReactNode } from 'react'
-import {
-  AlertTriangle,
-  ArrowLeft,
-  CheckCircle2,
-  FileSpreadsheet,
-  Loader2,
-  RefreshCcw,
-  Search,
-  ShieldCheck,
-} from 'lucide-react'
+import { AlertTriangle, ArrowLeft, FileSpreadsheet, Loader2, RefreshCcw, Search, ShieldCheck } from 'lucide-react'
 
 import { Topbar } from '@/components/layout/Topbar'
 import { AttendanceWorkspaceTabs } from '@/components/attendance/AttendanceWorkspaceTabs'
@@ -19,7 +10,7 @@ import { isUuid } from '@/lib/attendance-reporting'
 import { useHRAttendanceReporting } from '@/components/attendance/useHRAttendanceReporting'
 
 export default function HRAttendanceDataPage() {
-  const { periodMonth, setPeriodMonth, dataset, search, setSearch, loading, errorMessage, range, rows, filteredRows, fetchData } =
+  const { periodMonth, setPeriodMonth, dataset, search, setSearch, loading, errorMessage, range, filteredRows, fetchData } =
     useHRAttendanceReporting('Data absensi gagal dimuat.')
 
   const totals = useMemo(
@@ -123,7 +114,7 @@ export default function HRAttendanceDataPage() {
         <section className="harmony-card overflow-hidden">
           <div className="flex flex-col gap-3 border-b border-black/5 p-5 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
             <div className="flex min-h-11 items-center gap-2 rounded-2xl border border-black/5 bg-[#f5f5f7] px-4 sm:w-80">
-              <Search size={16} className="text-[#86868b]" />
+              <Search size={16} className="harmony-text-muted" />
               <input
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
@@ -148,7 +139,7 @@ export default function HRAttendanceDataPage() {
           </div>
 
           {loading ? (
-            <div className="flex items-center gap-3 p-8 text-sm text-[#6e6e73]">
+            <div className="flex items-center gap-3 p-8 text-sm harmony-text-secondary">
               <Loader2 size={18} className="animate-spin" />
               Menggabungkan sumber absensi...
             </div>
@@ -156,7 +147,7 @@ export default function HRAttendanceDataPage() {
             <div className="overflow-x-auto">
               <table className="min-w-[1680px] w-full border-collapse text-left text-xs">
                 <thead>
-                  <tr className="border-b border-black/5 bg-[#f5f5f7] text-[#6e6e73]">
+                  <tr className="border-b border-black/5 bg-[#f5f5f7] harmony-text-secondary">
                     <Th>Karyawan</Th>
                     <Th>Workflow</Th>
                     <Th>Kehadiran Tercatat</Th>
@@ -180,8 +171,8 @@ export default function HRAttendanceDataPage() {
                   {filteredRows.map((row) => (
                     <tr key={row.employee.id} className="border-b border-black/5 hover:bg-[#fafafa]">
                       <Td>
-                        <div className="font-bold text-[#1d1d1f]">{row.employee.full_name || '-'}</div>
-                        <div className="mt-1 text-[11px] text-[#86868b]">
+                        <div className="font-bold harmony-text-primary">{row.employee.full_name || '-'}</div>
+                        <div className="mt-1 text-[11px] harmony-text-muted">
                           {row.employee.employee_number || '-'} · PIN {row.employee.machine_pin || '-'} · {row.employee.department || '-'}
                         </div>
                         {row.synthetic && (
@@ -252,9 +243,9 @@ export default function HRAttendanceDataPage() {
   )
 }
 
-function WorkflowLines({ confirmation, locked }: { confirmation: any; locked: boolean }) {
+function WorkflowLines({ confirmation, locked }: { confirmation: { employee_status?: string | null; supervisor_status?: string | null; hr_status?: string | null } | null; locked: boolean }) {
   return (
-    <div className="space-y-1 text-[11px] text-[#6e6e73]">
+    <div className="space-y-1 text-[11px] harmony-text-secondary">
       <Line label="Emp" value={workflowLabel(confirmation?.employee_status)} />
       <Line label="Atasan" value={workflowLabel(confirmation?.supervisor_status)} />
       <Line label="HR" value={workflowLabel(confirmation?.hr_status)} />
@@ -266,7 +257,7 @@ function WorkflowLines({ confirmation, locked }: { confirmation: any; locked: bo
 function Line({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <span className="font-bold text-[#1d1d1f]">{label}:</span> {value}
+      <span className="font-bold harmony-text-primary">{label}:</span> {value}
     </div>
   )
 }
@@ -329,7 +320,7 @@ function Count({
     ? 'bg-red-50 text-red-700'
     : tone === 'green' || strong
       ? 'bg-green-50 text-green-700'
-      : 'bg-[#f5f5f7] text-[#1d1d1f]'
+      : 'bg-[#f5f5f7] harmony-text-primary'
 
   return (
     <td className="px-4 py-4 text-center align-top">

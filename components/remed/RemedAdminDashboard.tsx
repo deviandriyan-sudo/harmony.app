@@ -28,7 +28,11 @@ export function RemedAdminDashboard({ role }: { role: 'hr' | 'finance' }) {
       setError(issue instanceof Error ? issue.message : `Gagal memuat dashboard Re-Med ${role.toUpperCase()}.`)
     }
   }, [role])
-  useEffect(() => { void load() }, [load])
+  useEffect(() => {
+    let active = true
+    queueMicrotask(() => { if (active) void load() })
+    return () => { active = false }
+  }, [load])
   const exportAll = async () => {
     setExporting(true)
     setError('')

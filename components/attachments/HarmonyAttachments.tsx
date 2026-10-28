@@ -1,5 +1,7 @@
 'use client'
 
+
+import { readErrorMessage } from '@/lib/error-utils'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   ExternalLink,
@@ -88,21 +90,21 @@ export function HarmonyPendingAttachmentPicker({
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <div className="flex items-center gap-2">
-            <Paperclip size={17} className="text-[#007aff]" />
-            <h3 className="font-semibold text-[#1d1d1f]">
+            <Paperclip size={17} className="harmony-text-link" />
+            <h3 className="font-semibold harmony-text-primary">
               {label}
               {required ? <span className="ml-1 text-red-500">*</span> : null}
             </h3>
           </div>
-          <p className="mt-1 text-sm leading-6 text-[#6e6e73]">{description}</p>
-          <p className="mt-1 text-xs font-semibold text-[#86868b]">
+          <p className="mt-1 text-sm leading-6 harmony-text-secondary">{description}</p>
+          <p className="mt-1 text-xs font-semibold harmony-text-muted">
             PDF/JPG/PNG/WEBP/DOC/DOCX/XLS/XLSX · maks. 10 MB/file · {files.length}/{maxFiles} file baru
           </p>
         </div>
 
         <label
           className={[
-            'inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl bg-white px-4 text-sm font-bold text-[#007aff] shadow-sm transition',
+            'inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl bg-white px-4 text-sm font-bold harmony-text-link shadow-sm transition',
             disabled || files.length >= maxFiles
               ? 'cursor-not-allowed opacity-50'
               : 'cursor-pointer hover:bg-[#e8f2ff]',
@@ -135,12 +137,12 @@ export function HarmonyPendingAttachmentPicker({
               key={`${file.name}-${file.size}-${file.lastModified}-${index}`}
               className="flex items-center gap-3 rounded-2xl border border-black/5 bg-white p-3"
             >
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#e8f2ff] text-[#007aff]">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#e8f2ff] harmony-text-link">
                 <FileText size={17} />
               </div>
               <div className="min-w-0 flex-1">
-                <p className="truncate text-xs font-bold text-[#1d1d1f]">{file.name}</p>
-                <p className="mt-0.5 text-[11px] text-[#86868b]">
+                <p className="truncate text-xs font-bold harmony-text-primary">{file.name}</p>
+                <p className="mt-0.5 text-[11px] harmony-text-muted">
                   {formatHarmonyAttachmentSize(file.size)}
                 </p>
               </div>
@@ -157,7 +159,7 @@ export function HarmonyPendingAttachmentPicker({
           ))}
         </div>
       ) : (
-        <div className="mt-4 rounded-2xl border border-dashed border-black/10 bg-white/70 px-4 py-3 text-xs text-[#86868b]">
+        <div className="mt-4 rounded-2xl border border-dashed border-black/10 bg-white/70 px-4 py-3 text-xs harmony-text-muted">
           Belum ada dokumen dipilih.
         </div>
       )}
@@ -235,10 +237,10 @@ export function HarmonyAttachmentViewer({
       try {
         const rows = await listHarmonyAttachments(entityType, entityId)
         if (active) setAttachments(rows)
-      } catch (loadError: any) {
+      } catch (loadError: unknown) {
         if (active) {
           setAttachments([])
-          setError(loadError?.message || 'Lampiran belum dapat dimuat.')
+          setError(readErrorMessage(loadError) || 'Lampiran belum dapat dimuat.')
         }
       } finally {
         if (active) setLoading(false)
@@ -270,8 +272,8 @@ export function HarmonyAttachmentViewer({
       await deleteHarmonyAttachment(attachment.id)
       setAttachments((prev) => prev.filter((item) => item.id !== attachment.id))
       onDeleted?.()
-    } catch (deleteError: any) {
-      setError(deleteError?.message || 'Lampiran gagal dihapus.')
+    } catch (deleteError: unknown) {
+      setError(readErrorMessage(deleteError) || 'Lampiran gagal dihapus.')
     } finally {
       setDeletingId('')
     }
@@ -279,7 +281,7 @@ export function HarmonyAttachmentViewer({
 
   if (loading && visibleAttachments.length === 0) {
     return (
-      <span className="inline-flex items-center gap-2 text-xs font-semibold text-[#86868b]">
+      <span className="inline-flex items-center gap-2 text-xs font-semibold harmony-text-muted">
         <Loader2 size={13} className="animate-spin" />
         Memuat dokumen...
       </span>
@@ -289,7 +291,7 @@ export function HarmonyAttachmentViewer({
   if (visibleAttachments.length === 0) {
     return (
       <div>
-        <span className="text-xs font-semibold text-[#86868b]">{emptyText}</span>
+        <span className="text-xs font-semibold harmony-text-muted">{emptyText}</span>
         {error ? <p className="mt-1 text-[11px] text-orange-600">{error}</p> : null}
       </div>
     )
@@ -305,17 +307,17 @@ export function HarmonyAttachmentViewer({
             compact ? 'px-2.5 py-2' : 'px-3 py-2.5',
           ].join(' ')}
         >
-          <FileText size={compact ? 13 : 15} className="shrink-0 text-[#007aff]" />
+          <FileText size={compact ? 13 : 15} className="shrink-0 harmony-text-link" />
           <a
             href={attachment.file_url}
             target="_blank"
             rel="noreferrer"
-            className="min-w-0 flex-1 truncate text-xs font-bold text-[#007aff] hover:underline"
+            className="min-w-0 flex-1 truncate text-xs font-bold harmony-text-link hover:underline"
             title={attachment.file_name}
           >
             {index + 1}. {attachment.file_name}
           </a>
-          <ExternalLink size={11} className="shrink-0 text-[#86868b]" />
+          <ExternalLink size={11} className="shrink-0 harmony-text-muted" />
           {editable && !attachment.id.startsWith('legacy-') ? (
             <button
               type="button"

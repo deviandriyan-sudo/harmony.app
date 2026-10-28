@@ -1,5 +1,7 @@
+
+import { readErrorMessage, readErrorStatus } from '@/lib/error-utils'
 import { NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 
 import {
   getNotificationEnvironmentStatus,
@@ -134,7 +136,7 @@ async function getAuthenticatedAppUser(request: Request) {
     }
   }
 
-  let appUser: any = null
+  let appUser: { id?: string; email?: string | null; role?: string | null; employee_id?: string | null; is_active?: boolean | null } | null = null
 
   const byId = await admin
     .from('app_users')
@@ -179,7 +181,7 @@ async function getAuthenticatedAppUser(request: Request) {
 }
 
 async function validateRecipientsAreHarmonyUsers(
-  admin: any,
+  admin: SupabaseClient,
   recipients: string[]
 ) {
   if (recipients.length === 0) {
@@ -222,7 +224,7 @@ async function validateRecipientsAreHarmonyUsers(
   ;[
     ...(employeesResponse.data || []),
     ...(appUsersResponse.data || []),
-  ].forEach((row: any) => {
+  ].forEach((row) => {
     const email = normalizeEmail(row?.email)
     if (email) allowed.add(email)
   })
@@ -359,10 +361,10 @@ export async function POST(request: Request) {
           failed: result.failed,
           details: result.details || [],
         })
-      } catch (workflowError: any) {
+      } catch (workflowError: unknown) {
         return buildError(
-          workflowError?.message || 'Workflow notifikasi HARMONY gagal diproses.',
-          Number(workflowError?.status || 500),
+          readErrorMessage(workflowError) || 'Workflow notifikasi HARMONY gagal diproses.',
+          Number(readErrorStatus(workflowError) || 500),
           { code: 'HARMONY_WORKFLOW_NOTIFICATION_ERROR' },
         )
       }
@@ -443,9 +445,9 @@ export async function POST(request: Request) {
       cc,
       bcc,
     })
-  } catch (error: any) {
+  } catch (error: unknown) {
     return buildError(
-      error?.message || 'Terjadi kesalahan pada pusat notifikasi HARMONY.',
+      readErrorMessage(error) || 'Terjadi kesalahan pada pusat notifikasi HARMONY.',
       500,
       { code: 'HARMONY_NOTIFICATION_ERROR' },
     )

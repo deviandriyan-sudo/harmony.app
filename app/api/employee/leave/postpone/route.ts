@@ -1,6 +1,8 @@
+
+import { readErrorMessage } from '@/lib/error-utils'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { canonicalizeLeaveBalanceSummary } from '@/lib/leave-balance-canonical'
+import { canonicalizeLeaveBalanceSummary, type HarmonyLeaveCycleLike, type HarmonyLeaveBalanceSummary, type HarmonyCanonicalLeaveBalance } from '@/lib/leave-balance-canonical'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -43,14 +45,14 @@ export async function GET(request: NextRequest) {
     )
     if (contextResponse.error) throw contextResponse.error
 
-    const context = (contextResponse.data || {}) as Record<string, any>
-    const allCycles = Array.isArray(context.cycles) ? context.cycles : []
+    const context = (contextResponse.data || {}) as { employee?: { id?: string | null } | null; cycles?: HarmonyLeaveCycleLike[]; requests?: unknown[]; reference_date?: string | null }
+    const allCycles: HarmonyLeaveCycleLike[] = Array.isArray(context.cycles) ? context.cycles : []
     const visibleCycles = allCycles.filter(
-      (cycle: any) => !String(cycle?.notes || '').includes('[HR_FLEX_POSTPONE]')
+      (cycle) => !String(cycle?.notes || '').includes('[HR_FLEX_POSTPONE]')
     )
 
     const employeeId = String(context?.employee?.id || '').trim()
-    let balanceSummary: Record<string, any> | null = null
+    let balanceSummary: HarmonyCanonicalLeaveBalance | null = null
 
     if (employeeId) {
       const summaryResponse = await supabase
@@ -62,7 +64,7 @@ export async function GET(request: NextRequest) {
       if (summaryResponse.error) throw summaryResponse.error
       if (summaryResponse.data) {
         balanceSummary = canonicalizeLeaveBalanceSummary(
-          summaryResponse.data as Record<string, any>,
+          summaryResponse.data as HarmonyLeaveBalanceSummary,
           allCycles,
           context.reference_date || null,
         )
@@ -86,8 +88,8 @@ export async function GET(request: NextRequest) {
       },
       { headers: { 'Cache-Control': 'no-store, max-age=0' } },
     )
-  } catch (error: any) {
-    const message = error?.message || 'Gagal memuat pengajuan postpone.'
+  } catch (error: unknown) {
+    const message = readErrorMessage(error) || 'Gagal memuat pengajuan postpone.'
     const status = /session/i.test(message)
       ? 401
       : /belum terhubung|employee aktif/i.test(message)
@@ -111,8 +113,8 @@ export async function POST(request: NextRequest) {
     if (error) throw error
 
     return NextResponse.json({ success: true, result: data })
-  } catch (error: any) {
-    const message = error?.message || 'Gagal mengirim pengajuan postpone.'
+  } catch (error: unknown) {
+    const message = readErrorMessage(error) || 'Gagal mengirim pengajuan postpone.'
     const status = /session/i.test(message) ? 401 : 400
     return NextResponse.json({ success: false, error: message }, { status })
   }

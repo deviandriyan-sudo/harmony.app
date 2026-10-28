@@ -1,3 +1,5 @@
+
+import { readErrorMessage, readErrorName } from '@/lib/error-utils'
 import { randomUUID } from 'node:crypto'
 import { enqueueHarmonyEmailJob, scheduleHarmonyJobQueueDrain } from '@/lib/server/job-queue'
 import { getHarmonySystemControl } from '@/lib/server/system-control'
@@ -227,12 +229,16 @@ export async function getResendDomainDiagnostic(): Promise<ResendDomainDiagnosti
       }
     }
 
-    const domains = Array.isArray(result?.data)
+    const domains: Array<{
+      name?: string
+      status?: string
+      capabilities?: { sending?: string }
+    }> = Array.isArray(result?.data)
       ? result.data
       : []
 
     const matched =
-      domains.find((domain: any) => {
+      domains.find((domain) => {
         return (
           normalizeEmailValue(domain?.name) ===
           normalizeEmailValue(
@@ -276,20 +282,20 @@ export async function getResendDomainDiagnostic(): Promise<ResendDomainDiagnosti
           ? 'Domain sender sudah verified dan siap mengirim email.'
           : `Domain ditemukan dengan status ${status}.`,
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     return {
       checked: false,
       found: false,
       name: environment.senderDomain,
       status:
-        error?.name === 'AbortError'
+        readErrorName(error) === 'AbortError'
           ? 'timeout'
           : 'check_failed',
       sendingCapability: '',
       message:
-        error?.name === 'AbortError'
+        readErrorName(error) === 'AbortError'
           ? 'Pengecekan domain Resend melewati batas waktu.'
-          : error?.message ||
+          : readErrorMessage(error) ||
             'Pengecekan domain Resend gagal.',
     }
   } finally {
@@ -471,10 +477,10 @@ export async function deliverHarmonyServerEmail(
       if (![429, 500, 502, 503, 504].includes(response.status) || attempt === maxAttempts - 1) {
         return { ok: false, message: lastError, detail: result }
       }
-    } catch (error: any) {
-      lastError = error?.name === 'AbortError'
+    } catch (error: unknown) {
+      lastError = readErrorName(error) === 'AbortError'
         ? 'Pengiriman email melewati batas waktu provider.'
-        : error?.message || 'Tidak dapat menghubungi Resend.'
+        : readErrorMessage(error) || 'Tidak dapat menghubungi Resend.'
       if (attempt === maxAttempts - 1) return { ok: false, message: lastError }
     } finally {
       clearTimeout(timeout)

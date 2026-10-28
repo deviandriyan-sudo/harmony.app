@@ -1,5 +1,7 @@
+
+import { readErrorMessage } from '@/lib/error-utils'
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 
 export const runtime = 'nodejs'
 
@@ -86,7 +88,7 @@ function getClients(token: string) {
   return { admin, user }
 }
 
-async function cleanupFiles(admin: any, paths: string[]) {
+async function cleanupFiles(admin: SupabaseClient, paths: string[]) {
   if (paths.length === 0) return
   await admin.storage.from(BUCKET).remove(paths)
 }
@@ -338,7 +340,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const result = (data || {}) as Record<string, any>
+    const result = (data || {}) as Record<string, unknown>
 
     if (result.success === false) {
       await cleanupFiles(admin, uploadedPaths)
@@ -356,7 +358,7 @@ export async function POST(request: NextRequest) {
       success: true,
       evidence_count: Number(result.evidence_count || evidence.length),
     })
-  } catch (error: any) {
+  } catch (error: unknown) {
     try {
       const authHeader = request.headers.get('authorization') || ''
       const token = authHeader.replace(/^Bearer\s+/i, '').trim()
@@ -369,7 +371,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         success: false,
-        error: error?.message || 'Penyesuaian saldo PHL dengan evidence gagal diproses.',
+        error: readErrorMessage(error) || 'Penyesuaian saldo PHL dengan evidence gagal diproses.',
       },
       { status: 500 },
     )

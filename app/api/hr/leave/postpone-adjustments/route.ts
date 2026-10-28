@@ -1,6 +1,8 @@
+
+import { readErrorMessage } from '@/lib/error-utils'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { canonicalizeLeaveBalanceSummaries } from '@/lib/leave-balance-canonical'
+import { canonicalizeLeaveBalanceSummaries, type HarmonyLeaveCycleLike, type HarmonyLeaveBalanceSummary } from '@/lib/leave-balance-canonical'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -13,7 +15,7 @@ function bearer(request: NextRequest) {
   return clean(request.headers.get('authorization')).replace(/^Bearer\s+/i, '').trim()
 }
 
-function isFlexibleTechnicalCycle(value: any) {
+function isFlexibleTechnicalCycle(value: { notes?: string | null } | null) {
   return String(value?.notes || '').includes('[HR_FLEX_POSTPONE]')
 }
 
@@ -50,7 +52,7 @@ export async function GET(request: NextRequest) {
 
     if (error) throw error
 
-    const context = (data || {}) as Record<string, any>
+    const context = (data || {}) as { cycles?: HarmonyLeaveCycleLike[]; summaries?: HarmonyLeaveBalanceSummary[]; adjustments?: unknown[]; reference_date?: string | null }
     const allCycles = Array.isArray(context.cycles) ? context.cycles : []
     const flexibleCycles = allCycles.filter(isFlexibleTechnicalCycle)
     const visibleCycles = allCycles.filter((item) => !isFlexibleTechnicalCycle(item))
@@ -68,14 +70,14 @@ export async function GET(request: NextRequest) {
         flexible_cycles: flexibleCycles,
         adjustments: context.adjustments || [],
         reference_date: context.reference_date || null,
-        balance_integrity_warning: canonicalSummaries.some((item: any) => item.balance_integrity_status && item.balance_integrity_status !== 'ok')
+        balance_integrity_warning: canonicalSummaries.some((item) => item.balance_integrity_status && item.balance_integrity_status !== 'ok')
           ? 'Ada summary saldo yang berbeda dari cycle aktif; nilai canonical cycle digunakan.'
           : null,
       },
       { headers: { 'Cache-Control': 'no-store, max-age=0' } },
     )
-  } catch (error: any) {
-    const message = error?.message || 'Gagal memuat administrasi postpone.'
+  } catch (error: unknown) {
+    const message = readErrorMessage(error) || 'Gagal memuat administrasi postpone.'
     const status = /session/i.test(message) ? 401 : /Hanya HR|akses/i.test(message) ? 403 : 500
     return NextResponse.json({ success: false, error: message }, { status })
   }
@@ -119,8 +121,8 @@ export async function POST(request: NextRequest) {
     if (error) throw error
 
     return NextResponse.json({ success: true, result: data })
-  } catch (error: any) {
-    const message = error?.message || 'Gagal memproses postpone manual.'
+  } catch (error: unknown) {
+    const message = readErrorMessage(error) || 'Gagal memproses postpone manual.'
     const status = /session/i.test(message) ? 401 : /Hanya HR|akses/i.test(message) ? 403 : 400
     return NextResponse.json({ success: false, error: message }, { status })
   }

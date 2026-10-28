@@ -1,4 +1,7 @@
+
+import { readErrorMessage } from '@/lib/error-utils'
 import { NextRequest, NextResponse } from 'next/server'
+import type { SupabaseClient } from '@supabase/supabase-js'
 
 import {
   apiError,
@@ -14,10 +17,10 @@ type BulkItem = { employee_id: string; email: string; name: string }
 
 type FailedItem = BulkItem & { reason: string }
 
-async function loadAuthEmails(admin: any) {
+async function loadAuthEmails(admin: SupabaseClient) {
   const result = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 })
   if (result.error) throw result.error
-  return new Map(result.data.users.map((user: any) => [normalizeEmail(user.email), user]))
+  return new Map(result.data.users.map((user) => [normalizeEmail(user.email), user] as const))
 }
 
 export async function POST(request: NextRequest) {
@@ -61,10 +64,10 @@ export async function POST(request: NextRequest) {
     if (existingUsersResult.error) throw existingUsersResult.error
 
     const existingEmployeeIds = new Set(
-      (existingUsersResult.data || []).map((item: any) => item.employee_id).filter(Boolean),
+      (existingUsersResult.data || []).map((item) => item.employee_id).filter(Boolean),
     )
     const existingEmails = new Set(
-      (existingUsersResult.data || []).map((item: any) => normalizeEmail(item.email)).filter(Boolean),
+      (existingUsersResult.data || []).map((item) => normalizeEmail(item.email)).filter(Boolean),
     )
     const authByEmail = await loadAuthEmails(admin)
 
@@ -90,7 +93,7 @@ export async function POST(request: NextRequest) {
       }
 
       try {
-        let authUser = authByEmail.get(email) as any
+        let authUser = authByEmail.get(email)
         let createdAuth = false
         if (!authUser) {
           const createResult = await admin.auth.admin.createUser({
@@ -143,8 +146,8 @@ export async function POST(request: NextRequest) {
         existingEmployeeIds.add(employee.id)
         existingEmails.add(email)
         created.push(base)
-      } catch (error: any) {
-        failed.push({ ...base, reason: error?.message || 'Gagal membuat akun.' })
+      } catch (error: unknown) {
+        failed.push({ ...base, reason: readErrorMessage(error) || 'Gagal membuat akun.' })
       }
     }
 

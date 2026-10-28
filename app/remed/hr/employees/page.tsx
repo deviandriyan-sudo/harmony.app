@@ -1,6 +1,8 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+
+import { readErrorMessage } from '@/lib/error-utils'
+import { useEffectEvent, useCallback, useEffect, useState } from 'react'
 import { RefreshCw, Save, SlidersHorizontal, UsersRound, WalletCards, X } from 'lucide-react'
 import { RemedPageHeader } from '@/components/remed/RemedPageHeader'
 import { formatRupiah } from '@/lib/remed'
@@ -41,7 +43,18 @@ export default function Page() {
     }
   }
 
-  useEffect(() => { void load() }, [])
+  const onEntitlementsLoad = useEffectEvent(load)
+  useEffect(() => {
+    let active = true
+    queueMicrotask(() => { if (active) void onEntitlementsLoad() })
+    return () => { active = false }
+  }, [])
+
+  const closeModal = useCallback(() => {
+    if (saving) return
+    setSelected(null)
+    setModalError('')
+  }, [saving])
 
   useEffect(() => {
     if (!selected) return
@@ -50,7 +63,7 @@ export default function Page() {
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [selected, saving])
+  }, [selected, saving, closeModal])
 
   function openModal(row: RemedEntitlement, nextMode: AdjustmentMode = 'balance') {
     setSelected(row)
@@ -58,12 +71,6 @@ export default function Page() {
     setRemainingInput(formatMoneyInput(Math.max(0, Number(row.available_amount || 0))))
     setPlafondInput(formatMoneyInput(Number(row.plafond_total || 0)))
     setNote(nextMode === 'balance' ? 'Penyesuaian sisa plafond oleh HR' : 'Perubahan plafond dasar karena perubahan level jabatan')
-    setModalError('')
-  }
-
-  function closeModal() {
-    if (saving) return
-    setSelected(null)
     setModalError('')
   }
 
@@ -112,8 +119,8 @@ export default function Page() {
       if (result.notification?.ok === false) {
         window.alert(`Data plafond berhasil disimpan, tetapi email notifikasi belum terkirim lengkap: ${result.notification.message || 'cek konfigurasi notifikasi.'}`)
       }
-    } catch (error: any) {
-      setModalError(error?.message || 'Gagal memperbarui plafond.')
+    } catch (error: unknown) {
+      setModalError(readErrorMessage(error) || 'Gagal memperbarui plafond.')
     } finally {
       setSaving(false)
     }
@@ -139,7 +146,7 @@ export default function Page() {
 
       <div className="harmony-unified-surface overflow-x-auto">
         <table className="w-full min-w-[1050px] text-sm">
-          <thead className="bg-[#f6f7f9]/70 text-[11px] font-bold uppercase tracking-[0.08em] text-[#777c85] backdrop-blur-xl">
+          <thead className="bg-[#f6f7f9]/70 text-[11px] font-bold uppercase tracking-[0.08em] harmony-text-secondary backdrop-blur-xl">
             <tr>
               <th className="px-5 py-4 text-left">Karyawan</th>
               <th className="px-5 py-4 text-left">Plafond Dasar</th>
@@ -154,13 +161,13 @@ export default function Page() {
             {rows.map((row) => (
               <tr key={row.id} className="transition hover:bg-white/35">
                 <td className="px-5 py-4">
-                  <p className="font-bold text-[#17181b]">{row.employee?.full_name || row.employee_id}</p>
-                  <p className="mt-1 text-xs text-[#858a93]">{row.employee?.employee_number || '-'} · {row.employee?.position || '-'}</p>
+                  <p className="font-bold harmony-text-primary">{row.employee?.full_name || row.employee_id}</p>
+                  <p className="mt-1 text-xs harmony-text-muted">{row.employee?.employee_number || '-'} · {row.employee?.position || '-'}</p>
                 </td>
-                <td className="px-5 py-4 font-semibold text-[#25272c]">{formatRupiah(row.plafond_total)}</td>
-                <td className="px-5 py-4 text-[#646971]">{formatRupiah(row.balance_adjustment || 0)}</td>
-                <td className="px-5 py-4 text-[#646971]">{formatRupiah(Number(row.legacy_used || 0) + Number(row.current_used || 0))}</td>
-                <td className="px-5 py-4 text-[#646971]">{formatRupiah(row.reserved_amount)}</td>
+                <td className="px-5 py-4 font-semibold harmony-text-primary">{formatRupiah(row.plafond_total)}</td>
+                <td className="px-5 py-4 harmony-text-secondary">{formatRupiah(row.balance_adjustment || 0)}</td>
+                <td className="px-5 py-4 harmony-text-secondary">{formatRupiah(Number(row.legacy_used || 0) + Number(row.current_used || 0))}</td>
+                <td className="px-5 py-4 harmony-text-secondary">{formatRupiah(row.reserved_amount)}</td>
                 <td className={`px-5 py-4 font-bold ${Number(row.available_amount || 0) < 0 ? 'text-red-600' : 'text-emerald-700'}`}>{formatRupiah(row.available_amount)}</td>
                 <td className="px-5 py-4 text-right">
                   <div className="inline-flex rounded-full border border-white/75 bg-white/55 p-1 shadow-sm backdrop-blur-xl">
@@ -188,7 +195,7 @@ export default function Page() {
                 <div className="inline-flex items-center gap-2 rounded-full border border-emerald-100/80 bg-emerald-50/80 px-3 py-1.5 text-xs font-bold text-emerald-700">
                   <WalletCards size={14} /> Re-Med · Kelola Plafond
                 </div>
-                <h2 className="mt-4 text-2xl font-semibold tracking-tight text-[#17181b]">{selected.employee?.full_name || 'Karyawan'}</h2>
+                <h2 className="mt-4 text-2xl font-semibold tracking-tight harmony-text-primary">{selected.employee?.full_name || 'Karyawan'}</h2>
                 <p className="mt-1 text-sm text-[#737880]">{selected.employee?.employee_number || '-'} · {selected.employee?.position || '-'} · Tahun {year}</p>
               </div>
               <button type="button" onClick={closeModal} disabled={saving} className="flex h-10 w-10 items-center justify-center rounded-full border border-white/75 bg-white/60 text-[#626872] shadow-sm transition hover:bg-white/85 disabled:opacity-50" aria-label="Tutup">
@@ -205,10 +212,10 @@ export default function Page() {
               </div>
 
               <div className="grid grid-cols-2 rounded-[22px] border border-white/75 bg-white/48 p-1 shadow-sm backdrop-blur-xl">
-                <button type="button" onClick={() => changeMode('balance')} className={`min-h-10 rounded-[18px] px-4 text-sm font-bold transition ${mode === 'balance' ? 'bg-[#17191d] text-white shadow-md' : 'text-[#666b73] hover:bg-white/65'}`}>
+                <button type="button" onClick={() => changeMode('balance')} className={`min-h-10 rounded-[18px] px-4 text-sm font-bold transition ${mode === 'balance' ? 'bg-[#17191d] text-white shadow-md' : 'harmony-text-secondary hover:bg-white/65'}`}>
                   Sesuaikan Sisa
                 </button>
-                <button type="button" onClick={() => changeMode('plafond')} className={`min-h-10 rounded-[18px] px-4 text-sm font-bold transition ${mode === 'plafond' ? 'bg-[#17191d] text-white shadow-md' : 'text-[#666b73] hover:bg-white/65'}`}>
+                <button type="button" onClick={() => changeMode('plafond')} className={`min-h-10 rounded-[18px] px-4 text-sm font-bold transition ${mode === 'plafond' ? 'bg-[#17191d] text-white shadow-md' : 'harmony-text-secondary hover:bg-white/65'}`}>
                   Ubah Plafond Dasar
                 </button>
               </div>
@@ -216,11 +223,11 @@ export default function Page() {
               {mode === 'balance' ? (
                 <div className="rounded-[26px] border border-white/75 bg-white/46 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] backdrop-blur-2xl sm:p-5">
                   <label className="block">
-                    <span className="text-sm font-bold text-[#25272c]">Sisa Plafond Baru</span>
-                    <p className="mt-1 text-xs leading-5 text-[#787d85]">Mengubah saldo yang tersedia tanpa mengubah plafond dasar, pemakaian, atau reserve.</p>
+                    <span className="text-sm font-bold harmony-text-primary">Sisa Plafond Baru</span>
+                    <p className="mt-1 text-xs leading-5 harmony-text-secondary">Mengubah saldo yang tersedia tanpa mengubah plafond dasar, pemakaian, atau reserve.</p>
                     <div className="mt-3 flex min-h-13 items-center rounded-[20px] border border-white/80 bg-white/60 px-4 shadow-sm">
-                      <span className="mr-2 text-sm font-bold text-[#4c5159]">Rp</span>
-                      <input autoFocus inputMode="numeric" value={remainingInput} onChange={(event) => setRemainingInput(formatMoneyInput(parseMoneyInput(event.target.value)))} className="w-full bg-transparent text-base font-semibold text-[#17181b] outline-none" placeholder="0" />
+                      <span className="mr-2 text-sm font-bold harmony-text-secondary">Rp</span>
+                      <input autoFocus inputMode="numeric" value={remainingInput} onChange={(event) => setRemainingInput(formatMoneyInput(parseMoneyInput(event.target.value)))} className="w-full bg-transparent text-base font-semibold harmony-text-primary outline-none" placeholder="0" />
                     </div>
                   </label>
                   <div className="mt-4 rounded-[20px] border border-emerald-100/70 bg-emerald-50/60 px-4 py-3 text-sm text-emerald-800">
@@ -230,11 +237,11 @@ export default function Page() {
               ) : (
                 <div className="rounded-[26px] border border-white/75 bg-white/46 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] backdrop-blur-2xl sm:p-5">
                   <label className="block">
-                    <span className="text-sm font-bold text-[#25272c]">Plafond Dasar Baru</span>
-                    <p className="mt-1 text-xs leading-5 text-[#787d85]">Gunakan untuk promosi/demosi atau perubahan level jabatan. Penyesuaian saldo HR yang sudah ada tetap dipertahankan.</p>
+                    <span className="text-sm font-bold harmony-text-primary">Plafond Dasar Baru</span>
+                    <p className="mt-1 text-xs leading-5 harmony-text-secondary">Gunakan untuk promosi/demosi atau perubahan level jabatan. Penyesuaian saldo HR yang sudah ada tetap dipertahankan.</p>
                     <div className="mt-3 flex min-h-13 items-center rounded-[20px] border border-white/80 bg-white/60 px-4 shadow-sm">
-                      <span className="mr-2 text-sm font-bold text-[#4c5159]">Rp</span>
-                      <input autoFocus inputMode="numeric" value={plafondInput} onChange={(event) => setPlafondInput(formatMoneyInput(parseMoneyInput(event.target.value)))} className="w-full bg-transparent text-base font-semibold text-[#17181b] outline-none" placeholder="0" />
+                      <span className="mr-2 text-sm font-bold harmony-text-secondary">Rp</span>
+                      <input autoFocus inputMode="numeric" value={plafondInput} onChange={(event) => setPlafondInput(formatMoneyInput(parseMoneyInput(event.target.value)))} className="w-full bg-transparent text-base font-semibold harmony-text-primary outline-none" placeholder="0" />
                     </div>
                   </label>
                   <div className="mt-4 grid gap-3 sm:grid-cols-2">
@@ -245,7 +252,7 @@ export default function Page() {
               )}
 
               <label className="block">
-                <span className="text-sm font-bold text-[#25272c]">Catatan HR</span>
+                <span className="text-sm font-bold harmony-text-primary">Catatan HR</span>
                 <textarea value={note} onChange={(event) => setNote(event.target.value)} rows={3} className="mt-2 w-full rounded-[22px] border border-white/80 bg-white/52 px-4 py-3 text-sm outline-none shadow-sm backdrop-blur-xl focus:border-blue-200" placeholder="Alasan penyesuaian" />
               </label>
 
@@ -270,7 +277,7 @@ function BalanceCard({ label, value, accent = false }: { label: string; value: s
   return (
     <div className={`rounded-[22px] border p-4 shadow-sm backdrop-blur-xl ${accent ? 'border-emerald-100/80 bg-emerald-50/70' : 'border-white/75 bg-white/48'}`}>
       <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-[#7b8088]">{label}</p>
-      <p className={`mt-2 text-sm font-bold ${accent ? 'text-emerald-700' : 'text-[#25272c]'}`}>{value}</p>
+      <p className={`mt-2 text-sm font-bold ${accent ? 'text-emerald-700' : 'harmony-text-primary'}`}>{value}</p>
     </div>
   )
 }

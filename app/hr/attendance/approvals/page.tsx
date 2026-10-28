@@ -97,7 +97,7 @@ export default function HRAttendanceApprovalQueuePage() {
               <p className="mt-2 max-w-3xl text-sm leading-7 text-white/60">
                 HR boleh membuka raw fingerprint, manual attendance,
                 ST/tugas luar, dan keterangan seluruh employee. Status
-                "Disetujui HR" dibaca dari approval log aktual, sedangkan
+                &quot;Disetujui HR&quot; dibaca dari approval log aktual, sedangkan
                 Finalized tetap mengikuti proses finalisasi terpisah.
               </p>
             </div>
@@ -152,10 +152,10 @@ export default function HRAttendanceApprovalQueuePage() {
           />
         </section>
 
-        <section className="harmony-card overflow-hidden">
+        <section className="harmony-card harmony-hr-review-table overflow-hidden">
           <div className="flex flex-col gap-3 border-b border-black/5 p-5 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex min-h-11 items-center gap-2 rounded-2xl border border-black/5 bg-[#f5f5f7] px-4 sm:w-80">
-              <Search size={16} className="text-[#86868b]" />
+              <Search size={16} className="harmony-text-muted" />
 
               <input
                 value={search}
@@ -189,7 +189,7 @@ export default function HRAttendanceApprovalQueuePage() {
           </div>
 
           {loading ? (
-            <div className="flex items-center gap-3 p-8 text-sm text-[#6e6e73]">
+            <div className="flex items-center gap-3 p-8 text-sm harmony-text-secondary">
               <Loader2 size={18} className="animate-spin" />
               Memuat queue...
             </div>
@@ -197,7 +197,7 @@ export default function HRAttendanceApprovalQueuePage() {
             <div className="overflow-x-auto">
               <table className="min-w-[1450px] w-full text-left text-xs">
                 <thead>
-                  <tr className="border-b border-black/5 bg-[#f5f5f7] text-[#6e6e73]">
+                  <tr className="harmony-table-heading border-b border-black/5 bg-[#f5f5f7] harmony-text-secondary">
                     <Th>Karyawan</Th>
                     <Th>Submit</Th>
                     <Th>Atasan</Th>
@@ -241,11 +241,11 @@ export default function HRAttendanceApprovalQueuePage() {
                         className="border-b border-black/5 hover:bg-[#fafafa]"
                       >
                         <Td>
-                          <div className="font-bold text-[#1d1d1f]">
+                          <div className="font-bold harmony-text-primary">
                             {row.employee.full_name || '-'}
                           </div>
 
-                          <div className="mt-1 text-[11px] text-[#86868b]">
+                          <div className="mt-1 text-[11px] harmony-text-muted">
                             {row.employee.employee_number || '-'} · PIN{' '}
                             {row.employee.machine_pin || '-'} ·{' '}
                             {row.employee.department || '-'}
@@ -452,12 +452,12 @@ function Count({
   return (
     <td className="px-4 py-4 text-center">
       <span
-        className={`inline-flex min-w-8 justify-center rounded-full px-2.5 py-1 font-bold ${
+        className={`harmony-count-indicator inline-flex min-w-8 justify-center rounded-full px-2.5 py-1 font-bold ${
           danger
             ? 'bg-red-50 text-red-700'
             : strong
               ? 'bg-green-50 text-green-700'
-              : 'bg-[#f5f5f7] text-[#1d1d1f]'
+              : 'bg-[#f5f5f7] harmony-text-primary'
         }`}
       >
         {value}
@@ -475,10 +475,10 @@ function Status({
 }) {
   return (
     <span
-      className={`inline-flex rounded-full px-3 py-1 text-[11px] font-bold ${
+      className={`harmony-status-indicator inline-flex rounded-full px-3 py-1 text-[11px] font-bold ${
         positive
           ? 'bg-green-50 text-green-700'
-          : 'bg-[#f5f5f7] text-[#6e6e73]'
+          : 'bg-[#f5f5f7] harmony-text-secondary'
       }`}
     >
       {value}

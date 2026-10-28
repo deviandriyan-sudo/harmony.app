@@ -14,31 +14,36 @@ export function useAttendancePeriodQuery() {
   const [periodReady, setPeriodReady] = useState(false)
 
   useEffect(() => {
-    const fallback = getCurrentPeriodMonthWita()
+    let active = true
+    queueMicrotask(() => {
+      if (!active) return
+      const fallback = getCurrentPeriodMonthWita()
 
-    if (typeof window === 'undefined') {
+      if (typeof window === 'undefined') {
+        setPeriodReady(true)
+        return
+      }
+
+      const url = new URL(window.location.href)
+      const queryPeriod = url.searchParams.get('period')
+      const initialPeriod = isValidAttendancePeriod(queryPeriod)
+        ? String(queryPeriod)
+        : fallback
+
+      setPeriodMonthState(initialPeriod)
+
+      if (queryPeriod !== initialPeriod) {
+        url.searchParams.set('period', initialPeriod)
+        window.history.replaceState(
+          window.history.state,
+          '',
+          `${url.pathname}${url.search}${url.hash}`,
+        )
+      }
+
       setPeriodReady(true)
-      return
-    }
-
-    const url = new URL(window.location.href)
-    const queryPeriod = url.searchParams.get('period')
-    const initialPeriod = isValidAttendancePeriod(queryPeriod)
-      ? String(queryPeriod)
-      : fallback
-
-    setPeriodMonthState(initialPeriod)
-
-    if (queryPeriod !== initialPeriod) {
-      url.searchParams.set('period', initialPeriod)
-      window.history.replaceState(
-        window.history.state,
-        '',
-        `${url.pathname}${url.search}${url.hash}`,
-      )
-    }
-
-    setPeriodReady(true)
+    })
+    return () => { active = false }
   }, [])
 
   const setPeriodMonth = useCallback((nextPeriod: string) => {

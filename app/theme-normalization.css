@@ -1,0 +1,298 @@
+/* HARMONY V3.8.5 — Shared semantic presentation layer.
+   Imported after globals.css. No business selectors, calculations or API changes.
+   Context-dependent foreground/background pairs prevent the V3.8.4 dark-mode
+   white-on-light failures while retaining the existing glass visual language. */
+:root,
+html[data-harmony-theme='light'] {
+  --h385-canvas:#edf5ff;
+  --h385-surface:rgba(249,252,255,.93);
+  --h385-surface-hover:#f1f8ff;
+  --h385-surface-subtle:#e4effb;
+  --h385-surface-strong:#ffffff;
+  --h385-glass-border:rgba(61,117,181,.27);
+  --h385-ink:#122b4a;
+  --h385-ink-soft:#3c5572;
+  --h385-ink-muted:#526985;
+  --h385-link:#0759b8;
+  --h385-table-head:#dceafa;
+  --h385-table-head-ink:#173756;
+  --h385-table-row:rgba(255,255,255,.65);
+  --h385-table-hover:#eaf3ff;
+  --h385-status-neutral-bg:#e3eaf3;
+  --h385-status-neutral-ink:#263d59;
+  --h385-status-neutral-border:#bdcadc;
+  --h385-success-bg:#def6ea;
+  --h385-success-ink:#075938;
+  --h385-warning-bg:#fff0d3;
+  --h385-warning-ink:#794600;
+  --h385-danger-bg:#ffe5ea;
+  --h385-danger-ink:#991d35;
+  --h385-info-bg:#dbeafe;
+  --h385-info-ink:#134d9f;
+  --h385-violet-bg:#ede6ff;
+  --h385-violet-ink:#58349e;
+  --h385-focus:#075ed2;
+  --h385-action:#075cc8;
+  --h385-action-hover:#064d9d;
+  --h385-action-ink:#fff;
+  --h385-modal:rgba(245,250,255,.98);
+}
+html[data-harmony-theme='dark'] {
+  --h385-canvas:#06152b;
+  --h385-surface:rgba(22,49,81,.94);
+  --h385-surface-hover:#22476e;
+  --h385-surface-subtle:#193756;
+  --h385-surface-strong:#173c61;
+  --h385-glass-border:rgba(138,192,235,.35);
+  --h385-ink:#f0f7ff;
+  --h385-ink-soft:#d4e5f7;
+  --h385-ink-muted:#bbd1e8;
+  --h385-link:#91ceff;
+  --h385-table-head:#24466b;
+  --h385-table-head-ink:#f0f7ff;
+  --h385-table-row:rgba(16,39,68,.65);
+  --h385-table-hover:#24476e;
+  --h385-status-neutral-bg:#304d6e;
+  --h385-status-neutral-ink:#edf6ff;
+  --h385-status-neutral-border:#6b91b5;
+  --h385-success-bg:#164b42;
+  --h385-success-ink:#b7ffe1;
+  --h385-warning-bg:#624313;
+  --h385-warning-ink:#ffe0a1;
+  --h385-danger-bg:#602b3a;
+  --h385-danger-ink:#ffd3dc;
+  --h385-info-bg:#154779;
+  --h385-info-ink:#d0e8ff;
+  --h385-violet-bg:#45336c;
+  --h385-violet-ink:#e9d7ff;
+  --h385-focus:#7cdbff;
+  --h385-action:#095fcb;
+  --h385-action-hover:#1175e9;
+  --h385-action-ink:#fff;
+  --h385-modal:#102944;
+}
+
+/* Semantic typography: replaces hundreds of immutable foreground utilities. */
+.harmony-text-primary {color:var(--h385-ink) !important}
+.harmony-text-secondary {color:var(--h385-ink-soft) !important}
+.harmony-text-muted {color:var(--h385-ink-muted) !important}
+.harmony-text-link {color:var(--h385-link) !important}
+.harmony-text-link:is(a,button):hover {text-decoration-color:currentColor}
+
+.harmony-placeholder-muted::placeholder {color:var(--h385-ink-muted) !important;opacity:1}
+.harmony-hover-text-primary:hover {color:var(--h385-ink) !important}
+.harmony-hover-text-link:hover {color:var(--h385-link) !important}
+.harmony-disabled-text-secondary:disabled {color:var(--h385-ink-soft) !important}
+
+/* Semantic status text is always paired with its own corresponding tint. */
+.harmony-text-success {color:var(--h385-success-ink) !important}
+.harmony-text-warning {color:var(--h385-warning-ink) !important}
+.harmony-text-violet {color:var(--h385-violet-ink) !important}
+
+/* Shared glass and data surfaces: values must follow actual background. */
+.harmony-workspace :is(.harmony-card,.harmony-card-solid,.harmony-card-soft,.harmony-unified-surface,.harmony-reference-surface,.harmony-review-metric),
+.harmony-modal-surface .harmony-hr-edit-modal {
+  color:var(--h385-ink);
+}
+html[data-harmony-theme='dark'] .harmony-workspace :is(.harmony-card,.harmony-card-solid,.harmony-card-soft,.harmony-unified-surface,.harmony-unified-toolbar,.harmony-reference-surface) {
+  background:linear-gradient(145deg,rgba(32,65,103,.93),rgba(16,39,69,.95)) !important;
+  border-color:var(--h385-glass-border) !important;
+}
+html[data-harmony-theme='dark'] .harmony-workspace :is(.harmony-card,.harmony-unified-surface) [class*='bg-gradient-to-']:not([class*='from-blue-']):not([class*='from-indigo-']) {
+  color:var(--h385-ink);
+}
+
+/* Tables across HR, Employee, Finance, and Re-Med. Only data table surfaces,
+   not print templates or the intentionally dark login hero. */
+.harmony-workspace table thead,
+.harmony-workspace .harmony-table thead {
+  background:var(--h385-table-head) !important;
+  color:var(--h385-table-head-ink);
+}
+.harmony-workspace table thead th,
+.harmony-workspace table thead tr,
+.harmony-workspace table thead [class*='text-'] {
+  color:var(--h385-table-head-ink) !important;
+}
+.harmony-workspace table tbody {color:var(--h385-ink-soft)}
+.harmony-workspace table tbody tr:hover,
+.harmony-workspace .harmony-table tbody tr:hover {background:var(--h385-table-hover) !important}
+.harmony-workspace table tbody td {border-color:var(--h385-glass-border)}
+html[data-harmony-theme='dark'] .harmony-workspace table tbody tr {
+  background-color:var(--h385-table-row);
+}
+
+/* Semantic utility background/foreground pairs. These are context-aware
+   replacements for Tailwind -50 badges and icons, not general typography. */
+html[data-harmony-theme='dark'] :is(.harmony-workspace,.harmony-modal-surface) :is(
+  [class~='bg-green-50'],[class~='bg-emerald-50'],[class~='bg-green-100'],[class~='bg-emerald-100']
+) {background-color:var(--h385-success-bg) !important;color:var(--h385-success-ink)}
+html[data-harmony-theme='dark'] :is(.harmony-workspace,.harmony-modal-surface) :is(
+  [class~='text-green-700'],[class~='text-green-600'],[class~='text-emerald-700'],[class~='text-emerald-800'],[class~='text-emerald-600']
+) {color:var(--h385-success-ink)}
+html[data-harmony-theme='dark'] :is(.harmony-workspace,.harmony-modal-surface) :is(
+  [class~='bg-red-50'],[class~='bg-red-100']
+) {background-color:var(--h385-danger-bg) !important;color:var(--h385-danger-ink)}
+html[data-harmony-theme='dark'] :is(.harmony-workspace,.harmony-modal-surface) :is([class~='text-red-700'],[class~='text-red-600'],[class~='text-red-800']) {color:var(--h385-danger-ink)}
+html[data-harmony-theme='dark'] :is(.harmony-workspace,.harmony-modal-surface) :is([class~='bg-amber-50'],[class~='bg-orange-50'],[class~='bg-amber-100'],[class~='bg-orange-100']) {background-color:var(--h385-warning-bg) !important;color:var(--h385-warning-ink)}
+html[data-harmony-theme='dark'] :is(.harmony-workspace,.harmony-modal-surface) :is([class~='text-amber-700'],[class~='text-amber-800'],[class~='text-orange-700'],[class~='text-orange-600']) {color:var(--h385-warning-ink)}
+html[data-harmony-theme='dark'] :is(.harmony-workspace,.harmony-modal-surface) :is([class~='bg-blue-50'],[class~='bg-blue-100']) {background-color:var(--h385-info-bg) !important;color:var(--h385-info-ink)}
+html[data-harmony-theme='dark'] :is(.harmony-workspace,.harmony-modal-surface) :is([class~='text-blue-700'],[class~='text-blue-600'],[class~='text-blue-800']) {color:var(--h385-info-ink)}
+html[data-harmony-theme='dark'] :is(.harmony-workspace,.harmony-modal-surface) :is([class~='bg-purple-50'],[class~='bg-violet-50'],[class~='bg-indigo-50']) {background-color:var(--h385-violet-bg) !important;color:var(--h385-violet-ink)}
+html[data-harmony-theme='dark'] :is(.harmony-workspace,.harmony-modal-surface) :is([class~='text-purple-700'],[class~='text-violet-700'],[class~='text-indigo-700']) {color:var(--h385-violet-ink)}
+html[data-harmony-theme='dark'] :is(.harmony-workspace,.harmony-modal-surface) :is([class~='bg-slate-50'],[class~='bg-slate-100'],[class~='bg-zinc-100']) {background-color:var(--h385-status-neutral-bg) !important;color:var(--h385-status-neutral-ink)}
+
+/* Resolve foreground/backdrop as a pair when legacy Tailwind retains bright
+   gradient cards or white controls inside a dark role workspace. */
+html[data-harmony-theme='dark'] .harmony-workspace :is(div,section,article)[class*='bg-gradient-to-']:is(
+  [class*='from-blue-50'],[class*='from-slate-50'],[class*='from-emerald-50'],
+  [class*='from-green-50'],[class*='from-orange-50'],[class*='from-purple-50'],
+  [class*='from-amber-50'],[class*='from-indigo-50'],[class*='from-cyan-50']
+) {
+  background:linear-gradient(146deg,#254a70,#183351) !important;
+  border-color:var(--h385-glass-border) !important;
+  color:var(--h385-ink);
+}
+html[data-harmony-theme='dark'] .harmony-workspace :is(button,a)[class~='bg-white']:not([class~='text-white']) {
+  background:var(--h385-surface-strong) !important;color:var(--h385-ink);
+}
+.harmony-workspace :is(button,a):disabled {opacity:.78;cursor:not-allowed}
+.harmony-access-state {background:var(--h385-canvas) !important;color:var(--h385-ink)}
+.harmony-access-state > div {background:var(--h385-surface-strong) !important;border-color:var(--h385-glass-border)}
+
+/* HR employee directory: ensure actions and balances are readable in both modes. */
+html[data-harmony-theme] .harmony-workspace div.harmony-employee-directory-card[class*="bg-white/"][class*="rounded-"] {
+  background:var(--h385-surface) !important;
+  border-color:var(--h385-glass-border) !important;
+  color:var(--h385-ink);
+}
+html[data-harmony-theme] .harmony-workspace div.harmony-employee-directory-card:hover {background:var(--h385-surface-hover) !important}
+html[data-harmony-theme] .harmony-workspace div.harmony-employee-homebase[class*="bg-[#f5f5f7]"][class*="rounded-"] {background:var(--h385-surface-subtle) !important;color:var(--h385-ink)}
+.harmony-employee-compact-balances > * {
+  color:var(--h385-ink) !important;
+  background:var(--h385-status-neutral-bg) !important;
+  border:1px solid var(--h385-status-neutral-border);
+  min-height:28px;
+}
+.harmony-employee-detail-action {background:var(--h385-info-bg) !important;color:var(--h385-info-ink) !important;border:1px solid var(--h385-glass-border)}
+.harmony-employee-edit-action {background:var(--h385-surface-strong) !important;color:var(--h385-ink) !important;border:1px solid var(--h385-glass-border) !important}
+.harmony-employee-power-action {border:1px solid var(--h385-glass-border)}
+:is(.harmony-employee-detail-action,.harmony-employee-edit-action,.harmony-employee-power-action):hover {filter:brightness(1.08)}
+
+/* HR attendance four-step workflow. Keeps original tone distinctions only in
+   icons, badges and CTAs; information is placed on a predictable ink surface. */
+.harmony-workspace .harmony-attendance-step-card {
+  color:var(--h385-ink) !important;
+  border-color:var(--h385-glass-border) !important;
+}
+html[data-harmony-theme='dark'] .harmony-workspace .harmony-attendance-step-card {
+  background:linear-gradient(143deg,rgba(33,68,106,.98),rgba(18,41,72,.97)) !important;
+}
+html[data-harmony-theme] .harmony-workspace div.harmony-attendance-step-helper[class*="bg-white/"][class*="rounded-"] {background:var(--h385-surface-subtle) !important;color:var(--h385-ink-soft) !important;border-color:var(--h385-glass-border) !important}
+.harmony-workspace .harmony-attendance-step-secondary,
+.harmony-workspace .harmony-attendance-tool-link {
+  background:var(--h385-surface-strong) !important;
+  border-color:var(--h385-glass-border) !important;
+  color:var(--h385-ink) !important;
+}
+.harmony-workspace :is(.harmony-attendance-step-secondary,.harmony-attendance-tool-link):hover {background:var(--h385-surface-hover) !important}
+.harmony-workspace .harmony-attendance-step-primary {color:#fff !important;text-shadow:0 1px 1px rgba(0,0,0,.2)}
+.harmony-workspace .harmony-attendance-step-primary:focus-visible {outline:3px solid var(--h385-focus);outline-offset:3px}
+
+/* Upload history: icon-only actions are intentionally discoverable, never
+   disguised as an unavailable control when the backing private file exists. */
+.harmony-workspace .harmony-upload-history table thead tr {background:var(--h385-table-head) !important}
+.harmony-workspace .harmony-upload-download {
+  background:var(--h385-info-bg) !important;
+  color:var(--h385-info-ink) !important;
+  border:1px solid var(--h385-glass-border) !important;
+  opacity:1 !important;
+}
+.harmony-workspace .harmony-upload-delete {
+  background:var(--h385-danger-bg) !important;color:var(--h385-danger-ink) !important;
+  border:1px solid var(--h385-glass-border);
+}
+.harmony-workspace :is(.harmony-upload-download,.harmony-upload-delete):not(:disabled):hover {filter:brightness(1.12)}
+.harmony-workspace :is(.harmony-upload-download,.harmony-upload-delete):focus-visible {outline:3px solid var(--h385-focus);outline-offset:2px}
+
+/* Review table: zero values and statuses have the same legibility as nonzero. */
+.harmony-workspace .harmony-hr-review-table table thead,
+.harmony-workspace .harmony-hr-review-table .harmony-table-heading {background:var(--h385-table-head) !important;color:var(--h385-table-head-ink) !important}
+.harmony-workspace .harmony-count-indicator,
+.harmony-workspace .harmony-status-indicator {
+  background:var(--h385-status-neutral-bg) !important;
+  color:var(--h385-status-neutral-ink) !important;
+  border:1px solid var(--h385-status-neutral-border);
+  opacity:1;
+}
+.harmony-workspace :is(.harmony-count-indicator,.harmony-status-indicator)[class*='bg-green-'] {
+  background:var(--h385-success-bg) !important;color:var(--h385-success-ink) !important;
+}
+.harmony-workspace :is(.harmony-count-indicator,.harmony-status-indicator)[class*='bg-red-'] {
+  background:var(--h385-danger-bg) !important;color:var(--h385-danger-ink) !important;
+}
+
+/* Re-Med status badges share the same status semantics in all three roles. */
+.harmony-remed-status[data-remed-status='pending_hr'],
+.harmony-remed-status[data-remed-status='pending_finance'],
+.harmony-remed-status[data-remed-status='waiting_payment'] {background:var(--h385-warning-bg) !important;color:var(--h385-warning-ink) !important;border-color:currentColor !important}
+.harmony-remed-status[data-remed-status='rejected_hr'],
+.harmony-remed-status[data-remed-status='rejected_finance'] {background:var(--h385-danger-bg) !important;color:var(--h385-danger-ink) !important;border-color:currentColor !important}
+.harmony-remed-status[data-remed-status='paid'] {background:var(--h385-success-bg) !important;color:var(--h385-success-ink) !important;border-color:currentColor !important}
+.harmony-remed-status[data-remed-status='cancelled'],
+.harmony-remed-status[data-remed-status='legacy_record'] {background:var(--h385-status-neutral-bg) !important;color:var(--h385-status-neutral-ink) !important;border-color:var(--h385-status-neutral-border) !important}
+
+/* Public auth recovery/callback share the same theme tokens even though these
+   routes are intentionally outside the authenticated workspace shell. */
+html[data-harmony-theme='dark'] .harmony-public-page {
+  background:linear-gradient(135deg,#06172d,#102d4d) !important;
+  color:var(--h385-ink);
+}
+html[data-harmony-theme='dark'] .harmony-public-shell {
+  background:linear-gradient(145deg,#1c3c60,#102944) !important;
+  border-color:var(--h385-glass-border) !important;
+  color:var(--h385-ink);
+}
+html[data-harmony-theme='dark'] .harmony-public-shell :is(input,textarea) {color:var(--h385-ink);}
+html[data-harmony-theme='dark'] .harmony-public-shell :is(div,button)[class*='bg-[#f5f5f7]'] {
+  background:var(--h385-surface-subtle) !important;
+  color:var(--h385-ink);
+}
+html[data-harmony-theme='dark'] .harmony-public-shell :is(div,button)[class*='bg-white']:not(.harmony-login-logo-plate) {
+  background:var(--h385-surface-subtle) !important;
+}
+/* Print document is a fixed white-paper semantic context in both screen themes.
+   Re-Med payment print forms must not inherit pale dark-mode typography. */
+.harmony-print-document {color:#172638 !important;background:#fff !important}
+.harmony-print-document .harmony-text-primary {color:#172638 !important}
+.harmony-print-document .harmony-text-secondary {color:#46546a !important}
+.harmony-print-document .harmony-text-muted {color:#58647a !important}
+
+/* Portal-hosted modals are siblings of body, not descendants of role shell. */
+html[data-harmony-theme='dark'] body > .harmony-modal-surface .harmony-hr-edit-modal,
+html[data-harmony-theme='dark'] .harmony-modal-surface > :first-child {
+  background:linear-gradient(150deg,#173b60,#0e2745) !important;
+  color:var(--h385-ink);
+  border-color:var(--h385-glass-border) !important;
+}
+html[data-harmony-theme='light'] body > .harmony-modal-surface .harmony-hr-edit-modal {
+  background:var(--h385-modal);
+  color:var(--h385-ink);
+}
+.harmony-modal-surface :is(button,a,input,select,textarea,summary):focus-visible,
+.harmony-workspace :is(button,a,input,select,textarea,summary):focus-visible {outline-color:var(--h385-focus)}
+
+/* Accessibility fallbacks: do not force light backgrounds inside dark mode. */
+@media(prefers-reduced-transparency:reduce) {
+  html[data-harmony-theme='dark'] :is(.harmony-workspace,.harmony-modal-surface) :is(.harmony-employee-directory-card,.harmony-attendance-step-card,.harmony-card,.harmony-unified-surface) {
+    background:#183352 !important;backdrop-filter:none !important;-webkit-backdrop-filter:none !important;
+  }
+  html[data-harmony-theme='light'] :is(.harmony-workspace,.harmony-modal-surface) :is(.harmony-employee-directory-card,.harmony-attendance-step-card,.harmony-card,.harmony-unified-surface) {
+    background:#f7fbff !important;backdrop-filter:none !important;-webkit-backdrop-filter:none !important;
+  }
+}
+@media print {
+  .harmony-remed-status {color:#172638 !important;background:#fff !important;border-color:#9ca3af !important}
+  .harmony-text-primary,.harmony-text-secondary,.harmony-text-muted {color:#172638 !important}
+  .harmony-workspace table thead {background:#e8eff7 !important;color:#172638 !important}
+}

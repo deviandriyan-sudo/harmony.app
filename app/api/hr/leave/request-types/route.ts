@@ -1,3 +1,5 @@
+
+import { readErrorMessage } from '@/lib/error-utils'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
@@ -66,8 +68,8 @@ export async function POST(request: NextRequest) {
     if (error) throw error
 
     return NextResponse.json({ success: true, result: data })
-  } catch (error: any) {
-    const message = error?.message || 'Gagal menyimpan jenis kehadiran/ketidakhadiran.'
+  } catch (error: unknown) {
+    const message = readErrorMessage(error) || 'Gagal menyimpan jenis kehadiran/ketidakhadiran.'
     const status = /session/i.test(message) ? 401 : /Hanya HR|akses/i.test(message) ? 403 : 400
     return NextResponse.json({ success: false, error: message }, { status })
   }
@@ -90,8 +92,8 @@ export async function PATCH(request: NextRequest) {
     if (error) throw error
 
     return NextResponse.json({ success: true, result: data })
-  } catch (error: any) {
-    const message = error?.message || 'Gagal mengubah status master jenis.'
+  } catch (error: unknown) {
+    const message = readErrorMessage(error) || 'Gagal mengubah status master jenis.'
     const status = /session/i.test(message) ? 401 : /Hanya HR|akses/i.test(message) ? 403 : 400
     return NextResponse.json({ success: false, error: message }, { status })
   }

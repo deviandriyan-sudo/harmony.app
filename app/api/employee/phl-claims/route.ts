@@ -59,17 +59,19 @@ function isTerminalInactiveStatus(value: unknown) {
     || status.startsWith('ditolak')
 }
 
-function isTerminalInactiveClaim(row: Record<string, any>) {
+function isTerminalInactiveClaim(row: PHLClaimRow) {
   return isTerminalInactiveStatus(row.status)
     || isTerminalInactiveStatus(row.supervisor_status)
     || isTerminalInactiveStatus(row.hr_status)
 }
 
+type PHLClaimRow = { id: string; phl_date?: string | null; status?: string | null; supervisor_status?: string | null; hr_status?: string | null }
+
 async function findSameDateClaims(ctx: Awaited<ReturnType<typeof requireHarmonyApi>>, claimDate: string) {
-  const results: Record<string, any>[] = []
+  const results: PHLClaimRow[] = []
   const seen = new Set<string>()
 
-  const collect = (rows: Record<string, any>[] | null) => {
+  const collect = (rows: PHLClaimRow[] | null) => {
     for (const row of rows || []) {
       const id = String(row.id || '')
       if (!id || seen.has(id)) continue
@@ -86,7 +88,7 @@ async function findSameDateClaims(ctx: Awaited<ReturnType<typeof requireHarmonyA
     .order('created_at', { ascending: false })
     .limit(500)
   if (byEmployee.error) throw byEmployee.error
-  collect((byEmployee.data || []).filter((row: any) => canonicalDate(row.phl_date) === claimDate))
+  collect((byEmployee.data || []).filter((row) => canonicalDate(row.phl_date) === claimDate))
 
   // Legacy claim indexes use machine/date. Check machine_pin too so the API preflight
   // mirrors the database uniqueness rule even when an old row lost employee_id linkage
@@ -100,7 +102,7 @@ async function findSameDateClaims(ctx: Awaited<ReturnType<typeof requireHarmonyA
       .order('created_at', { ascending: false })
       .limit(500)
     if (byMachine.error) throw byMachine.error
-    collect((byMachine.data || []).filter((row: any) => canonicalDate(row.phl_date) === claimDate))
+    collect((byMachine.data || []).filter((row) => canonicalDate(row.phl_date) === claimDate))
   }
 
   return results
@@ -160,14 +162,15 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    if ((balanceData as any)?.success === false) {
+    const balance = balanceData as { success?: boolean; message?: string; total_available_days?: number; available_days?: number } | null
+    if (balance?.success === false) {
       return NextResponse.json(
-        { message: String((balanceData as any)?.message || 'Saldo PHL tidak dapat diverifikasi.') },
+        { message: String(balance?.message || 'Saldo PHL tidak dapat diverifikasi.') },
         { status: 409 },
       )
     }
 
-    const available = Number((balanceData as any)?.total_available_days ?? (balanceData as any)?.available_days ?? 0)
+    const available = Number(balance?.total_available_days ?? balance?.available_days ?? 0)
     if (!Number.isFinite(available) || available < 1) {
       return NextResponse.json(
         { message: 'Saldo PHL aktif tidak mencukupi untuk klaim 1 hari.' },
@@ -197,9 +200,9 @@ export async function POST(request: NextRequest) {
 
     if (error) {
       const databaseText = [
-        String((error as any)?.message || ''),
-        String((error as any)?.details || ''),
-        String((error as any)?.hint || ''),
+        String(error.message || ''),
+        String(error.details || ''),
+        String(error.hint || ''),
       ].join(' ')
       const legacyUniqueIndex = error.code === '23505'
         && databaseText.includes('idx_phl_claim_unique_machine_date_active')

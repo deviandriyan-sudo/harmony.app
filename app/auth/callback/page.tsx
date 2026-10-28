@@ -1,5 +1,7 @@
 'use client'
 
+
+import { readErrorMessage } from '@/lib/error-utils'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Loader2, ShieldCheck } from 'lucide-react'
@@ -13,11 +15,6 @@ import type { RemedSession } from '@/types/remed'
 export default function AuthCallbackPage() {
   const router = useRouter()
   const [message, setMessage] = useState('Menghubungkan akun Google...')
-
-  useEffect(() => {
-    run()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
 
   async function run() {
     try {
@@ -59,22 +56,30 @@ export default function AuthCallbackPage() {
       }
 
       throw new Error('Email Google belum terdaftar atau tidak aktif pada HARMONY.')
-    } catch (error: any) {
+    } catch (error: unknown) {
       await supabase.auth.signOut()
       localStorage.removeItem('harmony_user')
       localStorage.removeItem('remed_user')
-      router.replace(`/login?google_error=${encodeURIComponent(error?.message || 'Login Google gagal.')}`)
+      router.replace(`/login?google_error=${encodeURIComponent(readErrorMessage(error) || 'Login Google gagal.')}`)
     }
   }
+
+  useEffect(() => {
+    let active = true
+    // Start session/data loading after the effect setup, avoiding a cascading synchronous render.
+    queueMicrotask(() => { if (active) void run() })
+    return () => { active = false }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   return (
     <main className="harmony-public-page flex min-h-screen items-center justify-center bg-[#f5f5f7] p-6">
       <div className="harmony-public-shell w-full max-w-md rounded-[34px] border border-black/5 bg-white p-8 text-center shadow-xl">
-        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-3xl bg-[#e8f2ff] text-[#007aff]">
+        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-3xl bg-[#e8f2ff] harmony-text-link">
           <ShieldCheck size={28} />
         </div>
         <h1 className="mt-6 text-2xl font-semibold">Google Login</h1>
-        <p className="mt-3 text-sm text-[#6e6e73]">{message}</p>
+        <p className="mt-3 text-sm harmony-text-secondary">{message}</p>
         <div className="mt-6 inline-flex items-center gap-2 rounded-full bg-[#f5f5f7] px-4 py-2 text-sm">
           <Loader2 size={16} className="animate-spin" /> Mohon tunggu
         </div>

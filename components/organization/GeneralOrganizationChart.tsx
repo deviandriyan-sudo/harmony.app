@@ -1,18 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import {
-  AlertTriangle,
-  Building2,
-  ChevronDown,
-  ChevronUp,
-  GitBranch,
-  Loader2,
-  Maximize2,
-  RefreshCcw,
-  UserRound,
-  UsersRound,
-} from 'lucide-react'
+import { AlertTriangle, Building2, ChevronDown, ChevronUp, GitBranch, Loader2, Maximize2, RefreshCcw, UserRound } from 'lucide-react'
 
 import { supabase } from '@/lib/supabase'
 
@@ -712,16 +701,16 @@ export function GeneralOrganizationChart({
     <section className="overflow-hidden rounded-[30px] border border-black/5 bg-white shadow-sm">
       <div className="flex flex-col gap-4 border-b border-black/5 bg-gradient-to-br from-white via-white to-slate-50 p-5 sm:p-6 xl:flex-row xl:items-center xl:justify-between">
         <div className="min-w-0">
-          <div className="inline-flex items-center gap-2 rounded-full bg-[#e8f2ff] px-3 py-1 text-[11px] font-bold text-[#007aff]">
+          <div className="inline-flex items-center gap-2 rounded-full bg-[#e8f2ff] px-3 py-1 text-[11px] font-bold harmony-text-link">
             <GitBranch size={14} />
             SO Umum
           </div>
 
-          <h2 className="mt-3 text-xl font-bold tracking-tight text-[#1d1d1f] sm:text-2xl">
+          <h2 className="mt-3 text-xl font-bold tracking-tight harmony-text-primary sm:text-2xl">
             Struktur Organisasi Umum
           </h2>
 
-          <p className="mt-1 max-w-3xl text-sm leading-6 text-[#6e6e73]">
+          <p className="mt-1 max-w-3xl text-sm leading-6 harmony-text-secondary">
             Struktur utama ditampilkan dari Direktur berdasarkan atasan dan homebase.
             Jabatan kedua atau penugasan tambahan menggunakan konektor garis putus-putus.
           </p>
@@ -735,7 +724,7 @@ export function GeneralOrganizationChart({
               className={[
                 'inline-flex min-h-8 items-center justify-center gap-1.5 rounded-xl px-3 text-[11px] font-bold transition',
                 fitMode === 'auto'
-                  ? 'bg-white text-[#007aff] shadow-sm'
+                  ? 'bg-white harmony-text-link shadow-sm'
                   : 'text-slate-500 hover:text-slate-700',
               ].join(' ')}
             >
@@ -805,7 +794,7 @@ export function GeneralOrganizationChart({
       </div>
 
       {loading ? (
-        <div className="flex min-h-48 items-center justify-center gap-3 p-8 text-sm font-semibold text-[#6e6e73]">
+        <div className="flex min-h-48 items-center justify-center gap-3 p-8 text-sm font-semibold harmony-text-secondary">
           <Loader2 size={20} className="animate-spin" />
           Memuat struktur organisasi...
         </div>
@@ -1076,7 +1065,7 @@ function OrgCard({
           'mx-auto flex h-9 w-9 items-center justify-center rounded-2xl',
           isAssignment
             ? 'bg-violet-100 text-violet-700'
-            : 'bg-[#e8f2ff] text-[#007aff]',
+            : 'bg-[#e8f2ff] harmony-text-link',
         ].join(' ')}
       >
         {isAssignment ? <GitBranch size={16} /> : <UserRound size={16} />}
@@ -1088,7 +1077,7 @@ function OrgCard({
         </div>
       )}
 
-      <p className="mt-2 truncate text-xs font-extrabold text-[#1d1d1f]">
+      <p className="mt-2 truncate text-xs font-extrabold harmony-text-primary">
         {node.fullName}
       </p>
 

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffectEvent, useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
   ArrowLeft,
@@ -128,9 +128,10 @@ export default function AttendanceAuditPage() {
     );
   }, [logs]);
 
+  const onAuditLoad = useEffectEvent(fetchAuditLogs)
   useEffect(() => {
     if (!periodReady) return;
-    fetchAuditLogs();
+    onAuditLoad();
   }, [periodMonth, periodReady]);
 
   async function fetchAuditLogs() {
@@ -317,7 +318,7 @@ export default function AttendanceAuditPage() {
 
               <div className="min-w-0">
                 <span className="harmony-label">Rentang Periode</span>
-                <div className="flex min-h-12 items-center rounded-2xl border border-black/5 bg-[#f5f5f7] px-4 text-sm font-semibold leading-6 text-[#1d1d1f]">
+                <div className="flex min-h-12 items-center rounded-2xl border border-black/5 bg-[#f5f5f7] px-4 text-sm font-semibold leading-6 harmony-text-primary">
                   <span className="min-w-0 break-words">
                     {formatDisplayDate(periodRange.start)} -{" "}
                     {formatDisplayDate(periodRange.end)}
@@ -328,12 +329,12 @@ export default function AttendanceAuditPage() {
               <label className="block min-w-0 sm:col-span-2 xl:col-span-1">
                 <span className="harmony-label">Pencarian</span>
                 <div className="flex min-h-12 w-full items-center gap-3 rounded-[18px] border border-black/5 bg-[#f5f5f7]/85 px-4 shadow-sm transition focus-within:border-[#007aff]/40 focus-within:bg-white">
-                  <Search size={18} className="shrink-0 text-[#86868b]" />
+                  <Search size={18} className="shrink-0 harmony-text-muted" />
                   <input
                     value={searchKeyword}
                     onChange={(event) => setSearchKeyword(event.target.value)}
                     placeholder="Cari aktor, aksi, catatan..."
-                    className="min-h-12 min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-[#9a9aa0]"
+                    className="min-h-12 min-w-0 flex-1 bg-transparent text-sm outline-none harmony-placeholder-muted"
                   />
                 </div>
               </label>
@@ -359,7 +360,7 @@ export default function AttendanceAuditPage() {
           </div>
 
           {loading ? (
-            <div className="flex items-center gap-3 p-6 text-sm text-[#6e6e73]">
+            <div className="flex items-center gap-3 p-6 text-sm harmony-text-secondary">
               <Loader2 size={18} className="animate-spin" />
               Memuat audit log absensi...
             </div>
@@ -377,15 +378,15 @@ function AuditTable({ logs }: { logs: AuditLog[] }) {
     return (
       <div className="p-4 sm:p-6">
         <div className="rounded-[28px] border border-dashed border-black/10 bg-[#f5f5f7]/70 p-6 text-center sm:p-8">
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-3xl bg-white text-[#007aff] shadow-sm">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-3xl bg-white harmony-text-link shadow-sm">
             <FileText size={24} />
           </div>
 
-          <h3 className="mt-5 text-lg font-semibold text-[#1d1d1f]">
+          <h3 className="mt-5 text-lg font-semibold harmony-text-primary">
             Belum ada audit log
           </h3>
 
-          <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-[#6e6e73]">
+          <p className="mx-auto mt-2 max-w-xl text-sm leading-6 harmony-text-secondary">
             Audit log akan muncul setelah HR melakukan finalisasi, lock, atau
             unlock periode.
           </p>
@@ -405,7 +406,7 @@ function AuditTable({ logs }: { logs: AuditLog[] }) {
       <div className="hidden overflow-hidden 2xl:block">
         <table className="w-full table-fixed border-collapse text-left text-[13px]">
           <thead>
-            <tr className="border-b border-black/5 bg-[#f5f5f7]/90 text-xs uppercase tracking-wide text-[#6e6e73]">
+            <tr className="border-b border-black/5 bg-[#f5f5f7]/90 text-xs uppercase tracking-wide harmony-text-secondary">
               <th className="w-[15%] px-4 py-4 font-semibold">Waktu</th>
               <th className="w-[20%] px-4 py-4 font-semibold">Aksi</th>
               <th className="w-[16%] px-4 py-4 font-semibold">Periode</th>
@@ -422,7 +423,7 @@ function AuditTable({ logs }: { logs: AuditLog[] }) {
                 className="border-b border-black/5 align-top transition hover:bg-[#f5f5f7]/70"
               >
                 <td className="px-4 py-4">
-                  <p className="break-words font-semibold leading-6 text-[#1d1d1f]">
+                  <p className="break-words font-semibold leading-6 harmony-text-primary">
                     {formatDateTime(item.created_at || "")}
                   </p>
                 </td>
@@ -432,16 +433,16 @@ function AuditTable({ logs }: { logs: AuditLog[] }) {
                     actionType={item.action_type}
                     label={item.action_label}
                   />
-                  <p className="mt-2 break-words text-xs leading-5 text-[#6e6e73]">
+                  <p className="mt-2 break-words text-xs leading-5 harmony-text-secondary">
                     {item.action_type}
                   </p>
                 </td>
 
                 <td className="px-4 py-4">
-                  <p className="break-words font-semibold text-[#1d1d1f]">
+                  <p className="break-words font-semibold harmony-text-primary">
                     {item.period_month || "-"}
                   </p>
-                  <p className="mt-1 break-words text-xs leading-5 text-[#6e6e73]">
+                  <p className="mt-1 break-words text-xs leading-5 harmony-text-secondary">
                     {formatDisplayDate(item.period_start || "")} -{" "}
                     {formatDisplayDate(item.period_end || "")}
                   </p>
@@ -452,13 +453,13 @@ function AuditTable({ logs }: { logs: AuditLog[] }) {
                 </td>
 
                 <td className="px-4 py-4">
-                  <span className="inline-flex rounded-xl bg-[#e8f2ff] px-3 py-1 text-xs font-bold text-[#0059b8]">
+                  <span className="inline-flex rounded-xl bg-[#e8f2ff] px-3 py-1 text-xs font-bold harmony-text-link">
                     {item.total_affected || 0} data
                   </span>
                 </td>
 
                 <td className="px-4 py-4">
-                  <p className="break-words text-sm leading-6 text-[#6e6e73]">
+                  <p className="break-words text-sm leading-6 harmony-text-secondary">
                     {item.note || "-"}
                   </p>
                 </td>
@@ -480,12 +481,12 @@ function AuditMobileCard({ item }: { item: AuditLog }) {
             actionType={item.action_type}
             label={item.action_label}
           />
-          <p className="mt-2 break-words text-xs leading-5 text-[#6e6e73]">
+          <p className="mt-2 break-words text-xs leading-5 harmony-text-secondary">
             {item.action_type}
           </p>
         </div>
 
-        <span className="inline-flex w-fit rounded-xl bg-[#e8f2ff] px-3 py-1 text-xs font-bold text-[#0059b8]">
+        <span className="inline-flex w-fit rounded-xl bg-[#e8f2ff] px-3 py-1 text-xs font-bold harmony-text-link">
           {item.total_affected || 0} data
         </span>
       </div>
@@ -499,17 +500,17 @@ function AuditMobileCard({ item }: { item: AuditLog }) {
       </div>
 
       <div className="mt-4 rounded-2xl bg-[#f5f5f7]/80 p-4">
-        <p className="mb-3 text-[11px] font-bold uppercase tracking-wide text-[#86868b]">
+        <p className="mb-3 text-[11px] font-bold uppercase tracking-wide harmony-text-muted">
           Aktor
         </p>
         <ActorCell item={item} />
       </div>
 
       <div className="mt-3 rounded-2xl bg-[#f5f5f7]/80 p-4">
-        <p className="mb-2 text-[11px] font-bold uppercase tracking-wide text-[#86868b]">
+        <p className="mb-2 text-[11px] font-bold uppercase tracking-wide harmony-text-muted">
           Catatan
         </p>
-        <p className="break-words text-sm leading-6 text-[#6e6e73]">
+        <p className="break-words text-sm leading-6 harmony-text-secondary">
           {item.note || "-"}
         </p>
       </div>
@@ -520,15 +521,15 @@ function AuditMobileCard({ item }: { item: AuditLog }) {
 function ActorCell({ item }: { item: AuditLog }) {
   return (
     <div className="flex min-w-0 items-start gap-3">
-      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#f5f5f7] text-[#007aff]">
+      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#f5f5f7] harmony-text-link">
         <UserRound size={17} />
       </div>
 
       <div className="min-w-0">
-        <p className="break-words font-semibold leading-5 text-[#1d1d1f]">
+        <p className="break-words font-semibold leading-5 harmony-text-primary">
           {item.actor_name || "-"}
         </p>
-        <p className="mt-1 break-words text-xs leading-5 text-[#6e6e73]">
+        <p className="mt-1 break-words text-xs leading-5 harmony-text-secondary">
           {item.actor_role || "-"}
         </p>
       </div>
@@ -556,11 +557,11 @@ function ActionBadge({
           }
         : actionType === "hr_unlock_period"
           ? {
-              className: "bg-[#f7edfc] text-[#7b2cbf]",
+              className: "bg-[#f7edfc] harmony-text-violet",
               icon: <LockOpen size={14} />,
             }
           : {
-              className: "bg-[#f5f5f7] text-[#6e6e73]",
+              className: "bg-[#f5f5f7] harmony-text-secondary",
               icon: <History size={14} />,
             };
 
@@ -588,25 +589,25 @@ function SummaryCard({
   tone: "blue" | "green" | "orange" | "purple";
 }) {
   const toneClass = {
-    blue: "text-[#007aff] bg-[#e8f2ff]",
-    green: "text-[#168034] bg-[#eaf8ee]",
-    orange: "text-[#b35b00] bg-[#fff4e5]",
-    purple: "text-[#7b2cbf] bg-[#f7edfc]",
+    blue: "harmony-text-link bg-[#e8f2ff]",
+    green: "harmony-text-success bg-[#eaf8ee]",
+    orange: "harmony-text-warning bg-[#fff4e5]",
+    purple: "harmony-text-violet bg-[#f7edfc]",
   }[tone];
 
   return (
     <div className="harmony-metric-card min-w-0 p-5">
       <div className="flex min-w-0 items-start justify-between gap-4">
         <div className="min-w-0">
-          <p className="break-words text-sm font-medium leading-5 text-[#6e6e73]">
+          <p className="break-words text-sm font-medium leading-5 harmony-text-secondary">
             {title}
           </p>
 
-          <h3 className="mt-2 break-words text-2xl font-semibold tracking-tight text-[#1d1d1f]">
+          <h3 className="mt-2 break-words text-2xl font-semibold tracking-tight harmony-text-primary">
             {value}
           </h3>
 
-          <p className="mt-1 break-words text-xs leading-5 text-[#86868b]">
+          <p className="mt-1 break-words text-xs leading-5 harmony-text-muted">
             {description}
           </p>
         </div>
@@ -634,10 +635,10 @@ function HeroMetric({ label, value }: { label: string; value: string }) {
 function MiniInfo({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-2xl bg-[#f5f5f7]/80 p-4">
-      <p className="text-[11px] font-bold uppercase tracking-wide text-[#86868b]">
+      <p className="text-[11px] font-bold uppercase tracking-wide harmony-text-muted">
         {label}
       </p>
-      <p className="mt-2 break-words text-sm font-semibold leading-6 text-[#1d1d1f]">
+      <p className="mt-2 break-words text-sm font-semibold leading-6 harmony-text-primary">
         {value || "-"}
       </p>
     </div>
@@ -677,17 +678,7 @@ function AlertBox({
   );
 }
 
-function getCurrentPeriodMonth() {
-  const today = new Date();
-  const day = today.getDate();
-  const period = new Date(today);
 
-  if (day <= 10) {
-    period.setMonth(period.getMonth() - 1);
-  }
-
-  return `${period.getFullYear()}-${String(period.getMonth() + 1).padStart(2, "0")}`;
-}
 
 function getCutoffRange(periodMonth: string) {
   const [yearText, monthText] = periodMonth.split("-");

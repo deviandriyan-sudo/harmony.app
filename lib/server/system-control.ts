@@ -43,7 +43,7 @@ export async function getHarmonySystemControl(
     }
   }
 
-  const row = result.data as any
+  const row = result.data as { system_enabled?: boolean | null; maintenance_message?: string | null; updated_at?: string | null; updated_by_email?: string | null } | null
   const systemEnabled = row?.system_enabled !== false
 
   return {

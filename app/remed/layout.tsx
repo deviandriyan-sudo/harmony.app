@@ -1,5 +1,7 @@
 'use client'
 
+
+import { readErrorMessage } from '@/lib/error-utils'
 import Image from 'next/image'
 import { useEffect, useState } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
@@ -22,9 +24,25 @@ export default function RemedLayout({ children }: { children: React.ReactNode })
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
   const [hasSubordinates, setHasSubordinates] = useState(false)
 
+  async function loadSession() {
+    setLoading(true)
+    try {
+      const payload = await remedFetch<{ session: RemedSession }>('/api/remed/session')
+      setSession(payload.session)
+      localStorage.setItem('remed_user', JSON.stringify(payload.session))
+    } catch (error: unknown) {
+      localStorage.removeItem('remed_user')
+      setMessage(readErrorMessage(error) || 'Akses Re-Med tidak tersedia.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   useEffect(() => {
-    loadSession()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    let active = true
+    // Start session/data loading after the effect setup, avoiding a cascading synchronous render.
+    queueMicrotask(() => { if (active) void loadSession() })
+    return () => { active = false }
   }, [])
 
   useEffect(() => {
@@ -54,20 +72,6 @@ export default function RemedLayout({ children }: { children: React.ReactNode })
     }
   }, [mobileSidebarOpen])
 
-  async function loadSession() {
-    setLoading(true)
-    try {
-      const payload = await remedFetch<{ session: RemedSession }>('/api/remed/session')
-      setSession(payload.session)
-      localStorage.setItem('remed_user', JSON.stringify(payload.session))
-    } catch (error: any) {
-      localStorage.removeItem('remed_user')
-      setMessage(error?.message || 'Akses Re-Med tidak tersedia.')
-    } finally {
-      setLoading(false)
-    }
-  }
-
   const menu = session?.role === 'hr'
     ? navigationForRole('hr', { remed: true })
     : session?.role === 'finance'
@@ -78,13 +82,13 @@ export default function RemedLayout({ children }: { children: React.ReactNode })
 
   if (!session) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-[#f5f5f7] p-6">
+      <main className="harmony-access-state flex min-h-screen items-center justify-center bg-[#f5f5f7] p-6">
         <div className="w-full max-w-md rounded-[32px] border border-red-100 bg-white p-8 text-center shadow-[0_24px_70px_rgba(15,23,42,0.12)]">
           <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-red-50 text-red-600">
             <ShieldAlert size={26} />
           </div>
-          <h1 className="mt-5 text-xl font-semibold text-[#1d1d1f]">Akses Re-Med Ditolak</h1>
-          <p className="mt-2 text-sm leading-6 text-[#6e6e73]">{message}</p>
+          <h1 className="mt-5 text-xl font-semibold harmony-text-primary">Akses Re-Med Ditolak</h1>
+          <p className="mt-2 text-sm leading-6 harmony-text-secondary">{message}</p>
           <button type="button" onClick={() => router.replace('/login')} className="mt-5 rounded-2xl bg-[#1d1d1f] px-5 py-3 text-sm font-semibold text-white">
             Kembali ke HARMONY
           </button>
@@ -127,7 +131,7 @@ export default function RemedLayout({ children }: { children: React.ReactNode })
                 mobile
                 onNavigate={() => setMobileSidebarOpen(false)}
               />
-              <button type="button" aria-label="Tutup menu" onClick={() => setMobileSidebarOpen(false)} className="absolute right-[-48px] top-4 flex h-10 w-10 items-center justify-center rounded-2xl bg-white text-[#1d1d1f] shadow-lg">
+              <button type="button" aria-label="Tutup menu" onClick={() => setMobileSidebarOpen(false)} className="absolute right-[-48px] top-4 flex h-10 w-10 items-center justify-center rounded-2xl bg-white harmony-text-primary shadow-lg">
                 <X size={20} />
               </button>
             </div>
@@ -137,7 +141,7 @@ export default function RemedLayout({ children }: { children: React.ReactNode })
         <main className="min-w-0 flex-1 overflow-x-hidden lg:ml-[88px] harmony-desktop-main">
           <div className="harmony-mobile-topbar sticky top-0 z-40 border-b px-4 py-3 print:hidden lg:hidden">
             <div className="flex items-center justify-between gap-3">
-              <button type="button" onClick={() => setMobileSidebarOpen(true)} className="harmony-mobile-glass flex h-11 w-11 items-center justify-center rounded-2xl text-[#1d1d1f]" aria-label="Buka menu">
+              <button type="button" onClick={() => setMobileSidebarOpen(true)} className="harmony-mobile-glass flex h-11 w-11 items-center justify-center rounded-2xl harmony-text-primary" aria-label="Buka menu">
                 <Menu size={22} />
               </button>
               <div className="harmony-mobile-brand flex min-w-0 flex-1 items-center gap-3 rounded-2xl px-3 py-2">
@@ -145,8 +149,8 @@ export default function RemedLayout({ children }: { children: React.ReactNode })
                   <Image src="/logo.png" alt="HARMONY Logo" width={30} height={30} className="h-7 w-7 object-contain" />
                 </div>
                 <div className="min-w-0">
-                  <p className="truncate text-sm font-bold text-[#1d1d1f]">HARMONY</p>
-                  <p className="truncate text-[11px] font-medium text-[#6e6e73]">Re-Med · {REMED_ROLE_LABELS[session.role]}</p>
+                  <p className="truncate text-sm font-bold harmony-text-primary">HARMONY</p>
+                  <p className="truncate text-[11px] font-medium harmony-text-secondary">Re-Med · {REMED_ROLE_LABELS[session.role]}</p>
                 </div>
               </div>
             </div>
@@ -166,13 +170,13 @@ function roleHome(role: RemedSession['role']) {
 
 function AccessLoading({ message }: { message: string }) {
   return (
-    <main className="flex min-h-screen items-center justify-center bg-[#f5f5f7] p-6">
+    <main className="harmony-access-state flex min-h-screen items-center justify-center bg-[#f5f5f7] p-6">
       <div className="w-full max-w-md rounded-[32px] border border-black/5 bg-white p-8 text-center shadow-[0_24px_70px_rgba(15,23,42,0.12)]">
-        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[#e8f7f1] text-[#18794e]">
+        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[#e8f7f1] harmony-text-success">
           <Loader2 size={26} className="animate-spin" />
         </div>
-        <h1 className="mt-5 text-xl font-semibold text-[#1d1d1f]">Memeriksa Akses Re-Med</h1>
-        <p className="mt-2 text-sm leading-6 text-[#6e6e73]">{message}</p>
+        <h1 className="mt-5 text-xl font-semibold harmony-text-primary">Memeriksa Akses Re-Med</h1>
+        <p className="mt-2 text-sm leading-6 harmony-text-secondary">{message}</p>
       </div>
     </main>
   )

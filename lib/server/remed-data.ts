@@ -1,10 +1,11 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import type { RemedClaim, RemedClaimAttachment, RemedEntitlement } from '@/types/remed'
 
 function entitlementKey(employeeId: string, year: number) {
   return `${employeeId}:${year}`
 }
 
-export async function enrichRemedClaims(admin: SupabaseClient, claims: any[]) {
+export async function enrichRemedClaims(admin: SupabaseClient, claims: RemedClaim[]) {
   if (!claims.length) return []
 
   const employeeIds = [...new Set(claims.map((x) => x.employee_id).filter(Boolean))]
@@ -42,10 +43,10 @@ export async function enrichRemedClaims(admin: SupabaseClient, claims: any[]) {
   if (attachmentsResult.error) throw attachmentsResult.error
   if (entitlementsResult.error) throw entitlementsResult.error
 
-  const employeeMap = new Map((employeesResult.data || []).map((x: any) => [x.id, x]))
-  const typeMap = new Map((typesResult.data || []).map((x: any) => [x.id, x]))
-  const attachmentMap = new Map<string, any[]>()
-  const entitlementMap = new Map<string, any>()
+  const employeeMap = new Map((employeesResult.data || []).map((x) => [x.id, x] as const))
+  const typeMap = new Map((typesResult.data || []).map((x) => [x.id, x] as const))
+  const attachmentMap = new Map<string, RemedClaimAttachment[]>()
+  const entitlementMap = new Map<string, RemedEntitlement>()
 
   for (const attachment of attachmentsResult.data || []) {
     const list = attachmentMap.get(attachment.claim_id) || []

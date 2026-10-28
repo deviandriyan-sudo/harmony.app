@@ -1,5 +1,7 @@
 'use client'
 
+
+import { readErrorMessage } from '@/lib/error-utils'
 import { useEffect, useMemo, useState } from 'react'
 import {
   AlertTriangle,
@@ -14,7 +16,7 @@ import {
 
 import { supabase } from '@/lib/supabase'
 
-type AnyRow = Record<string, any>
+type AnyRow = Record<string, unknown>
 
 type EmployeeDirectoryEntry = {
   id: string
@@ -123,7 +125,7 @@ function getMonthRange(monthKey: string) {
   }
 }
 
-function monthKeyFromDate(value?: string | null) {
+function monthKeyFromDate(value?: unknown) {
   const text = String(value || '').trim()
   const matched = text.match(/^(\d{4})-(\d{2})/)
   return matched ? `${matched[1]}-${matched[2]}` : ''
@@ -165,7 +167,7 @@ function buildMonthOptions(earliestMonth?: string | null) {
   return options
 }
 
-function normalize(value?: string | null) {
+function normalize(value?: unknown) {
   return String(value || '').trim().toLowerCase()
 }
 
@@ -407,7 +409,7 @@ function looksLikeUuid(value?: string | null) {
 
 function findEmployeeByReference(
   directory: EmployeeDirectoryEntry[],
-  reference?: string | null,
+  reference?: unknown,
 ) {
   const target = normalize(reference)
   if (!target) return null
@@ -854,11 +856,11 @@ export function TodayTeamAvailability() {
       })
 
       setItems(merged)
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error(error)
       setItems([])
       setMessage(
-        error?.message ||
+        readErrorMessage(error) ||
           `Gagal memuat riwayat kehadiran tim periode ${periodLabel}.`,
       )
     } finally {
@@ -884,24 +886,24 @@ export function TodayTeamAvailability() {
             )}
           </div>
 
-          <h2 className="mt-3 text-xl font-bold tracking-tight text-[#1d1d1f] sm:text-2xl">
+          <h2 className="mt-3 text-xl font-bold tracking-tight harmony-text-primary sm:text-2xl">
             Informasi Kehadiran Tim
           </h2>
 
-          <p className="mt-1 max-w-3xl text-sm leading-6 text-[#6e6e73]">
+          <p className="mt-1 max-w-3xl text-sm leading-6 harmony-text-secondary">
             Riwayat cuti, klaim PHL, dan ketidakhadiran tim berdasarkan bulan. Pilih periode untuk melihat histori yang tersimpan.
           </p>
         </div>
 
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
           <label className="flex min-h-11 items-center gap-2 rounded-2xl border border-black/5 bg-[#f5f5f7] px-3 shadow-sm">
-            <CalendarDays size={16} className="shrink-0 text-[#007aff]" />
+            <CalendarDays size={16} className="shrink-0 harmony-text-link" />
             <span className="sr-only">Pilih periode bulan</span>
             <select
               value={selectedMonth}
               onChange={(event) => setSelectedMonth(event.target.value)}
               disabled={loading}
-              className="min-w-[170px] bg-transparent py-2 text-sm font-bold text-[#1d1d1f] outline-none disabled:cursor-not-allowed disabled:opacity-60"
+              className="min-w-[170px] bg-transparent py-2 text-sm font-bold harmony-text-primary outline-none disabled:cursor-not-allowed disabled:opacity-60"
             >
               {monthOptions.map((option) => (
                 <option key={option.value} value={option.value}>
@@ -912,15 +914,15 @@ export function TodayTeamAvailability() {
           </label>
 
           <div className="rounded-2xl bg-[#f5f5f7] px-4 py-3 text-sm">
-            <span className="font-bold text-[#1d1d1f]">{totalPeople}</span>{' '}
-            <span className="text-[#6e6e73]">orang terdata</span>
+            <span className="font-bold harmony-text-primary">{totalPeople}</span>{' '}
+            <span className="harmony-text-secondary">orang terdata</span>
           </div>
 
           <button
             type="button"
             onClick={fetchMonthData}
             disabled={loading}
-            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl border border-black/5 bg-white px-4 text-sm font-bold text-[#1d1d1f] shadow-sm transition hover:bg-[#f5f5f7] disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl border border-black/5 bg-white px-4 text-sm font-bold harmony-text-primary shadow-sm transition hover:bg-[#f5f5f7] disabled:cursor-not-allowed disabled:opacity-60"
           >
             <RefreshCcw size={16} className={loading ? 'animate-spin' : ''} />
             Refresh
@@ -984,10 +986,10 @@ function HistoryColumn({
           </div>
 
           <div className="min-w-0">
-            <h3 className="truncate text-base font-bold text-[#1d1d1f]">
+            <h3 className="truncate text-base font-bold harmony-text-primary">
               {meta.label}
             </h3>
-            <p className="text-xs font-semibold text-[#86868b]">
+            <p className="text-xs font-semibold harmony-text-muted">
               {peopleCount} orang
               {items.length > peopleCount ? ` · ${items.length} catatan` : ''}
             </p>
@@ -996,11 +998,11 @@ function HistoryColumn({
       </div>
 
       {loading ? (
-        <div className="rounded-2xl border border-dashed border-black/10 bg-white p-4 text-sm font-semibold text-[#6e6e73]">
+        <div className="rounded-2xl border border-dashed border-black/10 bg-white p-4 text-sm font-semibold harmony-text-secondary">
           Memuat data...
         </div>
       ) : items.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-black/10 bg-white p-4 text-sm leading-6 text-[#6e6e73]">
+        <div className="rounded-2xl border border-dashed border-black/10 bg-white p-4 text-sm leading-6 harmony-text-secondary">
           {meta.emptyLabel(periodLabel)}
         </div>
       ) : (
@@ -1025,11 +1027,11 @@ function HistoryPersonCard({ item }: { item: TeamHistoryItem }) {
         <div className="min-w-0 flex-1">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
             <div className="min-w-0">
-              <h4 className="break-words text-sm font-bold leading-5 text-[#1d1d1f]">
+              <h4 className="break-words text-sm font-bold leading-5 harmony-text-primary">
                 {item.employeeName}
               </h4>
 
-              <p className="mt-1 break-words text-xs leading-5 text-[#6e6e73]">
+              <p className="mt-1 break-words text-xs leading-5 harmony-text-secondary">
                 {[item.employeeNumber, item.department, item.position]
                   .filter(Boolean)
                   .join(' · ') || '-'}
@@ -1046,12 +1048,12 @@ function HistoryPersonCard({ item }: { item: TeamHistoryItem }) {
           </div>
 
           <div className="mt-3 flex flex-wrap gap-2">
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-[#f5f5f7] px-3 py-1 text-xs font-bold text-[#1d1d1f]">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-[#f5f5f7] px-3 py-1 text-xs font-bold harmony-text-primary">
               <UserRound size={13} />
               {item.categoryLabel}
             </span>
 
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-[#f5f5f7] px-3 py-1 text-xs font-semibold text-[#6e6e73]">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-[#f5f5f7] px-3 py-1 text-xs font-semibold harmony-text-secondary">
               <Clock3 size={13} />
               {item.startDate === item.endDate
                 ? formatDate(item.startDate)
@@ -1063,21 +1065,21 @@ function HistoryPersonCard({ item }: { item: TeamHistoryItem }) {
             <div className="flex items-start gap-2">
               <BriefcaseBusiness
                 size={15}
-                className="mt-0.5 shrink-0 text-[#007aff]"
+                className="mt-0.5 shrink-0 harmony-text-link"
               />
 
               <div className="min-w-0">
-                <p className="text-[11px] font-bold uppercase tracking-wide text-[#86868b]">
+                <p className="text-[11px] font-bold uppercase tracking-wide harmony-text-muted">
                   Job pending
                 </p>
-                <p className="mt-1 whitespace-pre-line break-words text-xs leading-5 text-[#1d1d1f]">
+                <p className="mt-1 whitespace-pre-line break-words text-xs leading-5 harmony-text-primary">
                   {item.jobPending || 'Belum ada detail job pending.'}
                 </p>
 
-                <p className="mt-2 text-[11px] font-bold uppercase tracking-wide text-[#86868b]">
+                <p className="mt-2 text-[11px] font-bold uppercase tracking-wide harmony-text-muted">
                   Pengganti / PIC
                 </p>
-                <p className="mt-1 break-words text-xs leading-5 text-[#1d1d1f]">
+                <p className="mt-1 break-words text-xs leading-5 harmony-text-primary">
                   {item.handoverTo || 'Belum ditentukan.'}
                 </p>
               </div>

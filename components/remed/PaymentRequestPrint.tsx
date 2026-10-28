@@ -22,12 +22,12 @@ export function PaymentRequestPrint({ claimId }: { claimId: string }) {
         setClaim(payload.claim)
         setSignatures(payload.signatures)
       })
-      .catch((issue: any) => setError(issue?.message || 'Gagal memuat form pembayaran.'))
+      .catch((issue: unknown) => setError(issue instanceof Error ? issue.message : 'Gagal memuat form pembayaran.'))
       .finally(() => setLoading(false))
   }, [claimId])
 
   if (loading) {
-    return <div className="flex min-h-[60vh] items-center justify-center"><Loader2 className="animate-spin text-[#18794e]" /></div>
+    return <div className="flex min-h-[60vh] items-center justify-center"><Loader2 className="animate-spin harmony-text-success" /></div>
   }
 
   if (!claim) {
@@ -49,20 +49,20 @@ export function PaymentRequestPrint({ claimId }: { claimId: string }) {
         </button>
       </div>
 
-      <article className="rounded-[28px] border border-black/10 bg-white p-6 shadow-sm sm:p-9 print:rounded-none print:border-0 print:p-0 print:shadow-none">
+      <article className="harmony-print-document rounded-[28px] border border-black/10 bg-white p-6 shadow-sm sm:p-9 print:rounded-none print:border-0 print:p-0 print:shadow-none">
         <header className="flex items-start justify-between gap-5 border-b-2 border-[#1d1d1f] pb-5">
           <div className="flex items-center gap-4">
             <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-2xl border border-black/10">
               <Image src="/logo.png" alt="Logo Poltek Simas Berau" width={56} height={56} className="h-14 w-14 object-contain" />
             </div>
             <div>
-              <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#6e6e73]">HARMONY · RE-MED</p>
-              <h1 className="mt-1 text-2xl font-bold text-[#1d1d1f]">FORM PERMOHONAN PEMBAYARAN</h1>
-              <p className="mt-1 text-sm text-[#6e6e73]">Medical Reimbursement</p>
+              <p className="text-xs font-bold uppercase tracking-[0.2em] harmony-text-secondary">HARMONY · RE-MED</p>
+              <h1 className="mt-1 text-2xl font-bold harmony-text-primary">FORM PERMOHONAN PEMBAYARAN</h1>
+              <p className="mt-1 text-sm harmony-text-secondary">Medical Reimbursement</p>
             </div>
           </div>
           <div className="text-right">
-            <p className="text-xs text-[#6e6e73]">Nomor Klaim</p>
+            <p className="text-xs harmony-text-secondary">Nomor Klaim</p>
             <p className="mt-1 font-mono text-sm font-bold">{claim.claim_number}</p>
             <div className="mt-2 inline-flex"><ClaimStatusBadge status={claim.status} /></div>
           </div>
@@ -80,7 +80,7 @@ export function PaymentRequestPrint({ claimId }: { claimId: string }) {
         </div>
 
         <div className="mt-6 rounded-2xl border border-black/10 bg-[#f8f8fa] p-5 print:bg-white">
-          <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#6e6e73]">Nilai Pembayaran</p>
+          <p className="text-xs font-bold uppercase tracking-[0.16em] harmony-text-secondary">Nilai Pembayaran</p>
           <div className="mt-3 grid gap-4 sm:grid-cols-3">
             <Field label="Nominal Diajukan" value={formatRupiah(claim.submitted_amount)} strong />
             <Field label="Nominal Disetujui" value={approvedAmount ? formatRupiah(approvedAmount) : '-'} strong />
@@ -90,7 +90,7 @@ export function PaymentRequestPrint({ claimId }: { claimId: string }) {
 
         <div className="mt-6 grid gap-5 sm:grid-cols-2">
           <div className="rounded-2xl border border-black/10 p-5">
-            <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#6e6e73]">Rekening Pembayaran</p>
+            <p className="text-xs font-bold uppercase tracking-[0.16em] harmony-text-secondary">Rekening Pembayaran</p>
             <div className="mt-4 space-y-3">
               <Field label="Bank" value={claim.bank_name || '-'} />
               <Field label="Nomor Rekening" value={claim.bank_account_number || '-'} />
@@ -98,7 +98,7 @@ export function PaymentRequestPrint({ claimId }: { claimId: string }) {
             </div>
           </div>
           <div className="rounded-2xl border border-black/10 p-5">
-            <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#6e6e73]">Catatan</p>
+            <p className="text-xs font-bold uppercase tracking-[0.16em] harmony-text-secondary">Catatan</p>
             <div className="mt-4 space-y-3">
               <Field label="Karyawan" value={claim.employee_note || '-'} />
               <Field label="HR" value={claim.hr_note || '-'} />
@@ -133,7 +133,7 @@ export function PaymentRequestPrint({ claimId }: { claimId: string }) {
 
         {(claim.payment_date || claim.payment_reference) && (
           <div className="mt-6 border-t border-black/10 pt-5">
-            <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#6e6e73]">Informasi Pembayaran</p>
+            <p className="text-xs font-bold uppercase tracking-[0.16em] harmony-text-secondary">Informasi Pembayaran</p>
             <div className="mt-3 grid gap-4 sm:grid-cols-2">
               <Field label="Tanggal Pembayaran" value={formatRemedDate(claim.payment_date)} />
               <Field label="Referensi Pembayaran" value={claim.payment_reference || '-'} />
@@ -141,7 +141,7 @@ export function PaymentRequestPrint({ claimId }: { claimId: string }) {
           </div>
         )}
 
-        <footer className="mt-8 border-t border-black/10 pt-4 text-[11px] leading-5 text-[#6e6e73]">
+        <footer className="mt-8 border-t border-black/10 pt-4 text-[11px] leading-5 harmony-text-secondary">
           Form ini dihasilkan otomatis oleh HARMONY Re-Med. Tanda tangan HR/Finance mengikuti pejabat fungsi yang aktif pada saat approval; karyawan dapat memperbarui tanda tangannya melalui Akun & Tanda Tangan Re-Med.
         </footer>
       </article>
@@ -152,8 +152,8 @@ export function PaymentRequestPrint({ claimId }: { claimId: string }) {
 function Field({ label, value, strong = false }: { label: string; value: string; strong?: boolean }) {
   return (
     <div>
-      <p className="text-[11px] font-semibold uppercase tracking-wide text-[#8e8e93]">{label}</p>
-      <p className={['mt-1 break-words text-sm text-[#1d1d1f]', strong ? 'font-bold' : 'font-medium'].join(' ')}>{value}</p>
+      <p className="text-[11px] font-semibold uppercase tracking-wide harmony-text-muted">{label}</p>
+      <p className={['mt-1 break-words text-sm harmony-text-primary', strong ? 'font-bold' : 'font-medium'].join(' ')}>{value}</p>
     </div>
   )
 }
@@ -175,7 +175,7 @@ function ApprovalBox({
 
   return (
     <div className="min-h-[190px] rounded-2xl border border-black/10 p-4 text-center">
-      <p className="text-xs font-bold uppercase tracking-wide text-[#6e6e73]">{title}</p>
+      <p className="text-xs font-bold uppercase tracking-wide harmony-text-secondary">{title}</p>
       <div className="mt-2 flex h-20 items-center justify-center">
         {showSignature && signature?.signature_url ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -184,8 +184,8 @@ function ApprovalBox({
           <p className="text-[10px] font-medium text-amber-700">Tanda tangan belum diunggah</p>
         ) : null}
       </div>
-      <p className="border-t border-black/30 pt-2 text-sm font-semibold text-[#1d1d1f]">{name}</p>
-      <p className="mt-1 text-xs text-[#6e6e73]">{date}</p>
+      <p className="border-t border-black/30 pt-2 text-sm font-semibold harmony-text-primary">{name}</p>
+      <p className="mt-1 text-xs harmony-text-secondary">{date}</p>
     </div>
   )
 }

@@ -1,24 +1,12 @@
 "use client";
 
+
+import { readErrorMessage } from '@/lib/error-utils'
 import Link from "next/link";
 import { useParams, usePathname } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffectEvent, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
-import {
-  AlertTriangle,
-  ArrowLeft,
-  CheckCircle2,
-  ExternalLink,
-  FileText,
-  Loader2,
-  Lock,
-  RefreshCcw,
-  ShieldCheck,
-  Timer,
-  Undo2,
-  UserCheck,
-  UserRound,
-} from "lucide-react";
+import { AlertTriangle, ArrowLeft, CheckCircle2, Loader2, Lock, RefreshCcw, ShieldCheck, Timer, Undo2, UserCheck, UserRound } from "lucide-react";
 
 import { Topbar } from "@/components/layout/Topbar";
 import { HarmonyAttachmentViewer } from "@/components/attachments/HarmonyAttachments";
@@ -239,8 +227,9 @@ export default function HRAttendanceSafeReviewPage() {
     };
   }, [logs]);
 
+  const onPeriodLoad = useEffectEvent(fetchData)
   useEffect(() => {
-    fetchData();
+    onPeriodLoad();
   }, [employeeId, periodMonth]);
 
   async function fetchData() {
@@ -312,12 +301,12 @@ export default function HRAttendanceSafeReviewPage() {
       if (logError) throw logError;
 
       setLogs((logData || []) as AttendanceLog[]);
-    } catch (error: any) {
+    } catch (error: unknown) {
       setEmployee(null);
       setConfirmation(null);
       setLogs([]);
       setErrorMessage(
-        error?.message || "Data HR Review gagal dimuat.",
+        readErrorMessage(error) || "Data HR Review gagal dimuat.",
       );
     } finally {
       setLoading(false);
@@ -436,9 +425,9 @@ export default function HRAttendanceSafeReviewPage() {
         `/hr/attendance/approvals?period=${encodeURIComponent(periodMonth)}`,
       );
       return;
-    } catch (error: any) {
+    } catch (error: unknown) {
       setErrorMessage(
-        error?.message || "Approval HR gagal diproses.",
+        readErrorMessage(error) || "Approval HR gagal diproses.",
       );
     } finally {
       setProcessing(false);
@@ -525,9 +514,9 @@ export default function HRAttendanceSafeReviewPage() {
       );
 
       await fetchData();
-    } catch (error: any) {
+    } catch (error: unknown) {
       setErrorMessage(
-        error?.message || "Pembatalan Approval HR gagal.",
+        readErrorMessage(error) || "Pembatalan Approval HR gagal.",
       );
     } finally {
       setProcessing(false);
@@ -613,7 +602,7 @@ export default function HRAttendanceSafeReviewPage() {
         </div>
 
         {loading ? (
-          <div className="harmony-card flex items-center gap-3 p-6 text-sm text-[#6e6e73]">
+          <div className="harmony-card flex items-center gap-3 p-6 text-sm harmony-text-secondary">
             <Loader2 size={18} className="animate-spin" />
             Memuat detail HR Review...
           </div>
@@ -676,10 +665,10 @@ export default function HRAttendanceSafeReviewPage() {
             <div className="harmony-card overflow-hidden">
               <div className="flex flex-col gap-4 border-b border-black/5 p-5 sm:p-6 xl:flex-row xl:items-end xl:justify-between">
                 <div>
-                  <h2 className="text-lg font-semibold text-[#1d1d1f]">
+                  <h2 className="text-lg font-semibold harmony-text-primary">
                     Review Data Harian
                   </h2>
-                  <p className="mt-1 text-sm leading-6 text-[#6e6e73]">
+                  <p className="mt-1 text-sm leading-6 harmony-text-secondary">
                     Periksa jam, status, keterangan, approval atasan, dan
                     bukti sebelum Approve HR.
                   </p>
@@ -705,7 +694,7 @@ export default function HRAttendanceSafeReviewPage() {
               <div className="hidden overflow-x-auto 2xl:block">
                 <table className="min-w-[1180px] w-full table-fixed border-collapse text-left text-[12px]">
                   <thead>
-                    <tr className="border-b border-black/5 bg-[#f5f5f7]/90 text-xs uppercase tracking-wide text-[#6e6e73]">
+                    <tr className="border-b border-black/5 bg-[#f5f5f7]/90 text-xs uppercase tracking-wide harmony-text-secondary">
                       <th className="w-[120px] px-4 py-3">Tanggal</th>
                       <th className="w-[90px] px-4 py-3">Masuk</th>
                       <th className="w-[90px] px-4 py-3">Pulang</th>
@@ -723,7 +712,7 @@ export default function HRAttendanceSafeReviewPage() {
                         key={log.id}
                         className="border-b border-black/5 hover:bg-[#f8f8fa]"
                       >
-                        <td className="px-4 py-4 font-bold text-[#1d1d1f]">
+                        <td className="px-4 py-4 font-bold harmony-text-primary">
                           {formatDisplayDate(log.attendance_date)}
                         </td>
                         <td className="px-4 py-4">
@@ -741,7 +730,7 @@ export default function HRAttendanceSafeReviewPage() {
                         <td className="px-4 py-4">
                           <StatusPill value={log.status || "-"} />
                         </td>
-                        <td className="px-4 py-4 text-[#6e6e73]">
+                        <td className="px-4 py-4 harmony-text-secondary">
                           {log.absence_request_label ||
                             log.employee_daily_note ||
                             "-"}
@@ -847,7 +836,7 @@ function MobileLogCard({ log }: { log: AttendanceLog }) {
     <div className="rounded-[24px] border border-black/5 bg-white p-4 shadow-sm">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="font-bold text-[#1d1d1f]">
+          <p className="font-bold harmony-text-primary">
             {formatDisplayDate(log.attendance_date)}
           </p>
           <div className="mt-2">
@@ -927,12 +916,12 @@ function InfoCard({
   return (
     <div className="harmony-card p-5">
       <div className="flex items-start gap-3">
-        <div className="rounded-2xl bg-[#e8f2ff] p-2.5 text-[#007aff]">
+        <div className="rounded-2xl bg-[#e8f2ff] p-2.5 harmony-text-link">
           {icon}
         </div>
         <div className="min-w-0">
-          <p className="text-xs font-semibold text-[#86868b]">{label}</p>
-          <p className="mt-1 break-words text-sm font-bold text-[#1d1d1f]">
+          <p className="text-xs font-semibold harmony-text-muted">{label}</p>
+          <p className="mt-1 break-words text-sm font-bold harmony-text-primary">
             {value}
           </p>
         </div>
@@ -955,10 +944,10 @@ function HeroMetric({ label, value }: { label: string; value: string }) {
 function MiniInfo({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-2xl bg-[#f5f5f7]/80 p-3">
-      <p className="text-[10px] font-bold uppercase tracking-wide text-[#86868b]">
+      <p className="text-[10px] font-bold uppercase tracking-wide harmony-text-muted">
         {label}
       </p>
-      <p className="mt-1 break-words text-xs font-semibold leading-5 text-[#1d1d1f]">
+      <p className="mt-1 break-words text-xs font-semibold leading-5 harmony-text-primary">
         {value}
       </p>
     </div>
@@ -974,15 +963,15 @@ function TimeValue({
 }) {
   return (
     <div>
-      <div className="flex items-center gap-2 font-semibold text-[#1d1d1f]">
+      <div className="flex items-center gap-2 font-semibold harmony-text-primary">
         <Timer
           size={14}
-          className={manual ? "text-[#007aff]" : "text-[#86868b]"}
+          className={manual ? "harmony-text-link" : "harmony-text-muted"}
         />
         {value}
       </div>
       {manual && (
-        <p className="mt-1 text-[10px] font-bold text-[#007aff]">Manual</p>
+        <p className="mt-1 text-[10px] font-bold harmony-text-link">Manual</p>
       )}
     </div>
   );
@@ -1004,7 +993,7 @@ function StatusPill({ value }: { value: string }) {
             normalized.includes("ready") ||
             normalized.includes("waiting")
           ? "border-orange-200 bg-orange-50 text-orange-700"
-          : "border-black/5 bg-[#f5f5f7] text-[#6e6e73]";
+          : "border-black/5 bg-[#f5f5f7] harmony-text-secondary";
 
   return (
     <span

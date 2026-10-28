@@ -1,7 +1,9 @@
 'use client'
 
+
+import { readErrorMessage } from '@/lib/error-utils'
 import Link from 'next/link'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffectEvent, useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import {
   AlertTriangle,
@@ -136,13 +138,10 @@ type LeaveRequest = {
 
   created_at: string | null
 }
-
-type SummaryTone = 'blue' | 'green' | 'orange' | 'purple'
-
 type ModuleTone = 'blue' | 'purple'
 
 export default function EmployeeApprovalsPage() {
-  const [appUser, setAppUser] = useState<AppUser | null>(null)
+  const [, setAppUser] = useState<AppUser | null>(null)
   const [supervisor, setSupervisor] = useState<Employee | null>(null)
   const [subordinates, setSubordinates] = useState<Employee[]>([])
   const [subordinateRelations, setSubordinateRelations] = useState<
@@ -211,9 +210,10 @@ export default function EmployeeApprovalsPage() {
     rejected: phlWorkRequests.filter((item) => item.status === 'rejected').length,
   }), [phlWorkRequests])
 
+  const onPeriodLoad = useEffectEvent(fetchData)
   useEffect(() => {
     if (!periodReady) return
-    fetchData()
+    onPeriodLoad()
   }, [periodMonth, periodReady])
 
   async function fetchData() {
@@ -360,8 +360,8 @@ export default function EmployeeApprovalsPage() {
 
     try {
       setPHLWorkRequests(await fetchPHLWorkRequests('team'))
-    } catch (phlError: any) {
-      setErrorMessage(phlError?.message || 'Data approval PHL kerja gagal dimuat.')
+    } catch (phlError: unknown) {
+      setErrorMessage(readErrorMessage(phlError) || 'Data approval PHL kerja gagal dimuat.')
       setPHLWorkRequests([])
     }
 
@@ -563,16 +563,16 @@ function PeriodFilterBar({
     <div className="harmony-card overflow-hidden p-0">
       <div className="flex flex-col gap-4 p-5 lg:flex-row lg:items-center lg:justify-between lg:p-6">
         <div className="flex min-w-0 items-start gap-4">
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#e8f2ff] text-[#007aff]">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#e8f2ff] harmony-text-link">
             <Filter size={20} />
           </div>
 
           <div className="min-w-0">
-            <h2 className="text-lg font-semibold text-[#1d1d1f]">
+            <h2 className="text-lg font-semibold harmony-text-primary">
               Filter Periode Absensi
             </h2>
 
-            <p className="mt-1 text-sm leading-6 text-[#6e6e73]">
+            <p className="mt-1 text-sm leading-6 harmony-text-secondary">
               Periode ini dipakai untuk ringkasan dan akses approval absensi bawahan.
             </p>
           </div>
@@ -631,12 +631,12 @@ function PeriodFilterBar({
           </label>
 
           <div className="flex min-h-12 items-center gap-3 rounded-2xl border border-black/5 bg-[#f5f5f7]/80 px-4">
-            <CalendarDays size={17} className="shrink-0 text-[#007aff]" />
+            <CalendarDays size={17} className="shrink-0 harmony-text-link" />
             <div className="min-w-0">
-              <p className="text-[11px] font-bold uppercase tracking-wide text-[#86868b]">
+              <p className="text-[11px] font-bold uppercase tracking-wide harmony-text-muted">
                 Rentang
               </p>
-              <p className="truncate text-xs font-bold text-[#1d1d1f] sm:text-sm">
+              <p className="truncate text-xs font-bold harmony-text-primary sm:text-sm">
                 {formatDisplayDate(periodStart)} - {formatDisplayDate(periodEnd)}
               </p>
             </div>
@@ -645,10 +645,10 @@ function PeriodFilterBar({
           <div className="flex min-h-12 items-center gap-3 rounded-2xl border border-black/5 bg-[#f5f5f7]/80 px-4">
             <Clock3 size={17} className="shrink-0 text-orange-700" />
             <div>
-              <p className="text-[11px] font-bold uppercase tracking-wide text-[#86868b]">
+              <p className="text-[11px] font-bold uppercase tracking-wide harmony-text-muted">
                 Pending / Submit
               </p>
-              <p className="text-sm font-bold text-[#1d1d1f]">
+              <p className="text-sm font-bold harmony-text-primary">
                 {attendancePending} / {attendanceTotal}
               </p>
             </div>
@@ -658,7 +658,7 @@ function PeriodFilterBar({
             type="button"
             onClick={onRefresh}
             disabled={loading}
-            className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-black/5 bg-white px-5 text-sm font-bold text-[#1d1d1f] shadow-sm transition hover:bg-[#f5f5f7] disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-black/5 bg-white px-5 text-sm font-bold harmony-text-primary shadow-sm transition hover:bg-[#f5f5f7] disabled:cursor-not-allowed disabled:opacity-60"
           >
             {loading ? (
               <Loader2 size={18} className="animate-spin" />
@@ -701,18 +701,18 @@ function SubordinateOrgChart({
       <div className="border-b border-black/5 p-5 lg:p-6">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <h2 className="text-lg font-semibold text-[#1d1d1f]">
+            <h2 className="text-lg font-semibold harmony-text-primary">
               Bawahan Terhubung
             </h2>
 
-            <p className="mt-1 text-sm leading-6 text-[#6e6e73]">
+            <p className="mt-1 text-sm leading-6 harmony-text-secondary">
               Relasi approval membaca homebase dan jabatan tambahan aktif. Satu
               approval dari salah satu atasan yang sah menyelesaikan tahap
               supervisor.
             </p>
           </div>
 
-          <span className="inline-flex w-fit items-center gap-2 rounded-full bg-[#e8f2ff] px-3 py-1 text-xs font-bold text-[#007aff]">
+          <span className="inline-flex w-fit items-center gap-2 rounded-full bg-[#e8f2ff] px-3 py-1 text-xs font-bold harmony-text-link">
             <UsersRound size={14} />
             {employees.length} bawahan aktif
           </span>
@@ -720,22 +720,22 @@ function SubordinateOrgChart({
       </div>
 
       {loading ? (
-        <div className="flex items-center gap-3 p-6 text-sm text-[#6e6e73]">
+        <div className="flex items-center gap-3 p-6 text-sm harmony-text-secondary">
           <Loader2 size={18} className="animate-spin" />
           Memuat struktur bawahan...
         </div>
       ) : employees.length === 0 ? (
         <div className="p-6">
           <div className="rounded-[28px] border border-dashed border-black/10 bg-[#f5f5f7]/70 p-8 text-center">
-            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-3xl bg-white text-[#007aff] shadow-sm">
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-3xl bg-white harmony-text-link shadow-sm">
               <UsersRound size={24} />
             </div>
 
-            <h3 className="mt-5 text-lg font-semibold text-[#1d1d1f]">
+            <h3 className="mt-5 text-lg font-semibold harmony-text-primary">
               Belum ada bawahan terhubung
             </h3>
 
-            <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-[#6e6e73]">
+            <p className="mx-auto mt-2 max-w-xl text-sm leading-6 harmony-text-secondary">
               Pastikan supervisor homebase atau supervisor pada jabatan tambahan
               aktif menunjuk ke atasan yang sesuai.
             </p>
@@ -816,18 +816,18 @@ function OrgEmployeeNode({
   return (
     <div className="h-full rounded-[28px] border border-black/5 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
       <div className="flex items-start gap-3">
-        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#e8f2ff] text-[#007aff]">
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#e8f2ff] harmony-text-link">
           <UserRound size={18} />
         </div>
 
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="inline-flex rounded-full bg-[#f5f5f7] px-2.5 py-1 text-[11px] font-bold text-[#6e6e73]">
+            <span className="inline-flex rounded-full bg-[#f5f5f7] px-2.5 py-1 text-[11px] font-bold harmony-text-secondary">
               {relationLabel}
             </span>
 
             {assignments.length > 0 && (
-              <span className="inline-flex rounded-full bg-[#f7edfc] px-2.5 py-1 text-[11px] font-bold text-[#7b2cbf]">
+              <span className="inline-flex rounded-full bg-[#f7edfc] px-2.5 py-1 text-[11px] font-bold harmony-text-violet">
                 Jabatan Tambahan
               </span>
             )}
@@ -839,15 +839,15 @@ function OrgEmployeeNode({
             )}
           </div>
 
-          <h3 className="mt-3 break-words text-sm font-bold leading-5 text-[#1d1d1f]">
+          <h3 className="mt-3 break-words text-sm font-bold leading-5 harmony-text-primary">
             {employee.full_name || '-'}
           </h3>
 
-          <p className="mt-1 break-words text-xs leading-5 text-[#6e6e73]">
+          <p className="mt-1 break-words text-xs leading-5 harmony-text-secondary">
             {employee.employee_number || '-'} · {employee.department || '-'}
           </p>
 
-          <p className="mt-1 break-words text-xs leading-5 text-[#86868b]">
+          <p className="mt-1 break-words text-xs leading-5 harmony-text-muted">
             {employee.position || '-'}
           </p>
 
@@ -867,21 +867,21 @@ function OrgEmployeeNode({
                     className="rounded-2xl bg-[#f7f3fb] px-3 py-2.5"
                   >
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="text-[10px] font-bold uppercase tracking-wide text-[#7b2cbf]">
+                      <span className="text-[10px] font-bold uppercase tracking-wide harmony-text-violet">
                         Jabatan Tambahan
                       </span>
 
                       {assignmentRelations.length > 0 && (
-                        <span className="text-[10px] font-semibold text-[#86868b]">
+                        <span className="text-[10px] font-semibold harmony-text-muted">
                           {assignmentLevel}
                         </span>
                       )}
                     </div>
 
-                    <p className="mt-1 break-words text-xs font-semibold leading-5 text-[#1d1d1f]">
+                    <p className="mt-1 break-words text-xs font-semibold leading-5 harmony-text-primary">
                       {assignment.assignment_position || '-'}
                     </p>
-                    <p className="mt-0.5 break-words text-[11px] leading-4 text-[#6e6e73]">
+                    <p className="mt-0.5 break-words text-[11px] leading-4 harmony-text-secondary">
                       {assignment.assignment_department || '-'}
                     </p>
                   </div>
@@ -918,8 +918,8 @@ function ApprovalModuleCard({
   metricHref?: (label: string) => string
 }) {
   const toneClass = {
-    blue: 'bg-[#e8f2ff] text-[#007aff]',
-    purple: 'bg-[#f7edfc] text-[#7b2cbf]',
+    blue: 'bg-[#e8f2ff] harmony-text-link',
+    purple: 'bg-[#f7edfc] harmony-text-violet',
   }[tone]
 
   return (
@@ -930,17 +930,17 @@ function ApprovalModuleCard({
             {icon}
           </div>
 
-          <div className="inline-flex items-center gap-2 rounded-full bg-[#f5f5f7] px-3 py-1 text-xs font-bold text-[#6e6e73]">
+          <div className="inline-flex items-center gap-2 rounded-full bg-[#f5f5f7] px-3 py-1 text-xs font-bold harmony-text-secondary">
             Buka Modul
             <ArrowUpRight size={13} className="transition group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
           </div>
         </div>
 
-        <h3 className="mt-6 text-2xl font-semibold tracking-tight text-[#1d1d1f]">
+        <h3 className="mt-6 text-2xl font-semibold tracking-tight harmony-text-primary">
           {title}
         </h3>
 
-        <p className="mt-3 text-sm leading-6 text-[#6e6e73]">
+        <p className="mt-3 text-sm leading-6 harmony-text-secondary">
           {description}
         </p>
       </Link>
@@ -953,11 +953,11 @@ function ApprovalModuleCard({
             aria-label={`Lihat ${item.label}: ${item.value} - ${title}`}
             className="rounded-[20px] bg-[#f5f5f7]/80 p-4 transition hover:bg-[#e8f2ff] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#007aff]"
           >
-            <p className="text-xs font-semibold text-[#6e6e73]">
+            <p className="text-xs font-semibold harmony-text-secondary">
               {item.label}
             </p>
 
-            <p className="mt-2 text-2xl font-semibold text-[#1d1d1f]">
+            <p className="mt-2 text-2xl font-semibold harmony-text-primary">
               {item.value}
             </p>
           </Link>
@@ -974,7 +974,7 @@ function ApprovalModuleCard({
               <CheckCircle2 size={13} />
             </div>
 
-            <p className="text-sm leading-5 text-[#1d1d1f]">
+            <p className="text-sm leading-5 harmony-text-primary">
               {item}
             </p>
           </div>
@@ -984,50 +984,7 @@ function ApprovalModuleCard({
   )
 }
 
-function SummaryCard({
-  title,
-  value,
-  description,
-  icon,
-  tone,
-}: {
-  title: string
-  value: string
-  description: string
-  icon: ReactNode
-  tone: SummaryTone
-}) {
-  const toneClass = {
-    blue: 'text-[#007aff] bg-[#e8f2ff]',
-    green: 'text-[#168034] bg-[#eaf8ee]',
-    orange: 'text-[#b35b00] bg-[#fff4e5]',
-    purple: 'text-[#7b2cbf] bg-[#f7edfc]',
-  }[tone]
 
-  return (
-    <div className="harmony-metric-card p-6">
-      <div className="flex items-center justify-between gap-4">
-        <div className="min-w-0">
-          <p className="truncate text-sm text-[#6e6e73]">
-            {title}
-          </p>
-
-          <h3 className="mt-2 truncate text-2xl font-semibold tracking-tight text-[#1d1d1f]">
-            {value}
-          </h3>
-
-          <p className="mt-1 line-clamp-2 text-xs leading-5 text-[#86868b]">
-            {description}
-          </p>
-        </div>
-
-        <div className={`rounded-2xl p-3 ${toneClass}`}>
-          {icon}
-        </div>
-      </div>
-    </div>
-  )
-}
 
 function HeroMetric({
   label,

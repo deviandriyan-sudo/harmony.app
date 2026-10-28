@@ -1,6 +1,9 @@
 'use client'
 
+
+import { readErrorMessage } from '@/lib/error-utils'
 import { useEffect, useMemo, useState } from 'react'
+import type { ComponentType } from 'react'
 import Link from 'next/link'
 import {
   ArrowLeft,
@@ -224,21 +227,7 @@ function getRequestTypeLabel(type?: string | null, leaveType?: string | null) {
   return map[value] || leaveType || type || '-'
 }
 
-function getStatusLabel(status?: string | null) {
-  const value = normalize(status)
 
-  const map: Record<string, string> = {
-    pending: 'Menunggu Approval',
-    submitted: 'Diajukan',
-    approved: 'Disetujui',
-    rejected: 'Ditolak',
-    waiting_hr: 'Menunggu HR',
-    ready_for_hr: 'Ready for HR',
-    finalized: 'Final HR',
-  }
-
-  return map[value] || value.replaceAll('_', ' ') || '-'
-}
 
 function statusBadgeClass(status?: string | null) {
   const value = normalize(status)
@@ -377,10 +366,10 @@ async function sendSupervisorLeaveDecisionNotification({
       success: result.ok,
       message: result.message,
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     return {
       success: false,
-      message: error?.message || 'Email notifikasi gagal dikirim.',
+      message: readErrorMessage(error) || 'Email notifikasi gagal dikirim.',
     }
   }
 }
@@ -613,13 +602,13 @@ export default function EmployeeLeaveApprovalPage() {
           String(b.created_at || '').localeCompare(String(a.created_at || '')),
         ),
       )
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error(error)
 
       setMessage({
         type: 'error',
         text:
-          error?.message ||
+          readErrorMessage(error) ||
           'Gagal mengambil data approval cuti, izin, dan PHL.',
       })
     } finally {
@@ -677,13 +666,13 @@ export default function EmployeeLeaveApprovalPage() {
       })
 
       await fetchData()
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error(error)
 
       setMessage({
         type: 'error',
         text:
-          error?.message ||
+          readErrorMessage(error) ||
           'Gagal approve pengajuan. Pastikan function approve_leave_request_by_supervisor sudah tersedia.',
       })
     } finally {
@@ -746,13 +735,13 @@ export default function EmployeeLeaveApprovalPage() {
       })
 
       await fetchData()
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error(error)
 
       setMessage({
         type: 'error',
         text:
-          error?.message ||
+          readErrorMessage(error) ||
           'Gagal reject pengajuan. Pastikan function reject_leave_request_by_supervisor sudah tersedia.',
       })
     } finally {
@@ -1098,7 +1087,7 @@ function StatCard({
 }: {
   label: string
   value: number
-  icon: any
+  icon: ComponentType<{ className?: string }>
 }) {
   return (
     <div className="harmony-metric-card p-5">

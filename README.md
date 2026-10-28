@@ -1,36 +1,33 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# HARMONY — Integrated HR Platform
 
-## Getting Started
+**Version:** 3.8.5 · Enterprise Dual-Theme Normalization
 
-First, run the development server:
+Next.js 16 (App Router), React 19, TypeScript, Supabase and Vercel. Workspaces: HR, Employee, Finance and Re-Med. This package preserves existing business workflows and includes global Dark/Light semantic presentation refinements.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+## Quick start
+
+Run in a project directory containing your **existing** `.env.local` (never committed):
+
+```powershell
+npm ci
+npm run test:theme-normalization
+npm run test:theme
+npm run test:smoke
+npm run test:ui
+npx tsc --noEmit
+npm run lint
+npm run build
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Full existing regression suite, installation, backup and GitHub/Vercel deployment: [`INSTALL.md`](./INSTALL.md). Do not push until the checks succeed.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Design system
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- Theme preference: `harmony-color-theme` (existing provider; Dark/Light).
+- Theme variables: `app/globals.css` and `app/theme-normalization.css`.
+- Color, status, table, modal and printing guidelines: [`DESIGN_SYSTEM.md`](./DESIGN_SYSTEM.md).
+- Routing and authorized workflow integrity: [`ROUTE_INVENTORY_V385.csv`](./ROUTE_INVENTORY_V385.csv) and [`THEME_AUDIT_REPORT.md`](./THEME_AUDIT_REPORT.md).
+- Tests performed and environmental limits: [`VALIDATION_REPORT.md`](./VALIDATION_REPORT.md).
+- Source changes: [`CHANGED_FILES.md`](./CHANGED_FILES.md).
 
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Do not rerun already applied SQL migrations. The `SQL_ONLY` folder is retained for the original balance correction regression test and historical verification.

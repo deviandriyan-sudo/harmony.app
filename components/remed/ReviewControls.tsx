@@ -1,5 +1,7 @@
 'use client'
 
+
+import { readErrorMessage } from '@/lib/error-utils'
 import { useState } from 'react'
 import { Check, Loader2, Upload, X } from 'lucide-react'
 import { remedFetch } from '@/lib/remed-client'
@@ -37,15 +39,15 @@ export function HrReviewControls({ claim, onDone }: { claim: RemedClaim; onDone:
       })
       warnNotification(result, `Keputusan HR ${decision === 'approve' ? 'approve' : 'reject'}`)
       onDone()
-    } catch (error: any) {
-      window.alert(error?.message || 'Gagal memproses klaim.')
+    } catch (error: unknown) {
+      window.alert(readErrorMessage(error) || 'Gagal memproses klaim.')
     } finally {
       setLoading(false)
     }
   }
 
   if (loading) {
-    return <div className="inline-flex min-h-9 items-center gap-2 rounded-[13px] bg-[#eef0f3] px-3 text-xs font-bold text-[#646971]"><Loader2 size={14} className="animate-spin" /> Memproses</div>
+    return <div className="inline-flex min-h-9 items-center gap-2 rounded-[13px] bg-[#eef0f3] px-3 text-xs font-bold harmony-text-secondary"><Loader2 size={14} className="animate-spin" /> Memproses</div>
   }
 
   return (
@@ -67,14 +69,14 @@ export function FinanceReviewControls({ claim, onDone }: { claim: RemedClaim; on
       const result = await remedFetch<ActionResponse>(`/api/remed/finance/claims/${claim.id}/review`, { method: 'POST', body: JSON.stringify({ decision, note: note || '' }) })
       warnNotification(result, `Keputusan Finance ${decision === 'approve' ? 'approve' : 'reject'}`)
       onDone()
-    } catch (error: any) {
-      window.alert(error?.message || 'Gagal memproses klaim.')
+    } catch (error: unknown) {
+      window.alert(readErrorMessage(error) || 'Gagal memproses klaim.')
     } finally {
       setLoading(false)
     }
   }
 
-  if (loading) return <div className="inline-flex min-h-9 items-center rounded-[13px] bg-[#eef0f3] px-3 text-[#646971]"><Loader2 size={16} className="animate-spin" /></div>
+  if (loading) return <div className="inline-flex min-h-9 items-center rounded-[13px] bg-[#eef0f3] px-3 harmony-text-secondary"><Loader2 size={16} className="animate-spin" /></div>
 
   return (
     <div className="harmony-action-group">
@@ -104,8 +106,8 @@ export function PaymentControls({ claim, onDone }: { claim: RemedClaim; onDone: 
       const result = await remedFetch<ActionResponse>(`/api/remed/finance/claims/${claim.id}/payment`, { method: 'POST', body: formData })
       warnNotification(result, 'Pembayaran')
       onDone()
-    } catch (error: any) {
-      window.alert(error?.message || 'Gagal memproses pembayaran.')
+    } catch (error: unknown) {
+      window.alert(readErrorMessage(error) || 'Gagal memproses pembayaran.')
     } finally {
       setLoading(false)
     }
@@ -115,7 +117,7 @@ export function PaymentControls({ claim, onDone }: { claim: RemedClaim; onDone: 
     <div className="w-full max-w-sm space-y-2 rounded-[18px] border border-black/[0.055] bg-[#f7f8fa] p-3.5">
       <input type="date" value={date} onChange={(event) => setDate(event.target.value)} className="harmony-input min-h-10 text-xs" />
       <input value={reference} onChange={(event) => setReference(event.target.value)} placeholder="Referensi pembayaran (opsional)" className="harmony-input min-h-10 text-xs" />
-      <label className="flex min-h-10 cursor-pointer items-center gap-2 rounded-[13px] border border-dashed border-black/[0.09] bg-white px-3 text-xs font-bold text-[#646971] transition hover:border-emerald-200 hover:text-emerald-700">
+      <label className="flex min-h-10 cursor-pointer items-center gap-2 rounded-[13px] border border-dashed border-black/[0.09] bg-white px-3 text-xs font-bold harmony-text-secondary transition hover:border-emerald-200 hover:text-emerald-700">
         <Upload size={14} />
         <span className="truncate">{file ? file.name : 'Upload bukti bayar'}</span>
         <input type="file" accept="application/pdf,image/jpeg,image/png,image/webp" className="hidden" onChange={(event) => setFile(event.target.files?.[0] || null)} />

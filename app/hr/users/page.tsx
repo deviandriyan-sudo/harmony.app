@@ -1,5 +1,7 @@
 'use client'
 
+
+import { readErrorMessage } from '@/lib/error-utils'
 import { useEffect, useMemo, useState } from 'react'
 import {
   Search,
@@ -161,7 +163,10 @@ export default function HRUsersPage() {
   }
 
   useEffect(() => {
-    fetchData()
+    let active = true
+    // Start session/data loading after the effect setup, avoiding a cascading synchronous render.
+    queueMicrotask(() => { if (active) void fetchData() })
+    return () => { active = false }
   }, [])
 
   const existingEmployeeIds = useMemo(() => {
@@ -405,10 +410,10 @@ export default function HRUsersPage() {
     await fetchData()
   }
 
-  function buildBulkSummary(json: any) {
-    const createdCount = json.created?.length || 0
-    const skippedCount = json.skipped?.length || 0
-    const failedCount = json.failed?.length || 0
+  function buildBulkSummary(json: Record<string, unknown>) {
+    const createdCount = Array.isArray(json.created) ? json.created.length : 0
+    const skippedCount = Array.isArray(json.skipped) ? json.skipped.length : 0
+    const failedCount = Array.isArray(json.failed) ? json.failed.length : 0
 
     return `Created: ${createdCount} · Skipped: ${skippedCount} · Failed: ${failedCount}`
   }
@@ -480,8 +485,8 @@ Perubahan akan disinkronkan ke Supabase Auth, app_users, Employee Master, dan Re
       setShowEmailModal(false)
       setEmailChangeForm(initialEmailChangeForm)
       await fetchData()
-    } catch (error: any) {
-      setErrorMessage(error?.message || 'Email login gagal diubah.')
+    } catch (error: unknown) {
+      setErrorMessage(readErrorMessage(error) || 'Email login gagal diubah.')
     } finally {
       setSaving(false)
     }
@@ -600,7 +605,6 @@ Perubahan akan disinkronkan ke Supabase Auth, app_users, Employee Master, dan Re
   const hrCount = users.filter((item) => item.role === 'hr').length
   const employeeCount = users.filter((item) => item.role === 'employee').length
   const activeCount = users.filter((item) => item.is_active).length
-  const inactiveCount = users.filter((item) => !item.is_active).length
 
   return (
     <>
@@ -784,16 +788,16 @@ Perubahan akan disinkronkan ke Supabase Auth, app_users, Employee Master, dan Re
         <div className="harmony-card harmony-slide-up overflow-hidden">
           <div className="flex flex-col gap-4 border-b border-black/5 bg-white/55 p-5 xl:flex-row xl:items-center xl:justify-between">
             <div>
-              <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-[#e8f2ff] px-3 py-1.5 text-xs font-bold text-[#0059b8]">
+              <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-[#e8f2ff] px-3 py-1.5 text-xs font-bold harmony-text-link">
                 <Sparkles size={14} />
                 Access Control
               </div>
 
-              <h2 className="text-lg font-semibold text-[#1d1d1f]">
+              <h2 className="text-lg font-semibold harmony-text-primary">
                 Daftar User
               </h2>
 
-              <p className="mt-1 text-sm text-[#6e6e73]">
+              <p className="mt-1 text-sm harmony-text-secondary">
                 Kelola akun login yang terhubung ke Supabase Auth.
               </p>
             </div>
@@ -821,12 +825,12 @@ Perubahan akan disinkronkan ke Supabase Auth, app_users, Employee Master, dan Re
 
           <div className="grid gap-3 border-b border-black/5 bg-white/35 p-5 xl:grid-cols-[1fr_200px_200px]">
             <div className="flex min-h-11 items-center gap-3 rounded-2xl border border-black/5 bg-[#f5f5f7]/85 px-4 shadow-sm transition focus-within:border-[#007aff]/40 focus-within:bg-white focus-within:shadow-md">
-              <Search size={18} className="text-[#6e6e73]" />
+              <Search size={18} className="harmony-text-secondary" />
               <input
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
                 placeholder="Cari email, nama employee, NIP, unit..."
-                className="w-full bg-transparent text-sm outline-none placeholder:text-[#86868b]"
+                className="w-full bg-transparent text-sm outline-none harmony-placeholder-muted"
               />
             </div>
 
@@ -852,7 +856,7 @@ Perubahan akan disinkronkan ke Supabase Auth, app_users, Employee Master, dan Re
           </div>
 
           {loading && (
-            <div className="p-6 text-sm text-[#6e6e73]">
+            <div className="p-6 text-sm harmony-text-secondary">
               Memuat data user...
             </div>
           )}
@@ -861,7 +865,7 @@ Perubahan akan disinkronkan ke Supabase Auth, app_users, Employee Master, dan Re
             <div className="overflow-x-auto">
               <table className="w-full min-w-[1100px] border-collapse text-left text-sm">
                 <thead>
-                  <tr className="border-b border-black/5 bg-[#f5f5f7]/90 text-xs uppercase tracking-wide text-[#6e6e73]">
+                  <tr className="border-b border-black/5 bg-[#f5f5f7]/90 text-xs uppercase tracking-wide harmony-text-secondary">
                     <th className="w-[24%] px-5 py-4 font-semibold">User</th>
                     <th className="w-[24%] px-5 py-4 font-semibold">Employee</th>
                     <th className="w-[12%] px-5 py-4 font-semibold">Role</th>
@@ -884,10 +888,10 @@ Perubahan akan disinkronkan ke Supabase Auth, app_users, Employee Master, dan Re
                           </div>
 
                           <div className="min-w-0">
-                            <div className="truncate font-semibold text-[#1d1d1f]">
+                            <div className="truncate font-semibold harmony-text-primary">
                               {user.email}
                             </div>
-                            <div className="mt-1 truncate text-xs text-[#6e6e73]">
+                            <div className="mt-1 truncate text-xs harmony-text-secondary">
                               Auth ID: {user.id.slice(0, 8)}...
                             </div>
                           </div>
@@ -895,10 +899,10 @@ Perubahan akan disinkronkan ke Supabase Auth, app_users, Employee Master, dan Re
                       </td>
 
                       <td className="px-5 py-3.5">
-                        <div className="font-semibold text-[#1d1d1f]">
+                        <div className="font-semibold harmony-text-primary">
                           {user.employees?.full_name || '-'}
                         </div>
-                        <div className="mt-1 text-xs text-[#6e6e73]">
+                        <div className="mt-1 text-xs harmony-text-secondary">
                           {user.employees?.employee_number || '-'} · {user.employees?.department || '-'}
                         </div>
                       </td>
@@ -924,7 +928,7 @@ Perubahan akan disinkronkan ke Supabase Auth, app_users, Employee Master, dan Re
                         <StatusBadge active={user.is_active} />
                       </td>
 
-                      <td className="px-5 py-3.5 text-[#6e6e73]">
+                      <td className="px-5 py-3.5 harmony-text-secondary">
                         {formatDateTime(user.created_at)}
                       </td>
 
@@ -943,7 +947,7 @@ Perubahan akan disinkronkan ke Supabase Auth, app_users, Employee Master, dan Re
                             type="button"
                             title="Reset password"
                             onClick={() => openResetPassword(user)}
-                            className="flex h-9 w-9 items-center justify-center rounded-2xl border border-black/5 bg-white text-[#007aff] shadow-sm transition hover:-translate-y-0.5 hover:bg-[#f5f5f7] hover:shadow-md"
+                            className="flex h-9 w-9 items-center justify-center rounded-2xl border border-black/5 bg-white harmony-text-link shadow-sm transition hover:-translate-y-0.5 hover:bg-[#f5f5f7] hover:shadow-md"
                           >
                             <KeyRound size={15} />
                           </button>
@@ -974,15 +978,15 @@ Perubahan akan disinkronkan ke Supabase Auth, app_users, Employee Master, dan Re
 
               {filteredUsers.length === 0 && (
                 <div className="p-8 text-center">
-                  <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-3xl bg-[#f5f5f7] text-[#007aff]">
+                  <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-3xl bg-[#f5f5f7] harmony-text-link">
                     <UserCog size={24} />
                   </div>
 
-                  <h3 className="mt-4 font-semibold text-[#1d1d1f]">
+                  <h3 className="mt-4 font-semibold harmony-text-primary">
                     Data user tidak ditemukan
                   </h3>
 
-                  <p className="mt-1 text-sm text-[#6e6e73]">
+                  <p className="mt-1 text-sm harmony-text-secondary">
                     Tambahkan user baru untuk mulai menggunakan sistem login berbasis role.
                   </p>
                 </div>
@@ -1119,10 +1123,10 @@ function ChecklistCreateUserForm({
           />
 
           <div className="rounded-[22px] border border-black/5 bg-white/70 p-4 shadow-sm">
-            <p className="text-xs font-bold uppercase tracking-wide text-[#6e6e73]">
+            <p className="text-xs font-bold uppercase tracking-wide harmony-text-secondary">
               Terpilih
             </p>
-            <p className="mt-2 text-2xl font-semibold text-[#1d1d1f]">
+            <p className="mt-2 text-2xl font-semibold harmony-text-primary">
               {selectedEmployeeIds.length}
             </p>
           </div>
@@ -1135,7 +1139,7 @@ function ChecklistCreateUserForm({
         )}
 
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <div className="text-sm text-[#6e6e73]">
+          <div className="text-sm harmony-text-secondary">
             Kandidat tersedia: <b>{employeesWithoutUser.length}</b> employee.
           </div>
 
@@ -1182,10 +1186,10 @@ function ChecklistCreateUserForm({
                 </div>
 
                 <div className="min-w-0 flex-1">
-                  <div className="truncate font-semibold text-[#1d1d1f]">
+                  <div className="truncate font-semibold harmony-text-primary">
                     {employee.full_name || '-'}
                   </div>
-                  <div className="mt-1 truncate text-xs text-[#6e6e73]">
+                  <div className="mt-1 truncate text-xs harmony-text-secondary">
                     {employee.employee_number || '-'} · {employee.email || '-'} · {employee.department || '-'}
                   </div>
                 </div>
@@ -1194,7 +1198,7 @@ function ChecklistCreateUserForm({
           })}
 
           {employeesWithoutUser.length === 0 && (
-            <div className="p-8 text-center text-sm text-[#6e6e73]">
+            <div className="p-8 text-center text-sm harmony-text-secondary">
               Tidak ada employee aktif dengan email yang belum punya user.
             </div>
           )}
@@ -1244,10 +1248,10 @@ function BulkCreateUserForm({
       <form onSubmit={onSubmit} className="space-y-5 bg-white/35 p-5">
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <div className="rounded-[22px] border border-black/5 bg-white/70 p-4 shadow-sm">
-            <p className="text-xs font-bold uppercase tracking-wide text-[#6e6e73]">
+            <p className="text-xs font-bold uppercase tracking-wide harmony-text-secondary">
               Kandidat
             </p>
-            <p className="mt-2 text-3xl font-semibold text-[#1d1d1f]">
+            <p className="mt-2 text-3xl font-semibold harmony-text-primary">
               {totalCandidates}
             </p>
           </div>
@@ -1312,8 +1316,8 @@ function EmailChangeModal({
               <Mail size={14} />
               Account Identity
             </div>
-            <h2 className="text-xl font-semibold text-[#1d1d1f]">Ubah Email Login</h2>
-            <p className="mt-1 text-sm leading-6 text-[#6e6e73]">
+            <h2 className="text-xl font-semibold harmony-text-primary">Ubah Email Login</h2>
+            <p className="mt-1 text-sm leading-6 harmony-text-secondary">
               Email baru menjadi username login dan disinkronkan ke seluruh modul HARMONY.
             </p>
           </div>
@@ -1322,7 +1326,7 @@ function EmailChangeModal({
             type="button"
             onClick={onClose}
             disabled={saving}
-            className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#f5f5f7] text-[#1d1d1f] transition hover:bg-white disabled:opacity-50"
+            className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#f5f5f7] harmony-text-primary transition hover:bg-white disabled:opacity-50"
           >
             <X size={18} />
           </button>
@@ -1330,8 +1334,8 @@ function EmailChangeModal({
 
         <form onSubmit={onSubmit} className="space-y-5 p-6">
           <div className="rounded-[22px] border border-black/5 bg-[#f5f5f7]/80 p-4">
-            <p className="text-xs font-bold uppercase tracking-wide text-[#6e6e73]">Email Login Saat Ini</p>
-            <p className="mt-2 font-semibold text-[#1d1d1f]">{form.old_email}</p>
+            <p className="text-xs font-bold uppercase tracking-wide harmony-text-secondary">Email Login Saat Ini</p>
+            <p className="mt-2 font-semibold harmony-text-primary">{form.old_email}</p>
           </div>
 
           <label className="block">
@@ -1389,16 +1393,16 @@ function ResetPasswordModal({
       <div className="w-full max-w-xl overflow-hidden rounded-[32px] border border-white/20 bg-white/95 shadow-[0_30px_90px_rgba(0,0,0,0.22)] backdrop-blur-2xl">
         <div className="flex items-start justify-between gap-4 border-b border-black/5 bg-white/70 p-6">
           <div>
-            <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-[#e8f2ff] px-3 py-1.5 text-xs font-bold text-[#0059b8]">
+            <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-[#e8f2ff] px-3 py-1.5 text-xs font-bold harmony-text-link">
               <KeyRound size={14} />
               Reset Access
             </div>
 
-            <h2 className="text-xl font-semibold text-[#1d1d1f]">
+            <h2 className="text-xl font-semibold harmony-text-primary">
               Reset Password
             </h2>
 
-            <p className="mt-1 text-sm text-[#6e6e73]">
+            <p className="mt-1 text-sm harmony-text-secondary">
               Password baru akan langsung tersimpan di Supabase Auth.
             </p>
           </div>
@@ -1406,7 +1410,7 @@ function ResetPasswordModal({
           <button
             type="button"
             onClick={onClose}
-            className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#f5f5f7] text-[#1d1d1f] transition hover:bg-white"
+            className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#f5f5f7] harmony-text-primary transition hover:bg-white"
           >
             <X size={18} />
           </button>
@@ -1414,10 +1418,10 @@ function ResetPasswordModal({
 
         <form onSubmit={onSubmit} className="space-y-5 p-6">
           <div className="rounded-[22px] border border-black/5 bg-[#f5f5f7]/80 p-4">
-            <p className="text-xs font-bold uppercase tracking-wide text-[#6e6e73]">
+            <p className="text-xs font-bold uppercase tracking-wide harmony-text-secondary">
               User
             </p>
-            <p className="mt-2 font-semibold text-[#1d1d1f]">
+            <p className="mt-2 font-semibold harmony-text-primary">
               {resetForm.email}
             </p>
           </div>
@@ -1461,16 +1465,16 @@ function FormHeader({
     <div className="border-b border-black/5 bg-white/55 p-5">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
-          <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-[#e8f2ff] px-3 py-1.5 text-xs font-bold text-[#0059b8]">
+          <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-[#e8f2ff] px-3 py-1.5 text-xs font-bold harmony-text-link">
             {icon}
             User Workflow
           </div>
 
-          <h2 className="text-lg font-semibold text-[#1d1d1f]">
+          <h2 className="text-lg font-semibold harmony-text-primary">
             {title}
           </h2>
 
-          <p className="mt-1 text-sm text-[#6e6e73]">
+          <p className="mt-1 text-sm harmony-text-secondary">
             {description}
           </p>
         </div>
@@ -1542,13 +1546,13 @@ function ModeButton({
         'flex items-center gap-3 rounded-[24px] p-4 text-left transition hover:-translate-y-0.5',
         active
           ? 'bg-[#1d1d1f] text-white shadow-sm'
-          : 'bg-white/60 text-[#1d1d1f] hover:bg-white',
+          : 'bg-white/60 harmony-text-primary hover:bg-white',
       ].join(' ')}
     >
       <div
         className={[
           'rounded-2xl p-3',
-          active ? 'bg-white/10 text-white' : 'bg-[#e8f2ff] text-[#007aff]',
+          active ? 'bg-white/10 text-white' : 'bg-[#e8f2ff] harmony-text-link',
         ].join(' ')}
       >
         {icon}
@@ -1562,7 +1566,7 @@ function ModeButton({
         <div
           className={[
             'mt-1 text-xs',
-            active ? 'text-white/60' : 'text-[#6e6e73]',
+            active ? 'text-white/60' : 'harmony-text-secondary',
           ].join(' ')}
         >
           {description}
@@ -1656,26 +1660,26 @@ function SummaryCard({
   tone: 'blue' | 'green' | 'orange' | 'purple' | 'cyan'
 }) {
   const toneClass = {
-    blue: 'text-[#007aff] bg-[#e8f2ff]',
-    green: 'text-[#168034] bg-[#eaf8ee]',
-    orange: 'text-[#b35b00] bg-[#fff4e5]',
-    purple: 'text-[#7b2cbf] bg-[#f7edfc]',
-    cyan: 'text-[#0077a3] bg-[#e8f8ff]',
+    blue: 'harmony-text-link bg-[#e8f2ff]',
+    green: 'harmony-text-success bg-[#eaf8ee]',
+    orange: 'harmony-text-warning bg-[#fff4e5]',
+    purple: 'harmony-text-violet bg-[#f7edfc]',
+    cyan: 'harmony-text-link bg-[#e8f8ff]',
   }[tone]
 
   return (
     <div className="harmony-metric-card harmony-slide-up p-5">
       <div className="flex items-center justify-between gap-4">
         <div className="min-w-0">
-          <p className="truncate text-sm text-[#6e6e73]">
+          <p className="truncate text-sm harmony-text-secondary">
             {title}
           </p>
 
-          <h3 className="mt-2 truncate text-2xl font-semibold tracking-tight text-[#1d1d1f]">
+          <h3 className="mt-2 truncate text-2xl font-semibold tracking-tight harmony-text-primary">
             {value}
           </h3>
 
-          <p className="mt-1 line-clamp-1 text-xs leading-5 text-[#86868b]">
+          <p className="mt-1 line-clamp-1 text-xs leading-5 harmony-text-muted">
             {description}
           </p>
         </div>

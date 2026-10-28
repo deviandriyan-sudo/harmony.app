@@ -1,6 +1,8 @@
 'use client'
 
-import {
+
+import { readErrorMessage } from '@/lib/error-utils'
+import { useEffectEvent,
   useEffect,
   useMemo,
   useState,
@@ -480,23 +482,25 @@ export default function HRLeaveAdministrationPage() {
       )
     }, [summaries])
 
+  const onAdministrationLoad = useEffectEvent(fetchAll)
   useEffect(() => {
-    fetchAll()
+    onAdministrationLoad()
   }, [])
 
+  const onEmployeeDetailLoad = useEffectEvent(fetchEmployeeDetail)
   useEffect(() => {
-    if (
-      !selectedEmployeeId
-    ) {
-      setCycles([])
-      setAdjustments([])
-      setSelectedCycleId('')
-      return
-    }
-
-    fetchEmployeeDetail(
-      selectedEmployeeId,
-    )
+    let active = true
+    queueMicrotask(() => {
+      if (!active) return
+      if (!selectedEmployeeId) {
+        setCycles([])
+        setAdjustments([])
+        setSelectedCycleId('')
+        return
+      }
+      void onEmployeeDetailLoad(selectedEmployeeId)
+    })
+    return () => { active = false }
   }, [selectedEmployeeId])
 
   async function getToken() {
@@ -604,9 +608,9 @@ export default function HRLeaveAdministrationPage() {
             .employee_id,
         )
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       setErrorMessage(
-        error?.message ||
+        readErrorMessage(error) ||
           'Gagal memuat administrasi cuti.',
       )
     } finally {
@@ -702,9 +706,9 @@ export default function HRLeaveAdministrationPage() {
         firstEligible?.id ||
           '',
       )
-    } catch (error: any) {
+    } catch (error: unknown) {
       setErrorMessage(
-        error?.message ||
+        readErrorMessage(error) ||
           'Gagal memuat detail employee.',
       )
     } finally {
@@ -816,9 +820,9 @@ export default function HRLeaveAdministrationPage() {
       await fetchEmployeeDetail(
         selectedEmployeeId,
       )
-    } catch (error: any) {
+    } catch (error: unknown) {
       setErrorMessage(
-        error?.message ||
+        readErrorMessage(error) ||
           'Gagal memproses postpone manual.',
       )
     } finally {
@@ -1074,9 +1078,9 @@ export default function HRLeaveAdministrationPage() {
       )
 
       await fetchAll()
-    } catch (error: any) {
+    } catch (error: unknown) {
       setErrorMessage(
-        error?.message ||
+        readErrorMessage(error) ||
           'Gagal menyimpan master jenis.',
       )
     } finally {
@@ -1147,9 +1151,9 @@ export default function HRLeaveAdministrationPage() {
       )
 
       await fetchAll()
-    } catch (error: any) {
+    } catch (error: unknown) {
       setErrorMessage(
-        error?.message ||
+        readErrorMessage(error) ||
           'Gagal mengubah status master jenis.',
       )
     } finally {
@@ -1410,7 +1414,7 @@ export default function HRLeaveAdministrationPage() {
               )}
 
               {detailLoading ? (
-                <div className="flex items-center gap-2 rounded-2xl bg-[#f5f5f7] p-4 text-sm text-[#6e6e73]">
+                <div className="flex items-center gap-2 rounded-2xl bg-[#f5f5f7] p-4 text-sm harmony-text-secondary">
                   <Loader2
                     size={17}
                     className="animate-spin"
@@ -1683,7 +1687,7 @@ export default function HRLeaveAdministrationPage() {
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div>
-                          <p className="font-bold text-[#1d1d1f]">
+                          <p className="font-bold harmony-text-primary">
                             {Number(
                               item.delta_days ||
                                 0,
@@ -1697,7 +1701,7 @@ export default function HRLeaveAdministrationPage() {
                             hari
                           </p>
 
-                          <p className="mt-1 text-xs text-[#6e6e73]">
+                          <p className="mt-1 text-xs harmony-text-secondary">
                             {
                               item.note
                             }
@@ -1712,7 +1716,7 @@ export default function HRLeaveAdministrationPage() {
                         />
                       </div>
 
-                      <div className="mt-3 grid grid-cols-2 gap-2 text-[11px] text-[#6e6e73]">
+                      <div className="mt-3 grid grid-cols-2 gap-2 text-[11px] harmony-text-secondary">
                         <span>
                           Anniversary:{' '}
                           {formatDate(
@@ -1765,7 +1769,7 @@ export default function HRLeaveAdministrationPage() {
               }
               className="space-y-4 rounded-[26px] border border-black/5 bg-[#f8f8fa] p-5"
             >
-              <h3 className="font-bold text-[#1d1d1f]">
+              <h3 className="font-bold harmony-text-primary">
                 Tambah Jenis Baru
               </h3>
 
@@ -2134,13 +2138,13 @@ export default function HRLeaveAdministrationPage() {
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
-                          <p className="truncate font-bold text-[#1d1d1f]">
+                          <p className="truncate font-bold harmony-text-primary">
                             {
                               item.label
                             }
                           </p>
 
-                          <p className="mt-1 break-all text-[11px] font-semibold text-[#007aff]">
+                          <p className="mt-1 break-all text-[11px] font-semibold harmony-text-link">
                             {
                               item.code
                             }
@@ -2154,7 +2158,7 @@ export default function HRLeaveAdministrationPage() {
                         />
                       </div>
 
-                      <div className="mt-3 flex flex-wrap gap-2 text-[10px] font-bold text-[#6e6e73]">
+                      <div className="mt-3 flex flex-wrap gap-2 text-[10px] font-bold harmony-text-secondary">
                         <span className="rounded-full bg-[#f5f5f7] px-2.5 py-1">
                           {
                             item.group_label
@@ -2198,12 +2202,12 @@ export default function HRLeaveAdministrationPage() {
                         )}
                       </div>
 
-                      <p className="mt-3 text-xs leading-5 text-[#6e6e73]">
+                      <p className="mt-3 text-xs leading-5 harmony-text-secondary">
                         {item.description || '-'}
                       </p>
 
                       {item.policy_note && (
-                        <p className="mt-2 rounded-xl bg-[#f8f8fa] px-3 py-2 text-[11px] leading-5 text-[#3a3a3c]">
+                        <p className="mt-2 rounded-xl bg-[#f8f8fa] px-3 py-2 text-[11px] leading-5 harmony-text-primary">
                           {item.policy_note}
                         </p>
                       )}
@@ -2278,16 +2282,16 @@ function SectionTitle({
 }) {
   return (
     <div className="flex items-start gap-3 border-b border-black/5 p-5 sm:p-6">
-      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#e8f2ff] text-[#007aff]">
+      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#e8f2ff] harmony-text-link">
         {icon}
       </div>
 
       <div>
-        <h2 className="font-bold text-[#1d1d1f]">
+        <h2 className="font-bold harmony-text-primary">
           {title}
         </h2>
 
-        <p className="mt-1 text-sm leading-6 text-[#6e6e73]">
+        <p className="mt-1 text-sm leading-6 harmony-text-secondary">
           {description}
         </p>
       </div>
@@ -2366,11 +2370,11 @@ function InfoBox({
 }) {
   return (
     <div className="rounded-2xl bg-white p-3">
-      <p className="text-[10px] font-bold uppercase tracking-wide text-[#86868b]">
+      <p className="text-[10px] font-bold uppercase tracking-wide harmony-text-muted">
         {label}
       </p>
 
-      <p className="mt-1 text-sm font-bold text-[#1d1d1f]">
+      <p className="mt-1 text-sm font-bold harmony-text-primary">
         {value}
       </p>
     </div>
@@ -2388,7 +2392,7 @@ function CheckField({
     (value: boolean) => void
 }) {
   return (
-    <label className="flex cursor-pointer items-center gap-3 rounded-2xl border border-black/5 bg-white p-3 text-sm font-semibold text-[#1d1d1f]">
+    <label className="flex cursor-pointer items-center gap-3 rounded-2xl border border-black/5 bg-white p-3 text-sm font-semibold harmony-text-primary">
       <input
         type="checkbox"
         checked={checked}
@@ -2469,7 +2473,7 @@ function EmptyText({
   text: string
 }) {
   return (
-    <div className="rounded-[22px] border border-dashed border-black/10 bg-[#f5f5f7]/70 p-5 text-sm text-[#6e6e73]">
+    <div className="rounded-[22px] border border-dashed border-black/10 bg-[#f5f5f7]/70 p-5 text-sm harmony-text-secondary">
       {text}
     </div>
   )

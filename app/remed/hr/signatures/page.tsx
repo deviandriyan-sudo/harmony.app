@@ -1,5 +1,7 @@
 'use client'
 
+
+import { readErrorMessage } from '@/lib/error-utils'
 import { ChangeEvent, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Loader2, PenLine, RefreshCw, Save, Search, ShieldCheck, Upload, WalletCards } from 'lucide-react'
 
@@ -28,15 +30,18 @@ export default function RemedSignatureManagementPage() {
       setHrEmployeeId(hr?.id || '')
       setFinanceEmployeeId(finance?.id || '')
       setSelectedEmployeeId((current: string) => current || hr?.id || result.employees[0]?.id || '')
-    } catch (error: any) {
-      setMessage(error?.message || 'Gagal memuat manajemen tanda tangan.')
+    } catch (error: unknown) {
+      setMessage(readErrorMessage(error) || 'Gagal memuat manajemen tanda tangan.')
     } finally {
       setLoading(false)
     }
   }
 
   useEffect(() => {
-    load()
+    let active = true
+    // Start session/data loading after the effect setup, avoiding a cascading synchronous render.
+    queueMicrotask(() => { if (active) void load() })
+    return () => { active = false }
   }, [])
 
   const filtered = useMemo(() => {
@@ -60,8 +65,8 @@ export default function RemedSignatureManagementPage() {
       })
       setMessage(`Penandatangan ${role === 'hr' ? 'HR' : 'Finance'} berhasil diperbarui.`)
       await load()
-    } catch (error: any) {
-      setMessage(error?.message || 'Gagal memperbarui penandatangan.')
+    } catch (error: unknown) {
+      setMessage(readErrorMessage(error) || 'Gagal memperbarui penandatangan.')
     } finally {
       setSaving(false)
     }
@@ -87,8 +92,8 @@ export default function RemedSignatureManagementPage() {
       setFile(null)
       setMessage('Tanda tangan employee berhasil diperbarui.')
       await load()
-    } catch (error: any) {
-      setMessage(error?.message || 'Gagal upload tanda tangan.')
+    } catch (error: unknown) {
+      setMessage(readErrorMessage(error) || 'Gagal upload tanda tangan.')
     } finally {
       setSaving(false)
     }
@@ -99,7 +104,7 @@ export default function RemedSignatureManagementPage() {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-3xl font-semibold tracking-tight">Manajemen Tanda Tangan</h1>
-          <p className="mt-2 text-sm text-[#6e6e73]">Atur penandatangan HR/Finance dan kelola tanda tangan karyawan untuk form pembayaran Re-Med.</p>
+          <p className="mt-2 text-sm harmony-text-secondary">Atur penandatangan HR/Finance dan kelola tanda tangan karyawan untuk form pembayaran Re-Med.</p>
         </div>
         <button type="button" onClick={load} disabled={loading || saving} className="inline-flex items-center gap-2 rounded-2xl border border-black/10 bg-white px-4 py-3 text-sm font-semibold shadow-sm disabled:opacity-50">
           <RefreshCw size={16} className={loading ? 'animate-spin' : ''} /> Refresh
@@ -135,10 +140,10 @@ export default function RemedSignatureManagementPage() {
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <div className="flex items-center gap-2 text-base font-semibold"><PenLine size={18} /> Tanda Tangan Karyawan</div>
-            <p className="mt-1 text-sm text-[#6e6e73]">HR dapat membantu upload/replace. Karyawan juga dapat mengganti tanda tangannya sendiri dari menu Akun & Tanda Tangan.</p>
+            <p className="mt-1 text-sm harmony-text-secondary">HR dapat membantu upload/replace. Karyawan juga dapat mengganti tanda tangannya sendiri dari menu Akun & Tanda Tangan.</p>
           </div>
           <div className="relative w-full sm:w-[320px]">
-            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#8e8e93]" />
+            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 harmony-text-muted" />
             <input value={query} onChange={(e: ChangeEvent<HTMLInputElement>) => setQuery(e.target.value)} placeholder="Cari nama, NIK, unit..." className="w-full rounded-2xl bg-[#f5f5f7] py-3 pl-10 pr-4 text-sm outline-none" />
           </div>
         </div>
@@ -146,39 +151,39 @@ export default function RemedSignatureManagementPage() {
         <div className="mt-5 grid gap-5 lg:grid-cols-[1fr_360px]">
           <div className="max-h-[520px] overflow-auto rounded-2xl border border-black/5">
             {loading ? (
-              <div className="flex min-h-40 items-center justify-center"><Loader2 className="animate-spin text-[#18794e]" /></div>
+              <div className="flex min-h-40 items-center justify-center"><Loader2 className="animate-spin harmony-text-success" /></div>
             ) : filtered.length ? (
               <div className="divide-y divide-black/5">
                 {filtered.map((row: RemedSignatureManagementRow) => (
                   <button key={row.id} type="button" onClick={() => { setSelectedEmployeeId(row.id); setFile(null) }} className={`flex w-full items-center justify-between gap-4 px-4 py-3 text-left transition ${selectedEmployeeId === row.id ? 'bg-[#eef7f3]' : 'hover:bg-[#fafafa]'}`}>
                     <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold text-[#1d1d1f]">{row.full_name || '-'}</p>
-                      <p className="mt-0.5 truncate text-xs text-[#6e6e73]">{row.employee_number || '-'} · {row.department || '-'} · {row.position || '-'}</p>
+                      <p className="truncate text-sm font-semibold harmony-text-primary">{row.full_name || '-'}</p>
+                      <p className="mt-0.5 truncate text-xs harmony-text-secondary">{row.employee_number || '-'} · {row.department || '-'} · {row.position || '-'}</p>
                     </div>
                     <div className="shrink-0 text-right">
                       <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide ${row.signature_url ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>{row.signature_url ? 'Ada TTD' : 'Belum Ada'}</span>
-                      {row.signer_role && <p className="mt-1 text-[10px] font-semibold uppercase text-[#6e6e73]">{row.signer_role}</p>}
+                      {row.signer_role && <p className="mt-1 text-[10px] font-semibold uppercase harmony-text-secondary">{row.signer_role}</p>}
                     </div>
                   </button>
                 ))}
               </div>
             ) : (
-              <div className="flex min-h-40 items-center justify-center p-5 text-sm text-[#8e8e93]">Data tidak ditemukan.</div>
+              <div className="flex min-h-40 items-center justify-center p-5 text-sm harmony-text-muted">Data tidak ditemukan.</div>
             )}
           </div>
 
           <div className="rounded-2xl border border-black/5 bg-[#fafafa] p-5">
             <p className="text-sm font-semibold">{selected?.full_name || 'Pilih employee'}</p>
-            <p className="mt-1 text-xs text-[#6e6e73]">{selected?.employee_number || '-'} · {selected?.department || '-'}</p>
+            <p className="mt-1 text-xs harmony-text-secondary">{selected?.employee_number || '-'} · {selected?.department || '-'}</p>
             <div className="mt-4 flex min-h-[180px] items-center justify-center rounded-2xl border border-dashed border-black/15 bg-white p-4">
               {selected?.signature_url ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={selected.signature_url} alt={`Tanda tangan ${selected.full_name || ''}`} className="max-h-32 max-w-full object-contain" />
               ) : (
-                <p className="text-center text-sm text-[#8e8e93]">Belum ada tanda tangan.</p>
+                <p className="text-center text-sm harmony-text-muted">Belum ada tanda tangan.</p>
               )}
             </div>
-            <label className="mt-4 flex min-h-12 cursor-pointer items-center rounded-2xl bg-white px-4 text-sm text-[#6e6e73] shadow-sm">
+            <label className="mt-4 flex min-h-12 cursor-pointer items-center rounded-2xl bg-white px-4 text-sm harmony-text-secondary shadow-sm">
               <input type="file" accept="image/png,image/jpeg,image/webp" onChange={chooseFile} className="hidden" />
               <span className="truncate">{file?.name || 'Pilih PNG/JPG/WEBP...'}</span>
             </label>
@@ -218,10 +223,10 @@ function RoleCard({
   return (
     <div className="rounded-[28px] border border-black/5 bg-white p-5 shadow-sm sm:p-6">
       <div className="flex items-start gap-3">
-        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#eef7f3] text-[#18794e]">{icon}</div>
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#eef7f3] harmony-text-success">{icon}</div>
         <div>
-          <p className="font-semibold text-[#1d1d1f]">{title}</p>
-          <p className="mt-1 text-xs text-[#6e6e73]">{subtitle}</p>
+          <p className="font-semibold harmony-text-primary">{title}</p>
+          <p className="mt-1 text-xs harmony-text-secondary">{subtitle}</p>
         </div>
       </div>
       <div className="mt-5 grid gap-3 sm:grid-cols-[1fr_auto]">
@@ -239,12 +244,12 @@ function RoleCard({
           <img src={signer.signature_url} alt={`Tanda tangan ${signer.full_name || ''}`} className="max-h-24 max-w-full object-contain" />
         ) : (
           <div className="text-center">
-            <p className="text-sm font-semibold text-[#1d1d1f]">{signer?.full_name || 'Belum dipilih'}</p>
+            <p className="text-sm font-semibold harmony-text-primary">{signer?.full_name || 'Belum dipilih'}</p>
             <p className="mt-1 text-xs text-amber-700">Tanda tangan belum tersedia.</p>
           </div>
         )}
       </div>
-      {signer && <p className="mt-3 text-xs text-[#6e6e73]">Aktif: <span className="font-semibold text-[#1d1d1f]">{signer.full_name}</span> · {signer.employee_number || '-'}</p>}
+      {signer && <p className="mt-3 text-xs harmony-text-secondary">Aktif: <span className="font-semibold harmony-text-primary">{signer.full_name}</span> · {signer.employee_number || '-'}</p>}
     </div>
   )
 }

@@ -44,3 +44,9 @@ next-env.d.ts
 /_setup/_private_signature_seed/
 
 node_modules.zip
+
+# generated diagnostic outputs (keep locally or private archived, never commit)
+/lint-results.json
+/lint-stage*-results.json
+/npm-audit.json
+/npm-audit-production.json

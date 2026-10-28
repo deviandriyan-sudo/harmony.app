@@ -1,8 +1,11 @@
+
+import { readErrorMessage } from '@/lib/error-utils'
 import { NextRequest, NextResponse } from 'next/server'
+import type { SupabaseClient } from '@supabase/supabase-js'
 import { requireRemedApi, remedApiError } from '@/lib/server/remed-api-auth'
 import { notifyRemedEntitlementChanged } from '@/lib/server/workflow-notifications'
 
-async function getEntitlementSnapshot(admin: any, employeeId: string, year: number) {
+async function getEntitlementSnapshot(admin: SupabaseClient, employeeId: string, year: number) {
   const { data } = await admin
     .from('remed_entitlements')
     .select('plafond_total,legacy_used,current_used,reserved_amount,balance_adjustment')
@@ -47,9 +50,9 @@ export async function GET(request: NextRequest) {
     if (entitlementResult.error) throw entitlementResult.error
     if (employeeResult.error) throw employeeResult.error
 
-    const entitlementMap = new Map((entitlementResult.data || []).map((x: any) => [x.employee_id, x]))
-    const rows = (employeeResult.data || []).map((employee: any) => {
-      const value: any = entitlementMap.get(employee.id)
+    const entitlementMap = new Map((entitlementResult.data || []).map((x) => [x.employee_id, x] as const))
+    const rows = (employeeResult.data || []).map((employee) => {
+      const value = entitlementMap.get(employee.id)
       const plafond = Number(value?.plafond_total || 0)
       const legacy = Number(value?.legacy_used || 0)
       const current = Number(value?.current_used || 0)
@@ -119,12 +122,12 @@ export async function PUT(request: NextRequest) {
           before,
           after,
         })
-      } catch (notificationError: any) {
+      } catch (notificationError: unknown) {
         notification = {
           ok: false,
           sent: 0,
           failed: 1,
-          message: notificationError?.message || 'Notifikasi penyesuaian sisa plafond gagal diproses.',
+          message: readErrorMessage(notificationError) || 'Notifikasi penyesuaian sisa plafond gagal diproses.',
         }
         console.warn('Re-Med balance adjustment email notification warning:', notificationError)
       }
@@ -160,12 +163,12 @@ export async function PUT(request: NextRequest) {
           before,
           after,
         })
-      } catch (notificationError: any) {
+      } catch (notificationError: unknown) {
         notification = {
           ok: false,
           sent: 0,
           failed: 1,
-          message: notificationError?.message || 'Notifikasi perubahan plafond dasar gagal diproses.',
+          message: readErrorMessage(notificationError) || 'Notifikasi perubahan plafond dasar gagal diproses.',
         }
         console.warn('Re-Med plafond email notification warning:', notificationError)
       }
