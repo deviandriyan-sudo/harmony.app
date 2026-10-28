@@ -35,7 +35,9 @@ export function AnnualLeaveCorrection({employeeId, summary, onSaved}: {
     let cancelled = false
     void harmonyFetch<{history:Audit[]}>(`/api/hr/leave/balance-correction?employee_id=${encodeURIComponent(employeeId)}`)
       .then(x => { if (!cancelled) setHistory(x.history || []) })
-      .catch(() => { /* optional when SQL migration has not been applied yet */ })
+      .catch((cause: unknown) => {
+        if (!cancelled) setError(cause instanceof Error ? cause.message : 'Riwayat koreksi belum bisa dibaca; periksa ketersediaan tabel audit SQL.')
+      })
     return () => {cancelled = true}
   }, [employeeId])
 
@@ -82,7 +84,8 @@ export function AnnualLeaveCorrection({employeeId, summary, onSaved}: {
           <div className="harmony-leave-value"><span>Postpone aktif</span><strong>{Number(summary?.postpone_active_days ?? 0)} hari</strong></div>
           <div className="harmony-leave-value"><span>Saldo efektif</span><strong>{balance} hari</strong></div>
         </div>
-        <p className="text-xs leading-relaxed text-slate-600">Adjustment tercatat: {Number(summary?.annual_manual_adjustment_days ?? 0)} hari. Isi <strong>saldo akhir yang benar</strong>, bukan besarnya penambahan.</p>
+        {!summary && <p role="alert" className="text-xs font-semibold text-amber-700">Data lifecycle cuti belum dapat dimuat. Simpan koreksi dinonaktifkan untuk mencegah perubahan saldo yang tidak tervalidasi. Gunakan SQL diagnostik Stage 5 (read-only) untuk memeriksa RPC dan summary.</p>}
+        <p className="text-xs leading-relaxed harmony-text-secondary">Adjustment tercatat: {Number(summary?.annual_manual_adjustment_days ?? 0)} hari. Isi <strong>saldo akhir yang benar</strong>, bukan besarnya penambahan.</p>
         <div className="grid gap-3 sm:grid-cols-[180px_1fr]">
           <label className="block"><span className="harmony-label">Saldo akhir (hari)</span><input inputMode="numeric" type="number" step="1" min="0" max="365" value={target} onChange={e=>setTarget(e.target.value)} placeholder={`Saat ini ${balance}`} className="harmony-input w-full"/></label>
           <label className="block"><span className="harmony-label">Alasan koreksi</span><textarea rows={2} maxLength={1000} value={reason} onChange={e=>setReason(e.target.value)} placeholder="Contoh: pembetulan adjustment historis berdasarkan verifikasi HR" className="harmony-input w-full"/></label>

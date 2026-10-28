@@ -20,7 +20,13 @@ async function hrClient(request: NextRequest) {
   const auth = await db.auth.getUser(token)
   if (auth.error || !auth.data.user) throw Object.assign(new Error('Session HR tidak valid.'), {status: 401})
   const permission = await db.rpc('harmony_leave_is_active_hr_admin')
-  if (permission.error || permission.data !== true) throw Object.assign(new Error('Akses HR/Admin aktif diperlukan.'), {status: 403})
+  if (permission.error) {
+    const unavailable = ['PGRST202', '42883'].includes(String(permission.error.code || ''))
+    throw Object.assign(new Error(unavailable
+      ? 'Fungsi permission lifecycle cuti belum tersedia di Supabase. Jalankan SQL diagnostik Stage 5 (read-only), jangan ubah saldo secara langsung.'
+      : `Pemeriksaan permission HR untuk koreksi cuti gagal: ${permission.error.message}`), {status: unavailable ? 503 : 403})
+  }
+  if (permission.data !== true) throw Object.assign(new Error('Akses HR/Admin lifecycle cuti ditolak oleh database. Pastikan app_users aktif, role HR, dan fungsi harmony_leave_is_active_hr_admin sesuai.'), {status: 403})
   return db
 }
 
@@ -32,7 +38,12 @@ export async function GET(request: NextRequest) {
     const result = await db.from('harmony_annual_leave_correction_audit')
       .select('id,employee_id,previous_effective_balance,corrected_effective_balance,reason,created_at')
       .eq('employee_id',employeeId).order('created_at',{ascending:false}).limit(10)
-    if (result.error) throw result.error
+    if (result.error) {
+      const missing = ['42P01', 'PGRST205'].includes(String(result.error.code || ''))
+      throw Object.assign(new Error(missing
+        ? 'Tabel audit koreksi cuti tidak tersedia. Periksa SQL_ONLY/02 dan jalankan diagnostik Stage 5 read-only.'
+        : result.error.message), {status: missing ? 503 : 400})
+    }
     return NextResponse.json({success:true,history:result.data||[]},{headers:{'Cache-Control':'no-store'}})
   } catch (error) {
     const status = (error as {status?:number}).status || 400
@@ -52,7 +63,16 @@ export async function POST(request: NextRequest) {
     const result = await db.rpc('harmony_hr_correct_annual_leave_balance_v1', {
       p_employee_id:employeeId,p_target_days:target,p_reason:reason,
     })
-    if (result.error) throw result.error
+    if (result.error) {
+      const unavailable = ['PGRST202', '42883'].includes(String(result.error.code || ''))
+      const lifecycleMismatch = String(result.error.message).includes('Database tidak menghubungkan saldo legacy')
+      const explanation = unavailable
+        ? 'RPC koreksi saldo cuti belum terpasang di Supabase. Periksa migrasi SQL_ONLY/02 dan jalankan diagnostik read-only Stage 5.'
+        : lifecycleMismatch
+          ? 'Perhitungan lifecycle cuti di database tidak cocok dengan adjustment legacy; perubahan dibatalkan otomatis. Jalankan SQL_ONLY/05_STAGE5_LEAVE_DIAGNOSTIC_READ_ONLY.sql dan kirim hasilnya sebelum melakukan migrasi.'
+          : result.error.message
+      throw Object.assign(new Error(explanation), {status: unavailable ? 503 : lifecycleMismatch ? 409 : 400})
+    }
     return NextResponse.json({success:true,result:result.data},{headers:{'Cache-Control':'no-store'}})
   } catch (error) {
     const status = (error as {status?:number}).status || 400

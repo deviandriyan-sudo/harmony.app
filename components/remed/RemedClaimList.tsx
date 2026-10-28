@@ -33,7 +33,7 @@ function ClaimBalanceImpact({ claim }: { claim: RemedClaim }) {
   const isSafe = availableAfterClaim >= 0
 
   return (
-    <div className="mt-3 rounded-[20px] border border-emerald-100/80 bg-[linear-gradient(135deg,rgba(236,253,245,.88),rgba(239,246,255,.82))] p-3.5 shadow-[inset_0_1px_0_rgba(255,255,255,.9)] backdrop-blur-xl">
+    <div className="harmony-remed-impact mt-3 rounded-[20px] border border-emerald-100/80 bg-[linear-gradient(135deg,rgba(236,253,245,.88),rgba(239,246,255,.82))] p-3.5 shadow-[inset_0_1px_0_rgba(255,255,255,.9)] backdrop-blur-xl">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <div className="inline-flex items-center gap-2 text-xs font-bold text-emerald-800">
           <WalletCards size={15} /> Dampak Plafond {entitlement.period_year}
@@ -44,19 +44,19 @@ function ClaimBalanceImpact({ claim }: { claim: RemedClaim }) {
       </div>
 
       <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
-        <div className="rounded-[16px] border border-white/80 bg-white/70 p-3">
+        <div className="harmony-remed-impact-tile rounded-[16px] border border-white/80 bg-white/70 p-3">
           <p className="text-[10px] font-bold uppercase tracking-[0.08em] harmony-text-muted">Plafond Dasar</p>
           <p className="mt-1 text-sm font-bold harmony-text-primary">{formatRupiah(entitlement.plafond_total)}</p>
         </div>
-        <div className="rounded-[16px] border border-white/80 bg-white/70 p-3">
+        <div className="harmony-remed-impact-tile rounded-[16px] border border-white/80 bg-white/70 p-3">
           <p className="text-[10px] font-bold uppercase tracking-[0.08em] harmony-text-muted">Sisa Sebelum Klaim Ini</p>
           <p className="mt-1 text-sm font-bold harmony-text-primary">{formatRupiah(availableBeforeClaim)}</p>
         </div>
-        <div className="rounded-[16px] border border-amber-100/80 bg-amber-50/85 p-3">
+        <div className="harmony-remed-impact-tile harmony-remed-impact-warning rounded-[16px] border border-amber-100/80 bg-amber-50/85 p-3">
           <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-amber-700">{claim.status === 'pending_hr' ? 'Nominal Diajukan' : 'Nominal Disetujui HR'}</p>
           <p className="mt-1 flex items-center gap-1.5 text-sm font-bold text-amber-800"><TrendingDown size={14} /> {formatRupiah(impactAmount)}</p>
         </div>
-        <div className={`rounded-[16px] border p-3 ${isSafe ? 'border-emerald-100/90 bg-emerald-50/90' : 'border-red-100/90 bg-red-50/90'}`}>
+        <div className={`harmony-remed-impact-tile harmony-remed-impact-result rounded-[16px] border p-3 ${isSafe ? 'border-emerald-100/90 bg-emerald-50/90' : 'border-red-100/90 bg-red-50/90'}`}>
           <p className={`text-[10px] font-bold uppercase tracking-[0.08em] ${isSafe ? 'text-emerald-700' : 'text-red-700'}`}>Sisa Setelah Klaim</p>
           <p className={`mt-1 flex items-center gap-1.5 text-sm font-bold ${isSafe ? 'text-emerald-800' : 'text-red-800'}`}><ShieldCheck size={14} /> {formatRupiah(availableAfterClaim)}</p>
         </div>
@@ -96,7 +96,7 @@ export function RemedClaimList({
   return (
     <div className="space-y-3">
       {claims.map((claim) => (
-        <article key={claim.id} className="rounded-[22px] border border-black/[0.065] bg-white p-4 shadow-[0_7px_22px_rgba(15,23,42,.035)] transition hover:border-black/[0.10] hover:shadow-[0_10px_28px_rgba(15,23,42,.055)] sm:p-5">
+        <article key={claim.id} className="harmony-remed-claim-card rounded-[22px] border border-black/[0.065] bg-white p-4 shadow-[0_7px_22px_rgba(15,23,42,.035)] transition hover:border-black/[0.10] hover:shadow-[0_10px_28px_rgba(15,23,42,.055)] sm:p-5">
           <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2">
@@ -105,7 +105,7 @@ export function RemedClaimList({
               </div>
               {showEmployee ? <p className="mt-2 text-sm font-bold harmony-text-primary">{claim.employee?.full_name || '-'}</p> : null}
 
-              <div className="mt-3 grid gap-2 rounded-[17px] bg-[#f7f8fa] p-3.5 text-sm harmony-text-secondary sm:grid-cols-2 lg:grid-cols-4">
+              <div className="harmony-remed-claim-meta mt-3 grid gap-2 rounded-[17px] bg-[#f7f8fa] p-3.5 text-sm harmony-text-secondary sm:grid-cols-2 lg:grid-cols-4">
                 <p><span className="font-semibold harmony-text-primary">Jenis:</span> {claim.claim_type?.name || '-'}</p>
                 <p><span className="font-semibold harmony-text-primary">Tanggal:</span> {formatRemedDate(claim.treatment_date)}</p>
                 <p><span className="font-semibold harmony-text-primary">Nilai diproses:</span> {formatRupiah(claim.submitted_amount)}</p>
@@ -121,7 +121,7 @@ export function RemedClaimList({
               {showBalanceImpact ? <ClaimBalanceImpact claim={claim} /> : null}
 
               {(claim.provider_name || claim.employee_note) ? (
-                <div className="mt-3 rounded-[17px] border border-black/[0.045] bg-white p-3.5 text-sm harmony-text-secondary">
+                <div className="harmony-remed-claim-note mt-3 rounded-[17px] border border-black/[0.045] bg-white p-3.5 text-sm harmony-text-secondary">
                   {claim.provider_name ? <p><span className="font-bold harmony-text-primary">Provider:</span> {claim.provider_name}</p> : null}
                   {claim.employee_note ? <p className="mt-1"><span className="font-bold harmony-text-primary">Catatan:</span> {claim.employee_note}</p> : null}
                 </div>

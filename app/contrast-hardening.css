@@ -1,0 +1,122 @@
+/* Stage 5: theme-aware contrast repairs for all role workspaces.
+ * No routing, permission, or print-document rules are changed.
+ * All foregrounds are paired with dark/light backdrops; disabled controls
+ * remain distinguishable and continue to obey native disabled state. */
+:root, html[data-harmony-theme='light'] {
+  --h5-panel:rgba(255,255,255,.88);
+  --h5-panel-nested:rgba(235,244,255,.96);
+  --h5-panel-border:rgba(70,119,169,.30);
+  --h5-panel-ink:#13314f;
+  --h5-panel-soft:#355473;
+  --h5-lift:rgba(255,255,255,.91);
+}
+html[data-harmony-theme='dark'] {
+  --h5-panel:rgba(19,45,77,.94);
+  --h5-panel-nested:rgba(28,61,99,.94);
+  --h5-panel-border:rgba(146,200,243,.41);
+  --h5-panel-ink:#f2f8ff;
+  --h5-panel-soft:#cbdff3;
+  --h5-lift:rgba(41,78,116,.91);
+}
+
+/* Re-Med: the screenshots revealed pale foreground text on pale nested
+   white/amber/emerald surfaces inside a dark shell. Repair each surface as
+   a component rather than relying on overly broad Tailwind token rewrites. */
+.harmony-workspace .harmony-remed-claim-card {
+  background:var(--h5-panel) !important;
+  color:var(--h5-panel-ink) !important;
+  border:1px solid var(--h5-panel-border) !important;
+  backdrop-filter:blur(22px);-webkit-backdrop-filter:blur(22px);
+}
+.harmony-workspace :is(.harmony-remed-claim-meta,.harmony-remed-claim-note) {
+  background:var(--h5-panel-nested) !important;
+  color:var(--h5-panel-soft) !important;
+  border:1px solid var(--h5-panel-border) !important;
+}
+.harmony-workspace .harmony-remed-impact {
+  background:linear-gradient(135deg,var(--h5-panel-nested),var(--h5-panel)) !important;
+  color:var(--h5-panel-ink) !important;
+  border-color:var(--h5-panel-border) !important;
+}
+.harmony-workspace .harmony-remed-impact-tile {
+  background:var(--h5-lift) !important;
+  border:1px solid var(--h5-panel-border) !important;
+  color:var(--h5-panel-ink) !important;
+}
+.harmony-workspace .harmony-remed-impact-tile :is(.harmony-text-primary,.harmony-text-muted) {
+  color:var(--h5-panel-ink) !important;
+}
+html[data-harmony-theme='dark'] .harmony-workspace .harmony-remed-impact-warning {
+  background:var(--h385-warning-bg) !important;
+}
+html[data-harmony-theme='dark'] .harmony-workspace .harmony-remed-impact-warning :is([class*='text-amber-'],[class*='text-orange-']) {
+  color:var(--h385-warning-ink) !important;
+}
+html[data-harmony-theme='dark'] .harmony-workspace .harmony-remed-impact-result[class*='bg-emerald-'] {
+  background:var(--h385-success-bg) !important;
+}
+html[data-harmony-theme='dark'] .harmony-workspace .harmony-remed-impact-result[class*='bg-emerald-'] :is([class*='text-emerald-'],[class*='text-green-']) {
+  color:var(--h385-success-ink) !important;
+}
+html[data-harmony-theme='dark'] .harmony-workspace .harmony-remed-impact-result[class*='bg-red-'] {
+  background:var(--h385-danger-bg) !important;
+}
+html[data-harmony-theme='dark'] .harmony-workspace .harmony-remed-impact-result[class*='bg-red-'] [class*='text-red-'] {
+  color:var(--h385-danger-ink) !important;
+}
+.harmony-workspace .harmony-remed-impact > p:last-child {color:var(--h5-panel-soft) !important}
+
+/* Common role workspaces: bright utility panels left over from legacy CSS
+   become dark glass in dark mode; special status badges and print sheets are
+   kept under their existing semantic/status/print rules. */
+html[data-harmony-theme='dark'] .harmony-workspace :is(div,section,article)[class*='bg-[#f7f8fa]'],
+html[data-harmony-theme='dark'] .harmony-workspace :is(div,section,article)[class*='bg-[#f6f7f9]'],
+html[data-harmony-theme='dark'] .harmony-workspace :is(div,section,article)[class*='bg-[#f7faff]'] {
+  background:var(--h5-panel-nested) !important;
+  color:var(--h5-panel-ink);
+  border-color:var(--h5-panel-border) !important;
+}
+html[data-harmony-theme='dark'] .harmony-workspace :is(div,section,article)[class*='bg-white/']:not(.harmony-print-document):not(.harmony-remed-status) {
+  background:var(--h5-panel-nested) !important;
+  border-color:var(--h5-panel-border) !important;
+}
+/* High-level role text must be legible without turning colored badges white. */
+.harmony-workspace :is(.harmony-unified-surface,.harmony-action-tray,.harmony-card,.harmony-card-solid) {
+  color:var(--h5-panel-ink);
+}
+.harmony-workspace .harmony-glass-showcase .harmony-metric-card :is(.harmony-text-primary,.harmony-text-muted,.harmony-text-secondary) {
+  opacity:1 !important;
+}
+.harmony-workspace .harmony-glass-showcase .harmony-metric-card .harmony-text-muted {
+  color:var(--h5-panel-soft) !important;
+}
+.harmony-workspace .harmony-action-soft:not(:disabled),
+.harmony-workspace .harmony-button-secondary:not(:disabled) {
+  color:var(--h5-panel-ink) !important;
+  border-color:var(--h5-panel-border) !important;
+}
+html[data-harmony-theme='dark'] .harmony-workspace .harmony-action-soft:not(:disabled),
+html[data-harmony-theme='dark'] .harmony-workspace .harmony-button-secondary:not(:disabled) {
+  background:var(--h5-panel-nested) !important;
+}
+.harmony-workspace :is(button,a):disabled {
+  opacity:.62;
+}
+.harmony-workspace :is(button,a):focus-visible,
+.harmony-modal-surface :is(button,a,input,select,textarea):focus-visible {
+  outline:3px solid var(--h385-focus) !important;
+  outline-offset:2px;
+}
+/* Onboarding section and leave correction cards share the active theme. */
+.harmony-new-employee-login {background:var(--h5-panel-nested);border-color:var(--h5-panel-border);color:var(--h5-panel-ink)}
+.harmony-leave-correction :is(.harmony-leave-value,.harmony-hr-form-body) {color:var(--h5-panel-ink)}
+html[data-harmony-theme='dark'] .harmony-leave-correction :is(.harmony-leave-value,[class*='bg-white/']) {background:var(--h5-panel-nested) !important}
+.harmony-leave-correction .harmony-leave-value span {color:var(--h5-panel-soft)}
+/* Sidebar header on dark glass was especially faint. */
+html[data-harmony-theme='dark'] .harmony-sidebar-panel .harmony-sidebar-header .harmony-side-detail p:first-child {color:#f5faff !important}
+html[data-harmony-theme='dark'] .harmony-sidebar-panel .harmony-sidebar-header .harmony-side-detail p:nth-child(2) {color:#c5d9ee !important}
+/* Fixed white paper used for print/PDF remains unaffected. */
+@media print {
+  .harmony-print-document,.harmony-print-document * {color:#172638}
+  .harmony-print-document {background:#fff !important}
+}

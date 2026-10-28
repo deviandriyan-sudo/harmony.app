@@ -272,7 +272,7 @@ export default function EmployeeLeavePage() {
     return leaveRequests.filter((item) => isWorkflowPending(item)).length
   }, [leaveRequests])
 
-
+  
 
   const calculatedDays = useMemo(() => {
     if (!form.start_date || !form.end_date) return 0
@@ -2177,3 +2177,6 @@ function resolveHandoverDisplay(
 function normalizeText(value?: string | null) {
   return String(value || '').trim().toLowerCase()
 }
+
+
+

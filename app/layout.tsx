@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import './globals.css'
 import './theme-normalization.css'
+import './contrast-hardening.css'
 import { SystemMaintenanceGate } from '@/components/system/SystemMaintenanceGate'
 import { HarmonyThemeProvider } from '@/components/theme/ThemeProvider'
 

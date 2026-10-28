@@ -2,6 +2,7 @@
 
 
 import { readErrorMessage } from '@/lib/error-utils'
+import { useRouter } from 'next/navigation'
 import {
   useEffect,
   useMemo,
@@ -760,6 +761,7 @@ function explainPostponeError(error: unknown, fallback: string): string {
 }
 
 export default function HRLeavePostponePage() {
+  const router = useRouter()
   const [
     postpones,
     setPostpones,
@@ -1593,10 +1595,7 @@ export default function HRLeavePostponePage() {
 
                 <button
                   type="button"
-                  onClick={() => {
-                    window.location.href =
-                      '/hr/leave/administration'
-                  }}
+                  onClick={() => router.push('/hr/leave/administration')}
                   className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl border border-blue-200 bg-blue-50 px-4 text-sm font-bold text-blue-700 shadow-sm transition hover:bg-blue-100"
                 >
                   <ShieldCheck

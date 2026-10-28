@@ -103,7 +103,8 @@ export async function POST(request: NextRequest) {
       .select('id,email,employee_id')
       .ilike('email', email)
       .maybeSingle()
-    if (!existingByEmail.error && existingByEmail.data) {
+    if (existingByEmail.error) throw existingByEmail.error
+    if (existingByEmail.data) {
       return NextResponse.json({ message: 'Email tersebut sudah terdaftar di app_users.' }, { status: 409 })
     }
 
@@ -113,7 +114,8 @@ export async function POST(request: NextRequest) {
         .select('id,email,employee_id')
         .eq('employee_id', employeeId)
         .maybeSingle()
-      if (!existingByEmployee.error && existingByEmployee.data) {
+      if (existingByEmployee.error) throw existingByEmployee.error
+      if (existingByEmployee.data) {
         return NextResponse.json({ message: 'Employee tersebut sudah mempunyai akun HARMONY.' }, { status: 409 })
       }
     }
@@ -137,19 +139,13 @@ export async function POST(request: NextRequest) {
       authUser = created.data.user
       createdAuth = true
     } else {
-      const updated = await admin.auth.admin.updateUserById(authUser.id, {
-        password,
-        email_confirm: true,
-        user_metadata: {
-          ...(authUser.user_metadata || {}),
-          employee_id: employeeId,
-          employee_number: employee?.employee_number || null,
-          full_name: employee?.full_name || null,
-          source: 'harmony_hr_users_v8',
-        },
-      })
-      if (updated.error) throw updated.error
-      authUser = updated.data.user || authUser
+      // Existing Supabase identities must never have their password or metadata
+      // silently replaced by the generic create-user flow. HR can reconcile a
+      // pre-existing identity separately after confirming its ownership.
+      return NextResponse.json({
+        message: 'Email sudah ada di Supabase Auth tetapi belum terhubung ke HARMONY. Akun lama tidak diubah; verifikasi identitas dan lakukan rekonsiliasi melalui administrator.',
+        code: 'AUTH_EXISTS_UNLINKED',
+      }, { status: 409 })
     }
 
     const now = new Date().toISOString()

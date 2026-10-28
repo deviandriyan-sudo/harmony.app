@@ -442,7 +442,7 @@ export default function EmployeeAttendancePage() {
     (bucket) => bucket === "incomplete",
   ).length;
 
-
+  
 
   const phlCandidateCount = summaryBuckets.filter(
     (bucket) => bucket === "phl",
@@ -746,7 +746,7 @@ export default function EmployeeAttendancePage() {
     );
   }
 
-
+  
 
   function canShowResetButton(row: CalendarDayRow) {
     // Tombol selalu dirender. Fungsi ini menentukan apakah tombol aktif.

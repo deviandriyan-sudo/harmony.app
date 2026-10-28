@@ -406,6 +406,8 @@ export default function HREmployeesPage() {
   const [errorMessage, setErrorMessage] = useState('')
   const [successMessage, setSuccessMessage] = useState('')
   const [form, setForm] = useState<EmployeeForm>(initialForm)
+  const [createLoginWithEmployee, setCreateLoginWithEmployee] = useState(true)
+  const [initialLoginPassword, setInitialLoginPassword] = useState('')
 
   const onEmployeesLoad = useEffectEvent(fetchEmployees)
   useEffect(() => {
@@ -545,7 +547,13 @@ export default function HREmployeesPage() {
           .order('full_name', { ascending: true }),
         harmonyFetch<{ summaries?: LeaveBalanceSummary[] }>(
           '/api/hr/leave/postpone-adjustments',
-        ),
+        ).catch((cause: unknown) => {
+          // The employee directory must remain available even when the
+          // separate leave-lifecycle RPC is missing or temporarily failing.
+          // Never invent a corrected balance: display the stored fallback.
+          console.warn('Ringkasan lifecycle cuti tidak tersedia:', readErrorMessage(cause))
+          return { summaries: [] as LeaveBalanceSummary[] }
+        }),
       ])
 
       if (employeeResponse.error) throw employeeResponse.error
@@ -1266,6 +1274,8 @@ export default function HREmployeesPage() {
 
   function resetForm() {
     setForm(initialForm)
+    setCreateLoginWithEmployee(true)
+    setInitialLoginPassword('')
     setAssignmentForm(initialAssignmentForm)
     setPHLAdjustmentForm(initialPHLAdjustmentForm)
     setPHLAdjustmentFiles([])
@@ -1290,6 +1300,8 @@ export default function HREmployeesPage() {
 
   function handleAddNew() {
     setForm(initialForm)
+    setCreateLoginWithEmployee(true)
+    setInitialLoginPassword('')
     setAssignmentForm(initialAssignmentForm)
     setPHLAdjustmentForm(initialPHLAdjustmentForm)
     setPHLAdjustmentFiles([])
@@ -1312,6 +1324,8 @@ export default function HREmployeesPage() {
   }
 
   function openEditModal(employee: Employee) {
+    setCreateLoginWithEmployee(false)
+    setInitialLoginPassword('')
     setEditingEmployeeId(employee.id)
     setForm(employeeToForm(employee))
     setAssignmentForm(initialAssignmentForm)
@@ -1703,6 +1717,24 @@ export default function HREmployeesPage() {
       return
     }
 
+    if (!editingEmployeeId && createLoginWithEmployee) {
+      if (!/^\S+@\S+\.\S+$/.test(form.email.trim())) {
+        setErrorMessage('Untuk membuat akun login, email karyawan harus valid. Isi email atau nonaktifkan opsi buat akun login.')
+        setSaving(false)
+        return
+      }
+      if (initialLoginPassword.length < 8) {
+        setErrorMessage('Password awal akun HARMONY minimal 8 karakter. Password tidak disimpan dalam data karyawan.')
+        setSaving(false)
+        return
+      }
+      if (!form.is_active) {
+        setErrorMessage('Aktifkan status karyawan terlebih dahulu untuk membuat akun login.')
+        setSaving(false)
+        return
+      }
+    }
+
     try {
       await ensureMasterOption('department', form.department)
       await ensureMasterOption('position', form.position)
@@ -1763,13 +1795,32 @@ export default function HREmployeesPage() {
             : 'Data karyawan berhasil diperbarui.',
         )
       } else {
-        const { error } = await supabase.from('employees').insert({
+        const added = await supabase.from('employees').insert({
           ...payload,
           annual_leave_balance: form.annual_leave_balance,
           created_at: now,
-        })
-        if (error) throw error
-        setSuccessMessage('Data karyawan berhasil ditambahkan.')
+        }).select('id').single()
+        if (added.error || !added.data?.id) throw added.error || new Error('ID karyawan yang baru disimpan tidak ditemukan.')
+
+        let resultMessage = 'Data karyawan berhasil ditambahkan. Akun login belum dibuat; HR dapat membuatnya dari menu Kelola User.'
+        if (createLoginWithEmployee) {
+          try {
+            await harmonyFetch('/api/hr/users', {
+              method: 'POST',
+              body: JSON.stringify({
+                employee_id: added.data.id,
+                email: nextEmail,
+                password: initialLoginPassword,
+                role: 'employee',
+              }),
+            })
+            resultMessage = 'Data karyawan dan akun login HARMONY berhasil dibuat. Berikan email dan password awal kepada karyawan melalui jalur yang aman.'
+          } catch (accountError: unknown) {
+            const detail = readErrorMessage(accountError) || 'Gagal menghubungkan akun login.'
+            resultMessage = `Data karyawan SUDAH tersimpan, tetapi akun login BELUM aktif: ${detail} Buka HR → Kelola User untuk pemeriksaan atau pembuatan akun.`
+          }
+        }
+        setSuccessMessage(resultMessage)
       }
 
       resetForm()
@@ -2103,6 +2154,10 @@ export default function HREmployeesPage() {
               await fetchEmployees()
             }}
             onSubmit={handleSubmit}
+            createLoginWithEmployee={createLoginWithEmployee}
+            initialLoginPassword={initialLoginPassword}
+            onCreateLoginChange={setCreateLoginWithEmployee}
+            onInitialLoginPasswordChange={setInitialLoginPassword}
             onClose={resetForm}
             onUpdate={updateForm}
             onAssignmentUpdate={updateAssignmentForm}
@@ -2641,6 +2696,10 @@ function EmployeeFormModal({
   savingAnnualLeaveDebt,
   onLeaveCorrected,
   onSubmit,
+  createLoginWithEmployee,
+  initialLoginPassword,
+  onCreateLoginChange,
+  onInitialLoginPasswordChange,
   onClose,
   onUpdate,
   onAssignmentUpdate,
@@ -2682,6 +2741,10 @@ function EmployeeFormModal({
   savingAnnualLeaveDebt: boolean
   onLeaveCorrected: () => Promise<void>
   onSubmit: (event: FormEvent<HTMLFormElement>) => void
+  createLoginWithEmployee: boolean
+  initialLoginPassword: string
+  onCreateLoginChange: (enabled: boolean) => void
+  onInitialLoginPasswordChange: (password: string) => void
   onClose: () => void
   onUpdate: (field: keyof EmployeeForm, value: string | number | boolean) => void
   onAssignmentUpdate: (field: keyof AssignmentForm, value: string) => void
@@ -2734,6 +2797,17 @@ function EmployeeFormModal({
               <InputField label="Machine PIN" value={form.machine_pin} onChange={(value) => onUpdate('machine_pin', value)} placeholder="PIN dari mesin fingerprint" required />
               <InputField label="Nama Lengkap" value={form.full_name} onChange={(value) => onUpdate('full_name', value)} placeholder="Nama karyawan" required />
               <InputField label="Email" type="email" value={form.email} onChange={(value) => onUpdate('email', value)} placeholder="email@company.com" />
+              {!editingEmployeeId && <div className="harmony-new-employee-login rounded-[16px] border p-3 sm:col-span-2">
+                <label className="flex cursor-pointer items-start gap-3 text-sm harmony-text-primary">
+                  <input type="checkbox" checked={createLoginWithEmployee} onChange={event => onCreateLoginChange(event.target.checked)} className="mt-1 h-4 w-4 accent-blue-600" />
+                  <span><strong>Buat akun login HARMONY sekaligus</strong><small className="mt-1 block harmony-text-secondary">Akun Supabase Auth dan app_users akan disiapkan setelah data karyawan berhasil disimpan.</small></span>
+                </label>
+                {createLoginWithEmployee && <label className="mt-3 block text-xs font-semibold harmony-text-secondary">
+                  Password awal karyawan (minimal 8 karakter)
+                  <input type="password" autoComplete="new-password" required minLength={8} value={initialLoginPassword} onChange={event=>onInitialLoginPasswordChange(event.target.value)} className="harmony-input mt-1 w-full" placeholder="Masukkan password awal" />
+                  <small className="mt-1 block font-normal harmony-text-secondary">Jangan gunakan PIN absensi sebagai password. Sampaikan password secara privat dan minta karyawan menggantinya setelah login.</small>
+                </label>}
+              </div>}
               <InputField label="Nomor HP Kantor/Utama" value={form.phone} onChange={(value) => onUpdate('phone', value)} placeholder="08xxxxxxxxxx" />
               <SelectField label="Gender" value={form.gender} onChange={(value) => onUpdate('gender', value)} options={[{ label: 'Semua / Tidak diset', value: 'all' }, { label: 'Laki-laki', value: 'male' }, { label: 'Perempuan', value: 'female' }]} />
             </FormSection>

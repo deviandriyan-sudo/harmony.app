@@ -58,7 +58,8 @@ export function AppSidebar({ menu, title = 'HARMONY', userName = 'HARMONY User',
       localStorage.removeItem('harmony_user')
       localStorage.removeItem('remed_user')
       sessionStorage.clear()
-      window.location.href = '/login'
+      router.replace('/login')
+      router.refresh()
     } finally { setLoggingOut(false) }
   }
 

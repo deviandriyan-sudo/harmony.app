@@ -5,6 +5,7 @@ import { readErrorMessage } from '@/lib/error-utils'
 import { useEffectEvent, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { AlertTriangle, BriefcaseBusiness, CheckCircle2, FileText, History, Landmark, Loader2, RefreshCcw, RotateCcw, Search, ShieldCheck, Trash2, UserRound, WalletCards, X, XCircle } from 'lucide-react'
 
+import { useRouter } from 'next/navigation'
 import { Topbar } from '@/components/layout/Topbar'
 import { HarmonyAttachmentViewer } from '@/components/attachments/HarmonyAttachments'
 import { supabase } from '@/lib/supabase'
@@ -653,6 +654,7 @@ function appendNotificationText(baseMessage: string, notification: { success: bo
 }
 
 export default function HRLeavePage() {
+  const router = useRouter()
   const [appUser, setAppUser] = useState<AppUser | null>(null)
   const [employeeDirectory, setEmployeeDirectory] = useState<EmployeeDirectoryRow[]>([])
   const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>([])
@@ -1936,9 +1938,7 @@ export default function HRLeavePage() {
               <div className="harmony-action-group">
                 <button
                   type="button"
-                  onClick={() => {
-                    window.location.href = '/hr/leave/administration'
-                  }}
+                  onClick={() => router.push('/hr/leave/administration')}
                   className="harmony-action-soft inline-flex items-center justify-center gap-2 px-4 text-sm font-bold whitespace-nowrap"
                   title="Kelola lifecycle saldo, postpone manual, dan master jenis kehadiran/ketidakhadiran"
                 >
