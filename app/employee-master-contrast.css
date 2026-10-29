@@ -1,0 +1,79 @@
+/* Stage 6 Employee Master modal: visually paired dark/light glass surfaces.
+   Scoped: does not affect role dashboards, Re-Med print forms, or server code. */
+:root,html[data-harmony-theme='light'] {
+  --h6-modal-bg:#f0f7ff;--h6-modal-header:#e5f1ff;--h6-modal-panel:#fff;
+  --h6-modal-subpanel:#e9f3ff;--h6-modal-input:#fff;
+  --h6-modal-ink:#16324e;--h6-modal-soft:#385873;--h6-modal-border:#a9c6e0;
+  --h6-modal-error:#8f1830;--h6-modal-error-bg:#fff0f2;
+}
+html[data-harmony-theme='dark'] {
+  --h6-modal-bg:#142d4a;--h6-modal-header:#1b3e63;--h6-modal-panel:#20456e;
+  --h6-modal-subpanel:#183956;--h6-modal-input:#142d4a;
+  --h6-modal-ink:#f0f7ff;--h6-modal-soft:#d1e4f7;--h6-modal-border:#668cb2;
+  --h6-modal-error:#ffd0d7;--h6-modal-error-bg:#682c3e;
+}
+.harmony-modal-surface .harmony-hr-edit-modal {
+  background:var(--h6-modal-bg) !important;
+  border:1px solid var(--h6-modal-border) !important;
+  color:var(--h6-modal-ink) !important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.15),0 30px 80px rgba(2,15,36,.35) !important;
+}
+.harmony-modal-surface .harmony-hr-edit-modal > div:first-child {
+  background:var(--h6-modal-header) !important;color:var(--h6-modal-ink) !important;
+  border-bottom:1px solid var(--h6-modal-border);
+}
+.harmony-modal-surface .harmony-hr-edit-modal > div:first-child :is(h1,h2,h3,strong,p,span) {
+  color:var(--h6-modal-ink) !important;opacity:1 !important;
+}
+.harmony-modal-surface .harmony-hr-edit-modal .harmony-hr-form-scroll,
+.harmony-modal-surface .harmony-hr-edit-modal .harmony-hr-form-body {
+  color:var(--h6-modal-ink) !important;
+}
+.harmony-modal-surface .harmony-hr-edit-modal .harmony-hr-form-disclosure {
+  color:var(--h6-modal-ink) !important;
+  background:var(--h6-modal-panel) !important;
+  border:1px solid var(--h6-modal-border) !important;
+}
+.harmony-modal-surface .harmony-hr-edit-modal .harmony-hr-form-summary,
+.harmony-modal-surface .harmony-hr-edit-modal .harmony-hr-form-summary strong {
+  color:var(--h6-modal-ink) !important;
+}
+.harmony-modal-surface .harmony-hr-edit-modal .harmony-hr-form-summary small,
+.harmony-modal-surface .harmony-hr-edit-modal .harmony-hr-disclosure-indicator,
+.harmony-modal-surface .harmony-hr-edit-modal :is(.harmony-label,.harmony-text-secondary,.harmony-text-muted) {
+  color:var(--h6-modal-soft) !important;opacity:1 !important;
+}
+.harmony-modal-surface .harmony-hr-edit-modal :is(.harmony-leave-value,.harmony-new-employee-login) {
+  color:var(--h6-modal-ink) !important;
+  background:var(--h6-modal-subpanel) !important;
+  border-color:var(--h6-modal-border) !important;
+}
+.harmony-modal-surface .harmony-hr-edit-modal .harmony-leave-value strong {
+  color:var(--h6-modal-ink) !important;opacity:1 !important;
+}
+.harmony-modal-surface .harmony-hr-edit-modal .harmony-leave-value span {
+  color:var(--h6-modal-soft) !important;opacity:1 !important;
+}
+.harmony-modal-surface .harmony-hr-edit-modal :is(input,textarea,select,.harmony-input) {
+  color:var(--h6-modal-ink) !important;
+  background:var(--h6-modal-input) !important;
+  border:1px solid var(--h6-modal-border) !important;
+  opacity:1 !important;
+  color-scheme:light;
+}
+html[data-harmony-theme='dark'] .harmony-modal-surface .harmony-hr-edit-modal :is(input,textarea,select,.harmony-input) {color-scheme:dark}
+.harmony-modal-surface .harmony-hr-edit-modal :is(input,textarea)::placeholder {
+  color:var(--h6-modal-soft) !important;opacity:.85 !important;
+}
+.harmony-modal-surface .harmony-hr-edit-modal form > div:last-child {
+  background:var(--h6-modal-header) !important;border-top:1px solid var(--h6-modal-border) !important;
+}
+.harmony-modal-surface .harmony-hr-edit-modal .harmony-leave-correction [role='alert'] {
+  display:block;background:var(--h6-modal-error-bg) !important;
+  color:var(--h6-modal-error) !important;border:1px solid var(--h6-modal-error);
+  border-radius:10px;padding:10px 12px;line-height:1.55;
+}
+.harmony-modal-surface .harmony-hr-edit-modal :is(input,textarea,select,button):focus-visible {
+  outline:3px solid #4eaafa !important;outline-offset:2px;
+}
+@media print {.harmony-modal-surface .harmony-hr-edit-modal {box-shadow:none !important}}

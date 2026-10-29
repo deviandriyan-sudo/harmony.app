@@ -1,0 +1,11 @@
+change_type,relative_file
+NEW,INSTALL_STAGE6.md
+MODIFIED,SQL_ONLY/02_V380_SAFE_AUDITED_ANNUAL_CORRECTION.sql
+NEW,SQL_ONLY/07_STAGE6_LIFECYCLE_ANNUAL_CORRECTION_SAFE.sql
+NEW,SQL_ONLY/08_STAGE6_VERIFY_CORRECTION_READ_ONLY.sql
+MODIFIED,app/api/hr/leave/balance-correction/route.ts
+NEW,app/employee-master-contrast.css
+MODIFIED,app/layout.tsx
+NEW,scripts/test-stage6-guards.mjs
+NEW,STAGE6_AUDIT_REPORT.md
+NEW,STAGE6_SHA256_MANIFEST.txt

@@ -1,3 +1,4 @@
+-- DEPRECATED: DO NOT RUN AFTER STAGE 6. Reinstalls the legacy-only RPC and breaks correction.
 -- HARMONY V3.8.0 — guarded correction of existing lifecycle adjustment.
 -- Does NOT replace any existing view, trigger, RPC, or approval function.
 -- Requires confirmed preflight: annual_manual_adjustment_days must respond

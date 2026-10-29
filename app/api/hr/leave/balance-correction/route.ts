@@ -65,11 +65,15 @@ export async function POST(request: NextRequest) {
     })
     if (result.error) {
       const unavailable = ['PGRST202', '42883'].includes(String(result.error.code || ''))
-      const lifecycleMismatch = String(result.error.message).includes('Database tidak menghubungkan saldo legacy')
+      const lifecycleMismatch = [
+        'Database tidak menghubungkan saldo legacy',
+        'Verifikasi saldo lifecycle gagal',
+        'Adjustment lifecycle berubah sejak ringkasan dibaca',
+      ].some((marker) => String(result.error.message).includes(marker))
       const explanation = unavailable
         ? 'RPC koreksi saldo cuti belum terpasang di Supabase. Periksa migrasi SQL_ONLY/02 dan jalankan diagnostik read-only Stage 5.'
         : lifecycleMismatch
-          ? 'Perhitungan lifecycle cuti di database tidak cocok dengan adjustment legacy; perubahan dibatalkan otomatis. Jalankan SQL_ONLY/05_STAGE5_LEAVE_DIAGNOSTIC_READ_ONLY.sql dan kirim hasilnya sebelum melakukan migrasi.'
+          ? 'RPC koreksi saldo lama masih aktif di Supabase. Instal SQL_ONLY/07_STAGE6_LIFECYCLE_ANNUAL_CORRECTION_SAFE.sql setelah backup database; perubahan saat ini dibatalkan otomatis.'
           : result.error.message
       throw Object.assign(new Error(explanation), {status: unavailable ? 503 : lifecycleMismatch ? 409 : 400})
     }
