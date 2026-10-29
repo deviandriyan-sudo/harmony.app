@@ -1,0 +1,19 @@
+action,file,reason
+added,SQL_ONLY/12_STAGE8_DATABASE_SECURITY_AND_CRON_DIAGNOSTIC_READ_ONLY.sql,Stage 8 cron/security database audit support
+added,SQL_ONLY/13_STAGE8_RESTRICT_INTERNAL_LIFECYCLE_RPC_OPTIONAL.sql,Stage 8 cron/security database audit support
+added,STAGE8_CLEANUP_REPORT.md,Stage 8 cron/security database audit support
+added,STAGE8_DATABASE_AUDIT.md,Stage 8 cron/security database audit support
+added,STAGE8_VALIDATION_REPORT.md,Stage 8 cron/security database audit support
+added,app/api/cron/leave-lifecycle/route.ts,Stage 8 cron/security database audit support
+added,docs/archive/STAGE7_SHA256_MANIFEST.txt,Stage 8 cron/security database audit support
+added,scripts/test-stage8-db-cron.mjs,Stage 8 cron/security database audit support
+modified,package.json,Stage 8 integration or regression guard update
+modified,scripts/smoke-check.mjs,Stage 8 integration or regression guard update
+modified,scripts/test-stage3-1-build-guards.mjs,Stage 8 integration or regression guard update
+modified,scripts/test-stage3-2-lint-guards.mjs,Stage 8 integration or regression guard update
+modified,scripts/test-stage3-4-hook-guards.mjs,Stage 8 integration or regression guard update
+modified,scripts/test-stage6-guards.mjs,Stage 8 integration or regression guard update
+modified,scripts/test-stage7-guards.mjs,Stage 8 integration or regression guard update
+modified,scripts/test-theme-normalization.mjs,Stage 8 integration or regression guard update
+modified,vercel.json,Stage 8 integration or regression guard update
+removed_or_archived,STAGE7_SHA256_MANIFEST.txt,Prior-version manifest archived / historical

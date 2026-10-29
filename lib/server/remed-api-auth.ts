@@ -76,24 +76,9 @@ export async function requireRemedApi(
 
   if (!byId.error && byId.data) access = byId.data as RemedAccess
 
-  if (!access && authEmail) {
-    const byEmail = await admin
-      .from('remed_user_access')
-      .select('id,auth_user_id,employee_id,email,role,is_active')
-      .ilike('email', authEmail)
-      .maybeSingle()
-
-    if (!byEmail.error && byEmail.data) {
-      access = byEmail.data as RemedAccess
-      if (access.auth_user_id !== authUserId) {
-        const linkResult = await admin
-          .from('remed_user_access')
-          .update({ auth_user_id: authUserId, updated_at: new Date().toISOString() })
-          .eq('id', access.id)
-        if (!linkResult.error) access.auth_user_id = authUserId
-      }
-    }
-  }
+  // Do not self-link or elevate a Re-Med identity from an email lookup.
+  // HR must repair any legacy auth_user_id mismatch explicitly and audit it.
+  if (byId.error) throw byId.error
 
   const role = normalizeRemedRole(access?.role)
   if (!access || !role || access.is_active === false) {

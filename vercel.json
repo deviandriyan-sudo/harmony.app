@@ -1,5 +1,12 @@
 {
   "crons": [
-    { "path": "/api/cron/attendance-emails", "schedule": "0 0 * * *" }
+    {
+      "path": "/api/cron/attendance-emails",
+      "schedule": "0 0 * * *"
+    },
+    {
+      "path": "/api/cron/leave-lifecycle",
+      "schedule": "10 16 * * *"
+    }
   ]
 }

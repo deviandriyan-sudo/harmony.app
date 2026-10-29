@@ -39,14 +39,9 @@ export async function GET(request: NextRequest) {
 
     if (!byId.error && byId.data) appUser = byId.data
 
-    if (!appUser && authEmail) {
-      const byEmail = await supabaseAdmin
-        .from('app_users')
-        .select('id,email,role,employee_id,is_active')
-        .ilike('email', authEmail)
-        .maybeSingle()
-      if (!byEmail.error && byEmail.data) appUser = byEmail.data
-    }
+    // Never infer application role from email alone: require app_users.id
+    // to equal the authenticated Supabase Auth UUID.
+    if (byId.error) throw byId.error
 
     if (appUser) {
       if (appUser.is_active === false) {
@@ -68,7 +63,7 @@ export async function GET(request: NextRequest) {
         if (!employeeResult.error && employeeResult.data) employee = employeeResult.data
       }
 
-      if (!employee && authEmail) {
+      if (!employee && !appUser.employee_id && authEmail && authData.user.email_confirmed_at) {
         const employeeByEmail = await supabaseAdmin
           .from('employees')
           .select('id,employee_number,full_name,department,position,email,is_active')
@@ -108,14 +103,8 @@ export async function GET(request: NextRequest) {
 
     if (!financeById.error && financeById.data) financeAccess = financeById.data
 
-    if (!financeAccess && authEmail) {
-      const financeByEmail = await supabaseAdmin
-        .from('remed_user_access')
-        .select('id,auth_user_id,email,role,is_active')
-        .ilike('email', authEmail)
-        .maybeSingle()
-      if (!financeByEmail.error && financeByEmail.data) financeAccess = financeByEmail.data
-    }
+    // Re-Med Finance privileges must be bound to this exact auth subject.
+    if (financeById.error) throw financeById.error
 
     if (financeAccess && financeAccess.is_active !== false && normalize(financeAccess.role) === 'finance') {
       const control = await getHarmonySystemControl(supabaseAdmin)

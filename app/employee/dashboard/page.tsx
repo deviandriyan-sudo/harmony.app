@@ -44,7 +44,7 @@ type BalanceSummary = {
   postpone_expired_days: number | null
   next_postpone_expiry: string | null
   next_phl_expiry: string | null
-  balance_integrity_status?: 'ok' | 'reconciled_from_cycle' | 'summary_only'
+  balance_integrity_status?: 'ok' | 'mismatch' | 'summary_only'
   balance_integrity_difference_days?: number | null
 }
 

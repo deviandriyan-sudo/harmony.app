@@ -53,6 +53,6 @@ const walk = (dir) => fs.readdirSync(dir, { withFileTypes: true }).flatMap((entr
 const pages = walk(path.join(projectRoot, 'app')).filter((f) => /[\/]page\.tsx$/.test(f)).length
 const routes = walk(path.join(projectRoot, 'app', 'api')).filter((f) => /[\/]route\.ts$/.test(f)).length
 assert.equal(pages, 64, 'Page routes changed')
-assert.equal(routes, 48, 'API routes changed')
+assert.equal(routes, 49, 'API routes changed')
 assert.equal(source('lib/server/phl-work.ts').includes('formatDate'), true)
-console.log('HARMONY Stage 3.2 source guards PASS: 36 typed any locations, 22 effect sites, 112 routes')
+console.log('HARMONY Stage 3.2 source guards PASS: 36 typed any locations, 22 effect sites, 113 routes')

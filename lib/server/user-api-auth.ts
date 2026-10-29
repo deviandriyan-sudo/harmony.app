@@ -105,17 +105,9 @@ export async function requireHarmonyApi(
     appUser = byId.data as HarmonyAppUser
   }
 
-  if (!appUser && authEmail) {
-    const byEmail = await admin
-      .from('app_users')
-      .select('id,email,role,employee_id,is_active')
-      .ilike('email', authEmail)
-      .maybeSingle()
-
-    if (!byEmail.error && byEmail.data) {
-      appUser = byEmail.data as HarmonyAppUser
-    }
-  }
+  // Identity binding must match the verified JWT subject; email-only matching
+  // can inherit someone else's app role after an account migration or mismatch.
+  if (byId.error) throw byId.error
 
   if (!appUser || appUser.is_active === false) {
     throw Object.assign(
@@ -142,7 +134,7 @@ export async function requireHarmonyApi(
     }
   }
 
-  if (!employee && authEmail) {
+  if (!employee && !appUser.employee_id && authEmail && authData.user.email_confirmed_at) {
     const byEmployeeEmail = await admin
       .from('employees')
       .select(
@@ -154,6 +146,10 @@ export async function requireHarmonyApi(
     if (!byEmployeeEmail.error && byEmployeeEmail.data) {
       employee = byEmployeeEmail.data as HarmonyEmployeeIdentity
     }
+  }
+
+  if (normalizeHarmonyRole(appUser.role) === 'employee' && employee?.is_active === false) {
+    throw Object.assign(new Error('Employee Master tidak aktif; akses karyawan ditolak.'), { status: 403 })
   }
 
   return {

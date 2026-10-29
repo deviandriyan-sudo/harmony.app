@@ -82,14 +82,9 @@ export async function requireHRApi(request: NextRequest): Promise<HRApiContext> 
 
   if (!byId.error && byId.data) actor = byId.data as HRActor
 
-  if (!actor && authEmail) {
-    const byEmail = await admin
-      .from('app_users')
-      .select('id,email,role,employee_id,is_active')
-      .ilike('email', authEmail)
-      .maybeSingle()
-    if (!byEmail.error && byEmail.data) actor = byEmail.data as HRActor
-  }
+  // Never grant elevated HR access by email-only fallback. A stale/mismatched
+  // app_users.id must be reconciled by an administrator, not by a login request.
+  if (byId.error) throw byId.error
 
   if (!actor || actor.is_active === false || !HR_ROLES.has(normalizeRole(actor.role))) {
     throw Object.assign(new Error('Akun ini tidak memiliki akses HR Administrator.'), { status: 403 })

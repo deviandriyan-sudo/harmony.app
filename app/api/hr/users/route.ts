@@ -165,7 +165,12 @@ export async function POST(request: NextRequest) {
     }
 
     if (employeeId) {
-      await admin.from('employees').update({ email, updated_at: now }).eq('id', employeeId)
+      const linked = await admin.from('employees').update({ email, updated_at: now }).eq('id', employeeId)
+      if (linked.error) {
+        // Do not claim successful sync; retain the valid account for explicit
+        // HR repair rather than attempting a destructive cross-table rollback.
+        throw Object.assign(new Error('Akun Auth dibuat tetapi email master karyawan gagal disinkronkan. Periksa akun melalui Kelola User; jangan buat ulang karyawan.'), { status: 409 })
+      }
     }
 
     await writeAudit(admin, actor, {

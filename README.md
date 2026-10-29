@@ -1,33 +1,22 @@
-# HARMONY — Integrated HR Platform
+# HARMONY — HR Platform, V3.8.5 Stage 7 review
 
-**Version:** 3.8.5 · Enterprise Dual-Theme Normalization
+Next.js 16.4.3, React 19.2.4, TypeScript, Supabase, Vercel, Tailwind. Employee, HR, Finance/Re-Med; attendance, leave, postpone, PHL, expense claims and notifications.
 
-Next.js 16 (App Router), React 19, TypeScript, Supabase and Vercel. Workspaces: HR, Employee, Finance and Re-Med. This package preserves existing business workflows and includes global Dark/Light semantic presentation refinements.
+## Installation
 
-## Quick start
+Read the extracted ZIP's `START_HERE_STAGE7.md`. Replace all route-bearing source directories after backup; preserve `.env.local`, `.git` and historical SQL. No Stage 7 production SQL write migration is authorized or included.
 
-Run in a project directory containing your **existing** `.env.local` (never committed):
+## Developer checks
 
 ```powershell
 npm ci
-npm run test:theme-normalization
-npm run test:theme
+npm run test:stage7
+npm run test:lifecycle
 npm run test:smoke
-npm run test:ui
+npm run test:balance
 npx tsc --noEmit
 npm run lint
 npm run build
 ```
 
-Full existing regression suite, installation, backup and GitHub/Vercel deployment: [`INSTALL.md`](./INSTALL.md). Do not push until the checks succeed.
-
-## Design system
-
-- Theme preference: `harmony-color-theme` (existing provider; Dark/Light).
-- Theme variables: `app/globals.css` and `app/theme-normalization.css`.
-- Color, status, table, modal and printing guidelines: [`DESIGN_SYSTEM.md`](./DESIGN_SYSTEM.md).
-- Routing and authorized workflow integrity: [`ROUTE_INVENTORY_V385.csv`](./ROUTE_INVENTORY_V385.csv) and [`THEME_AUDIT_REPORT.md`](./THEME_AUDIT_REPORT.md).
-- Tests performed and environmental limits: [`VALIDATION_REPORT.md`](./VALIDATION_REPORT.md).
-- Source changes: [`CHANGED_FILES.md`](./CHANGED_FILES.md).
-
-Do not rerun already applied SQL migrations. The `SQL_ONLY` folder is retained for the original balance correction regression test and historical verification.
+View full automation limitations in `STAGE7_AUDIT_REPORT.md`. See `DESIGN_TOKENS_STAGE7.md` for semantic light/dark palette. Historical reports retained under `docs/archive`.

@@ -18,7 +18,10 @@
     "test:login-motion": "node scripts/test-login-motion.mjs",
     "test:theme": "node scripts/test-theme-system.mjs",
     "test:theme-normalization": "node scripts/test-theme-normalization.mjs",
-    "test:build-guards": "node scripts/test-stage3-1-build-guards.mjs"
+    "test:build-guards": "node scripts/test-stage3-1-build-guards.mjs",
+    "test:stage7": "node scripts/test-stage7-guards.mjs",
+    "test:lifecycle": "node scripts/test-stage7-lifecycle.cjs",
+    "test:stage8": "node scripts/test-stage8-db-cron.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.107.0",

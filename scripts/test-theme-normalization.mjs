@@ -66,5 +66,5 @@ function files(path){return readdirSync(path,{withFileTypes:true}).flatMap(e=>e.
 const pages=files('app').filter(f=>f.replaceAll('\\', '/').endsWith('/page.tsx'))
 const apis=files('app/api').filter(f=>f.replaceAll('\\', '/').endsWith('/route.ts'))
 assert.equal(pages.length,64,'Page route inventory drift')
-assert.equal(apis.length,48,'API inventory drift')
-console.log('HARMONY V3.8.5 dual-theme normalization PASS: semantic surface pairs, status/table WCAG contrast, HR/Finance/Employee/Re-Med component hooks, persistence and 112 routes')
+assert.equal(apis.length,49,'API inventory drift')
+console.log('HARMONY V3.8.5 dual-theme normalization PASS: semantic surface pairs, status/table WCAG contrast, HR/Finance/Employee/Re-Med component hooks, persistence and 113 routes')

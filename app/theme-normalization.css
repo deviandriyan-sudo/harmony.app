@@ -36,6 +36,20 @@ html[data-harmony-theme='light'] {
   --h385-action-hover:#064d9d;
   --h385-action-ink:#fff;
   --h385-modal:rgba(245,250,255,.98);
+  /* Stage 7: one semantic token vocabulary; components reference these pairs. */
+  --harmony-semantic-background:var(--h385-canvas);
+  --harmony-semantic-surface:var(--h385-surface);
+  --harmony-semantic-elevated:var(--h385-surface-strong);
+  --harmony-semantic-border:var(--h385-glass-border);
+  --harmony-semantic-text:var(--h385-ink);
+  --harmony-semantic-muted:var(--h385-ink-muted);
+  --harmony-semantic-primary:var(--h385-action);
+  --harmony-semantic-secondary:var(--h385-link);
+  --harmony-semantic-success:var(--h385-success-ink);
+  --harmony-semantic-warning:var(--h385-warning-ink);
+  --harmony-semantic-danger:var(--h385-danger-ink);
+  --harmony-semantic-info:var(--h385-info-ink);
+  --harmony-semantic-focus:var(--h385-focus);
 }
 html[data-harmony-theme='dark'] {
   --h385-canvas:#06152b;
@@ -73,10 +87,10 @@ html[data-harmony-theme='dark'] {
 }
 
 /* Semantic typography: replaces hundreds of immutable foreground utilities. */
-.harmony-text-primary {color:var(--h385-ink) !important}
+.harmony-text-primary {color:var(--harmony-semantic-text) !important}
 .harmony-text-secondary {color:var(--h385-ink-soft) !important}
-.harmony-text-muted {color:var(--h385-ink-muted) !important}
-.harmony-text-link {color:var(--h385-link) !important}
+.harmony-text-muted {color:var(--harmony-semantic-muted) !important}
+.harmony-text-link {color:var(--harmony-semantic-secondary) !important}
 .harmony-text-link:is(a,button):hover {text-decoration-color:currentColor}
 
 .harmony-placeholder-muted::placeholder {color:var(--h385-ink-muted) !important;opacity:1}
@@ -85,8 +99,8 @@ html[data-harmony-theme='dark'] {
 .harmony-disabled-text-secondary:disabled {color:var(--h385-ink-soft) !important}
 
 /* Semantic status text is always paired with its own corresponding tint. */
-.harmony-text-success {color:var(--h385-success-ink) !important}
-.harmony-text-warning {color:var(--h385-warning-ink) !important}
+.harmony-text-success {color:var(--harmony-semantic-success) !important}
+.harmony-text-warning {color:var(--harmony-semantic-warning) !important}
 .harmony-text-violet {color:var(--h385-violet-ink) !important}
 
 /* Shared glass and data surfaces: values must follow actual background. */

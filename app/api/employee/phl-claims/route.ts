@@ -67,44 +67,35 @@ function isTerminalInactiveClaim(row: PHLClaimRow) {
 
 type PHLClaimRow = { id: string; phl_date?: string | null; status?: string | null; supervisor_status?: string | null; hr_status?: string | null }
 
+// Scan all candidate history pages. Legacy phl_date may be TEXT in several
+// formats; a date equality query could miss an older submission. Fail closed
+// if a pathological history exceeds the safety cap, rather than allow duplicates.
 async function findSameDateClaims(ctx: Awaited<ReturnType<typeof requireHarmonyApi>>, claimDate: string) {
   const results: PHLClaimRow[] = []
   const seen = new Set<string>()
-
-  const collect = (rows: PHLClaimRow[] | null) => {
-    for (const row of rows || []) {
-      const id = String(row.id || '')
-      if (!id || seen.has(id)) continue
-      seen.add(id)
-      results.push(row)
+  const PAGE = 250
+  const MAX_PAGES = 40
+  async function inspect(field: 'employee_id' | 'machine_pin', value: string) {
+    for (let page = 0; page < MAX_PAGES; page++) {
+      const { data, error } = await ctx.admin
+        .from('phl_records')
+        .select('id,employee_id,machine_pin,phl_date,status,supervisor_status,hr_status,source,created_at')
+        .eq(field, value)
+        .eq('source', 'employee_phl_claim')
+        .order('created_at', { ascending: false })
+        .range(page * PAGE, (page + 1) * PAGE - 1)
+      if (error) throw error
+      for (const row of data || []) {
+        if (canonicalDate(row.phl_date) !== claimDate || seen.has(row.id)) continue
+        seen.add(row.id)
+        results.push(row)
+      }
+      if ((data || []).length < PAGE) return
     }
+    throw Object.assign(new Error('Riwayat PHL terlalu besar untuk diverifikasi otomatis. Hubungi HR; pengajuan tidak disimpan.'), { status: 409 })
   }
-
-  const byEmployee = await ctx.admin
-    .from('phl_records')
-    .select('id,employee_id,machine_pin,phl_date,status,supervisor_status,hr_status,source,created_at')
-    .eq('employee_id', ctx.employee!.id)
-    .eq('source', 'employee_phl_claim')
-    .order('created_at', { ascending: false })
-    .limit(500)
-  if (byEmployee.error) throw byEmployee.error
-  collect((byEmployee.data || []).filter((row) => canonicalDate(row.phl_date) === claimDate))
-
-  // Legacy claim indexes use machine/date. Check machine_pin too so the API preflight
-  // mirrors the database uniqueness rule even when an old row lost employee_id linkage
-  // or phl_date is still stored as legacy TEXT formatting.
-  if (ctx.employee?.machine_pin) {
-    const byMachine = await ctx.admin
-      .from('phl_records')
-      .select('id,employee_id,machine_pin,phl_date,status,supervisor_status,hr_status,source,created_at')
-      .eq('machine_pin', ctx.employee.machine_pin)
-      .eq('source', 'employee_phl_claim')
-      .order('created_at', { ascending: false })
-      .limit(500)
-    if (byMachine.error) throw byMachine.error
-    collect((byMachine.data || []).filter((row) => canonicalDate(row.phl_date) === claimDate))
-  }
-
+  await inspect('employee_id', ctx.employee!.id)
+  if (ctx.employee?.machine_pin) await inspect('machine_pin', ctx.employee.machine_pin)
   return results
 }
 

@@ -1,0 +1,39 @@
+path,status,from_path,reason
+DESIGN_TOKENS_STAGE7.md,ADDED,,"New diagnostics, tests, design tokens or active documentation"
+INSTALL.md,MODIFIED,,Source update or refreshed instruction
+README.md,MODIFIED,,Source update or refreshed instruction
+SQL_ONLY/09_STAGE7_LIFECYCLE_AUTOMATION_DIAGNOSTIC_READ_ONLY.sql,ADDED,,"New diagnostics, tests, design tokens or active documentation"
+SQL_ONLY/10_STAGE7_POSTFLIGHT_READ_ONLY.sql,ADDED,,"New diagnostics, tests, design tokens or active documentation"
+SQL_ONLY/11_STAGE7_MIGRATION_STATUS.md,ADDED,,"New diagnostics, tests, design tokens or active documentation"
+STAGE7_AUDIT_REPORT.md,ADDED,,"New diagnostics, tests, design tokens or active documentation"
+STAGE7_CHANGED_FILES.csv,ADDED,,"New diagnostics, tests, design tokens or active documentation"
+STAGE7_CLEANUP_REPORT.md,ADDED,,"New diagnostics, tests, design tokens or active documentation"
+STAGE7_SHA256_MANIFEST.txt,ADDED,,"New diagnostics, tests, design tokens or active documentation"
+app/api/auth/access/route.ts,MODIFIED,,Source update or refreshed instruction
+app/api/employee/leave/postpone/route.ts,MODIFIED,,Source update or refreshed instruction
+app/api/employee/phl-claims/route.ts,MODIFIED,,Source update or refreshed instruction
+app/api/hr/users/route.ts,MODIFIED,,Source update or refreshed instruction
+app/employee/dashboard/page.tsx,MODIFIED,,Source update or refreshed instruction
+app/theme-normalization.css,MODIFIED,,Source update or refreshed instruction
+docs/archive/CHANGED_FILES.md,ARCHIVED,CHANGED_FILES.md,"Historical documents moved, content retained"
+docs/archive/HARMONY_6_PART_PROJECT_BRIEF.md,ARCHIVED,HARMONY_6_PART_PROJECT_BRIEF.md,"Historical documents moved, content retained"
+docs/archive/HARMONY_DESIGN_SYSTEM_V384.md,ARCHIVED,HARMONY_DESIGN_SYSTEM_V384.md,"Historical documents moved, content retained"
+docs/archive/INSTALL_STAGE5.md,ARCHIVED,INSTALL_STAGE5.md,"Historical documents moved, content retained"
+docs/archive/INSTALL_STAGE6.md,ARCHIVED,INSTALL_STAGE6.md,"Historical documents moved, content retained"
+docs/archive/STAGE5_AUDIT_AND_LIMITATIONS.md,ARCHIVED,STAGE5_AUDIT_AND_LIMITATIONS.md,"Historical documents moved, content retained"
+docs/archive/STAGE5_CHANGED_FILES.csv,ARCHIVED,STAGE5_CHANGED_FILES.csv,"Historical documents moved, content retained"
+docs/archive/STAGE5_SHA256_MANIFEST.txt,ARCHIVED,STAGE5_SHA256_MANIFEST.txt,"Historical documents moved, content retained"
+docs/archive/STAGE6_AUDIT_REPORT.md,ARCHIVED,STAGE6_AUDIT_REPORT.md,"Historical documents moved, content retained"
+docs/archive/STAGE6_CHANGED_FILES.csv,ARCHIVED,STAGE6_CHANGED_FILES.csv,"Historical documents moved, content retained"
+docs/archive/STAGE6_SHA256_MANIFEST.txt,ARCHIVED,STAGE6_SHA256_MANIFEST.txt,"Historical documents moved, content retained"
+docs/archive/THEME_AUDIT_REPORT.md,ARCHIVED,THEME_AUDIT_REPORT.md,"Historical documents moved, content retained"
+docs/archive/VALIDATION_REPORT.md,ARCHIVED,VALIDATION_REPORT.md,"Historical documents moved, content retained"
+lib/leave-balance-canonical.ts,MODIFIED,,Source update or refreshed instruction
+lib/server/hr-api-auth.ts,MODIFIED,,Source update or refreshed instruction
+lib/server/remed-api-auth.ts,MODIFIED,,Source update or refreshed instruction
+lib/server/system-control.ts,MODIFIED,,Source update or refreshed instruction
+lib/server/user-api-auth.ts,MODIFIED,,Source update or refreshed instruction
+package.json,MODIFIED,,Source update or refreshed instruction
+scripts/test-stage7-guards.mjs,ADDED,,"New diagnostics, tests, design tokens or active documentation"
+scripts/test-stage7-lifecycle.cjs,ADDED,,"New diagnostics, tests, design tokens or active documentation"
+tsconfig.tsbuildinfo,EXCLUDED,,"Generated TypeScript cache, regenerated during build"

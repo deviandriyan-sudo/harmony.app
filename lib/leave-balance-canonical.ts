@@ -27,7 +27,7 @@ export type HarmonyLeaveCycleLike = {
 }
 
 export type HarmonyCanonicalLeaveBalance = HarmonyLeaveBalanceSummary & {
-  balance_integrity_status: 'ok' | 'reconciled_from_cycle' | 'summary_only'
+  balance_integrity_status: 'ok' | 'mismatch' | 'summary_only'
   balance_integrity_difference_days: number
   canonical_cycle_id: string | null
   canonical_cycle_regular_days: number | null
@@ -82,7 +82,7 @@ function pickCurrentRegularCycle(
     .filter((cycle) => {
       const start = normalizeDate(cycle.matured_at || cycle.cycle_start)
       const end = normalizeDate(cycle.cycle_end)
-      if (start && start > ref) return false
+      if (!start || start > ref) return false
       if (end && end < ref) return false
       return true
     })
@@ -90,15 +90,15 @@ function pickCurrentRegularCycle(
 
   if (candidates.length) return candidates[0]
 
-  // Defensive fallback: lifecycle data from older schemas may not have is_active
-  // or may keep the current cycle end blank. Use the latest matured cycle that is
-  // not in the future, but never use synthetic HR flexible cycles as regular leave.
+  // A past cycle must NEVER be revived as current just because no active cycle
+  // exists. Diagnose missing maturity instead of silently displaying expired days.
   return cycles
     .filter((cycle) => !isFlexibleTechnicalCycle(cycle))
     .filter((cycle) => isSameEmployee(summary, cycle))
     .filter((cycle) => {
       const start = normalizeDate(cycle.matured_at || cycle.cycle_start)
-      return !start || start <= ref
+      const end = normalizeDate(cycle.cycle_end)
+      return Boolean(start && start <= ref && (!end || end >= ref))
     })
     .sort((a, b) => cycleSortKey(b).localeCompare(cycleSortKey(a)))[0] || null
 }
@@ -125,14 +125,15 @@ export function canonicalizeLeaveBalanceSummary(
     ? Math.max(cycleTotal - cycleUsed, 0)
     : null
 
-  // remaining_days stays authoritative because debt/manual lifecycle engines may
-  // intentionally alter it. total-used is exposed only as an integrity signal.
-  const regular = cycleRegular ?? summaryRegular
+  // The database lifecycle summary is authoritative for usable days. A client
+  // preview cannot grant additional balance or mask a missing maturity job.
+  // Cycle differences are diagnostic only; approvals still run atomically in DB.
+  const regular = summaryRegular
   const postpone = Math.max(numeric(summary.postpone_active_days), 0)
   const annualAdjustment = numeric(summary.annual_manual_adjustment_days)
-  const canonicalTotal = Math.max(regular + postpone + annualAdjustment, 0)
+  const computedTotal = Math.max(regular + postpone + annualAdjustment, 0)
   const storedTotal = Math.max(numeric(summary.annual_total_available_days), 0)
-  const difference = canonicalTotal - storedTotal
+  const difference = computedTotal - storedTotal
 
   const cycleMismatch = cycleRegular !== null && Math.abs(cycleRegular - summaryRegular) > 0.0001
   const totalMismatch = Math.abs(difference) > 0.0001
@@ -140,10 +141,10 @@ export function canonicalizeLeaveBalanceSummary(
   return {
     ...summary,
     annual_regular_days: regular,
-    annual_total_available_days: canonicalTotal,
+    annual_total_available_days: storedTotal,
     balance_integrity_status:
       cycleMismatch || totalMismatch
-        ? 'reconciled_from_cycle'
+        ? 'mismatch'
         : currentCycle
           ? 'ok'
           : 'summary_only',

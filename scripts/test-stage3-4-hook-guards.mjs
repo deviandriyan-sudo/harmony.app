@@ -48,5 +48,5 @@ function walk(dir) {
 }
 walk(path.join(root, 'app'))
 assert.equal(pages.length, 64)
-assert.equal(apis.length, 48)
-console.log(`HARMONY Stage 3.4 hook guards PASS: ${effectEvents} effect callbacks, 3 unused declarations removed, pure attendance summary, 112 routes`)
+assert.equal(apis.length, 49)
+console.log(`HARMONY Stage 3.4 hook guards PASS: ${effectEvents} effect callbacks, 3 unused declarations removed, pure attendance summary, 113 routes`)

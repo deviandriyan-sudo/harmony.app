@@ -221,7 +221,7 @@ assert(sourceText.includes('deliverHarmonyServerEmail'), 'Direct provider sender
 assert(sourceText.includes('Idempotency-Key'), 'Resend idempotency belum digunakan.')
 assert(sourceText.includes('/api/hr/attendance/upload-file'), 'HR signed file route belum digunakan.')
 assert(Boolean(pkg.scripts?.['test:smoke']), 'Script test:smoke belum tersedia.')
-assert(!sourceText.includes('harmony_reconcile_leave_lifecycle'), 'RPC lifecycle obsolete/missing masih direferensikan oleh source.')
+assert(fs.existsSync(path.join(root, 'app/api/cron/leave-lifecycle/route.ts')), 'Stage 8 lifecycle cron handler belum tersedia.')
 
 if (warnings.length) {
   console.warn(`HARMONY smoke check WARNINGS (${warnings.length})`)

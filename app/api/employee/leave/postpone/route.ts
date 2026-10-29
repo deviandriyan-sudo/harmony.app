@@ -83,7 +83,7 @@ export async function GET(request: NextRequest) {
         reference_date: context.reference_date || null,
         balance_integrity_warning:
           integrityStatus && integrityStatus !== 'ok'
-            ? 'Saldo summary berbeda dari cycle aktif; HARMONY menampilkan nilai canonical dari lifecycle cycle.'
+            ? 'Siklus dan ringkasan saldo tidak konsisten. HARMONY tidak menambah saldo berdasarkan siklus lama; hubungi HR untuk pemeriksaan lifecycle.'
             : null,
       },
       { headers: { 'Cache-Control': 'no-store, max-age=0' } },

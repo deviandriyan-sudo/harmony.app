@@ -31,11 +31,11 @@ export async function getHarmonySystemControl(
     .maybeSingle()
 
   if (result.error) {
-    // Fail-open before the migration is installed so an incomplete deployment
-    // never locks HR/users out of the existing application.
+    // Keep legacy application access available, but NEVER send mail when the
+    // maintenance control cannot be verified. Sending must fail closed.
     return {
       systemEnabled: true,
-      emailEnabled: true,
+      emailEnabled: false,
       maintenanceMessage: DEFAULT_MESSAGE,
       updatedAt: null,
       updatedByEmail: null,
@@ -44,7 +44,12 @@ export async function getHarmonySystemControl(
   }
 
   const row = result.data as { system_enabled?: boolean | null; maintenance_message?: string | null; updated_at?: string | null; updated_by_email?: string | null } | null
-  const systemEnabled = row?.system_enabled !== false
+  // Missing/empty control row is not proof that maintenance is disabled.
+  if (!row) {
+    return { systemEnabled: true, emailEnabled: false, maintenanceMessage: DEFAULT_MESSAGE,
+      updatedAt: null, updatedByEmail: null, configured: false }
+  }
+  const systemEnabled = row.system_enabled !== false
 
   return {
     systemEnabled,
