@@ -21,9 +21,7 @@ import {
 
 import { HarmonyThemeToggle } from '@/components/theme/ThemeToggle'
 import { harmonyFetch } from '@/lib/harmony-client'
-import { remedFetch } from '@/lib/remed-client'
 import { supabase } from '@/lib/supabase'
-import type { RemedSession } from '@/types/remed'
 
 type AppUser = {
   id: string
@@ -124,8 +122,8 @@ export default function LoginPage() {
     }
 
     if (result.kind === 'finance') {
-      const remed = await remedFetch<{ session: RemedSession }>('/api/remed/session')
-      localStorage.setItem('remed_user', JSON.stringify(remed.session))
+      // Re-Med layout performs the authoritative server access check.
+      localStorage.removeItem('remed_user')
       router.replace(result.home || '/remed/finance/dashboard')
       return
     }

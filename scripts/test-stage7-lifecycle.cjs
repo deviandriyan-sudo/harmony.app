@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-require-imports -- CommonJS test harness */
+/* eslint-disable @typescript-eslint/no-require-imports -- CommonJS lifecycle test script */
 const assert = require('node:assert/strict')
 const fs = require('node:fs')
 const vm = require('node:vm')

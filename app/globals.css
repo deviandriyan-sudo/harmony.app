@@ -4624,29 +4624,25 @@ html[data-harmony-theme='dark'] {
   --harmony-shadow-lg:0 27px 68px rgba(0,4,16,.48);
 }
 
-/* Shared accessible theme switch. On the rail it remains discoverable when collapsed. */
+/* Stage 10 icon-only theme switch (login and every workspace). */
 .harmony-theme-switch {
-  display:inline-flex;align-items:center;gap:3px;padding:4px;max-width:100%;
+  display:inline-flex;align-items:center;gap:4px;padding:4px;max-width:100%;
   border-radius:999px;border:1px solid var(--h-color-divider);
   background:var(--h-color-surface);box-shadow:inset 0 1px 0 rgba(255,255,255,.11);
 }
 .harmony-theme-switch button {
-  display:inline-flex;align-items:center;justify-content:center;gap:6px;
-  min-width:63px;min-height:32px;padding:5px 8px;border-radius:999px;
-  color:var(--h-color-text-soft);font-size:11px;font-weight:750;
+  display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;
+  width:40px;height:40px;min-width:40px;min-height:40px;padding:0;border-radius:999px;
+  color:var(--h-color-text-soft);
   transition:background-color .18s ease,box-shadow .18s ease,color .18s ease;
 }
 .harmony-theme-switch button:hover:not(:disabled) {background:rgba(78,155,224,.13)}
 .harmony-theme-switch button.is-selected {background:linear-gradient(125deg,#167ef6,#0054bb);color:#fff;box-shadow:0 3px 12px rgba(14,108,218,.22)}
 .harmony-theme-switch button:focus-visible {outline:2px solid var(--h-color-focus);outline-offset:2px}
 .harmony-theme-switch button:disabled {opacity:.65}
-.harmony-theme-switch--compact .harmony-theme-label {display:none}
-.harmony-theme-switch--compact button {min-width:35px;padding:7px}
-.harmony-sidebar-theme {display:flex;width:100%;justify-content:center;margin:0 auto 10px;min-height:42px}
-.harmony-sidebar-theme button {flex:1;min-width:0}
-.harmony-sidebar-shell:not(.harmony-sidebar-pinned):not(.harmony-sidebar-mobile):not(:hover):not(:focus-within) .harmony-sidebar-theme {width:42px;padding:3px;flex-direction:column;border-radius:18px}
-.harmony-sidebar-shell:not(.harmony-sidebar-pinned):not(.harmony-sidebar-mobile):not(:hover):not(:focus-within) .harmony-sidebar-theme button {min-height:30px;padding:3px}
-.harmony-sidebar-shell:not(.harmony-sidebar-pinned):not(.harmony-sidebar-mobile):not(:hover):not(:focus-within) .harmony-sidebar-theme .harmony-theme-label {display:none}
+.harmony-sidebar-theme {display:flex;width:max-content;justify-content:center;margin:0 auto 10px;min-height:48px}
+.harmony-sidebar-shell:not(.harmony-sidebar-pinned):not(.harmony-sidebar-mobile):not(:hover):not(:focus-within) .harmony-sidebar-theme {width:48px;padding:3px;flex-direction:column;border-radius:22px}
+.harmony-sidebar-shell:not(.harmony-sidebar-pinned):not(.harmony-sidebar-mobile):not(:hover):not(:focus-within) .harmony-sidebar-theme button {min-height:40px}
 .harmony-login-theme-control {align-self:flex-end;margin-bottom:13px;position:relative;z-index:4}
 
 /* The source is the actual photograph provided for HARMONY, not an AI building. */
@@ -4800,7 +4796,6 @@ html[data-harmony-theme='light'] .harmony-login-notice--info {color:#165b9a;back
 @media(max-width:760px){
   .harmony-login-theme-control {margin-bottom:16px}
   .harmony-login-brand .harmony-login-campus {background-position:center,center,center 55%}
-  .harmony-sidebar-theme .harmony-theme-label {font-size:10px}
 }
 @media(prefers-reduced-motion:reduce){
   .harmony-theme-switch button {transition:none!important}

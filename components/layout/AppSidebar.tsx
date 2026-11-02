@@ -7,6 +7,7 @@ import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Loader2, LogOut, Pin, PinOff } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import { clearRemedUiSession } from '@/lib/remed-session-client'
 import { isNavigationActive, type NavigationItem } from '@/lib/navigation'
 import { useEmployeeAvatar } from '@/components/profile/useEmployeeAvatar'
 import { HarmonyThemeToggle } from '@/components/theme/ThemeToggle'
@@ -27,7 +28,7 @@ export function AppSidebar({ menu, title = 'HARMONY', userName = 'HARMONY User',
   const [loggingOut, setLoggingOut] = useState(false)
   const [pinned, setPinned] = useState(false)
   const [portalReady, setPortalReady] = useState(false)
-  const profilePhoto = useEmployeeAvatar()
+  const profilePhoto = useEmployeeAvatar(!userRole.toLowerCase().includes('finance'))
 
   // Portal the fixed desktop rail above page stacking contexts; the shared
   // workspace follows its current width through CSS during expand/collapse.
@@ -50,6 +51,7 @@ export function AppSidebar({ menu, title = 'HARMONY', userName = 'HARMONY User',
       await supabase.auth.signOut()
       localStorage.removeItem('harmony_user')
       localStorage.removeItem('remed_user')
+      clearRemedUiSession()
       sessionStorage.clear()
       router.replace('/login')
       router.refresh()
@@ -57,6 +59,7 @@ export function AppSidebar({ menu, title = 'HARMONY', userName = 'HARMONY User',
       console.error('Logout error:', error)
       localStorage.removeItem('harmony_user')
       localStorage.removeItem('remed_user')
+      clearRemedUiSession()
       sessionStorage.clear()
       router.replace('/login')
       router.refresh()

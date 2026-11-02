@@ -4,14 +4,13 @@ import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Loader2 } from 'lucide-react'
 
-import { remedFetch } from '@/lib/remed-client'
-import type { RemedSession } from '@/types/remed'
+import { getRemedUiSession } from '@/lib/remed-session-client'
 
 export default function RemedIndexPage() {
   const router = useRouter()
 
   useEffect(() => {
-    remedFetch<{ session: RemedSession }>('/api/remed/session')
+    getRemedUiSession()
       .then(({ session }) => {
         if (session.role === 'hr') router.replace('/remed/hr/dashboard')
         else if (session.role === 'finance') router.replace('/remed/finance/dashboard')

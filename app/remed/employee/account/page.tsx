@@ -7,6 +7,7 @@ import { ChangeEvent, useEffect, useState } from 'react'
 import { Loader2, PenLine, RefreshCw, Settings, ShieldCheck, Trash2, Upload } from 'lucide-react'
 
 import { remedFetch } from '@/lib/remed-client'
+import { getRemedUiSession } from '@/lib/remed-session-client'
 import type { RemedSession, RemedSignatureDisplay } from '@/types/remed'
 
 export default function RemedEmployeeAccountPage() {
@@ -22,7 +23,7 @@ export default function RemedEmployeeAccountPage() {
     setMessage('')
     try {
       const [sessionResult, signatureResult] = await Promise.all([
-        remedFetch<{ session: RemedSession }>('/api/remed/session'),
+        getRemedUiSession(),
         remedFetch<{ signature: RemedSignatureDisplay | null }>('/api/remed/signatures'),
       ])
       setSession(sessionResult.session)

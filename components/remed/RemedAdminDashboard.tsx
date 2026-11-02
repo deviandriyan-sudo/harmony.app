@@ -20,12 +20,16 @@ type DashboardPayload = {
 export function RemedAdminDashboard({ role }: { role: 'hr' | 'finance' }) {
   const [data, setData] = useState<DashboardPayload | null>(null)
   const [error, setError] = useState('')
+  const [loading, setLoading] = useState(true)
   const [exporting, setExporting] = useState(false)
   const load = useCallback(async () => {
     setError('')
+    setLoading(true)
     try { setData(await remedFetch<DashboardPayload>('/api/remed/dashboard')) }
     catch (issue: unknown) {
       setError(issue instanceof Error ? issue.message : `Gagal memuat dashboard Re-Med ${role.toUpperCase()}.`)
+    } finally {
+      setLoading(false)
     }
   }, [role])
   useEffect(() => {
@@ -64,20 +68,21 @@ export function RemedAdminDashboard({ role }: { role: 'hr' | 'finance' }) {
     </header>
     <WorkspaceActions title={role === 'hr' ? 'Tindakan Re-Med HR' : 'Tindakan Finance'} actions={actions} />
     {error ? <div className="rounded-[22px] border border-red-100 bg-red-50 p-4 text-sm text-red-700">{error}</div> : null}
-    <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
-      <RemedStatCard label="Total Klaim" value={String(data?.stats?.totalClaims ?? 0)} icon={FileText} tone="blue" />
-      <RemedStatCard label={role === 'hr' ? 'Menunggu HR' : 'Perlu Diproses'} value={String(data?.stats?.pending ?? 0)} icon={ClipboardCheck} tone="orange" />
-      <RemedStatCard label="Selesai Dibayar" value={String(data?.stats?.paidCount ?? 0)} icon={Banknote} tone="green" />
-      <RemedStatCard label="Total Dibayar" value={formatRupiah(data?.stats?.paidTotal ?? 0)} icon={WalletCards} tone="purple" />
+    {loading && !data ? <p role="status" className="text-xs harmony-text-secondary">Memuat ringkasan klaim...</p> : null}
+    <div className="grid grid-cols-2 gap-3 xl:grid-cols-4" aria-busy={loading}>
+      <RemedStatCard label="Total Klaim" value={loading && !data ? '…' : String(data?.stats?.totalClaims ?? 0)} icon={FileText} tone="blue" />
+      <RemedStatCard label={role === 'hr' ? 'Menunggu HR' : 'Perlu Diproses'} value={loading && !data ? '…' : String(data?.stats?.pending ?? 0)} icon={ClipboardCheck} tone="orange" />
+      <RemedStatCard label="Selesai Dibayar" value={loading && !data ? '…' : String(data?.stats?.paidCount ?? 0)} icon={Banknote} tone="green" />
+      <RemedStatCard label="Total Dibayar" value={loading && !data ? '…' : formatRupiah(data?.stats?.paidTotal ?? 0)} icon={WalletCards} tone="purple" />
     </div>
     <div className="harmony-unified-surface">
       <div className="flex flex-col gap-3 border-b border-black/[0.055] p-3.5 sm:flex-row sm:items-center sm:justify-between sm:p-4">
         <h2 className="harmony-section-title inline-flex items-center gap-2"><FileText size={16} className="text-blue-600" /> Klaim Terbaru</h2>
-        <button type="button" onClick={() => void load()} className="harmony-button-secondary inline-flex min-h-10 items-center gap-2 px-4 text-xs"><RefreshCcw size={14}/> Refresh</button>
+        <button type="button" disabled={loading} onClick={() => void load()} className="harmony-button-secondary inline-flex min-h-10 items-center gap-2 px-4 text-xs"><RefreshCcw size={14}/> Refresh</button>
       </div>
       <div className="p-3 sm:p-4">
-        <RemedClaimList claims={data?.recentClaims || []} showEmployee showBalanceImpact
-          action={(claim) => <ClaimAdminActions claim={claim} role={role} onDone={load} />} />
+        {loading && !data ? <p role="status" className="p-4 text-sm harmony-text-secondary">Mengambil klaim terbaru...</p> : <RemedClaimList claims={data?.recentClaims || []} showEmployee showBalanceImpact
+          action={(claim) => <ClaimAdminActions claim={claim} role={role} onDone={load} />} />}
       </div>
     </div>
   </section>

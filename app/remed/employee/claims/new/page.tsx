@@ -7,9 +7,10 @@ import { useRouter } from 'next/navigation'
 import { FilePlus2, Loader2, Paperclip, Send, X } from 'lucide-react'
 import { RemedPageHeader } from '@/components/remed/RemedPageHeader'
 import { remedFetch } from '@/lib/remed-client'
+import { getRemedUiSession } from '@/lib/remed-session-client'
 import { supabase } from '@/lib/supabase'
 import { REMED_BUCKET, formatRupiah } from '@/lib/remed'
-import type { RemedClaimType, RemedSession, RemedEntitlement } from '@/types/remed'
+import type { RemedClaimType, RemedEntitlement } from '@/types/remed'
 
 export default function NewRemedClaimPage() {
   const router = useRouter()
@@ -30,7 +31,7 @@ export default function NewRemedClaimPage() {
   useEffect(() => {
     Promise.all([
       remedFetch<{ claimTypes: RemedClaimType[] }>('/api/remed/claim-types'),
-      remedFetch<{ session: RemedSession }>('/api/remed/session'),
+      getRemedUiSession(),
       remedFetch<{ entitlement: RemedEntitlement | null }>('/api/remed/dashboard'),
     ])
       .then(([claimTypePayload, sessionPayload, dashboardPayload]) => {

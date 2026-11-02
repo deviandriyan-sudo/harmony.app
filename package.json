@@ -21,7 +21,10 @@
     "test:build-guards": "node scripts/test-stage3-1-build-guards.mjs",
     "test:stage7": "node scripts/test-stage7-guards.mjs",
     "test:lifecycle": "node scripts/test-stage7-lifecycle.cjs",
-    "test:stage8": "node scripts/test-stage8-db-cron.mjs"
+    "test:stage8": "node scripts/test-stage8-db-cron.mjs",
+    "test:stage9": "node scripts/test-stage9-performance.mjs",
+    "test:stage9:dashboard": "node scripts/test-stage9-dashboard.cjs",
+    "test:stage10": "node scripts/test-stage10-source-integrity.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.107.0",

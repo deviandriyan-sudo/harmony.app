@@ -1,22 +1,9 @@
-# HARMONY — HR Platform, V3.8.5 Stage 7 review
+# HARMONY — V3.8.5 Stage 10 (compact, performance & theme)
 
-Next.js 16.4.3, React 19.2.4, TypeScript, Supabase, Vercel, Tailwind. Employee, HR, Finance/Re-Med; attendance, leave, postpone, PHL, expense claims and notifications.
+Sistem HR Next.js 16.4.3 / React 19.2.4 / TypeScript / Supabase / Vercel, role Karyawan, HR, Finance dan Re-Med.
 
-## Installation
+**Source hanya berisi berkas aplikasi, konfigurasi, tes, dan SQL historis.** Dokumentasi perubahan lama disimpan di `OPERATIONS_ARCHIVE` dalam paket ZIP, bukan dalam direktori deploy. Gunakan `INSTALL_STAGE10.ps1` untuk mengganti folder source setelah backup dan `CLEAN_HARMONY_SAFE.ps1` untuk memindahkan cache dan arsip lama secara aman.
 
-Read the extracted ZIP's `START_HERE_STAGE7.md`. Replace all route-bearing source directories after backup; preserve `.env.local`, `.git` and historical SQL. No Stage 7 production SQL write migration is authorized or included.
+Source yang diunggah berisi Stage 8; optimasi Stage 9 yang tidak ada di ZIP tersebut telah diport secara eksplisit, diuji ulang, dan dipisahkan dari perubahan tombol tema. Tidak ada perubahan database pada Stage 10. Cron Stage 8, RPC dan SQL historis dipertahankan.
 
-## Developer checks
-
-```powershell
-npm ci
-npm run test:stage7
-npm run test:lifecycle
-npm run test:smoke
-npm run test:balance
-npx tsc --noEmit
-npm run lint
-npm run build
-```
-
-View full automation limitations in `STAGE7_AUDIT_REPORT.md`. See `DESIGN_TOKENS_STAGE7.md` for semantic light/dark palette. Historical reports retained under `docs/archive`.
+Baca `INSTALL.md` dan `START_HERE_STAGE10.md` (di luar `APP_SOURCE`). Jalankan seluruh tes sebelum deploy.

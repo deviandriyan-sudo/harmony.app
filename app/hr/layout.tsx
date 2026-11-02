@@ -11,8 +11,7 @@ import { AppSidebar } from '@/components/layout/AppSidebar'
 import { navigationForRole } from '@/lib/navigation'
 import { ModuleSubnav } from '@/components/layout/ModuleSubnav'
 import { harmonyFetch } from '@/lib/harmony-client'
-import { remedFetch } from '@/lib/remed-client'
-import type { RemedSession } from '@/types/remed'
+import { getRemedUiSession } from '@/lib/remed-session-client'
 import { supabase } from '@/lib/supabase'
 
 type AppUser = {
@@ -62,14 +61,12 @@ export default function HRLayout({ children }: { children: React.ReactNode }) {
 
       setUserName(payload.employee?.full_name || fallbackName)
 
-      try {
-        const remed = await remedFetch<{ session: RemedSession }>('/api/remed/session')
-        setHasRemedAccess(remed.session.role === 'hr')
-      } catch {
-        setHasRemedAccess(false)
-      }
-
       setAllowed(true)
+      // HR route authorization is already verified above. An optional menu
+      // capability must not hold the entire workspace behind another request.
+      void getRemedUiSession()
+        .then(({ session }) => setHasRemedAccess(session.role === 'hr'))
+        .catch(() => setHasRemedAccess(false))
     } catch (error: unknown) {
       setMessage(readErrorMessage(error) || 'Akses HR tidak dapat diverifikasi.')
       await supabase.auth.signOut()

@@ -7,9 +7,8 @@ import { useRouter } from 'next/navigation'
 import { Loader2, ShieldCheck } from 'lucide-react'
 
 import { harmonyFetch } from '@/lib/harmony-client'
-import { remedFetch } from '@/lib/remed-client'
+import { clearRemedUiSession } from '@/lib/remed-session-client'
 import { supabase } from '@/lib/supabase'
-import type { RemedSession } from '@/types/remed'
 
 
 export default function AuthCallbackPage() {
@@ -49,8 +48,8 @@ export default function AuthCallbackPage() {
       }
 
       if (access.kind === 'finance') {
-        const remed = await remedFetch<{ session: RemedSession }>('/api/remed/session')
-        localStorage.setItem('remed_user', JSON.stringify(remed.session))
+        // Re-Med layout verifies identity and role before rendering.
+        localStorage.removeItem('remed_user')
         router.replace(access.home || '/remed/finance/dashboard')
         return
       }
@@ -58,6 +57,7 @@ export default function AuthCallbackPage() {
       throw new Error('Email Google belum terdaftar atau tidak aktif pada HARMONY.')
     } catch (error: unknown) {
       await supabase.auth.signOut()
+      clearRemedUiSession()
       localStorage.removeItem('harmony_user')
       localStorage.removeItem('remed_user')
       router.replace(`/login?google_error=${encodeURIComponent(readErrorMessage(error) || 'Login Google gagal.')}`)

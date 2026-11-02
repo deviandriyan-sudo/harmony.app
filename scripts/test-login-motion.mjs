@@ -6,17 +6,18 @@ const css = fs.readFileSync('app/globals.css', 'utf8')
 const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'))
 const lock = JSON.parse(fs.readFileSync('package-lock.json', 'utf8'))
 
-// Preserve the working authentication contract and role routing.
+// Preserve authentication and route checks, without requiring a redundant Re-Med session fetch during login.
 for (const required of [
   'supabase.auth.signInWithPassword',
   'supabase.auth.signInWithOAuth',
   'supabase.auth.resetPasswordForEmail',
   'supabase.auth.getUser',
   "'/api/auth/access'",
-  "'/api/remed/session'",
   "'/api/system/status'",
   'redirectAuthenticatedUser()',
   'router.replace(result.home)',
+  "router.replace(result.home || '/remed/finance/dashboard')",
+  "localStorage.removeItem('remed_user')",
   'setShowPassword((current) => !current)',
   'disabled={loading || googleLoading}',
   'role={messageType',
@@ -38,6 +39,7 @@ for (const required of [
   '@media (max-width:760px)',
 ]) assert(css.includes(required), `Missing login motion/responsive selector: ${required}`)
 
+assert(fs.readFileSync('app/remed/layout.tsx', 'utf8').includes('getRemedUiSession()'), 'Re-Med layout must still validate access')
 assert(login.includes('harmony-login-shutter--left') && login.includes('harmony-login-shutter--right'), 'Opening shutters not rendered')
 assert.equal(pkg.version, lock.version, 'Package and lockfile version diverged')
 assert.equal(pkg.version, lock.packages[''].version, 'Lockfile root version diverged')

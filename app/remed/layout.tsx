@@ -12,7 +12,7 @@ import { navigationForRole } from '@/lib/navigation'
 import { ModuleSubnav } from '@/components/layout/ModuleSubnav'
 import { REMED_ROLE_LABELS } from '@/lib/remed'
 import { hasSupervisorAssignments } from '@/lib/supervisor-navigation'
-import { remedFetch } from '@/lib/remed-client'
+import { getRemedUiSession } from '@/lib/remed-session-client'
 import type { RemedSession } from '@/types/remed'
 
 export default function RemedLayout({ children }: { children: React.ReactNode }) {
@@ -27,7 +27,7 @@ export default function RemedLayout({ children }: { children: React.ReactNode })
   async function loadSession() {
     setLoading(true)
     try {
-      const payload = await remedFetch<{ session: RemedSession }>('/api/remed/session')
+      const payload = await getRemedUiSession()
       setSession(payload.session)
       localStorage.setItem('remed_user', JSON.stringify(payload.session))
     } catch (error: unknown) {

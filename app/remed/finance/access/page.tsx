@@ -5,7 +5,7 @@ import type { FormEvent } from 'react'
 import { Eye, EyeOff, KeyRound, Loader2, ShieldCheck } from 'lucide-react'
 import { RemedPageHeader } from '@/components/remed/RemedPageHeader'
 import { changeHarmonyPassword } from '@/lib/account-password'
-import { remedFetch } from '@/lib/remed-client'
+import { getRemedUiSession } from '@/lib/remed-session-client'
 import type { RemedSession } from '@/types/remed'
 
 export default function Page() {
@@ -19,7 +19,7 @@ export default function Page() {
   const [error, setError] = useState('')
 
   useEffect(() => {
-    remedFetch<{ session: RemedSession }>('/api/remed/session')
+    getRemedUiSession()
       .then((payload) => setSession(payload.session))
       .catch(() => {})
   }, [])

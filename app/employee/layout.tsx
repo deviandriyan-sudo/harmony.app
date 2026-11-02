@@ -11,8 +11,7 @@ import { AppSidebar } from '@/components/layout/AppSidebar'
 import { navigationForRole } from '@/lib/navigation'
 import { ModuleSubnav } from '@/components/layout/ModuleSubnav'
 import { harmonyFetch } from '@/lib/harmony-client'
-import { remedFetch } from '@/lib/remed-client'
-import type { RemedSession } from '@/types/remed'
+import { getRemedUiSession } from '@/lib/remed-session-client'
 import { supabase } from '@/lib/supabase'
 import { hasSupervisorAssignments } from '@/lib/supervisor-navigation'
 
@@ -67,12 +66,11 @@ export default function EmployeeLayout({ children }: { children: React.ReactNode
 
       setUserName(payload.employee?.full_name || formatEmailName(payload.appUser.email))
 
-      try {
-        const remed = await remedFetch<{ session: RemedSession }>('/api/remed/session')
-        setHasRemedAccess(remed.session.role === 'employee')
-      } catch {
-        setHasRemedAccess(false)
-      }
+      // This optional menu check runs in parallel with the supervisor lookup.
+      // Employee access has already been verified by /api/auth/access.
+      void getRemedUiSession()
+        .then(({ session }) => setHasRemedAccess(session.role === 'employee'))
+        .catch(() => setHasRemedAccess(false))
 
       // Same supervisor identifiers as the canonical Approval Tim page (homebase and assignments).
       // Navigation is convenience only; the original page/API keep authorization checks.

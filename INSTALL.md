@@ -1,7 +1,8 @@
-# HARMONY V3.8.5 Stage 7 — installation
+# HARMONY — Stage 10 (source compact)
 
-See top-level `START_HERE_STAGE7.md` **outside** `COPY_TO_HARMONY_APP` in the full-replacement ZIP. Use `INSTALL_STAGE7.ps1` from the extracted ZIP in preview mode first. Source root must preserve `.env.local` and `.git`. Replace route-bearing directories as units, not by merging old and new routes.
+Gunakan installer `INSTALL_STAGE10.ps1` di root paket ZIP (di luar APP_SOURCE) untuk preview, backup, dan replace aman.
+File `.env.local` dan `.git` harus tetap berada di folder proyek lama. Jangan menyalin `node_modules`, `.next`, atau dump database.
 
-Validation commands are declared in `package.json`: `npm ci`, `npm run test:stage7`, `npm run test:lifecycle`, `npm run test:smoke`, `npm run test:ui`, `npm run test:balance`, `npm run test:ptkp`, `npm run test:theme-normalization`, `npx tsc --noEmit`, `npm run lint`, and `npm run build`.
+Validasi wajib sebelum deploy: `npm ci`, `npm run test:stage10`, `npm run test:stage9`, `npm run test:stage9:dashboard`, `npm run test:stage8`, `npm run test:smoke`, `npm run test:theme`, `npm run test:balance`, `npm run lint`, `npx tsc --noEmit`, `npm run build`, `npm audit`.
 
-Stage 7 contains no production database write migration. Use `SQL_ONLY/09_STAGE7_LIFECYCLE_AUTOMATION_DIAGNOSTIC_READ_ONLY.sql` only for read-only production diagnosis, and **never** rerun deprecated SQL 02 after Stage 6.
+Migrasi SQL di `SQL_ONLY` adalah arsip operasional; **tidak dijalankan otomatis**. SQL 02 merupakan implementasi legacy dan tidak boleh diterapkan ulang setelah Stage 6. Pembatasan izin RPC Stage 8 sebelumnya telah dilaporkan diterapkan di produksi, tetapi status itu tidak dapat diverifikasi dari ZIP ini. Cron hanya dijalankan sesuai env produksi dan kondisi maintenance.
