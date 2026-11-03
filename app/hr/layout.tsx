@@ -11,7 +11,6 @@ import { AppSidebar } from '@/components/layout/AppSidebar'
 import { navigationForRole } from '@/lib/navigation'
 import { ModuleSubnav } from '@/components/layout/ModuleSubnav'
 import { harmonyFetch } from '@/lib/harmony-client'
-import { getRemedUiSession } from '@/lib/remed-session-client'
 import { supabase } from '@/lib/supabase'
 
 type AppUser = {
@@ -29,7 +28,6 @@ export default function HRLayout({ children }: { children: React.ReactNode }) {
   const [userName, setUserName] = useState('HR Administrator')
   const [message, setMessage] = useState('Memeriksa akses akun...')
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
-  const [hasRemedAccess, setHasRemedAccess] = useState(false)
 
   async function checkAccess() {
     setLoading(true)
@@ -62,11 +60,6 @@ export default function HRLayout({ children }: { children: React.ReactNode }) {
       setUserName(payload.employee?.full_name || fallbackName)
 
       setAllowed(true)
-      // HR route authorization is already verified above. An optional menu
-      // capability must not hold the entire workspace behind another request.
-      void getRemedUiSession()
-        .then(({ session }) => setHasRemedAccess(session.role === 'hr'))
-        .catch(() => setHasRemedAccess(false))
     } catch (error: unknown) {
       setMessage(readErrorMessage(error) || 'Akses HR tidak dapat diverifikasi.')
       await supabase.auth.signOut()
@@ -121,14 +114,14 @@ export default function HRLayout({ children }: { children: React.ReactNode }) {
     <div className="harmony-shell min-h-screen overflow-x-hidden">
       <div className="flex min-h-screen w-full overflow-x-hidden">
         <div className="fixed inset-y-0 left-0 z-30 hidden h-screen w-[88px] lg:block harmony-desktop-sidebar">
-          <AppSidebar menu={navigationForRole('hr', { remed: hasRemedAccess })} title="HARMONY" userName={userName} userRole="HR Administrator" logoSrc="/logo.png" />
+          <AppSidebar menu={navigationForRole('hr', { remed: true })} title="HARMONY" userName={userName} userRole="HR Administrator" logoSrc="/logo.png" />
         </div>
 
         {mobileSidebarOpen && (
           <div className="harmony-modal-surface fixed inset-0 z-50 lg:hidden">
             <button type="button" aria-label="Tutup menu" onClick={() => setMobileSidebarOpen(false)} className="absolute inset-0 bg-black/35 backdrop-blur-sm" />
             <div className="absolute left-0 top-0 h-full max-w-[86vw]">
-              <AppSidebar menu={navigationForRole('hr', { remed: hasRemedAccess })} title="HARMONY" userName={userName} userRole="HR Administrator" logoSrc="/logo.png" mobile onNavigate={() => setMobileSidebarOpen(false)} />
+              <AppSidebar menu={navigationForRole('hr', { remed: true })} title="HARMONY" userName={userName} userRole="HR Administrator" logoSrc="/logo.png" mobile onNavigate={() => setMobileSidebarOpen(false)} />
               <button type="button" aria-label="Tutup menu" onClick={() => setMobileSidebarOpen(false)} className="absolute right-[-48px] top-4 flex h-10 w-10 items-center justify-center rounded-2xl bg-white harmony-text-primary shadow-lg"><X size={20} /></button>
             </div>
           </div>

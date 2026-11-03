@@ -3,6 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { getHarmonySystemControl } from '@/lib/server/system-control'
+import { isDailyEmailQuotaError, quotaRetryAt } from '@/lib/server/email-quota'
 
 export type HarmonyEmailQueuePayload = {
   to: string[]
@@ -131,10 +132,12 @@ export async function processHarmonyJobQueue(
   const jobs = (data || []) as HarmonyJobRow[]
   let completed = 0
   let failed = 0
+  let quotaPaused = false
 
   for (const job of jobs) {
     let result: { ok: boolean; message: string; providerId?: string | null }
     try {
+      if (quotaPaused) throw new Error('Resend daily quota reached; remaining jobs deferred.')
       const payload = job.payload as HarmonyEmailQueuePayload
       const { deliverHarmonyServerEmail } = await import('@/lib/notifications-server')
       result = await deliverHarmonyServerEmail({
@@ -154,6 +157,8 @@ export async function processHarmonyJobQueue(
       }
     }
 
+    const dailyQuota = isDailyEmailQuotaError(result.message)
+    if (dailyQuota) quotaPaused = true
     const now = new Date().toISOString()
     const attempts = Math.max(1, Number(job.attempts || 1))
     const terminal = attempts >= Math.max(1, Number(job.max_attempts || 6))
@@ -185,10 +190,11 @@ export async function processHarmonyJobQueue(
       const saved = await admin
         .from('harmony_job_queue')
         .update({
-          status: terminal ? 'failed' : 'pending',
+          status: dailyQuota ? 'pending' : terminal ? 'failed' : 'pending',
+          ...(dailyQuota ? { attempts: Math.max(0, attempts - 1) } : {}),
           last_error: cleanError(result.message),
           lease_until: null,
-          next_attempt_at: new Date(
+          next_attempt_at: dailyQuota ? quotaRetryAt() : new Date(
             Date.now() + retryDelayMinutes(attempts) * 60_000,
           ).toISOString(),
           updated_at: now,
@@ -223,12 +229,12 @@ export async function processHarmonyJobQueue(
 
   return {
     ok: failed === 0,
-    paused: false,
+    paused: quotaPaused,
     claimed: jobs.length,
     completed,
     failed,
     remaining: count || 0,
-    message: `${completed} job selesai, ${failed} gagal; ${count || 0} masih antre.`,
+    message: quotaPaused ? 'Kuota email harian Resend habis; antrean ditunda ±24 jam tanpa menjadikannya gagal permanen.' : `${completed} job selesai, ${failed} gagal; ${count || 0} masih antre.`,
   }
 }
 

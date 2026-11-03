@@ -4876,3 +4876,7 @@ html[data-harmony-theme='dark'] .harmony-workspace :is(div,section,article)[clas
   #scaleup-print-sheet .scaleup-sign-space{height:46px}
   #scaleup-print-sheet .scaleup-print-foot{font-size:8pt;color:#777}
 }
+
+/* SCALE UP: manual employee directory makes unauthorized executive nominees visible but not selectable. */
+.scaleup-dropdown button:disabled{opacity:.55;cursor:not-allowed;background:transparent}
+.scaleup-dropdown button:disabled:hover{background:transparent}

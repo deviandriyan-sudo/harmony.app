@@ -95,6 +95,7 @@ export async function PUT(request: NextRequest) {
     const before = await getEntitlementSnapshot(ctx.admin, employeeId, year)
 
     if (action === 'adjust_balance') {
+      if (!before) throw Object.assign(new Error('Plafond dasar tahun ini belum diatur. Simpan Plafond Dasar terlebih dahulu.'), { status: 409 })
       const targetAvailable = Number(body?.target_available)
       if (!Number.isFinite(targetAvailable) || targetAvailable < 0) {
         throw Object.assign(new Error('Sisa plafond baru tidak valid.'), { status: 400 })

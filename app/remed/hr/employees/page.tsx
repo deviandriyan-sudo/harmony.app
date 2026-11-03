@@ -67,14 +67,18 @@ export default function Page() {
 
   function openModal(row: RemedEntitlement, nextMode: AdjustmentMode = 'balance') {
     setSelected(row)
-    setMode(nextMode)
+    // HR must initialize the annual entitlement before adjusting its remainder.
+    setMode(row.id.startsWith('unconfigured-') ? 'plafond' : nextMode)
     setRemainingInput(formatMoneyInput(Math.max(0, Number(row.available_amount || 0))))
     setPlafondInput(formatMoneyInput(Number(row.plafond_total || 0)))
-    setNote(nextMode === 'balance' ? 'Penyesuaian sisa plafond oleh HR' : 'Perubahan plafond dasar karena perubahan level jabatan')
+    setNote(row.id.startsWith('unconfigured-') ? 'Penetapan awal plafond dasar Re-Med' : nextMode === 'balance' ? 'Penyesuaian sisa plafond oleh HR' : 'Perubahan plafond dasar karena perubahan level jabatan')
     setModalError('')
   }
 
   function changeMode(nextMode: AdjustmentMode) {
+    if (selected?.id.startsWith('unconfigured-') && nextMode === 'balance') {
+      setModalError('Atur plafond dasar terlebih dahulu untuk tahun ini sebelum menyesuaikan saldo.');return
+    }
     setMode(nextMode)
     setModalError('')
     setNote(nextMode === 'balance' ? 'Penyesuaian sisa plafond oleh HR' : 'Perubahan plafond dasar karena perubahan level jabatan')
@@ -82,6 +86,9 @@ export default function Page() {
 
   async function saveAdjustment() {
     if (!selected) return
+    if (mode === 'balance' && selected.id.startsWith('unconfigured-')) {
+      setModalError('Plafond dasar belum dibuat. Gunakan tab Ubah Plafond Dasar terlebih dahulu.');return
+    }
     setSaving(true)
     setModalError('')
 
@@ -219,6 +226,8 @@ export default function Page() {
                   Ubah Plafond Dasar
                 </button>
               </div>
+
+              {selected.id.startsWith('unconfigured-') && <div className="rounded-[18px] border border-amber-200 bg-amber-50/80 px-4 py-3 text-sm text-amber-900">Plafond tahun {year} belum dibuat. Tetapkan <strong>Plafond Dasar</strong> terlebih dahulu sebelum mengubah sisa saldo.</div>}
 
               {mode === 'balance' ? (
                 <div className="rounded-[26px] border border-white/75 bg-white/46 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] backdrop-blur-2xl sm:p-5">

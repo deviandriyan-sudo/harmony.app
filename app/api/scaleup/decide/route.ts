@@ -1,6 +1,6 @@
 import { NextRequest,NextResponse } from 'next/server'
 import { scaleupContext,requireScaleupEmployee,scaleupRouteError } from '@/lib/server/scaleup'
-import { enqueueHarmonyEmailJob } from '@/lib/server/job-queue'
+import { enqueueHarmonyEmailJob, scheduleHarmonyJobQueueDrain } from '@/lib/server/job-queue'
 export const runtime='nodejs'
 export async function POST(request:NextRequest) {
   try {
@@ -35,6 +35,7 @@ export async function POST(request:NextRequest) {
             idempotencyKey:`scaleup:${data.request_id}:${stageId}:${action}`,
           })
           notification=enqueued.ok?'queued':'queue_failed'
+          if(enqueued.ok)scheduleHarmonyJobQueueDrain()
         }
       }
     }

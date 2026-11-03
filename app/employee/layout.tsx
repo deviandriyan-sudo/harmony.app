@@ -11,7 +11,6 @@ import { AppSidebar } from '@/components/layout/AppSidebar'
 import { navigationForRole } from '@/lib/navigation'
 import { ModuleSubnav } from '@/components/layout/ModuleSubnav'
 import { harmonyFetch } from '@/lib/harmony-client'
-import { getRemedUiSession } from '@/lib/remed-session-client'
 import { supabase } from '@/lib/supabase'
 import { hasSupervisorAssignments } from '@/lib/supervisor-navigation'
 
@@ -30,7 +29,6 @@ export default function EmployeeLayout({ children }: { children: React.ReactNode
   const [userName, setUserName] = useState('Employee')
   const [message, setMessage] = useState('Memeriksa akses akun...')
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
-  const [hasRemedAccess, setHasRemedAccess] = useState(false)
   const [hasSubordinates, setHasSubordinates] = useState(false)
 
   useEffect(() => {
@@ -65,12 +63,6 @@ export default function EmployeeLayout({ children }: { children: React.ReactNode
       }
 
       setUserName(payload.employee?.full_name || formatEmailName(payload.appUser.email))
-
-      // This optional menu check runs in parallel with the supervisor lookup.
-      // Employee access has already been verified by /api/auth/access.
-      void getRemedUiSession()
-        .then(({ session }) => setHasRemedAccess(session.role === 'employee'))
-        .catch(() => setHasRemedAccess(false))
 
       // Same supervisor identifiers as the canonical Approval Tim page (homebase and assignments).
       // Navigation is convenience only; the original page/API keep authorization checks.
@@ -117,7 +109,7 @@ export default function EmployeeLayout({ children }: { children: React.ReactNode
       <div className="flex min-h-screen w-full overflow-x-hidden">
         <div className="fixed inset-y-0 left-0 z-30 hidden h-screen w-[88px] lg:block harmony-desktop-sidebar">
           <AppSidebar
-            menu={navigationForRole('employee', { remed: hasRemedAccess, supervisor: hasSubordinates })}
+            menu={navigationForRole('employee', { remed: true, supervisor: hasSubordinates })}
             title="HARMONY"
            
             userName={userName}
@@ -131,7 +123,7 @@ export default function EmployeeLayout({ children }: { children: React.ReactNode
             <button type="button" aria-label="Tutup menu" onClick={() => setMobileSidebarOpen(false)} className="absolute inset-0 bg-black/35 backdrop-blur-sm" />
             <div className="absolute left-0 top-0 h-full max-w-[86vw]">
               <AppSidebar
-                menu={navigationForRole('employee', { remed: hasRemedAccess, supervisor: hasSubordinates })}
+                menu={navigationForRole('employee', { remed: true, supervisor: hasSubordinates })}
                 title="HARMONY"
                
                 userName={userName}

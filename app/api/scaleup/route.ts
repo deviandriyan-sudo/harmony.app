@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { scaleupContext, requireScaleupEmployee, currentScaleupPolicy, scaleupRouteError, getVisibleRequests } from '@/lib/server/scaleup'
 import { planScaleupApproval, type Nominees } from '@/lib/scaleup/workflow'
+import { enqueueHarmonyEmailJob, scheduleHarmonyJobQueueDrain } from '@/lib/server/job-queue'
 
 export const runtime = 'nodejs'
 const clean = (x: unknown, max=3000) => String(x ?? '').trim().slice(0,max)
@@ -73,6 +74,33 @@ export async function POST(request: NextRequest) {
       p_plan:snapshotPlan,p_key:idempotency,p_existing_id:existingId,
     })
     if (error) throw error
-    return NextResponse.json({ id, status:'pending_approval',message:'Pengajuan berhasil dikirim.' })
+    // Submission must not depend on Resend availability; queue after the RPC commits.
+    // Stable job key ensures a retried submit cannot duplicate the email.
+    let notification: 'queued' | 'queue_failed' | 'no_recipient' = 'no_recipient'
+    try {
+      const { data: firstStage, error: stageError } = await ctx.admin
+        .from('scaleup_approval_stages').select('id,approver_employee_id')
+        .eq('request_id', id).eq('status','pending').order('stage_order').limit(1).maybeSingle()
+      if (stageError) throw stageError
+      if (firstStage) {
+        const { data: recipient, error: recipientError } = await ctx.admin.from('employees')
+          .select('email').eq('id',firstStage.approver_employee_id).maybeSingle()
+        if (recipientError) throw recipientError
+        if (recipient?.email) {
+          const result = await enqueueHarmonyEmailJob(ctx.admin, {
+            to:[recipient.email],
+            subject:'HARMONY SCALE UP — Pengajuan Training Menunggu Persetujuan',
+            text:`Ada pengajuan training menunggu persetujuan Anda. Referensi: ${id}. Buka HARMONY untuk memeriksa rincian.`,
+            idempotencyKey:`scaleup:submit:${id}:stage:${firstStage.id}`,
+          })
+          notification = result.ok ? 'queued' : 'queue_failed'
+          if (result.ok) scheduleHarmonyJobQueueDrain()
+        }
+      }
+    } catch (notifyError) {
+      notification = 'queue_failed'
+      console.error('SCALE UP submission notification failed:', notifyError)
+    }
+    return NextResponse.json({ id, status:'pending_approval',notification,message:'Pengajuan berhasil dikirim.' })
   } catch (error) { const e=scaleupRouteError(error); return NextResponse.json({ message:e.message }, { status:e.status }) }
 }

@@ -5,7 +5,7 @@ import Image from 'next/image'
 import { harmonyFetch } from '@/lib/harmony-client'
 import { planScaleupApproval, ROLE_LABELS, type Nominees, type ScaleupRole, type ApprovalPolicy } from '@/lib/scaleup/workflow'
 
-type Person={id:string;full_name:string|null;employee_number?:string|null;department?:string|null;position?:string|null}
+type Person={id:string;full_name:string|null;employee_number?:string|null;department?:string|null;position?:string|null;eligible?:boolean}
 type Stage={id:string;stage_order:number;approver_employee_id:string;obligations:ScaleupRole[];label:string;identity_snapshot:{name?:string;position?:string;unit?:string};status:string;decided_at?:string}
 type RequestRow={id:string;requester_employee_id:string;requester:Person|null;training:Training;nominees:Nominees;approval_status:string;execution_status:string;request_version:number;total_estimated_budget:number;submitted_at:string;stages:Stage[]}
 type Training={title:string;start_date:string;end_date:string;category:string;type:string;provider:string;objective:string;competency:string;description:string;method:string;location:string;justification:string;estimated_cost:number;transportation_cost:number;accommodation_cost:number;other_cost:number;total_budget:number}
@@ -20,22 +20,35 @@ const roles:ScaleupRole[]=['supervisor_1','supervisor_2','wadirsdk','finance','d
 const statusMap:Record<string,string>={pending_approval:'Menunggu persetujuan',revision_required:'Perlu revisi',rejected:'Ditolak',approved:'Disetujui',cancelled:'Dibatalkan',waiting:'Belum aktif',pending:'Menunggu',completed:'Selesai',scheduled:'Terjadwal'}
 
 function PersonPicker({role,value,onSelect,hr=false,label}:{role?:ScaleupRole;value:Person|null;onSelect:(person:Person|null)=>void;hr?:boolean;label:string}){
-  const [query,setQuery]=useState(''),[list,setList]=useState<Person[]>([]),[busy,setBusy]=useState(false),[opened,setOpened]=useState(false),[message,setMessage]=useState('')
+  const [query,setQuery]=useState(''),[list,setList]=useState<Person[]>([]),[busy,setBusy]=useState(false),[opened,setOpened]=useState(false),[message,setMessage]=useState(''),[page,setPage]=useState(0),[hasMore,setHasMore]=useState(false)
   useEffect(()=>{if(!opened)return;const controller=new AbortController();const timer=setTimeout(()=>{
-    setBusy(true);const url=hr?`/api/scaleup/employee-search?q=${encodeURIComponent(query)}`:`/api/scaleup/candidates?role=${role}&q=${encodeURIComponent(query)}`
-    harmonyFetch<{employees?:Person[];candidates?:Person[];configured?:boolean}>(url,{signal:controller.signal})
-      .then(res=>{setList(res.employees||res.candidates||[]);setMessage(res.configured===false?'Belum ada pejabat yang dikonfigurasi HR.':'')})
-      .catch(err=>{if(!controller.signal.aborted)setMessage(err instanceof Error?err.message:'Pencarian gagal.')})
-      .finally(()=>{if(!controller.signal.aborted)setBusy(false)})
-  },hr&&!query?500:300);return()=>{controller.abort();clearTimeout(timer)}},[query,opened,role,hr])
+    const load=async()=>{
+      setBusy(true)
+      const url=hr
+        ? `/api/scaleup/employee-search?q=${encodeURIComponent(query)}`
+        : `/api/scaleup/candidates?role=${encodeURIComponent(role||'')}&q=${encodeURIComponent(query)}&page=${page}`
+      try {
+        const res=await harmonyFetch<{employees?:Person[];candidates?:Person[];hasMore?:boolean}>(url,{signal:controller.signal})
+        if(controller.signal.aborted)return
+        setList(previous=>page>0&&!hr?[...previous,...(res.candidates||[])]:res.employees||res.candidates||[])
+        setHasMore(Boolean(res.hasMore)&&!hr)
+        setMessage('')
+      } catch(err) {
+        if(!controller.signal.aborted)setMessage(err instanceof Error?err.message:'Pencarian gagal.')
+      } finally {if(!controller.signal.aborted)setBusy(false)}
+    }
+    void load()
+  },300);return()=>{controller.abort();clearTimeout(timer)}},[query,opened,role,hr,page])
+  const resetQuery=(value:string)=>{setPage(0);setList([]);setHasMore(false);setQuery(value)}
   return <div className="scaleup-field relative">
     <label className="scaleup-label">{label}</label>
-    {value?<div className="scaleup-selected"><div className="min-w-0"><strong>{value.full_name}</strong><small>{value.position||'Jabatan belum diisi'} · {value.department||'Unit tidak tersedia'}</small></div><button type="button" aria-label={`Ganti ${label}`} onClick={()=>{onSelect(null);setOpened(true);setQuery('')}}><X size={15}/></button></div>
-    :<><input type="search" className="scaleup-input" placeholder={hr?'Cari nama karyawan (min. 2 huruf)':'Cari pejabat yang berwenang'} value={query} onFocus={()=>setOpened(true)} onChange={e=>{setQuery(e.target.value);setOpened(true)}} aria-label={label}/>
+    {value?<div className="scaleup-selected"><div className="min-w-0"><strong>{value.full_name}</strong><small>{value.position||'Jabatan belum diisi'} · {value.department||'Unit tidak tersedia'}</small></div><button type="button" aria-label={`Ganti ${label}`} onClick={()=>{onSelect(null);setOpened(true);resetQuery('')}}><X size={15}/></button></div>
+    :<><input type="search" className="scaleup-input" placeholder={hr?'Cari nama karyawan (min. 2 huruf)':'Cari nama karyawan aktif'} value={query} onFocus={()=>setOpened(true)} onChange={e=>{resetQuery(e.target.value);setOpened(true)}} aria-label={label}/>
       {opened&&<div className="scaleup-dropdown" role="listbox" aria-label={`Pilihan ${label}`}>
         {busy&&<p>Memuat karyawan...</p>}{message&&<p>{message}</p>}
-        {!busy&&list.length===0&&<p>{hr&&!query?'Ketik minimal 2 huruf.':'Tidak ada kandidat sesuai otorisasi.'}</p>}
-        {list.map(item=><button key={item.id} type="button" role="option" aria-selected="false" onClick={()=>{onSelect(item);setOpened(false);setQuery('');setMessage('')}}><strong>{item.full_name||'Tanpa nama'}</strong><small>{item.position||'—'} · {item.department||'—'}</small></button>)}
+        {!busy&&list.length===0&&<p>{hr&&!query?'Ketik minimal 2 huruf.':'Tidak ada karyawan aktif sesuai pencarian.'}</p>}
+        {list.map(item=><button key={item.id} type="button" role="option" aria-selected="false" disabled={!hr&&item.eligible===false} title={!hr&&item.eligible===false?'Belum berwenang untuk tahap ini. Hubungi HR untuk konfigurasi jabatan/policy.':undefined} onClick={()=>{onSelect(item);setOpened(false);resetQuery('');setMessage('')}}><strong>{item.full_name||'Tanpa nama'}</strong><small>{item.employee_number||'—'} · {item.position||'—'} · {item.department||'—'}{!hr&&item.eligible===false?' · Belum berwenang untuk tahap ini':''}</small></button>)}
+        {hasMore&&<button type="button" disabled={busy} onClick={()=>setPage(v=>v+1)}>Tampilkan 30 nama berikutnya</button>}
         <button type="button" className="scaleup-dropdown-dismiss" onClick={()=>setOpened(false)}>Tutup pilihan</button>
       </div>}</>}
   </div>
@@ -158,7 +171,7 @@ export function ScaleupWorkspace({mode}:{mode:'hr'|'employee'}) {
         <TextArea label="Justifikasi Pemohon" value={training.justification} onChange={v=>updateTraining('justification',v)}/>
       </div><div className="scaleup-divider"/><span className="scaleup-section-no">02 / COST ESTIMATE</span><h3>Perkiraan Biaya</h3>
       <div className="scaleup-form-grid">{([['estimated_cost','Training'],['transportation_cost','Transportasi'],['accommodation_cost','Akomodasi'],['other_cost','Lainnya']] as const).map(([key,label])=><Field key={key} label={`${label} (IDR)`} type="number" value={String(training[key])} onChange={v=>updateTraining(key,Number(v))}/>)}</div><div className="scaleup-budget-total"><span>Total Estimasi</span><strong>{money(totalForm)}</strong></div>
-      <div className="scaleup-divider"/><span className="scaleup-section-no">03 / MANUAL APPROVER SELECTION</span><h3>Alur Persetujuan</h3><p className="scaleup-caption">Seluruh pejabat dipilih sendiri dari employee master. Kedua Wadir wajib; perubahan jenis tahap wajib hanya melalui konfigurasi HR.</p>
+      <div className="scaleup-divider"/><span className="scaleup-section-no">03 / MANUAL APPROVER SELECTION</span><h3>Alur Persetujuan</h3><p className="scaleup-caption">Pilih nama karyawan aktif melalui dropdown. Atasan dapat dipilih manual; pejabat Wadir/Direktur harus sesuai kewenangan yang dikonfigurasi HR.</p>
       <div className="scaleup-form-grid">
         <PersonPicker role="supervisor_1" label="Atasan 1 *" value={chosen.supervisor_1||null} onSelect={p=>updateNominee('supervisor_1',p)}/>
         {extraSupervisor&&<PersonPicker role="supervisor_2" label="Atasan 2 (opsional)" value={chosen.supervisor_2||null} onSelect={p=>updateNominee('supervisor_2',p)}/>}

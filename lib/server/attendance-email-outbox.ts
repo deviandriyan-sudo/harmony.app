@@ -6,6 +6,7 @@ import {
   deliverHarmonyServerEmail,
 } from '@/lib/notifications-server'
 import { getHarmonySystemControl } from '@/lib/server/system-control'
+import { isDailyEmailQuotaError, quotaRetryAt } from '@/lib/server/email-quota'
 
 export type AttendanceEmailJob = {
   id: string
@@ -40,6 +41,7 @@ export async function processAttendanceEmailOutbox(admin: SupabaseClient) {
   const jobs = (data || []) as AttendanceEmailJob[]
   let sent = 0
   let failed = 0
+  let quotaPaused = false
 
   for (const job of jobs) {
     const subject = `[HARMONY] Absensi Periode ${job.period_label} Telah Diunggah`
@@ -48,6 +50,7 @@ export async function processAttendanceEmailOutbox(admin: SupabaseClient) {
     const path = `${env.appUrl}/employee/attendance`
     let result: { ok: boolean; providerId?: string | null; message: string }
     try {
+      if (quotaPaused) throw new Error('Resend daily quota reached; remaining jobs deferred.')
       result = await deliverHarmonyServerEmail({
         to: job.recipient_email,
         subject,
@@ -60,6 +63,8 @@ export async function processAttendanceEmailOutbox(admin: SupabaseClient) {
     }
 
     // Never persist the recipient's email or credentials in error messages.
+    const dailyQuota = isDailyEmailQuotaError(result.message)
+    if (dailyQuota) quotaPaused = true
     const attempts = Math.max(1, Number(job.attempts || 1))
     const terminal = attempts >= 6
     const delayMinutes = Math.min(360, 2 ** attempts * 5)
@@ -70,9 +75,10 @@ export async function processAttendanceEmailOutbox(admin: SupabaseClient) {
           updated_at: new Date().toISOString(),
         }
       : {
-          status: terminal ? 'failed' : 'pending',
+          status: dailyQuota ? 'pending' : terminal ? 'failed' : 'pending',
+          ...(dailyQuota ? { attempts: Math.max(0, attempts - 1) } : {}),
           last_error: result.message.slice(0, 400), lease_until: null,
-          next_attempt_at: new Date(Date.now() + delayMinutes * 60_000).toISOString(),
+          next_attempt_at: dailyQuota ? quotaRetryAt() : new Date(Date.now() + delayMinutes * 60_000).toISOString(),
           updated_at: new Date().toISOString(),
         }
 
@@ -95,9 +101,9 @@ export async function processAttendanceEmailOutbox(admin: SupabaseClient) {
     .in('status', ['pending', 'sending'])
   if (countError) throw new Error(countError.message)
 
-  return { ok: failed === 0, paused: false, sent, failed,
+  return { ok: failed === 0 && !quotaPaused, paused: quotaPaused, sent, failed,
     claimed: jobs.length, remaining: count || 0,
-    message: `${sent} email diterima Resend, ${failed} gagal; ${count || 0} masih dalam antrean.` }
+    message: quotaPaused ? 'Kuota harian Resend habis; email absensi ditunda ±24 jam.' : `${sent} email diterima Resend, ${failed} gagal; ${count || 0} masih dalam antrean.` }
 }
 
 export async function getAttendanceEmailStats(admin: SupabaseClient) {
