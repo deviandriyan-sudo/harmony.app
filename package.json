@@ -1,6 +1,6 @@
 {
   "name": "harmony",
-  "version": "3.8.5",
+  "version": "3.9.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -24,7 +24,8 @@
     "test:stage8": "node scripts/test-stage8-db-cron.mjs",
     "test:stage9": "node scripts/test-stage9-performance.mjs",
     "test:stage9:dashboard": "node scripts/test-stage9-dashboard.cjs",
-    "test:stage10": "node scripts/test-stage10-source-integrity.mjs"
+    "test:stage10": "node scripts/test-stage10-source-integrity.mjs",
+    "test:scaleup": "node scripts/test-scaleup-workflow.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.107.0",

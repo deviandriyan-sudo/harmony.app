@@ -1,6 +1,6 @@
 import type { LucideIcon } from 'lucide-react'
 import {
-  Banknote, CalendarDays, ClipboardCheck, Clock3, HeartPulse,
+  Banknote, CalendarDays, ClipboardCheck, Clock3, GraduationCap, HeartPulse,
   History, LayoutDashboard, Settings, UserCheck, Users, UserRound,
   ShieldCheck,
 } from 'lucide-react'
@@ -26,6 +26,7 @@ const hrItems: NavigationItem[] = [
   { title: 'Beranda', href: '/hr/dashboard', icon: LayoutDashboard },
   { title: 'SDM', href: '/hr/employees', icon: Users, activePrefixes: ['/hr/employees', '/hr/users'] },
   { title: 'Kehadiran', href: '/hr/attendance', icon: Clock3, activePrefixes: ['/hr/attendance', '/hr/leave', '/hr/phl', '/hr/holidays'] },
+  { title: 'SCALE UP', href: '/hr/scale-up', icon: GraduationCap, activePrefixes: ['/hr/scale-up'] },
   { title: 'Re-Med', href: '/remed/hr/dashboard', icon: HeartPulse, remed: true, activePrefixes: ['/remed/hr'] },
   { title: 'Sistem', href: '/hr/settings', icon: Settings, activePrefixes: ['/hr/settings'] },
 ]
@@ -34,6 +35,7 @@ const employeeItems: NavigationItem[] = [
   { title: 'Kehadiran', href: '/employee/attendance', icon: Clock3, activePrefixes: ['/employee/attendance'] },
   { title: 'Pengajuan', href: '/employee/leave', icon: CalendarDays, activePrefixes: ['/employee/leave', '/employee/phl', '/employee/requests'] },
   { title: 'Approval Tim', href: '/employee/approvals', icon: UserCheck, activePrefixes: ['/employee/approvals'] },
+  { title: 'SCALE UP', href: '/employee/scale-up', icon: GraduationCap, activePrefixes: ['/employee/scale-up'] },
   { title: 'Re-Med', href: '/remed/employee/dashboard', icon: HeartPulse, remed: true, activePrefixes: ['/remed/employee'] },
   { title: 'Akun', href: '/employee/account', icon: UserRound, activePrefixes: ['/employee/settings', '/employee/account'] },
 ]
@@ -61,6 +63,7 @@ export function isNavigationActive(pathname: string, item: NavigationItem): bool
 
 const modules: Record<'hr' | 'employee', ModuleNavigation[]> = {
   hr: [
+    { title: 'SCALE UP', prefixes: ['/hr/scale-up'], tabs: [{ title: 'Ringkasan', href: '/hr/scale-up' }] },
     { title: 'SDM', prefixes: ['/hr/employees', '/hr/users'], tabs: [
       { title: 'Data Karyawan', href: '/hr/employees' },
       { title: 'Akun & Akses', href: '/hr/users' },
@@ -87,6 +90,7 @@ const modules: Record<'hr' | 'employee', ModuleNavigation[]> = {
     ] },
   ],
   employee: [
+    { title: 'SCALE UP', prefixes: ['/employee/scale-up'], tabs: [{ title: 'Ringkasan', href: '/employee/scale-up' }] },
     { title: 'Akun', prefixes: ['/employee/account', '/employee/settings'], tabs: [
       { title: 'Biodata Lengkap', href: '/employee/account' },
       { title: 'Dokumen', href: '/employee/account/documents' },
