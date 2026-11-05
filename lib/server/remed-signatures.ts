@@ -89,9 +89,11 @@ export async function getRemedRoleSignatory(
       .from('remed_signature_profiles')
       .select('employee_id')
       .eq('signer_role', role)
-      .maybeSingle()
+      .limit(2)
     if (error) throw error
-    employeeId = data?.employee_id || null
+    // A duplicated signatory configuration must never pick an arbitrary
+    // person or prevent the rest of the medical form from printing.
+    employeeId = data?.length === 1 ? data[0].employee_id : null
   }
 
   if (!employeeId) return null

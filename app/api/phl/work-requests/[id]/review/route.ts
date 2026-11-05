@@ -253,14 +253,22 @@ async function syncApprovedPHLToAttendance(
   }
 }
 
-async function rollbackAttendanceSync(admin: SupabaseClient, snapshot: AttendanceSyncSnapshot | null) {
+async function rollbackAttendanceSync(
+  admin: SupabaseClient,
+  snapshot: AttendanceSyncSnapshot | null,
+  requestId: string,
+) {
   if (!snapshot) return
-  if (snapshot.created) {
-    await admin.from('attendance_logs').delete().eq('id', snapshot.id)
-    return
-  }
-  if (snapshot.previous) {
-    await admin.from('attendance_logs').update(snapshot.previous).eq('id', snapshot.id)
+  // Do not delete/overwrite an attendance row if another request has since
+  // taken ownership. Compensation is pre-commit best effort, not a substitute
+  // for a single database transaction across attendance + approval + credit.
+  const mutation = snapshot.created
+    ? await admin.from('attendance_logs').delete()
+      .eq('id', snapshot.id).eq('phl_work_request_id', requestId)
+    : await admin.from('attendance_logs').update(snapshot.previous || {})
+      .eq('id', snapshot.id).eq('phl_work_request_id', requestId)
+  if (mutation.error) {
+    console.error('PHL attendance compensation failed', mutation.error.code || 'db_error')
   }
 }
 
@@ -319,6 +327,10 @@ export async function POST(
     const supervisorEmail = auth.employee.email || auth.authEmail || null
     const supervisorNote = note || (decision === 'approve' ? 'Disetujui oleh atasan.' : 'Ditolak oleh atasan.')
 
+    // The SQL review RPC commits the business approval before we read the
+    // refreshed row or enqueue a notification. Never compensate an already
+    // committed approval on a downstream read/email failure.
+    let approvalCommitted = false
     let attendanceSnapshot: AttendanceSyncSnapshot | null = null
     const workRequestSnapshot = {
       attendance_log_id: target.attendance_log_id ?? null,
@@ -375,8 +387,14 @@ export async function POST(
       }
       if (!rpcResult.success) {
         if (attendanceSnapshot) {
-          await auth.admin.from('phl_work_requests').update(workRequestSnapshot).eq('id', requestId)
-          await rollbackAttendanceSync(auth.admin, attendanceSnapshot)
+          const restored = await auth.admin.from('phl_work_requests')
+            .update(workRequestSnapshot)
+            .eq('id', requestId)
+            .eq('status', 'pending_supervisor')
+            .select('id')
+            .maybeSingle()
+          if (restored.error) console.error('PHL pre-commit restore failed', restored.error.code || 'db_error')
+          if (restored.data) await rollbackAttendanceSync(auth.admin, attendanceSnapshot, requestId)
         }
         return NextResponse.json(
           { success: false, error: rpcResult.message || 'Pengajuan PHL belum berhasil diproses.' },
@@ -384,12 +402,25 @@ export async function POST(
         )
       }
 
+      approvalCommitted = true
+
       const { data: reviewed, error: reviewedError } = await auth.admin
         .from('phl_work_requests')
         .select('*')
         .eq('id', requestId)
         .single()
-      if (reviewedError) throw reviewedError
+      if (reviewedError || !reviewed) {
+        console.error('PHL approval committed, but result reload failed',
+          reviewedError?.code || 'row_unavailable')
+        return NextResponse.json({
+          success: true,
+          message: 'Keputusan PHL telah tersimpan di database. Detail belum dapat dimuat; muat ulang daftar untuk memeriksa status dan saldo.',
+          request: null,
+          phl_record_id: rpcResult.phl_record_id || null,
+          needs_refresh: true,
+          notification: { ok: false, message: 'Notifikasi belum dikirim karena detail keputusan tidak dapat dibaca.' },
+        }, { headers: { 'Cache-Control': 'no-store' } })
+      }
 
       const notification = await notifyPHLWorkDecision(reviewed).catch((error: unknown) => ({
         ok: false,
@@ -404,9 +435,25 @@ export async function POST(
         notification,
       })
     } catch (processingError) {
-      if (attendanceSnapshot) {
-        await auth.admin.from('phl_work_requests').update(workRequestSnapshot).eq('id', requestId)
-        await rollbackAttendanceSync(auth.admin, attendanceSnapshot)
+      if (!approvalCommitted && attendanceSnapshot) {
+        const reset = await auth.admin.from('phl_work_requests')
+          .update(workRequestSnapshot)
+          .eq('id', requestId)
+          .eq('status', 'pending_supervisor')
+          .select('id')
+          .maybeSingle()
+        if (reset.error) console.error('PHL pre-commit rollback failed', reset.error.code || 'db_error')
+        if (reset.data) await rollbackAttendanceSync(auth.admin, attendanceSnapshot, requestId)
+      }
+      if (approvalCommitted) {
+        console.error('PHL approval committed but post-commit processing failed')
+        return NextResponse.json({
+          success: true,
+          message: 'Keputusan PHL tersimpan. Pembaruan tampilan/notifikasi tertunda; periksa riwayat pengajuan.',
+          request: null,
+          needs_refresh: true,
+          notification: { ok: false, message: 'Pemeriksaan pasca persetujuan tertunda.' },
+        }, { headers: { 'Cache-Control': 'no-store' } })
       }
       throw processingError
     }

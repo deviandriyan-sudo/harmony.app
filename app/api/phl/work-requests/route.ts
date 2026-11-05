@@ -1,3 +1,4 @@
+import { hasPHLIdentityConflict } from '@/lib/phl-identity-conflict'
 import { NextRequest, NextResponse } from 'next/server'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
@@ -183,6 +184,7 @@ function historicalDateVariants(workDate: string) {
 }
 
 function identityScore(row: PHLIdentityRow | null, employee: EmployeeIdentityRow | null) {
+  if (row && employee && hasPHLIdentityConflict(row, employee)) return -1
   let score = 0
   if (sameIdentity(row?.employee_id, employee?.id)) score += 100
   if (sameIdentity(row?.employee_number, employee?.employee_number)) score += 60

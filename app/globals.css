@@ -4862,8 +4862,11 @@ html[data-harmony-theme='dark'] .harmony-workspace :is(div,section,article)[clas
 @media(prefers-reduced-motion:reduce){.scaleup-root *{transition:none!important;animation:none!important}}
 @media print{
   @page{size:A4 portrait;margin:15mm}
-  body *{visibility:hidden!important}
-  #scaleup-print-sheet,#scaleup-print-sheet *{visibility:visible!important}
+  /* Scope the exclusive SCALE UP print sheet to its own page only.
+     The former global body * selector hid every Re-Med payment form. */
+  body:has(#scaleup-print-sheet) *{visibility:hidden!important}
+  body:has(#scaleup-print-sheet) #scaleup-print-sheet,
+  body:has(#scaleup-print-sheet) #scaleup-print-sheet *{visibility:visible!important}
   #scaleup-print-sheet{display:block!important;position:absolute;left:0;top:0;width:100%;padding:0;margin:0;background:white;color:#111;font-family:Arial,sans-serif;font-size:10pt}
   #scaleup-print-sheet .scaleup-print-header{display:flex;align-items:center;gap:16px;border-bottom:2px solid #0b1f3b;padding-bottom:14px}
   #scaleup-print-sheet .scaleup-print-header img{width:65px;height:65px;object-fit:contain}
@@ -4898,4 +4901,29 @@ html[data-harmony-theme='dark'] .harmony-menu-search-results {
 html[data-harmony-theme='dark'] .harmony-menu-search-option:hover,
 html[data-harmony-theme='dark'] .harmony-menu-search-option:focus-visible {
   background: rgba(100, 171, 236, .2);
+}
+
+/* V3.9.3 RC1: Re-Med printing remains independent of SCALE UP.
+   Scope document rules to the actual printable component. */
+@media print {
+  body:has(.harmony-print-document) .harmony-module-subnav,
+  body:has(.harmony-print-document) .harmony-topbar,
+  body:has(.harmony-print-document) .harmony-mobile-topbar,
+  body:has(.harmony-print-document) .harmony-desktop-sidebar,
+  body:has(.harmony-print-document) > .harmony-sidebar-shell {display:none !important;}
+  body:has(.harmony-print-document) .harmony-shell .harmony-desktop-main {
+    margin:0 !important; padding:0 !important; width:100% !important; overflow:visible !important;
+  }
+  body:has(.harmony-print-document) .harmony-workspace {overflow:visible !important;}
+  .harmony-print-document {
+    display:block !important; visibility:visible !important;
+    width:100% !important; max-width:none !important;
+    color:#172638 !important; background:#fff !important;
+    box-shadow:none !important; break-inside:auto;
+    print-color-adjust:exact; -webkit-print-color-adjust:exact;
+  }
+  .harmony-print-document *{visibility:visible !important;}
+  .harmony-print-document header,
+  .harmony-print-document footer,
+  .harmony-print-document .rounded-2xl {break-inside:avoid;}
 }

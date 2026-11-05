@@ -15,12 +15,14 @@ export function PaymentRequestPrint({ claimId }: { claimId: string }) {
   const [signatures, setSignatures] = useState<RemedPrintSignatures | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [signatureWarning, setSignatureWarning] = useState('')
 
   useEffect(() => {
-    remedFetch<{ claim: RemedClaim; signatures: RemedPrintSignatures }>(`/api/remed/claims/${claimId}`)
+    remedFetch<{ claim: RemedClaim; signatures: RemedPrintSignatures | null; signature_warning?: string | null }>(`/api/remed/claims/${claimId}`)
       .then((payload) => {
         setClaim(payload.claim)
         setSignatures(payload.signatures)
+        setSignatureWarning(payload.signature_warning || '')
       })
       .catch((issue: unknown) => setError(issue instanceof Error ? issue.message : 'Gagal memuat form pembayaran.'))
       .finally(() => setLoading(false))
@@ -49,6 +51,7 @@ export function PaymentRequestPrint({ claimId }: { claimId: string }) {
         </button>
       </div>
 
+      {signatureWarning && <p role="status" className="mb-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 print:hidden">{signatureWarning}</p>}
       <article className="harmony-print-document rounded-[28px] border border-black/10 bg-white p-6 shadow-sm sm:p-9 print:rounded-none print:border-0 print:p-0 print:shadow-none">
         <header className="flex items-start justify-between gap-5 border-b-2 border-[#1d1d1f] pb-5">
           <div className="flex items-center gap-4">

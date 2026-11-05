@@ -24,12 +24,24 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
 
     const claims = await enrichRemedClaims(ctx.admin, [data])
     const claim = claims[0]
-    const signatures = await getRemedPrintSignatures(ctx.admin, {
-      employeeId: claim.employee_id,
-      hrSignatoryEmployeeId: claim.hr_signatory_employee_id || null,
-      financeSignatoryEmployeeId: claim.finance_signatory_employee_id || null,
-    })
-    return NextResponse.json({ claim, signatures })
+    // A missing/ambiguous signature configuration must not hide a valid claim
+    // from the authorized user. Print the document without signatures, but
+    // report their unavailability; never fabricate an approval signature.
+    let signatures: Awaited<ReturnType<typeof getRemedPrintSignatures>> | null = null
+    let signatureWarning: string | null = null
+    try {
+      signatures = await getRemedPrintSignatures(ctx.admin, {
+        employeeId: claim.employee_id,
+        hrSignatoryEmployeeId: claim.hr_signatory_employee_id || null,
+        financeSignatoryEmployeeId: claim.finance_signatory_employee_id || null,
+      })
+    } catch (signatureError) {
+      console.error('Re-Med claim signatures could not be loaded',
+        signatureError instanceof Error ? signatureError.name : 'lookup_error')
+      signatureWarning = 'Data tanda tangan belum dapat dimuat. Periksa konfigurasi di HR Re-Med.'
+    }
+    return NextResponse.json({ claim, signatures, signature_warning: signatureWarning },
+      { headers: { 'Cache-Control': 'no-store' } })
   } catch (error) {
     const issue = remedApiError(error)
     return NextResponse.json({ message: issue.message }, { status: issue.status })
