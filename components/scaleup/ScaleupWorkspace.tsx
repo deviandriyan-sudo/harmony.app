@@ -1,5 +1,5 @@
 'use client'
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useMemo, useState, useRef, useId, type FormEvent } from 'react'
 import { Activity, Award, BookOpen, Check, FileText, GraduationCap, Loader2, Plus, Printer, RefreshCcw, Settings2, ShieldCheck, X } from 'lucide-react'
 import Image from 'next/image'
 import { harmonyFetch } from '@/lib/harmony-client'
@@ -21,6 +21,31 @@ const statusMap:Record<string,string>={pending_approval:'Menunggu persetujuan',r
 
 function PersonPicker({role,value,onSelect,hr=false,label}:{role?:ScaleupRole;value:Person|null;onSelect:(person:Person|null)=>void;hr?:boolean;label:string}){
   const [query,setQuery]=useState(''),[list,setList]=useState<Person[]>([]),[busy,setBusy]=useState(false),[opened,setOpened]=useState(false),[message,setMessage]=useState(''),[page,setPage]=useState(0),[hasMore,setHasMore]=useState(false)
+  const pickerRef=useRef<HTMLDivElement>(null)
+  const listboxId=useId()
+  // Close the list when the user clicks outside, tabs to another field,
+  // or presses Escape. Interactions inside the picker (including pagination)
+  // must not dismiss the list.
+  useEffect(()=>{
+    if(!opened)return
+    const closeOnOutsidePointer=(event:PointerEvent)=>{
+      if(event.target instanceof Node && !pickerRef.current?.contains(event.target))setOpened(false)
+    }
+    const closeOnOutsideFocus=(event:FocusEvent)=>{
+      if(event.target instanceof Node && !pickerRef.current?.contains(event.target))setOpened(false)
+    }
+    const closeOnEscape=(event:KeyboardEvent)=>{
+      if(event.key==='Escape')setOpened(false)
+    }
+    document.addEventListener('pointerdown',closeOnOutsidePointer)
+    document.addEventListener('focusin',closeOnOutsideFocus)
+    document.addEventListener('keydown',closeOnEscape)
+    return()=>{
+      document.removeEventListener('pointerdown',closeOnOutsidePointer)
+      document.removeEventListener('focusin',closeOnOutsideFocus)
+      document.removeEventListener('keydown',closeOnEscape)
+    }
+  },[opened])
   useEffect(()=>{if(!opened)return;const controller=new AbortController();const timer=setTimeout(()=>{
     const load=async()=>{
       setBusy(true)
@@ -40,11 +65,11 @@ function PersonPicker({role,value,onSelect,hr=false,label}:{role?:ScaleupRole;va
     void load()
   },300);return()=>{controller.abort();clearTimeout(timer)}},[query,opened,role,hr,page])
   const resetQuery=(value:string)=>{setPage(0);setList([]);setHasMore(false);setQuery(value)}
-  return <div className="scaleup-field relative">
+  return <div ref={pickerRef} className="scaleup-field relative">
     <label className="scaleup-label">{label}</label>
     {value?<div className="scaleup-selected"><div className="min-w-0"><strong>{value.full_name}</strong><small>{value.position||'Jabatan belum diisi'} · {value.department||'Unit tidak tersedia'}</small></div><button type="button" aria-label={`Ganti ${label}`} onClick={()=>{onSelect(null);setOpened(true);resetQuery('')}}><X size={15}/></button></div>
-    :<><input type="search" className="scaleup-input" placeholder={hr?'Cari nama karyawan (min. 2 huruf)':'Cari nama karyawan aktif'} value={query} onFocus={()=>setOpened(true)} onChange={e=>{resetQuery(e.target.value);setOpened(true)}} aria-label={label}/>
-      {opened&&<div className="scaleup-dropdown" role="listbox" aria-label={`Pilihan ${label}`}>
+    :<><input type="search" className="scaleup-input" placeholder={hr?'Cari nama karyawan (min. 2 huruf)':'Cari nama karyawan aktif'} value={query} onFocus={()=>setOpened(true)} onChange={e=>{resetQuery(e.target.value);setOpened(true)}} role="combobox" aria-controls={opened?listboxId:undefined} aria-expanded={opened} aria-autocomplete="list" aria-label={label}/>
+      {opened&&<div id={listboxId} className="scaleup-dropdown" role="listbox" aria-label={`Pilihan ${label}`}>
         {busy&&<p>Memuat karyawan...</p>}{message&&<p>{message}</p>}
         {!busy&&list.length===0&&<p>{hr&&!query?'Ketik minimal 2 huruf.':'Tidak ada karyawan aktif sesuai pencarian.'}</p>}
         {list.map(item=><button key={item.id} type="button" role="option" aria-selected="false" disabled={!hr&&item.eligible===false} title={!hr&&item.eligible===false?'Belum berwenang untuk tahap ini. Hubungi HR untuk konfigurasi jabatan/policy.':undefined} onClick={()=>{onSelect(item);setOpened(false);resetQuery('');setMessage('')}}><strong>{item.full_name||'Tanpa nama'}</strong><small>{item.employee_number||'—'} · {item.position||'—'} · {item.department||'—'}{!hr&&item.eligible===false?' · Belum berwenang untuk tahap ini':''}</small></button>)}

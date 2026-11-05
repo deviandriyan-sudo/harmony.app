@@ -144,3 +144,19 @@ export function resolveDetailTabs(role: NavigationRole, pathname: string): Navig
   ]
   return []
 }
+
+/** Discover existing module destinations without building a second route registry.
+ * Menu search is navigation only; page and API authorization remain authoritative. */
+export function navigationSearchEntries(role: NavigationRole): Array<{ title: string; href: string; module: string }> {
+  const source = navigationForRole(role, { remed: true, supervisor: false })
+    .map(item => ({ title: item.title, href: item.href, module: 'Menu utama' }))
+  const groups = role === 'finance' ? [] : modules[role]
+  for (const group of groups) {
+    // Supervisor-only navigation is evaluated asynchronously by the employee shell.
+    if (role === 'employee' && group.title === 'Approval Tim') continue
+    for (const tab of [...group.tabs, ...(group.detailTabs || [])]) {
+      source.push({ title: tab.title, href: tab.href, module: group.title })
+    }
+  }
+  return Array.from(new Map(source.map(item => [item.href, item])).values())
+}

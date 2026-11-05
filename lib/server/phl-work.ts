@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { assignmentIsEffective } from '@/lib/phl-assignment-policy'
 
 import {
   buildServerHarmonyEmailHtml,
@@ -42,6 +43,7 @@ function supervisorFieldMatches(value: unknown, keys: string[]) {
 
 type PHLWorkNotificationRow = {
   employee_id: string
+  id?: string | null
   email?: string | null
   full_name?: string | null
   work_date?: string | null
@@ -55,14 +57,6 @@ type PHLWorkNotificationRow = {
   cancel_note?: string | null
 }
 
-function assignmentIsEffective(row: { is_active?: boolean | null; is_primary?: boolean | null; start_date?: string | null; end_date?: string | null }, today: string) {
-  if (row?.is_active === false || row?.is_primary === true) return false
-  const start = clean(row?.start_date).slice(0, 10)
-  const end = clean(row?.end_date).slice(0, 10)
-  if (start && start > today) return false
-  if (end && end < today) return false
-  return true
-}
 
 function todayWita() {
   const parts = new Intl.DateTimeFormat('en-CA', {
@@ -232,6 +226,7 @@ export async function notifyPHLWorkSubmitted(
   const result = await sendHarmonyServerEmail({
     to: emails,
     subject: `[HARMONY] Pengajuan Saldo PHL - ${clean(requestRow.full_name) || 'Karyawan'}`,
+    idempotencyKey: requestRow.id ? `phl-work:submitted:${requestRow.id}` : undefined,
     html: buildServerHarmonyEmailHtml({
       title,
       message,
@@ -269,6 +264,7 @@ export async function notifyPHLWorkDecision(requestRow: PHLWorkNotificationRow) 
   const result = await sendHarmonyServerEmail({
     to: email,
     subject: `[HARMONY] ${title}`,
+    idempotencyKey: requestRow.id ? `phl-work:${approved ? 'approved' : 'rejected'}:${requestRow.id}` : undefined,
     html: buildServerHarmonyEmailHtml({
       title,
       message,
@@ -306,6 +302,7 @@ export async function notifyPHLWorkCancelled(
   const result = await sendHarmonyServerEmail({
     to: emails,
     subject: `[HARMONY] Pengajuan PHL Dibatalkan - ${clean(requestRow.full_name) || 'Karyawan'}`,
+    idempotencyKey: requestRow.id ? `phl-work:cancelled:${requestRow.id}` : undefined,
     html: buildServerHarmonyEmailHtml({
       title,
       message,

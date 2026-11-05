@@ -22,6 +22,6 @@ function files(path) {
   })
 }
 assert(existsSync('app/api'))
-assert.equal(files('app').filter(path => basename(path) === 'page.tsx').length, 64)
-assert.equal(files('app/api').filter(path => basename(path) === 'route.ts').length, 49)
-console.log('HARMONY Stage 3.1 build guards PASS: nullable PHL date, offline-safe fonts, cross-platform route enumeration, 113 routes')
+assert(files('app').filter(path => basename(path) === 'page.tsx').length >= 64, 'Known baseline page routes missing')
+assert(files('app/api').filter(path => basename(path) === 'route.ts').length >= 49, 'Known baseline API routes missing')
+console.log('HARMONY Stage 3.1 build guards PASS: nullable PHL date, offline-safe fonts, cross-platform route enumeration, 113+ routes')

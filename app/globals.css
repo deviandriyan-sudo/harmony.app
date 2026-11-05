@@ -4880,3 +4880,22 @@ html[data-harmony-theme='dark'] .harmony-workspace :is(div,section,article)[clas
 /* SCALE UP: manual employee directory makes unauthorized executive nominees visible but not selectable. */
 .scaleup-dropdown button:disabled{opacity:.55;cursor:not-allowed;background:transparent}
 .scaleup-dropdown button:disabled:hover{background:transparent}
+
+/* V3.9.2 menu search: real navigation, not an inert employee search field. */
+.harmony-menu-search-results {
+  border-color: var(--harmony-border, rgba(134, 157, 187, .35));
+  color: var(--harmony-text, #193252);
+  background: var(--harmony-surface, #f8fbff);
+  box-shadow: 0 20px 45px rgba(27, 58, 106, .18);
+  backdrop-filter: blur(18px);
+}
+.harmony-menu-search-option:hover,.harmony-menu-search-option:focus-visible {
+  background: rgba(43, 111, 193, .12);
+}
+html[data-harmony-theme='dark'] .harmony-menu-search-results {
+  background: #142c46; color: #edf6ff; border-color: rgba(166, 207, 246, .23);
+}
+html[data-harmony-theme='dark'] .harmony-menu-search-option:hover,
+html[data-harmony-theme='dark'] .harmony-menu-search-option:focus-visible {
+  background: rgba(100, 171, 236, .2);
+}

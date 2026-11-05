@@ -1,6 +1,6 @@
 {
   "name": "harmony",
-  "version": "3.9.1",
+  "version": "3.9.2",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -26,7 +26,8 @@
     "test:stage9:dashboard": "node scripts/test-stage9-dashboard.cjs",
     "test:stage10": "node scripts/test-stage10-source-integrity.mjs",
     "test:scaleup": "node scripts/test-scaleup-workflow.mjs",
-    "test:release": "node scripts/test-scaleup-rc3-guards.mjs"
+    "test:release": "node scripts/test-scaleup-rc3-guards.mjs",
+    "test:refinement": "node scripts/test-v392-refinement.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.107.0",

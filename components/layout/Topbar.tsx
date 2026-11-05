@@ -18,6 +18,8 @@ import {
 } from 'lucide-react'
 import { useEffectEvent, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { usePathname, useRouter } from 'next/navigation'
+import { navigationSearchEntries, type NavigationRole } from '@/lib/navigation'
 
 import { supabase } from '@/lib/supabase'
 import type {
@@ -93,6 +95,36 @@ export function Topbar({
   description,
   badge = 'HARMONY System',
 }: TopbarProps) {
+  const pathname = usePathname()
+  const router = useRouter()
+  const searchRef = useRef<HTMLDivElement>(null)
+  const [menuQuery, setMenuQuery] = useState('')
+  const [searchOpen, setSearchOpen] = useState(false)
+  const menuRole: NavigationRole = pathname.startsWith('/hr/') ? 'hr' : pathname.startsWith('/remed/finance/') ? 'finance' : 'employee'
+  const matchedMenus = useMemo(() => {
+    const query = menuQuery.trim().toLocaleLowerCase('id-ID')
+    if (!query) return []
+    return navigationSearchEntries(menuRole)
+      .filter(item => `${item.title} ${item.module}`.toLocaleLowerCase('id-ID').includes(query))
+      .slice(0, 8)
+  }, [menuRole, menuQuery])
+  useEffect(() => {
+    if (!searchOpen) return
+    const outside = (event: PointerEvent) => {
+      if (event.target instanceof Node && !searchRef.current?.contains(event.target)) setSearchOpen(false)
+    }
+    const escape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setSearchOpen(false)
+    }
+    document.addEventListener('pointerdown', outside)
+    document.addEventListener('keydown', escape)
+    return () => { document.removeEventListener('pointerdown', outside); document.removeEventListener('keydown', escape) }
+  }, [searchOpen])
+  function openMenu(href: string) {
+    setSearchOpen(false)
+    setMenuQuery('')
+    router.push(href)
+  }
   const dropdownRef = useRef<HTMLDivElement | null>(null)
   const popoverRef = useRef<HTMLDivElement | null>(null)
   const [popoverPosition, setPopoverPosition] = useState({ top: 78, right: 16, maxHeight: 600 })
@@ -551,14 +583,36 @@ export function Topbar({
         </div>
 
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-          <div className="harmony-topbar-search flex h-11 min-w-0 items-center gap-3 rounded-full border px-4 transition focus-within:border-blue-300 sm:w-[320px]">
-            <Search size={18} className="shrink-0 harmony-text-muted" />
-
-            <input
-              type="text"
-              placeholder="Cari nama, NIP, unit kerja, atau menu..."
-              className="w-full rounded-full border-0 bg-transparent text-sm harmony-text-primary shadow-none outline-none ring-0 harmony-placeholder-muted focus:border-0 focus:outline-none focus:ring-0"
-            />
+          <div ref={searchRef} className="relative min-w-0 w-full sm:w-[360px] xl:w-[390px]">
+            <div className="harmony-topbar-search flex h-11 w-full min-w-0 items-center gap-3 rounded-full border px-4 transition focus-within:border-blue-300">
+              <Search size={18} className="shrink-0 harmony-text-muted" aria-hidden="true" />
+              <input
+                type="search"
+                value={menuQuery}
+                onFocus={() => setSearchOpen(true)}
+                onChange={(event) => { setMenuQuery(event.target.value); setSearchOpen(true) }}
+                onKeyDown={(event) => { if (event.key === 'Enter' && matchedMenus.length) { event.preventDefault(); openMenu(matchedMenus[0].href) } }}
+                placeholder="Cari menu HARMONY..."
+                aria-label="Cari menu HARMONY"
+                aria-expanded={searchOpen && Boolean(menuQuery.trim())}
+                aria-controls="harmony-menu-search-results"
+                role="combobox"
+                aria-autocomplete="list"
+                className="min-w-0 w-full border-0 bg-transparent text-sm harmony-text-primary shadow-none outline-none ring-0 harmony-placeholder-muted focus:border-0 focus:outline-none focus:ring-0"
+              />
+            </div>
+            {searchOpen && menuQuery.trim() && (
+              <div id="harmony-menu-search-results" role="listbox" aria-label="Hasil pencarian menu"
+                className="harmony-menu-search-results absolute left-0 right-0 top-[calc(100%+8px)] z-[120] max-h-72 overflow-y-auto rounded-2xl border p-1.5 shadow-xl">
+                {matchedMenus.length ? matchedMenus.map(item => (
+                  <button key={item.href} role="option" aria-selected="false" type="button"
+                    onClick={() => openMenu(item.href)}
+                    className="harmony-menu-search-option flex w-full flex-col gap-0.5 rounded-xl px-3 py-2.5 text-left text-sm focus-visible:outline-2 focus-visible:outline-blue-500">
+                    <span className="font-semibold">{item.title}</span><span className="text-xs opacity-70">{item.module}</span>
+                  </button>
+                )) : <p className="p-3 text-xs">Tidak ada menu yang cocok.</p>}
+              </div>
+            )}
           </div>
 
           <div ref={dropdownRef} className="relative">
