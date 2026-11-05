@@ -28,7 +28,8 @@
     "test:scaleup": "node scripts/test-scaleup-workflow.mjs",
     "test:release": "node scripts/test-scaleup-rc3-guards.mjs",
     "test:refinement": "node scripts/test-v392-refinement.mjs",
-    "test:refinement:393": "node scripts/test-v393-regression.mjs"
+    "test:refinement:393": "node scripts/test-v393-regression.mjs",
+    "test:remed-print": "node scripts/test-remed-print.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.107.0",

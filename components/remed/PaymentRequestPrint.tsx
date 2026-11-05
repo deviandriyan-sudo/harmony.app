@@ -41,7 +41,7 @@ export function PaymentRequestPrint({ claimId }: { claimId: string }) {
   const financeApproved = ['waiting_payment', 'paid'].includes(claim.status)
 
   return (
-    <section className="mx-auto max-w-[1000px] p-4 sm:p-6 lg:p-8 print:max-w-none print:p-0">
+    <section className="remed-print-page mx-auto max-w-[1000px] p-4 sm:p-6 lg:p-8 print:max-w-none print:p-0">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3 print:hidden">
         <button type="button" onClick={() => router.back()} className="inline-flex items-center gap-2 rounded-xl border border-black/10 bg-white px-4 py-2 text-sm font-semibold shadow-sm">
           <ArrowLeft size={16} /> Kembali
@@ -52,9 +52,9 @@ export function PaymentRequestPrint({ claimId }: { claimId: string }) {
       </div>
 
       {signatureWarning && <p role="status" className="mb-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 print:hidden">{signatureWarning}</p>}
-      <article className="harmony-print-document rounded-[28px] border border-black/10 bg-white p-6 shadow-sm sm:p-9 print:rounded-none print:border-0 print:p-0 print:shadow-none">
-        <header className="flex items-start justify-between gap-5 border-b-2 border-[#1d1d1f] pb-5">
-          <div className="flex items-center gap-4">
+      <article className="harmony-print-document remed-payment-sheet rounded-[28px] border border-black/10 bg-white p-6 shadow-sm sm:p-9 print:rounded-none print:border-0 print:p-0 print:shadow-none">
+        <header className="remed-print-head flex items-start justify-between gap-5 border-b-2 border-[#1d1d1f] pb-5">
+          <div className="remed-print-head-ident flex min-w-0 items-center gap-4">
             <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-2xl border border-black/10">
               <Image src="/logo.png" alt="Logo Poltek Simas Berau" width={56} height={56} className="h-14 w-14 object-contain" />
             </div>
@@ -64,14 +64,14 @@ export function PaymentRequestPrint({ claimId }: { claimId: string }) {
               <p className="mt-1 text-sm harmony-text-secondary">Medical Reimbursement</p>
             </div>
           </div>
-          <div className="text-right">
+          <div className="remed-print-claim min-w-0 text-right">
             <p className="text-xs harmony-text-secondary">Nomor Klaim</p>
             <p className="mt-1 font-mono text-sm font-bold">{claim.claim_number}</p>
             <div className="mt-2 inline-flex"><ClaimStatusBadge status={claim.status} /></div>
           </div>
         </header>
 
-        <div className="mt-6 grid gap-x-8 gap-y-4 sm:grid-cols-2">
+        <div className="remed-print-profile-grid mt-6 grid gap-x-8 gap-y-4 sm:grid-cols-2">
           <Field label="Nama Karyawan" value={claim.employee?.full_name || '-'} />
           <Field label="NIK" value={claim.employee?.employee_number || '-'} />
           <Field label="Unit / Departemen" value={claim.employee?.department || '-'} />
@@ -82,16 +82,16 @@ export function PaymentRequestPrint({ claimId }: { claimId: string }) {
           <Field label="Tanggal Pengajuan" value={formatRemedDate(claim.created_at)} />
         </div>
 
-        <div className="mt-6 rounded-2xl border border-black/10 bg-[#f8f8fa] p-5 print:bg-white">
+        <div className="remed-print-value-panel mt-6 rounded-2xl border border-black/10 bg-[#f8f8fa] p-5 print:bg-white">
           <p className="text-xs font-bold uppercase tracking-[0.16em] harmony-text-secondary">Nilai Pembayaran</p>
-          <div className="mt-3 grid gap-4 sm:grid-cols-3">
+          <div className="remed-print-summary-grid mt-3 grid gap-4 sm:grid-cols-3">
             <Field label="Nominal Diajukan" value={formatRupiah(claim.submitted_amount)} strong />
             <Field label="Nominal Disetujui" value={approvedAmount ? formatRupiah(approvedAmount) : '-'} strong />
             <Field label="Status" value={claim.status.replaceAll('_', ' ')} strong />
           </div>
         </div>
 
-        <div className="mt-6 grid gap-5 sm:grid-cols-2">
+        <div className="remed-print-dual-grid mt-6 grid gap-5 sm:grid-cols-2">
           <div className="rounded-2xl border border-black/10 p-5">
             <p className="text-xs font-bold uppercase tracking-[0.16em] harmony-text-secondary">Rekening Pembayaran</p>
             <div className="mt-4 space-y-3">
@@ -110,7 +110,7 @@ export function PaymentRequestPrint({ claimId }: { claimId: string }) {
           </div>
         </div>
 
-        <div className="mt-6 grid gap-5 sm:grid-cols-3">
+        <div className="remed-print-approvals mt-6 grid gap-5 sm:grid-cols-3">
           <ApprovalBox
             title="Diajukan Oleh"
             signature={signatures?.employee || null}
@@ -177,9 +177,9 @@ function ApprovalBox({
   const name = showSignature ? signature?.full_name || fallbackName : fallbackName
 
   return (
-    <div className="min-h-[190px] rounded-2xl border border-black/10 p-4 text-center">
+    <div className="remed-print-signature min-h-[190px] rounded-2xl border border-black/10 p-4 text-center">
       <p className="text-xs font-bold uppercase tracking-wide harmony-text-secondary">{title}</p>
-      <div className="mt-2 flex h-20 items-center justify-center">
+      <div className="remed-print-signature-image mt-2 flex h-20 items-center justify-center">
         {showSignature && signature?.signature_url ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={signature.signature_url} alt={`Tanda tangan ${signature.full_name}`} className="max-h-20 max-w-[180px] object-contain" />

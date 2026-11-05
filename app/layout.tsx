@@ -3,6 +3,7 @@ import './globals.css'
 import './theme-normalization.css'
 import './contrast-hardening.css'
 import './employee-master-contrast.css'
+import './remed-payment-print.css'
 import { SystemMaintenanceGate } from '@/components/system/SystemMaintenanceGate'
 import { HarmonyThemeProvider } from '@/components/theme/ThemeProvider'
 

@@ -1,0 +1,218 @@
+/* HARMONY Re-Med — print-only paper layout.
+ * All selectors are scoped to the payment form; HR, SCALE UP and other print
+ * surfaces retain their existing print styles and A4 page margin (15 mm).
+ * No screen/theme change is introduced by this file. */
+@media print {
+  /* The HARMONY role shell is a responsive application, not a sheet of paper.
+     Remove sidebar offsets and clipping at each containing ancestor. */
+  body:has(.remed-print-page),
+  body:has(.remed-print-page) .harmony-shell,
+  body:has(.remed-print-page) .harmony-workspace,
+  body:has(.remed-print-page) .harmony-desktop-main {
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+    background: #fff !important;
+    background-image: none !important;
+    box-shadow: none !important;
+  }
+
+  body:has(.remed-print-page) .harmony-shell > .flex {
+    display: block !important;
+    overflow: visible !important;
+    width: 100% !important;
+  }
+
+  body:has(.remed-print-page) .harmony-module-subnav,
+  body:has(.remed-print-page) .harmony-mobile-topbar,
+  body:has(.remed-print-page) .harmony-desktop-sidebar,
+  body:has(.remed-print-page) .harmony-notification-portal {
+    display: none !important;
+  }
+
+  body:has(.remed-print-page) .remed-print-page {
+    display: block !important;
+    width: 100% !important;
+    max-width: 180mm !important; /* A4 210mm minus 15mm page margin on both sides */
+    min-width: 0 !important;
+    margin: 0 auto !important;
+    padding: 0 !important;
+    overflow: visible !important;
+    box-sizing: border-box !important;
+    background: #fff !important;
+    background-image: none !important;
+  }
+
+  body:has(.remed-print-page) .remed-payment-sheet {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+    box-sizing: border-box !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    color: #172638 !important;
+    background: #fff !important;
+    background-image: none !important;
+    box-shadow: none !important;
+    -webkit-print-color-adjust: economy;
+    print-color-adjust: economy;
+    font-size: 9pt;
+    line-height: 1.4;
+  }
+
+  /* The app's frosted-glass theme uses high-specificity !important styles
+     on .harmony-workspace descendants; they must never tint printed paper. */
+  html[data-harmony-theme] body .harmony-workspace .remed-payment-sheet :is(div, section, article, header, footer, p, h1, span) {
+    color: #172638 !important;
+    background: transparent !important;
+    background-image: none !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+
+  body:has(.remed-print-page) .remed-payment-sheet * {
+    box-sizing: border-box !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    overflow-wrap: anywhere;
+    text-shadow: none !important;
+  }
+
+  body:has(.remed-print-page) .remed-payment-sheet .remed-print-head {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 36mm) !important;
+    align-items: start !important;
+    gap: 3mm !important;
+    border-color: #374151 !important;
+    padding-bottom: 3mm !important;
+    break-inside: avoid;
+  }
+
+  body:has(.remed-print-page) .remed-payment-sheet .remed-print-head-ident {
+    display: flex !important;
+    align-items: center !important;
+    gap: 3mm !important;
+  }
+
+  body:has(.remed-print-page) .remed-payment-sheet .remed-print-head-ident > div:first-child {
+    flex: 0 0 13mm !important;
+    width: 13mm !important;
+    height: 13mm !important;
+    border: none !important;
+  }
+
+  body:has(.remed-print-page) .remed-payment-sheet .remed-print-head-ident img {
+    width: 12mm !important;
+    height: 12mm !important;
+    object-fit: contain;
+  }
+
+  body:has(.remed-print-page) .remed-payment-sheet .remed-print-head h1 {
+    font-size: 13pt !important;
+    line-height: 1.2 !important;
+    letter-spacing: 0 !important;
+    margin-top: 1mm !important;
+    overflow-wrap: normal;
+    word-break: normal;
+  }
+
+  body:has(.remed-print-page) .remed-payment-sheet .remed-print-claim {
+    width: 36mm !important;
+    font-size: 8pt !important;
+  }
+
+  body:has(.remed-print-page) .remed-payment-sheet .remed-print-claim .inline-flex {
+    max-width: 100% !important;
+    text-align: center;
+    white-space: normal !important;
+    border: 1px solid #71717a !important;
+    border-radius: 2mm !important;
+    background: #fff !important;
+    color: #172638 !important;
+  }
+
+  body:has(.remed-print-page) .remed-payment-sheet .remed-print-profile-grid,
+  body:has(.remed-print-page) .remed-payment-sheet .remed-print-dual-grid {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 2.5mm 5mm !important;
+    margin-top: 4mm !important;
+  }
+
+  body:has(.remed-print-page) .remed-payment-sheet .remed-print-summary-grid,
+  body:has(.remed-print-page) .remed-payment-sheet .remed-print-approvals {
+    display: grid !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    gap: 3mm !important;
+  }
+
+  body:has(.remed-print-page) .remed-payment-sheet .remed-print-value-panel {
+    margin-top: 4mm !important;
+    padding: 3mm !important;
+    border: 1px solid #d4d4d8 !important;
+    border-radius: 2mm !important;
+  }
+
+  body:has(.remed-print-page) .remed-payment-sheet .remed-print-dual-grid > div {
+    padding: 3mm !important;
+    border: 1px solid #d4d4d8 !important;
+    border-radius: 2mm !important;
+    break-inside: avoid;
+  }
+
+  body:has(.remed-print-page) .remed-payment-sheet .remed-print-approvals {
+    margin-top: 4mm !important;
+    break-inside: avoid;
+  }
+
+  body:has(.remed-print-page) .remed-payment-sheet .remed-print-signature {
+    min-height: 30mm !important;
+    padding: 2.5mm !important;
+    border: 1px solid #d4d4d8 !important;
+    border-radius: 2mm !important;
+    break-inside: avoid;
+  }
+
+  body:has(.remed-print-page) .remed-payment-sheet .remed-print-signature-image {
+    height: 16mm !important;
+    margin-top: 1mm !important;
+  }
+
+  body:has(.remed-print-page) .remed-payment-sheet .remed-print-signature-image img {
+    max-width: 100% !important;
+    max-height: 15mm !important;
+    object-fit: contain !important;
+  }
+
+  body:has(.remed-print-page) .remed-payment-sheet .remed-print-field-value {
+    margin-top: 1mm !important;
+    font-size: 9pt !important;
+    line-height: 1.3 !important;
+  }
+
+  body:has(.remed-print-page) .remed-payment-sheet :is(.harmony-text-muted, .harmony-text-secondary) {
+    color: #475569 !important;
+  }
+
+  body:has(.remed-print-page) .remed-payment-sheet p {
+    orphans: 2;
+    widows: 2;
+  }
+
+  body:has(.remed-print-page) .remed-payment-sheet footer {
+    margin-top: 4mm !important;
+    padding-top: 2mm !important;
+    border-top: 1px solid #d4d4d8 !important;
+    font-size: 7pt !important;
+    line-height: 1.4 !important;
+    break-inside: avoid;
+  }
+}
