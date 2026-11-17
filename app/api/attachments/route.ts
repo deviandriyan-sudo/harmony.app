@@ -1,5 +1,6 @@
 
 import { readErrorMessage } from '@/lib/error-utils'
+import { unreferencedAttendanceProofPaths } from '@/lib/server/phl-evidence-preservation'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 
@@ -112,17 +113,10 @@ async function resolveIdentity(request: NextRequest, admin: SupabaseClient) {
     .eq('id', authData.user.id)
     .maybeSingle()
 
-  if (!byId.error && byId.data) {
-    appUser = byId.data
-  } else if (authData.user.email) {
-    const byEmail = await admin
-      .from('app_users')
-      .select('id,email,role,employee_id,is_active')
-      .ilike('email', authData.user.email)
-      .maybeSingle()
-
-    if (!byEmail.error) appUser = byEmail.data
-  }
+  // Authorization uses only the verified JWT subject. Email lookup may
+  // inadvertently borrow another user's role when an address is reassigned.
+  if (byId.error) throw byId.error
+  if (byId.data) appUser = byId.data
 
   if (!appUser || appUser.is_active === false) {
     return {
@@ -702,8 +696,13 @@ export async function DELETE(request: NextRequest) {
     const path = clean(attachment.storage_path) || storagePathFromPublicUrl(attachment.file_url)
 
     if (path) {
-      const remove = await admin.storage.from(BUCKET).remove([path])
-      if (remove.error) throw remove.error
+      const disposablePaths = await unreferencedAttendanceProofPaths(
+        admin, [path], [attachment.file_url],
+      )
+      if (disposablePaths.length > 0) {
+        const remove = await admin.storage.from(BUCKET).remove(disposablePaths)
+        if (remove.error) throw remove.error
+      }
     }
 
     const { error: deleteError } = await admin

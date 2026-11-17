@@ -5,6 +5,7 @@ import {
   harmonyApiError,
   requireHarmonyApi,
 } from '@/lib/server/user-api-auth'
+import { phlClaimIdentityAssessment } from '@/lib/phl-claim-identity'
 
 export const runtime = 'nodejs'
 
@@ -47,6 +48,20 @@ function canonicalDate(value: unknown) {
   return ''
 }
 
+function isValidCalendarDate(value: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false
+  const [year, month, day] = value.split('-').map(Number)
+  if (year < 1900 || year > 9999 || month < 1 || month > 12 || day < 1) return false
+  const resolved = new Date(Date.UTC(year, month - 1, day))
+  return resolved.getUTCFullYear() === year
+    && resolved.getUTCMonth() === month - 1
+    && resolved.getUTCDate() === day
+}
+
+function isUuid(value: string) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)
+}
+
 function normalizeStatus(value: unknown) {
   return String(value || '').trim().toLowerCase()
 }
@@ -65,7 +80,7 @@ function isTerminalInactiveClaim(row: PHLClaimRow) {
     || isTerminalInactiveStatus(row.hr_status)
 }
 
-type PHLClaimRow = { id: string; phl_date?: string | null; status?: string | null; supervisor_status?: string | null; hr_status?: string | null }
+type PHLClaimRow = { id: string; employee_id?: string | null; employee_number?: string | null; phl_date?: string | null; status?: string | null; supervisor_status?: string | null; hr_status?: string | null }
 
 // Scan all candidate history pages. Legacy phl_date may be TEXT in several
 // formats; a date equality query could miss an older submission. Fail closed
@@ -88,6 +103,16 @@ async function findSameDateClaims(ctx: Awaited<ReturnType<typeof requireHarmonyA
       for (const row of data || []) {
         if (canonicalDate(row.phl_date) !== claimDate || seen.has(row.id)) continue
         seen.add(row.id)
+        const ownership = phlClaimIdentityAssessment(row, ctx.employee!)
+        if (ownership === 'different_employee') continue
+        if (ownership === 'unverified_legacy') {
+          // Old machine-PIN-only claims cannot be attributed to a person safely.
+          // Block only active ambiguous claims, never expose their claim ID.
+          if (!isTerminalInactiveClaim(row)) {
+            throw Object.assign(new Error('Ada riwayat PHL lama dengan identitas yang belum dapat diverifikasi untuk tanggal ini. Hubungi HR sebelum mengajukan kembali.'), { status: 409 })
+          }
+          continue
+        }
         results.push(row)
       }
       if ((data || []).length < PAGE) return
@@ -115,8 +140,10 @@ export async function POST(request: NextRequest) {
     const reason = String(body?.reason || '').trim()
     const jobPending = String(body?.job_pending || '').trim()
     const handoverName = String(body?.handover_to_full_name || '').trim()
+    const handoverId = String(body?.handover_to_employee_id || '').trim()
+    const requestKey = String(body?.request_key || '').trim() || crypto.randomUUID()
 
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(claimDate)) {
+    if (!isValidCalendarDate(claimDate)) {
       return NextResponse.json({ message: 'Tanggal klaim PHL tidak valid.' }, { status: 400 })
     }
     if (days !== 1) {
@@ -130,6 +157,43 @@ export async function POST(request: NextRequest) {
     }
     if (!handoverName) {
       return NextResponse.json({ message: 'Penerima job pending wajib dipilih.' }, { status: 400 })
+    }
+    if (!isUuid(requestKey)) {
+      return NextResponse.json({ message: 'Identitas pengajuan PHL tidak valid. Muat ulang form dan coba lagi.' }, { status: 400 })
+    }
+
+    // When the picker supplies a stable ID, never trust the name/department
+    // echoed from the browser: resolve the exact active employee server-side.
+    // Free-text legacy handover remains supported to avoid breaking old forms.
+    let handover = {
+      id: null as string | null,
+      employee_number: body?.handover_to_employee_number || null,
+      full_name: handoverName,
+      department: body?.handover_to_department || null,
+      position: body?.handover_to_position || null,
+    }
+    if (handoverId) {
+      if (!isUuid(handoverId)) {
+        return NextResponse.json({ message: 'ID penerima handover tidak valid.' }, { status: 400 })
+      }
+      if (handoverId.toLowerCase() === ctx.employee.id.toLowerCase()) {
+        return NextResponse.json({ message: 'Penerima handover harus karyawan lain.' }, { status: 400 })
+      }
+      const lookup = await ctx.admin.from('employees')
+        .select('id,employee_number,full_name,department,position,is_active')
+        .eq('id', handoverId)
+        .maybeSingle()
+      if (lookup.error) throw lookup.error
+      if (!lookup.data || lookup.data.is_active === false || !String(lookup.data.full_name || '').trim()) {
+        return NextResponse.json({ message: 'Penerima handover tidak ditemukan atau tidak aktif.' }, { status: 409 })
+      }
+      handover = {
+        id: lookup.data.id,
+        employee_number: lookup.data.employee_number || null,
+        full_name: String(lookup.data.full_name).trim(),
+        department: lookup.data.department || null,
+        position: lookup.data.position || null,
+      }
     }
 
     const sameDateClaims = await findSameDateClaims(ctx, claimDate)
@@ -170,7 +234,7 @@ export async function POST(request: NextRequest) {
     }
 
     const { data, error } = await scoped.rpc('harmony_employee_submit_phl_claim_v1', {
-      p_request_key: String(body?.request_key || crypto.randomUUID()),
+      p_request_key: requestKey,
       p_claim_date: claimDate,
       p_days: days,
       p_reason: reason,
@@ -180,11 +244,11 @@ export async function POST(request: NextRequest) {
       p_proof_file_type: body?.proof_file_type || null,
       p_job_pending_summary: jobPending,
       p_job_pending_detail: String(body?.job_pending_detail || jobPending).trim(),
-      p_handover_to_employee_id: body?.handover_to_employee_id || null,
-      p_handover_to_employee_number: body?.handover_to_employee_number || null,
-      p_handover_to_full_name: handoverName,
-      p_handover_to_department: body?.handover_to_department || null,
-      p_handover_to_position: body?.handover_to_position || null,
+      p_handover_to_employee_id: handover.id,
+      p_handover_to_employee_number: handover.employee_number,
+      p_handover_to_full_name: handover.full_name,
+      p_handover_to_department: handover.department,
+      p_handover_to_position: handover.position,
       p_handover_note: String(body?.handover_note || '').trim() || null,
       p_emergency_contact: body?.emergency_contact || null,
     })
@@ -201,7 +265,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           message: legacyUniqueIndex
-            ? 'Klaim PHL lama pada tanggal ini sudah dibatalkan/ditolak, tetapi index database lama masih mengunci tanggal tersebut. Jalankan SQL_ONLY migration pada release HARMONY terbaru lalu submit ulang.'
+            ? 'Ada klaim PHL historis yang masih dibatasi index database. Hubungi HR untuk pemeriksaan sebelum mengajukan kembali; jangan jalankan SQL historis secara langsung.'
             : (error.message || 'Klaim PHL gagal diproses.'),
           code: legacyUniqueIndex ? 'PHL_LEGACY_UNIQUE_INDEX' : (error.code || null),
         },

@@ -166,11 +166,12 @@ export function harmonyApiError(
   fallback = 'Terjadi kesalahan pada server HARMONY.',
 ) {
   const value = error as { message?: string; status?: number }
-  const status = Number(value?.status || 500)
-  const message = value?.message || fallback
+  const requestedStatus = Number(value?.status)
+  const status = Number.isInteger(requestedStatus) && requestedStatus >= 400 && requestedStatus < 600
+    ? requestedStatus : 500
+  // Never forward raw PostgreSQL/provider internals on unexpected 5xx errors.
+  // Preserve action-specific client errors (401/403/409) for existing UI flows.
+  const message = status < 500 ? (value?.message || fallback) : fallback
 
-  return {
-    status: Number.isFinite(status) ? status : 500,
-    message,
-  }
+  return { status, message }
 }

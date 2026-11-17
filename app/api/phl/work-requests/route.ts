@@ -1,4 +1,5 @@
 import { hasPHLIdentityConflict } from '@/lib/phl-identity-conflict'
+import { phlStoragePathFromPublicUrl } from '@/lib/server/phl-evidence-preservation'
 import { NextRequest, NextResponse } from 'next/server'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
@@ -435,6 +436,71 @@ async function withAttachments(admin: SupabaseClient, rows: PHLWorkRow[]) {
 export async function GET(request: NextRequest) {
   try {
     const context = await requireHarmonyApi(request)
+
+    // Reuse this authenticated API for evidence retrieval; no new route or schema.
+    const evidenceId = clean(request.nextUrl.searchParams.get('evidence_id'))
+    if (evidenceId) {
+      if (!isUuid(evidenceId)) {
+        return NextResponse.json({ success: false, error: 'ID evidence tidak valid.' }, { status: 400 })
+      }
+      const { data: evidence, error: evidenceError } = await context.admin
+        .from('phl_work_request_attachments')
+        .select('id,request_id,file_name,mime_type,storage_bucket,storage_path,legacy_file_url')
+        .eq('id', evidenceId).maybeSingle()
+      if (evidenceError) throw evidenceError
+      if (!evidence) return NextResponse.json({ success: false, error: 'Evidence PHL tidak ditemukan.' }, { status: 404 })
+
+      const { data: owner, error: ownerError } = await context.admin
+        .from('phl_work_requests').select('id,employee_id')
+        .eq('id', evidence.request_id).maybeSingle()
+      if (ownerError) throw ownerError
+      if (!owner) return NextResponse.json({ success: false, error: 'Evidence PHL tidak ditemukan.' }, { status: 404 })
+
+      const isHR = HR_ROLES.has(normalizeHarmonyRole(context.appUser.role))
+      const isOwner = Boolean(context.employee?.id && context.employee.id === owner.employee_id)
+      const isSupervisor = !isHR && !isOwner && Boolean(context.employee &&
+        (await getPHLSubordinateIds(context.admin, context.employee)).includes(owner.employee_id))
+      if (!isHR && !isOwner && !isSupervisor) {
+        return NextResponse.json({ success: false, error: 'Evidence PHL tidak ditemukan.' }, { status: 404 })
+      }
+
+      // Never fetch arbitrary URLs or buckets from historical database rows.
+      const bucket = clean(evidence.storage_bucket) || BUCKET
+      if (bucket !== BUCKET) {
+        return NextResponse.json({ success: false, error: 'Bucket evidence belum dikenali. Hubungi HR.' }, { status: 404 })
+      }
+      const path = clean(evidence.storage_path) || phlStoragePathFromPublicUrl(evidence.legacy_file_url)
+      if (!path || path.startsWith('/') || path.split('/').some(segment => segment === '..' || segment === '.')) {
+        return NextResponse.json({ success: false, error: 'Path evidence historis tidak valid. Hubungi HR untuk pemulihan dokumen.' }, { status: 404 })
+      }
+      const { data: file, error: storageError } = await context.admin.storage.from(BUCKET).download(path)
+      if (storageError || !file) {
+        // Differentiate genuine missing objects from temporary permission/provider failures.
+        const storageStatus = Number(storageError?.statusCode || 0)
+        const notFound = !file && (!storageError || storageStatus === 404 || storageError?.name === 'StorageUnknownError' && /not found|nosuchkey/i.test(storageError.message))
+        return NextResponse.json({
+          success: false,
+          error: notFound
+            ? 'File evidence tidak ditemukan di Supabase Storage. Minta HR memulihkan dokumen asli; status PHL tidak berubah.'
+            : 'Supabase Storage belum dapat membuka evidence. Coba lagi atau hubungi HR.',
+        }, { status: notFound ? 404 : 503 })
+      }
+      const mime = clean(evidence.mime_type || file.type).toLowerCase()
+      const extension = clean(evidence.file_name).split('.').pop()?.toLowerCase()
+      const previewMime = ['application/pdf', 'image/png', 'image/jpeg', 'image/webp'].includes(mime)
+        ? mime : ({ pdf: 'application/pdf', png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp' } as Record<string, string>)[extension || ''] || 'application/octet-stream'
+      const safeName = clean(evidence.file_name).replace(/[^a-zA-Z0-9._ -]/g, '_').slice(0, 160) || 'evidence'
+      return new NextResponse(await file.arrayBuffer(), {
+        status: 200,
+        headers: {
+          'Content-Type': previewMime,
+          'Content-Disposition': `${previewMime === 'application/octet-stream' ? 'attachment' : 'inline'}; filename="${safeName}"`,
+          'Cache-Control': 'private, no-store',
+          'X-Content-Type-Options': 'nosniff',
+        },
+      })
+    }
+
     const scope = clean(request.nextUrl.searchParams.get('scope') || 'mine').toLowerCase()
     let query = context.admin
       .from('phl_work_requests')

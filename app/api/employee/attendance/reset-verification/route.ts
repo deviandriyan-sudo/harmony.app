@@ -1,5 +1,6 @@
 
 import { readErrorMessage } from '@/lib/error-utils'
+import { unreferencedAttendanceProofPaths } from '@/lib/server/phl-evidence-preservation'
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
@@ -96,7 +97,11 @@ function publicStoragePathFromUrl(url: unknown) {
 
   if (index < 0) return "";
 
-  return decodeURIComponent(value.slice(index + marker.length));
+  try {
+    return decodeURIComponent(value.slice(index + marker.length).split("?")[0]);
+  } catch {
+    return "";
+  }
 }
 
 export async function POST(request: NextRequest) {
@@ -192,19 +197,11 @@ export async function POST(request: NextRequest) {
       .eq("id", authData.user.id)
       .maybeSingle();
 
-    if (!byId.error && byId.data) {
-      appUser = byId.data;
-    } else if (authData.user.email) {
-      const byEmail = await admin
-        .from("app_users")
-        .select("*")
-        .eq("email", normalize(authData.user.email))
-        .maybeSingle();
-
-      if (!byEmail.error) {
-        appUser = byEmail.data;
-      }
-    }
+    // A legacy email must never substitute for app_users.id in a write API.
+    if (byId.error) return NextResponse.json(
+      { success: false, error: "Validasi akun gagal. Hubungi HR." }, { status: 503 },
+    );
+    if (byId.data) appUser = byId.data;
 
     if (!appUser || appUser.is_active === false) {
       return NextResponse.json(
@@ -232,20 +229,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const appUserOwnsEmployee =
-      clean(appUser.employee_id) === employeeId;
-
-    const emailMatches =
-      normalize(authData.user.email) !== "" &&
-      normalize(authData.user.email) === normalize(employee.email);
-
-    if (!appUserOwnsEmployee && !emailMatches) {
+    // Email-only ownership is unsafe for sensitive attendance changes.
+    if (clean(appUser.employee_id) !== employeeId) {
       return NextResponse.json(
-        {
-          success: false,
-          error:
-            "Anda hanya dapat mereset verifikasi absensi milik sendiri.",
-        },
+        { success: false, error: "Akun belum terhubung ke employee master. Hubungi HR untuk koreksi mapping." },
         { status: 403 },
       );
     }
@@ -294,12 +281,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const logMatchesEmployee =
-      clean(log.employee_id) === employeeId ||
-      (
-        clean(employee.machine_pin) !== "" &&
-        clean(log.machine_pin) === clean(employee.machine_pin)
-      );
+    const logMatchesEmployee = clean(log.employee_id)
+      ? clean(log.employee_id) === employeeId
+      : Boolean(clean(employee.machine_pin) && clean(log.machine_pin) === clean(employee.machine_pin));
 
     if (!logMatchesEmployee || clean(log.attendance_date) !== attendanceDate) {
       return NextResponse.json(
@@ -321,6 +305,27 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // An approved/pending PHL request must retain its linked attendance history.
+    // Blocking reset here also protects old evidence references and approval audit.
+    const { data: linkedPHL, error: linkedPHLError } = await admin
+      .from('phl_work_requests')
+      .select('id')
+      .eq('attendance_log_id', log.id)
+      .in('status', ['pending_supervisor', 'approved'])
+      .limit(1);
+    if (linkedPHLError) {
+      return NextResponse.json(
+        { success: false, error: 'Verifikasi keterkaitan PHL gagal. Reset dibatalkan demi keamanan evidence.' },
+        { status: 503 },
+      );
+    }
+    if (clean(log.phl_work_request_id) || (linkedPHL || []).length > 0) {
+      return NextResponse.json(
+        { success: false, error: 'Absensi telah terhubung ke pengajuan PHL. Reset tidak diizinkan; hubungi HR untuk peninjauan.' },
+        { status: 409 },
+      );
+    }
+
     if (!hasEmployeeVerificationData(log)) {
       return NextResponse.json({
         success: true,
@@ -333,11 +338,13 @@ export async function POST(request: NextRequest) {
     }
 
     // Best-effort cleanup proof files uploaded by employee.
-    const proofPaths = [
-      publicStoragePathFromUrl(log.correction_proof_url),
-      publicStoragePathFromUrl(log.phl_proof_url),
-      publicStoragePathFromUrl(log.absence_proof_url),
-    ].filter(Boolean);
+    const proofUrls = [log.correction_proof_url, log.phl_proof_url, log.absence_proof_url];
+    const proofPaths = await unreferencedAttendanceProofPaths(
+      admin,
+      proofUrls.map(publicStoragePathFromUrl).filter(Boolean),
+      proofUrls,
+    );
+    // PH(L)-linked files remain in Storage even when attendance verification is reset.
 
     // --------------------------------------------------------
     // Pure manual employee row -> hard delete

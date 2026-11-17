@@ -183,19 +183,14 @@ async function resolveIdentity(
     .eq("id", authData.user.id)
     .maybeSingle();
 
-  if (!byId.error && byId.data) {
-    appUser = byId.data;
-  } else if (authData.user.email) {
-    const byEmail = await admin
-      .from("app_users")
-      .select("id, email, role, employee_id, is_active")
-      .ilike("email", authData.user.email)
-      .maybeSingle();
-
-    if (!byEmail.error) {
-      appUser = byEmail.data;
-    }
+  // The verified JWT subject must match app_users.id. Do not use email
+  // fallback to inherit another employee's attendance privileges.
+  if (byId.error) {
+    return { ok: false as const, response: NextResponse.json(
+      { success: false, error: "Validasi akun gagal. Hubungi HR." }, { status: 503 },
+    ) };
   }
+  if (byId.data) appUser = byId.data;
 
   if (!appUser || appUser.is_active === false) {
     return {
@@ -250,37 +245,13 @@ async function resolveIdentity(
     };
   }
 
-  /*
-   * Primary ownership = app_users.employee_id.
-   *
-   * Email hanya dipakai sebagai fallback untuk akun legacy
-   * yang belum mempunyai employee_id.
-   *
-   * Ini mencegah user yang salah terhubung mengakses
-   * absensi manual karyawan lain.
-   */
-  const linkedEmployeeId = clean(appUser.employee_id);
-
-  const ownsById =
-    linkedEmployeeId !== "" &&
-    linkedEmployeeId === requestedEmployeeId;
-
-  const mayUseEmailFallback =
-    linkedEmployeeId === "" &&
-    normalize(authData.user.email) !== "" &&
-    normalize(authData.user.email) === normalize(employee.email);
-
-  if (!ownsById && !mayUseEmailFallback) {
+  // Require explicit HR-maintained employee UUID association.
+  if (clean(appUser.employee_id) !== requestedEmployeeId) {
     return {
       ok: false as const,
       response: NextResponse.json(
-        {
-          success: false,
-          error: "Anda hanya dapat mengakses absensi manual milik sendiri.",
-        },
-        {
-          status: 403,
-        },
+        { success: false, error: "Akun belum terhubung dengan employee master. Hubungi HR untuk koreksi mapping." },
+        { status: 403 },
       ),
     };
   }

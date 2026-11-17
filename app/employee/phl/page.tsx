@@ -13,6 +13,7 @@ import {
   cancelPHLWorkRequest,
   fetchPHLWorkRequests,
   formatPHLMinutes,
+  openPHLWorkEvidence,
   phlWorkStatusLabel,
   submitPHLWorkRequest,
   type PHLWorkRequest,
@@ -306,15 +307,14 @@ export default function EmployeePHLPage() {
                     {item.attachments.length > 0 && (
                       <div className="mt-4 flex flex-wrap gap-2">
                         {item.attachments.map((attachment) => (
-                          <a
+                          <button
                             key={attachment.id}
-                            href={attachment.signed_url || '#'}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="inline-flex items-center gap-2 rounded-xl bg-[#f5f5f7] px-3 py-2 text-xs font-bold harmony-text-link"
+                            type="button"
+                            onClick={() => void openPHLWorkEvidence(attachment.id).catch((error: unknown) => setMessage({ type: 'error', text: readErrorMessage(error) || 'Evidence tidak dapat dibuka.' }))}
+                            className="inline-flex items-center gap-2 rounded-xl bg-[#f5f5f7] px-3 py-2 text-left text-xs font-bold harmony-text-link"
                           >
                             <FileText size={14} /> {attachment.file_name}
-                          </a>
+                          </button>
                         ))}
                       </div>
                     )}

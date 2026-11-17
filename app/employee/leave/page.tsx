@@ -848,8 +848,10 @@ export default function EmployeeLeavePage() {
           throw new Error('Klaim PHL tersimpan tanpa ID request. Hubungi HR sebelum submit ulang.')
         }
       } catch (claimError: unknown) {
-        await cleanupUploadedProof(uploaded.storagePath)
-        setErrorMessage(readErrorMessage(claimError) || 'Klaim PHL belum berhasil disimpan.')
+        // A network timeout can happen *after* the RPC committed. Do not
+        // delete uploaded evidence while claim status is uncertain; user/HR
+        // must check claim history before retrying to avoid missing proof.
+        setErrorMessage(`${readErrorMessage(claimError) || 'Status klaim PHL belum dapat dipastikan.'} Periksa riwayat klaim sebelum mengirim ulang. Lampiran tetap disimpan untuk verifikasi.`)
         setSubmitting(false)
         return
       }

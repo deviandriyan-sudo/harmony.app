@@ -29,7 +29,12 @@
     "test:release": "node scripts/test-scaleup-rc3-guards.mjs",
     "test:refinement": "node scripts/test-v392-refinement.mjs",
     "test:refinement:393": "node scripts/test-v393-regression.mjs",
-    "test:remed-print": "node scripts/test-remed-print.mjs"
+    "test:remed-print": "node scripts/test-remed-print.mjs",
+    "test:phl-attendance-link": "node scripts/test-phl-attendance-link.mjs",
+    "test:auth-binding": "node scripts/test-auth-binding-guards.mjs",
+    "test:rc2b": "node scripts/test-rc2b-source-guards.mjs",
+    "test:rc2c": "node scripts/test-rc2c-evidence-preservation.mjs",
+    "test:attendance-modal": "node scripts/test-attendance-modal-portal.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.107.0",
@@ -37,7 +42,7 @@
     "clsx": "^2.1.1",
     "date-fns": "^4.4.0",
     "lucide-react": "^1.17.0",
-    "next": "16.4.3",
+    "next": "16.4.6",
     "radix-ui": "^1.4.3",
     "react": "19.2.4",
     "react-dom": "19.2.4",

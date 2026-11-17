@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 
 import { Topbar } from "@/components/layout/Topbar";
+import { HarmonyModalPortal } from "@/components/ui/HarmonyModalPortal";
 import { downloadRawCsv, downloadStyledWorkbook } from "@/lib/export/styled-workbook";
 import { estimatedLateMinutes, lateDescription, minutesBetween } from "@/lib/export/attendance-details";
 import {
@@ -3118,7 +3119,12 @@ function LiveManualAttendanceModal({
   );
 
   return (
-    <div className="harmony-modal-surface fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm sm:p-5">
+    <HarmonyModalPortal
+      labelledBy="harmony-attendance-live-manual-title"
+      onClose={onClose}
+      canClose={!saving}
+      className="harmony-attendance-modal"
+    >
       <div className="flex max-h-[94vh] w-full max-w-3xl flex-col overflow-hidden rounded-[32px] bg-white shadow-[0_32px_100px_rgba(0,0,0,0.28)]">
         <div className="flex items-start justify-between gap-4 border-b border-black/5 p-5 sm:p-6">
           <div>
@@ -3127,7 +3133,7 @@ function LiveManualAttendanceModal({
               Absensi Manual Harian
             </div>
 
-            <h2 className="text-xl font-semibold harmony-text-primary sm:text-2xl">
+            <h2 id="harmony-attendance-live-manual-title" className="text-xl font-semibold harmony-text-primary sm:text-2xl">
               Kehadiran di Luar Kantor
             </h2>
 
@@ -3315,7 +3321,7 @@ function LiveManualAttendanceModal({
           </button>
         </div>
       </div>
-    </div>
+    </HarmonyModalPortal>
   );
 }
 
@@ -3362,11 +3368,16 @@ function EditAttendanceModal({
   const meta = getDailyTypeMeta(draft.daily_type);
 
   return (
-    <div className="harmony-modal-surface fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-5 backdrop-blur-sm">
+    <HarmonyModalPortal
+      labelledBy="harmony-attendance-edit-title"
+      onClose={onClose}
+      canClose={!saving}
+      className="harmony-attendance-modal"
+    >
       <div className="flex max-h-[92vh] w-full max-w-3xl flex-col overflow-hidden rounded-[32px] bg-white shadow-[0_30px_90px_rgba(0,0,0,0.24)]">
         <div className="flex items-start justify-between gap-4 border-b border-black/5 p-6">
           <div>
-            <h2 className="text-xl font-semibold harmony-text-primary">
+            <h2 id="harmony-attendance-edit-title" className="text-xl font-semibold harmony-text-primary">
               Lengkapi Absensi
             </h2>
 
@@ -3378,7 +3389,9 @@ function EditAttendanceModal({
           <button
             type="button"
             onClick={onClose}
-            className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#f5f5f7] harmony-text-primary"
+            disabled={saving}
+            aria-label="Tutup modal absensi"
+            className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#f5f5f7] harmony-text-primary disabled:cursor-not-allowed disabled:opacity-50"
           >
             <X size={18} />
           </button>
@@ -3575,7 +3588,7 @@ function EditAttendanceModal({
           </button>
         </div>
       </div>
-    </div>
+    </HarmonyModalPortal>
   );
 }
 

@@ -19,6 +19,7 @@ import { Topbar } from '@/components/layout/Topbar'
 import {
   fetchPHLWorkRequests,
   formatPHLMinutes,
+  openPHLWorkEvidence,
   phlWorkStatusLabel,
   reviewPHLWorkRequest,
   type PHLWorkRequest,
@@ -223,9 +224,9 @@ export default function PHLApprovalPage() {
 
                 <div className="mt-4 flex flex-wrap gap-2">
                   {item.attachments.map((attachment) => (
-                    <a key={attachment.id} href={attachment.signed_url || '#'} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 rounded-xl bg-[#e8f2ff] px-3 py-2 text-xs font-bold harmony-text-link">
+                    <button key={attachment.id} type="button" onClick={() => void openPHLWorkEvidence(attachment.id).catch((error: unknown) => setMessage({ type: 'error', text: readErrorMessage(error) || 'Evidence tidak dapat dibuka.' }))} className="inline-flex items-center gap-2 rounded-xl bg-[#e8f2ff] px-3 py-2 text-left text-xs font-bold harmony-text-link">
                       <FileText size={14} />{attachment.file_name}
-                    </a>
+                    </button>
                   ))}
                 </div>
 

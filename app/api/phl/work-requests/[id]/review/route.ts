@@ -3,6 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 
 import { harmonyApiError, requireHarmonyApi } from '@/lib/server/user-api-auth'
 import { isPHLSupervisorOf, notifyPHLWorkDecision } from '@/lib/server/phl-work'
+import { phlAttendanceLinkIssue } from '@/lib/phl-attendance-link-policy'
 
 export const runtime = 'nodejs'
 
@@ -79,6 +80,8 @@ function appendNote(existing: unknown, next: string) {
   return current ? `${current}\n${next}` : next
 }
 
+// PHL credit must never attach to another employee's attendance record.
+// In particular, machine_pin is a lookup hint, not proof of identity.
 async function findAttendanceForApproval(admin: SupabaseClient, target: PHLWorkRequestRow) {
   if (target.attendance_log_id) {
     const byId = await admin
@@ -87,7 +90,13 @@ async function findAttendanceForApproval(admin: SupabaseClient, target: PHLWorkR
       .eq('id', target.attendance_log_id)
       .maybeSingle()
     if (byId.error) throw byId.error
-    if (byId.data) return byId.data
+    if (byId.data) {
+      const issue = phlAttendanceLinkIssue(byId.data, target)
+      if (issue) throw Object.assign(new Error(`Absensi tertaut tidak aman (${issue}). Perlu koreksi HR.`), { status: 409 })
+      return byId.data
+    }
+    // An explicit, missing attendance link must not silently point to a different row.
+    throw Object.assign(new Error('Absensi yang tertaut tidak ditemukan. Perlu pemeriksaan HR.'), { status: 409 })
   }
 
   const identities: Array<[string, string]> = [
@@ -97,6 +106,8 @@ async function findAttendanceForApproval(admin: SupabaseClient, target: PHLWorkR
   ].filter(([, value]) => Boolean(value)) as Array<[string, string]>
 
   for (const [column, value] of identities) {
+    // Read a bounded set: the latest machine PIN row can belong to a new owner.
+    // Filter every candidate by UUID / employee number + attendance date.
     const result = await admin
       .from('attendance_logs')
       .select('*')
@@ -104,11 +115,15 @@ async function findAttendanceForApproval(admin: SupabaseClient, target: PHLWorkR
       .eq('attendance_date', target.work_date)
       .is('deleted_at', null)
       .order('updated_at', { ascending: false })
-      .limit(1)
-      .maybeSingle()
-
+      .limit(25)
     if (result.error) throw result.error
-    if (result.data) return result.data
+    const candidates = result.data || []
+    const valid = candidates.find((row) => phlAttendanceLinkIssue(row, target) === null)
+    if (valid) return valid
+    if (column === 'employee_id' && candidates.length) {
+      // Same UUID/date but conflicting PHL linkage: do not create a second row.
+      throw Object.assign(new Error('Absensi tanggal tersebut memiliki konflik tautan PHL. Perlu pemeriksaan HR.'), { status: 409 })
+    }
   }
 
   return null
@@ -189,12 +204,24 @@ async function syncApprovedPHLToAttendance(
       }
     }
 
-    const updated = await admin
-      .from('attendance_logs')
+    // Guard the write itself against an attendance row changing owner / being
+    // linked to another PHL after our initial SELECT (read/write race).
+    const existingUuid = clean(existing.employee_id).toLowerCase()
+    const targetUuid = clean(target.employee_id).toLowerCase()
+    let updateQuery = admin.from('attendance_logs')
       .update(updatePayload)
       .eq('id', existing.id)
-      .select('id')
-      .single()
+      .eq('attendance_date', target.work_date)
+      .is('deleted_at', null)
+    if (existingUuid === targetUuid) {
+      updateQuery = updateQuery.eq('employee_id', target.employee_id)
+    } else {
+      updateQuery = updateQuery.eq('employee_number', clean(target.employee_number))
+    }
+    updateQuery = existing.phl_work_request_id
+      ? updateQuery.eq('phl_work_request_id', target.id)
+      : updateQuery.is('phl_work_request_id', null)
+    const updated = await updateQuery.select('id').single()
     if (updated.error) throw updated.error
 
     return {

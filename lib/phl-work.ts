@@ -142,6 +142,44 @@ export async function submitPHLWorkRequest(input: {
   }
 }
 
+/** Preview only authorized PHL evidence; missing historic objects show a clear error. */
+export async function openPHLWorkEvidence(attachmentId: string): Promise<void> {
+  // Open the tab synchronously to avoid popup blocking after the async request.
+  const preview = window.open('about:blank', '_blank')
+  if (preview) {
+    preview.opener = null
+    preview.document.title = 'Memuat evidence PHL'
+    preview.document.body.textContent = 'Memeriksa evidence PHL...'
+  }
+  try {
+    const token = await accessToken()
+    const response = await fetch(`/api/phl/work-requests?evidence_id=${encodeURIComponent(attachmentId)}`, {
+      headers: { Authorization: `Bearer ${token}` },
+      cache: 'no-store',
+    })
+    if (!response.ok) {
+      const error = await response.json().catch(() => null)
+      throw new Error(error?.error || 'Evidence PHL gagal dibuka.')
+    }
+    const blobUrl = URL.createObjectURL(await response.blob())
+    if (preview && !preview.closed) {
+      preview.location.replace(blobUrl)
+    } else {
+      // Popup blocked: use an explicit file download as fallback.
+      const link = document.createElement('a')
+      link.href = blobUrl
+      link.download = 'evidence-phl'
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+    }
+    window.setTimeout(() => URL.revokeObjectURL(blobUrl), 120_000)
+  } catch (error) {
+    preview?.close()
+    throw error
+  }
+}
+
 export async function reviewPHLWorkRequest(
   requestId: string,
   decision: 'approve' | 'reject',

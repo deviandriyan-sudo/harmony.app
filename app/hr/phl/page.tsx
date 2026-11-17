@@ -9,6 +9,7 @@ import { Topbar } from '@/components/layout/Topbar'
 import {
   fetchPHLWorkRequests,
   formatPHLMinutes,
+  openPHLWorkEvidence,
   phlWorkStatusLabel,
   type PHLWorkRequest,
 } from '@/lib/phl-work'
@@ -150,7 +151,7 @@ export default function HRPHLPage() {
                       <td className="px-4 py-4">
                         <div className="flex max-w-[220px] flex-col gap-1.5">
                           {item.attachments.map((attachment) => (
-                            <a key={attachment.id} href={attachment.signed_url || '#'} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 text-xs font-bold harmony-text-link"><FileText size={13} />{attachment.file_name}</a>
+                            <button key={attachment.id} type="button" onClick={() => void openPHLWorkEvidence(attachment.id).catch((error: unknown) => setMessage(readErrorMessage(error) || 'Evidence tidak dapat dibuka.'))} className="inline-flex items-center gap-2 text-left text-xs font-bold harmony-text-link"><FileText size={13} />{attachment.file_name}</button>
                           ))}
                         </div>
                       </td>

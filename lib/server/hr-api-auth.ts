@@ -100,9 +100,11 @@ export async function requireHRApi(request: NextRequest): Promise<HRApiContext> 
 
 export function apiError(error: unknown, fallback = 'Terjadi kesalahan pada server.') {
   const value = error as { message?: string; status?: number }
-  const message = value?.message || fallback
-  const status = Number(value?.status || 500)
-  return { message, error: message, status: Number.isFinite(status) ? status : 500 }
+  const requestedStatus = Number(value?.status)
+  const status = Number.isInteger(requestedStatus) && requestedStatus >= 400 && requestedStatus < 600
+    ? requestedStatus : 500
+  const message = status < 500 ? (value?.message || fallback) : fallback
+  return { message, error: message, status }
 }
 
 export function isAllowedManagedRole(value: unknown): value is 'employee' | 'hr' {

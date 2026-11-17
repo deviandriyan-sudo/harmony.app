@@ -136,6 +136,6 @@ export async function GET(request: NextRequest) {
   return NextResponse.json(
     { ok, referenceDate, processed, failed, remaining, createdCycles,
       expiredPostpone, errorsByCode },
-    { status: ok ? 200 : 207, headers: { 'Cache-Control': 'no-store' } },
+    { status: ok ? 200 : 503, headers: { 'Cache-Control': 'no-store' } },
   )
 }
