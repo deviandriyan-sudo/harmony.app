@@ -34,7 +34,8 @@
     "test:auth-binding": "node scripts/test-auth-binding-guards.mjs",
     "test:rc2b": "node scripts/test-rc2b-source-guards.mjs",
     "test:rc2c": "node scripts/test-rc2c-evidence-preservation.mjs",
-    "test:attendance-modal": "node scripts/test-attendance-modal-portal.mjs"
+    "test:attendance-modal": "node scripts/test-attendance-modal-portal.mjs",
+    "test:modal-feedback": "node scripts/test-global-modal-feedback.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.107.0",

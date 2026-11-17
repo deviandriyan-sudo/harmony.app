@@ -1848,7 +1848,7 @@ export default function HRLeavePage() {
 
       <section className="space-y-6 p-6">
         {successMessage && (
-          <div className="rounded-2xl border border-green-200 bg-green-50 p-4 text-sm leading-6 text-green-700">
+          <div role="status" data-harmony-feedback="success" className="rounded-2xl border border-green-200 bg-green-50 p-4 text-sm leading-6 text-green-700">
             <div className="mb-1 flex items-center gap-2 font-bold">
               <CheckCircle2 size={18} />
               Berhasil

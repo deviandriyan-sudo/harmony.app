@@ -4927,3 +4927,77 @@ html[data-harmony-theme='dark'] .harmony-menu-search-option:focus-visible {
   .harmony-print-document footer,
   .harmony-print-document .rounded-2xl {break-inside:avoid;}
 }
+
+
+/* RC2E — Page feedback relayed into the active modal, above its content.
+   Keep this at the end of globals.css to override historical modal styles.
+   The original feedback is hidden only while its accessible modal copy exists. */
+body[data-harmony-feedback-relayed="true"] [data-harmony-feedback="error"]:not(.harmony-modal-surface *):not([role="dialog"][aria-modal="true"] *),
+body[data-harmony-feedback-relayed="true"] [data-harmony-feedback="success"]:not(.harmony-modal-surface *):not([role="dialog"][aria-modal="true"] *),
+body[data-harmony-feedback-relayed="true"] [role="alert"]:not(.harmony-modal-surface *):not([role="dialog"][aria-modal="true"] *) {
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+.harmony-modal-surface > .harmony-modal-feedback-host,
+[role="dialog"][aria-modal="true"] > .harmony-modal-feedback-host {
+  position: fixed !important;
+  z-index: 2600 !important;
+  inset: max(14px, env(safe-area-inset-top)) 16px auto auto !important;
+  width: min(440px, calc(100vw - 32px)) !important;
+  max-width: calc(100vw - 32px) !important;
+  pointer-events: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  isolation: isolate;
+}
+.harmony-modal-feedback-card {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  max-height: min(48dvh, 360px);
+  overflow-y: auto;
+  padding: 14px 14px 14px 16px;
+  border: 1px solid rgba(235, 132, 135, .85) !important;
+  border-radius: 16px;
+  color: #7e2333 !important;
+  background: rgba(255, 244, 244, .98) !important;
+  box-shadow: 0 18px 60px rgba(37, 49, 72, .24);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  pointer-events: auto;
+}
+.harmony-modal-feedback-success {
+  color: #155938 !important;
+  border-color: rgba(94, 178, 127, .75) !important;
+  background: rgba(238, 255, 244, .98) !important;
+}
+.harmony-modal-feedback-content { flex: 1; min-width: 0; }
+.harmony-modal-feedback-content strong { display: block; font-size: 13px; font-weight: 700; }
+.harmony-modal-feedback-content p { margin: 5px 0 0; font-size: 13px; line-height: 1.5; overflow-wrap: anywhere; }
+.harmony-modal-feedback-dismiss {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 9px;
+  font-size: 20px;
+  font-weight: 400;
+  color: inherit;
+  background: rgba(255,255,255,.65);
+  cursor: pointer;
+}
+.harmony-modal-feedback-dismiss:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
+html[data-harmony-theme="dark"] .harmony-modal-feedback-error { color: #ffe7e9 !important; background: rgba(95, 34, 49, .98) !important; border-color: rgba(244, 131, 150, .75) !important; }
+html[data-harmony-theme="dark"] .harmony-modal-feedback-success { color: #d2ffe4 !important; background: rgba(22, 74, 54, .98) !important; border-color: rgba(101, 204, 149, .7) !important; }
+@media (max-width: 640px) {
+  .harmony-modal-surface > .harmony-modal-feedback-host,
+  [role="dialog"][aria-modal="true"] > .harmony-modal-feedback-host {
+    inset: max(10px, env(safe-area-inset-top)) 10px auto auto !important;
+    width: calc(100vw - 20px) !important;
+    max-height: 42dvh;
+  }
+}
