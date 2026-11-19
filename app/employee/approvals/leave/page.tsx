@@ -204,6 +204,15 @@ function normalize(value?: string | null) {
   return String(value || '').trim().toLowerCase()
 }
 
+// Stop a stale supervisor screen from offering a decision after HR has
+// finalized a leave request. The database RPC still has to enforce this.
+function isLeaveHRDecisionFinal(request: LeaveRequest) {
+  if (request.source_table === 'phl_records') return false
+  return ['approved', 'rejected', 'cancelled', 'canceled'].includes(
+    normalize(request.hr_status)
+  )
+}
+
 function getRequestTypeLabel(type?: string | null, leaveType?: string | null) {
   const value = normalize(type || leaveType)
 
@@ -384,6 +393,7 @@ export default function EmployeeLeaveApprovalPage() {
 
   const [filterStatus, setFilterStatus] = useState<FilterStatus>('pending')
   const [search, setSearch] = useState('')
+  const [contextEmployeeId, setContextEmployeeId] = useState('')
 
   const [loading, setLoading] = useState(true)
   const [processingId, setProcessingId] = useState<string | null>(null)
@@ -446,6 +456,8 @@ export default function EmployeeLeaveApprovalPage() {
       })
       .filter((request) => {
         const status = normalize(request.supervisor_status || request.status)
+        if (filterStatus === 'pending' && isLeaveHRDecisionFinal(request)) return false
+        if (filterStatus === 'rejected' && normalize(request.hr_status) === 'rejected') return true
 
         if (filterStatus === 'pending') {
           return (
@@ -462,6 +474,7 @@ export default function EmployeeLeaveApprovalPage() {
         return true
       })
       .filter((request) => {
+        if (contextEmployeeId && request.employee_id !== contextEmployeeId) return false
         if (!keyword) return true
 
         const employee = request.employee_id
@@ -486,7 +499,7 @@ export default function EmployeeLeaveApprovalPage() {
       .sort((a, b) => {
         return String(b.created_at || '').localeCompare(String(a.created_at || ''))
       })
-  }, [requests, subordinateIds, filterStatus, search, employeeById, employees])
+  }, [requests, subordinateIds, filterStatus, search, employeeById, employees, contextEmployeeId])
 
   const stats = useMemo(() => {
     const subordinateRequests = requests.filter((request) => {
@@ -497,6 +510,7 @@ export default function EmployeeLeaveApprovalPage() {
     return {
       total: subordinateRequests.length,
       pending: subordinateRequests.filter((item) => {
+        if (isLeaveHRDecisionFinal(item)) return false
         const status = normalize(item.supervisor_status || item.status)
         return status === 'pending' || status === 'submitted' || status === ''
       }).length,
@@ -504,12 +518,20 @@ export default function EmployeeLeaveApprovalPage() {
         (item) => normalize(item.supervisor_status || item.status) === 'approved'
       ).length,
       rejected: subordinateRequests.filter(
-        (item) => normalize(item.supervisor_status || item.status) === 'rejected'
+        (item) => normalize(item.hr_status) === 'rejected' ||
+          normalize(item.supervisor_status || item.status) === 'rejected'
       ).length,
     }
   }, [requests, subordinateIds])
 
   useEffect(() => {
+    // UI-only deep link from the per-employee attendance review. Authorization
+    // and supervisor ownership continue to be enforced by existing workflow.
+    const param = new URLSearchParams(window.location.search).get('employee_id') || ''
+    if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(param)) {
+      setContextEmployeeId(param)
+      setFilterStatus('all')
+    }
     fetchData()
   }, [])
 
@@ -625,6 +647,14 @@ export default function EmployeeLeaveApprovalPage() {
       return
     }
 
+    if (isLeaveHRDecisionFinal(request)) {
+      setMessage({
+        type: 'error',
+        text: 'Pengajuan telah diputuskan HR. Muat ulang daftar; approval atasan tidak diperbolehkan.',
+      })
+      return
+    }
+
     const note = window.prompt(
       'Catatan approval atasan:',
       'Disetujui oleh atasan.'
@@ -672,8 +702,15 @@ export default function EmployeeLeaveApprovalPage() {
       setMessage({
         type: 'error',
         text:
-          readErrorMessage(error) ||
-          'Gagal approve pengajuan. Pastikan function approve_leave_request_by_supervisor sudah tersedia.',
+          (() => {
+            const detail = readErrorMessage(error)
+            // Never bypass the RPC balance check. Different HR lifecycle and
+            // approval balances require reconciliation, not a manual credit.
+            if (/saldo cuti.*tidak cukup/i.test(detail)) {
+              return `${detail} Angka ini berasal dari proses approval database. Jika berbeda dari saldo yang terlihat di Data Karyawan, minta HR memeriksa ringkasan lifecycle dan fungsi approval sebelum melakukan koreksi.`
+            }
+            return detail || 'Gagal approve pengajuan. Pastikan function approve_leave_request_by_supervisor sudah tersedia.'
+          })(),
       })
     } finally {
       setProcessingId(null)
@@ -685,6 +722,14 @@ export default function EmployeeLeaveApprovalPage() {
       setMessage({
         type: 'error',
         text: 'Data atasan tidak ditemukan. Silakan login ulang.',
+      })
+      return
+    }
+
+    if (isLeaveHRDecisionFinal(request)) {
+      setMessage({
+        type: 'error',
+        text: 'Pengajuan telah diputuskan HR. Muat ulang daftar; keputusan atasan tidak dapat diubah.',
       })
       return
     }
@@ -814,6 +859,13 @@ export default function EmployeeLeaveApprovalPage() {
           </section>
         )}
 
+        {contextEmployeeId && (
+          <section className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
+            <span>Menampilkan pengajuan khusus {getEmployeeName(employeeById.get(contextEmployeeId))}. Keputusan approval tetap mengikuti aturan yang berlaku.</span>
+            <Link href="/employee/approvals/leave" className="font-semibold underline underline-offset-4">Tampilkan Semua Karyawan</Link>
+          </section>
+        )}
+
         <section className="grid gap-4 md:grid-cols-4">
           <StatCard label="Total Request" value={stats.total} icon={FileText} />
           <StatCard label="Pending" value={stats.pending} icon={Clock3} />
@@ -898,9 +950,11 @@ export default function EmployeeLeaveApprovalPage() {
 
                     const status = request.supervisor_status || request.status
                     const isPending =
-                      normalize(status) === 'pending' ||
-                      normalize(status) === 'submitted' ||
-                      normalize(status) === ''
+                      !isLeaveHRDecisionFinal(request) && (
+                        normalize(status) === 'pending' ||
+                        normalize(status) === 'submitted' ||
+                        normalize(status) === ''
+                      )
 
                     const proofUrl =
                       request.proof_file_url ||

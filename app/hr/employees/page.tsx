@@ -31,6 +31,8 @@ type Employee = {
   supervisor_1: string | null
   supervisor_2: string | null
   annual_leave_balance: number | null
+  stored_annual_leave_balance?: number | null
+  leave_balance_source?: 'lifecycle' | 'employee'
   phl_balance: number | null
   is_active: boolean | null
   personal_phone?: string | null
@@ -568,6 +570,8 @@ export default function HREmployeesPage() {
       const employeesRows = ((employeeResponse.data || []) as Employee[]).map(
         (employee) => ({
           ...employee,
+          stored_annual_leave_balance: employee.annual_leave_balance,
+          leave_balance_source: balanceByEmployee.has(employee.id) ? 'lifecycle' as const : 'employee' as const,
           annual_leave_balance: balanceByEmployee.has(employee.id)
             ? Number(balanceByEmployee.get(employee.id) || 0)
             : employee.annual_leave_balance,
@@ -2552,7 +2556,13 @@ function EmployeeCompactCard({ employee, assignmentCount, onDetail, onEdit, onTo
 
         <div className="harmony-employee-compact-balances flex min-w-0 flex-wrap gap-2">
           <SmallBadge icon={<Fingerprint size={13} />} label={employee.machine_pin || '-'} />
-          <SmallBadge icon={<WalletCards size={13} />} label={`Cuti ${employee.annual_leave_balance || 0}`} />
+          <SmallBadge icon={<WalletCards size={13} />} label={`Cuti ${employee.annual_leave_balance ?? 0}`} />
+          {employee.leave_balance_source === 'lifecycle' && employee.stored_annual_leave_balance != null &&
+            Math.abs(Number(employee.stored_annual_leave_balance) - Number(employee.annual_leave_balance ?? 0)) > 0.0001 && (
+              <span title="Saldo lifecycle berbeda dari saldo lama pada employees. Jangan mengoreksi otomatis: audit sumber saldo dan aturan RPC approval sebelum perubahan database." className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-900">
+                Periksa cuti (master {employee.stored_annual_leave_balance})
+              </span>
+            )}
           <SmallBadge icon={<WalletCards size={13} />} label={`PHL ${employee.phl_balance || 0}`} />
         </div>
 

@@ -1,4 +1,5 @@
 'use client'
+import { HarmonyPortaledOverlay } from '@/components/ui/HarmonyPortaledOverlay'
 
 
 import { readErrorMessage } from '@/lib/error-utils'
@@ -1057,11 +1058,11 @@ export default function EmployeeApprovalDetailPage() {
           <div className="relative flex flex-col gap-5 2xl:flex-row 2xl:items-end 2xl:justify-between">
             <div className="min-w-0">
               <Link
-                href={`/employee/approvals/attendance?period=${encodeURIComponent(periodMonth)}&focus=${encodeURIComponent(employeeId)}`}
+                href={`/employee/approvals/attendance?period=${encodeURIComponent(periodMonth)}`}
                 className="mb-5 inline-flex min-h-10 items-center gap-2 rounded-full border border-white/10 bg-white/10 px-4 text-xs font-semibold text-white/75 backdrop-blur-xl transition hover:bg-white/15"
               >
                 <ArrowLeft size={15} />
-                Kembali ke Daftar Absensi
+                Kembali ke Daftar Karyawan
               </Link>
 
               <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-4 py-2 text-xs font-semibold text-white/75 backdrop-blur-xl">
@@ -1133,7 +1134,9 @@ export default function EmployeeApprovalDetailPage() {
               </div>
               <p className="mt-1 text-xs leading-5 harmony-text-secondary">Dua keputusan terpisah: setujui jam kerja pada tabel absensi, lalu setujui saldo hanya jika ada pengajuan PHL beserta bukti. Keduanya memakai workflow PHL yang sama.</p>
             </div>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <Link href={`/employee/approvals/attendance?period=${encodeURIComponent(periodMonth)}`} className="harmony-button-secondary inline-flex items-center gap-2 !px-3 !py-2 text-xs"><ArrowLeft size={14}/> Daftar Karyawan</Link>
+              <Link href={`/employee/approvals/leave?employee_id=${encodeURIComponent(employeeId)}`} className="harmony-button-secondary inline-flex items-center gap-2 !px-3 !py-2 text-xs"><CalendarDays size={14}/> Approval Cuti &amp; Izin</Link>
               <button type="button" onClick={() => void refreshPeriodPHL()} disabled={phlLoading} className="harmony-button-secondary inline-flex items-center gap-2 !px-3 !py-2 text-xs"><RefreshCcw size={14} className={phlLoading ? 'animate-spin' : ''} /> Refresh</button>
               <Link href="/employee/approvals/phl?status=all" className="harmony-button-secondary inline-flex items-center gap-2 !px-3 !py-2 text-xs">Modul PHL <ExternalLink size={13}/></Link>
             </div>
@@ -1762,7 +1765,7 @@ function AttendanceDetailModal({
   const displayStatus = getStatusFromLog(log)
 
   return (
-    <div className="harmony-modal-surface fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-5 backdrop-blur-sm">
+    <HarmonyPortaledOverlay role="dialog" aria-modal="true" aria-label="Detail Absensi" className="harmony-modal-surface fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-5 backdrop-blur-sm">
       <div className="flex max-h-[92vh] w-full max-w-4xl flex-col overflow-hidden rounded-[32px] bg-white shadow-[0_30px_90px_rgba(0,0,0,0.24)]">
         <div className="flex items-start justify-between gap-4 border-b border-black/5 p-6">
           <div>
@@ -1823,7 +1826,7 @@ function AttendanceDetailModal({
           </div>
         </div>
       </div>
-    </div>
+    </HarmonyPortaledOverlay>
   )
 }
 
@@ -1843,7 +1846,7 @@ function RejectModal({
   onSubmit: () => void
 }) {
   return (
-    <div className="harmony-modal-surface fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-5 backdrop-blur-sm">
+    <HarmonyPortaledOverlay role="dialog" aria-modal="true" aria-label="Penolakan Absensi" className="harmony-modal-surface fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-5 backdrop-blur-sm">
       <div className="flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-[32px] bg-white shadow-[0_30px_90px_rgba(0,0,0,0.24)]">
         <div className="flex items-start justify-between gap-4 border-b border-black/5 p-6">
           <div>
@@ -1898,7 +1901,7 @@ function RejectModal({
           </div>
         </div>
       </div>
-    </div>
+    </HarmonyPortaledOverlay>
   )
 }
 

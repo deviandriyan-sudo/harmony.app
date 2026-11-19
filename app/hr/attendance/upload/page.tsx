@@ -1,4 +1,5 @@
 'use client'
+import { HarmonyPortaledOverlay } from '@/components/ui/HarmonyPortaledOverlay'
 
 
 import { readErrorMessage } from '@/lib/error-utils'
@@ -1874,7 +1875,7 @@ Data fingerprint dari upload ini akan dilepas. Data manual employee, alasan, app
         <ProcessingLogic />
 
         {uploadModalOpen && (
-          <div className="harmony-modal-surface fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4 backdrop-blur-sm">
+          <HarmonyPortaledOverlay role="dialog" aria-modal="true" aria-label="Unggah dan proses absensi" className="harmony-modal-surface fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4 backdrop-blur-sm">
             <div className="flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-[34px] bg-white shadow-[0_30px_90px_rgba(0,0,0,0.24)]">
               <div className="flex min-w-0 items-start justify-between gap-4 border-b border-black/5 p-5 sm:p-6">
                 <div className="min-w-0">
@@ -2076,7 +2077,7 @@ Data fingerprint dari upload ini akan dilepas. Data manual employee, alasan, app
                 </button>
               </div>
             </div>
-          </div>
+          </HarmonyPortaledOverlay>
         )}
       </section>
     </>

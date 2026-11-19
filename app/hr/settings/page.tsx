@@ -1,4 +1,5 @@
 'use client'
+import { HarmonyPortaledOverlay } from '@/components/ui/HarmonyPortaledOverlay'
 
 
 import { readErrorMessage } from '@/lib/error-utils'
@@ -1217,7 +1218,7 @@ function ConfirmActionModal({
   onConfirm: () => void
 }) {
   return (
-    <div className="harmony-modal-surface fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-5 backdrop-blur-sm">
+    <HarmonyPortaledOverlay role="dialog" aria-modal="true" aria-label="Pengaturan sistem" className="harmony-modal-surface fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-5 backdrop-blur-sm">
       <div className="w-full max-w-lg overflow-hidden rounded-[32px] bg-white shadow-[0_30px_90px_rgba(0,0,0,0.24)]">
         <div className="relative overflow-hidden bg-[#1d1d1f] p-6 text-white">
           <div className="pointer-events-none absolute -right-12 -top-14 h-40 w-40 rounded-full bg-red-500/30 blur-3xl" />
@@ -1255,7 +1256,7 @@ function ConfirmActionModal({
           </button>
         </div>
       </div>
-    </div>
+    </HarmonyPortaledOverlay>
   )
 }
 

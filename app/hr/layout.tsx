@@ -1,4 +1,5 @@
 'use client'
+import { HarmonyPortaledOverlay } from '@/components/ui/HarmonyPortaledOverlay'
 
 
 import { readErrorMessage } from '@/lib/error-utils'
@@ -118,13 +119,13 @@ export default function HRLayout({ children }: { children: React.ReactNode }) {
         </div>
 
         {mobileSidebarOpen && (
-          <div className="harmony-modal-surface fixed inset-0 z-50 lg:hidden">
+          <HarmonyPortaledOverlay role="navigation" aria-label="Menu navigasi HARMONY" className="harmony-mobile-drawer-layer fixed inset-0 z-50 lg:hidden">
             <button type="button" aria-label="Tutup menu" onClick={() => setMobileSidebarOpen(false)} className="absolute inset-0 bg-black/35 backdrop-blur-sm" />
             <div className="absolute left-0 top-0 h-full max-w-[86vw]">
               <AppSidebar menu={navigationForRole('hr', { remed: true })} title="HARMONY" userName={userName} userRole="HR Administrator" logoSrc="/logo.png" mobile onNavigate={() => setMobileSidebarOpen(false)} />
               <button type="button" aria-label="Tutup menu" onClick={() => setMobileSidebarOpen(false)} className="absolute right-[-48px] top-4 flex h-10 w-10 items-center justify-center rounded-2xl bg-white harmony-text-primary shadow-lg"><X size={20} /></button>
             </div>
-          </div>
+          </HarmonyPortaledOverlay>
         )}
 
         <main className="min-w-0 flex-1 overflow-x-hidden lg:ml-[88px] harmony-desktop-main">

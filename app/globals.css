@@ -5001,3 +5001,19 @@ html[data-harmony-theme="dark"] .harmony-modal-feedback-success { color: #d2ffe4
     max-height: 42dvh;
   }
 }
+
+/* RC2F — All route dialogs mount directly under body, never inside page shell.
+   This isolates dialogs from sticky topbar, transform and backdrop-filter
+   stacking contexts. Separate mobile navigation is also portaled without
+   inheriting the glass-card rules applied to form dialogs. */
+body > .harmony-modal-surface[role="dialog"] {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 2140 !important;
+}
+body > .harmony-mobile-drawer-layer {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 2140 !important;
+  isolation: isolate;
+}

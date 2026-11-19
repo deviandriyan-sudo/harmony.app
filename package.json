@@ -35,7 +35,13 @@
     "test:rc2b": "node scripts/test-rc2b-source-guards.mjs",
     "test:rc2c": "node scripts/test-rc2c-evidence-preservation.mjs",
     "test:attendance-modal": "node scripts/test-attendance-modal-portal.mjs",
-    "test:modal-feedback": "node scripts/test-global-modal-feedback.mjs"
+    "test:modal-feedback": "node scripts/test-global-modal-feedback.mjs",
+    "test:modal-route-audit": "node scripts/test-route-modal-layering.cjs",
+    "test:rc2g": "node scripts/test-rc2g-workflow-guards.mjs",
+    "test:rc2h": "node scripts/test-rc2h-approval-integrity.mjs",
+    "test:rc2h:sql": "node scripts/test-rc2h-approval-integrity.mjs --require-sql",
+    "test:rc2i": "node scripts/test-rc2i-source-guards.mjs",
+    "test:rc2i:sql": "node scripts/test-rc2i-sql-artifacts.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.107.0",

@@ -1,4 +1,5 @@
 'use client'
+import { HarmonyPortaledOverlay } from '@/components/ui/HarmonyPortaledOverlay'
 
 
 import { readErrorMessage } from '@/lib/error-utils'
@@ -1308,7 +1309,7 @@ function EmailChangeModal({
   onChange: (value: string) => void
 }) {
   return (
-    <div className="harmony-modal-surface fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-5 backdrop-blur-sm">
+    <HarmonyPortaledOverlay role="dialog" aria-modal="true" aria-label="Ubah email akun" className="harmony-modal-surface fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-5 backdrop-blur-sm">
       <div className="w-full max-w-xl overflow-hidden rounded-[32px] border border-white/20 bg-white/95 shadow-[0_30px_90px_rgba(0,0,0,0.22)] backdrop-blur-2xl">
         <div className="flex items-start justify-between gap-4 border-b border-black/5 bg-white/70 p-6">
           <div>
@@ -1369,7 +1370,7 @@ function EmailChangeModal({
           />
         </form>
       </div>
-    </div>
+    </HarmonyPortaledOverlay>
   )
 }
 
@@ -1389,7 +1390,7 @@ function ResetPasswordModal({
   onChange: (value: string) => void
 }) {
   return (
-    <div className="harmony-modal-surface fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-5 backdrop-blur-sm">
+    <HarmonyPortaledOverlay role="dialog" aria-modal="true" aria-label="Reset password akun" className="harmony-modal-surface fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-5 backdrop-blur-sm">
       <div className="w-full max-w-xl overflow-hidden rounded-[32px] border border-white/20 bg-white/95 shadow-[0_30px_90px_rgba(0,0,0,0.22)] backdrop-blur-2xl">
         <div className="flex items-start justify-between gap-4 border-b border-black/5 bg-white/70 p-6">
           <div>
@@ -1446,7 +1447,7 @@ function ResetPasswordModal({
           />
         </form>
       </div>
-    </div>
+    </HarmonyPortaledOverlay>
   )
 }
 

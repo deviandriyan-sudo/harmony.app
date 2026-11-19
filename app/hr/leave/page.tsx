@@ -1,4 +1,5 @@
 'use client'
+import { HarmonyPortaledOverlay } from '@/components/ui/HarmonyPortaledOverlay'
 
 
 import { readErrorMessage } from '@/lib/error-utils'
@@ -179,6 +180,10 @@ type LeaveBalanceLifecycleSummary = {
   postpone_manual_event_count?: number | null
   annual_manual_adjustment_days: number | null
   annual_total_available_days: number | null
+  // Diagnostic values: not an authorization decision or a balance mutation.
+  approval_legacy_remaining_days?: number | null
+  approval_pending_hr_days?: number | null
+  approval_estimated_after_pending_days?: number | null
 
   latest_matured_at: string | null
   current_cycle_end: string | null
@@ -1028,13 +1033,34 @@ export default function HRLeavePage() {
       const payload = await harmonyFetch<{
         summaries?: LeaveBalanceLifecycleSummary[]
         balance_integrity_warning?: string | null
+        approval_diagnostics_warning?: string | null
+        approval_balance_diagnostics?: Array<{
+          employee_id: string
+          pending_hr_annual_days: number
+          estimated_after_pending_days: number
+          legacy_supervisor_rpc_days: number | null
+        }>
       }>('/api/hr/leave/postpone-adjustments')
 
       if (payload.balance_integrity_warning) {
         console.warn('Leave balance integrity warning:', payload.balance_integrity_warning)
       }
 
-      const rows = [...(payload.summaries || [])].sort((a, b) =>
+      if (payload.approval_diagnostics_warning) {
+        console.warn('Leave approval diagnostic warning:', payload.approval_diagnostics_warning)
+      }
+      const approvalByEmployee = new Map(
+        (payload.approval_balance_diagnostics || []).map((item) => [item.employee_id, item])
+      )
+      const rows = [...(payload.summaries || [])].map((item) => {
+        const diagnostic = approvalByEmployee.get(item.employee_id)
+        return {
+          ...item,
+          approval_legacy_remaining_days: diagnostic?.legacy_supervisor_rpc_days ?? null,
+          approval_pending_hr_days: diagnostic?.pending_hr_annual_days ?? null,
+          approval_estimated_after_pending_days: diagnostic?.estimated_after_pending_days ?? null,
+        }
+      }).sort((a, b) =>
         String(a.full_name || '').localeCompare(String(b.full_name || ''), 'id'),
       )
       setLeaveBalanceLifecycle(rows)
@@ -1708,51 +1734,55 @@ export default function HRLeavePage() {
 
   async function rejectLeaveRequest() {
     if (!rejectLeaveRecord) return
+    const note = rejectLeaveReason.trim() || 'Ditolak oleh HR.'
+    if (note.length < 5) {
+      setErrorMessage('Alasan penolakan HR minimal 5 karakter.')
+      return
+    }
 
     setProcessingId(rejectLeaveRecord.id)
     setErrorMessage('')
     setSuccessMessage('')
-
-    const now = new Date().toISOString()
     const rejectedBy = appUser?.email || 'HR Administrator'
-    const rejectNote = rejectLeaveReason || 'Ditolak oleh HR.'
 
-    const { error } = await supabase
-      .from('leave_requests')
-      .update({
-        status: 'rejected',
-        hr_status: 'rejected',
-        hr_approved_by: rejectedBy,
-        hr_approved_at: now,
-        hr_note: rejectNote,
-        updated_at: now,
+    try {
+      // No direct UPDATE: a rejected request with a supervisor debit must
+      // release its reservation in the SAME database transaction.
+      const { data, error } = await supabase.rpc('hr_reject_leave_request_atomic_rc2i', {
+        p_request_id: rejectLeaveRecord.id,
+        p_rejected_by: rejectedBy,
+        p_note: note,
       })
-      .eq('id', rejectLeaveRecord.id)
+      if (error) throw error
+      const result = (data || {}) as { success?: boolean; message?: string; already_rejected?: boolean }
+      if (!result.success) throw new Error(result.message || 'Penolakan HR gagal.')
 
-    if (error) {
-      setErrorMessage(error.message)
-      setProcessingId('')
-      return
-    }
-
-    const notification = await sendHRLeaveDecisionEmail({
-      item: rejectLeaveRecord,
-      decision: 'rejected',
-      hrName: rejectedBy,
-      note: rejectNote,
-    })
-
-    setSuccessMessage(
-      appendNotificationText(
-        'Pengajuan cuti/izin berhasil ditolak HR.',
-        notification
+      let notification
+      try {
+        notification = await sendHRLeaveDecisionEmail({
+          item: rejectLeaveRecord,
+          decision: 'rejected',
+          hrName: rejectedBy,
+          note,
+        })
+      } catch (notificationError: unknown) {
+        console.warn('HR leave rejection notification warning:', notificationError)
+        notification = { success: false, message: readErrorMessage(notificationError) || 'Email belum berhasil dikirim.' }
+      }
+      setSuccessMessage(appendNotificationText(result.message || 'Pengajuan berhasil ditolak HR.', notification))
+      setRejectLeaveRecord(null)
+      setRejectLeaveReason('')
+    } catch (error: unknown) {
+      // Intentionally fail closed. A missing migration must NEVER fall back to
+      // a browser-side update that bypasses ledger reconciliation.
+      setErrorMessage(
+        `${readErrorMessage(error) || 'Penolakan HR gagal.'} ` +
+        'Pastikan migrasi RC2I sudah divalidasi dan diterapkan sebelum menggunakan fitur ini.'
       )
-    )
-
-    setRejectLeaveRecord(null)
-    setRejectLeaveReason('')
-    setProcessingId('')
-    await fetchData({ preserveMessages: true })
+    } finally {
+      setProcessingId('')
+      await fetchData({ preserveMessages: true })
+    }
   }
 
   function requestDeleteLeave(item: LeaveRequest) {
@@ -2590,6 +2620,9 @@ function LeaveBalanceLifecycleTab({
         description="Cuti matang, postpone aktif, postpone expired, adjustment HR, dan PHL ditampilkan sebagai sumber berbeda. Postpone expired tetap menjadi histori tetapi otomatis tidak dapat digunakan."
       />
 
+      <p className="border-b border-amber-200 bg-amber-50/60 px-5 py-3 text-xs leading-5 text-amber-950">
+        Saldo lifecycle bukan otomatis saldo yang dipakai RPC approval lama. Kolom Pending HR dan estimasi setelah pending hanya untuk audit; masa berlaku postpone, ledger, serta keputusan final tetap harus diverifikasi.
+      </p>
       <div className="grid gap-3 border-b border-black/5 p-5 sm:grid-cols-2 xl:grid-cols-6">
         <MiniMetricCard
           label="Cuti Matang"
@@ -2682,6 +2715,13 @@ function LeaveBalanceLifecycleTab({
                   />
                 </div>
 
+                <div className="mt-3 rounded-2xl border border-amber-200/80 bg-amber-50/70 p-3 text-xs leading-5 text-amber-950">
+                  <p className="font-bold">Diagnostik approval (bukan saldo final)</p>
+                  <p>Menunggu keputusan HR: {item.approval_pending_hr_days == null ? '—' : `${formatNumber(item.approval_pending_hr_days)} hari`}</p>
+                  <p>Estimasi setelah pengajuan pending: {item.approval_estimated_after_pending_days == null ? '—' : `${formatNumber(item.approval_estimated_after_pending_days)} hari`}</p>
+                  <p>Saldo legacy yang diperiksa atasan: {item.approval_legacy_remaining_days == null ? 'Tidak ada siklus / belum terbaca' : `${formatNumber(item.approval_legacy_remaining_days)} hari`}</p>
+                  <p className="mt-1 text-[11px]">Perbedaan perlu rekonsiliasi HR; angka ini tidak mengizinkan approval otomatis.</p>
+                </div>
                 <div className="mt-3 rounded-2xl bg-[#f5f5f7]/80 p-3 text-xs leading-5 harmony-text-secondary">
                   <p>
                     Matang terakhir: <strong>{formatDisplayDate(item.latest_matured_at || '')}</strong>
@@ -2708,6 +2748,8 @@ function LeaveBalanceLifecycleTab({
                   <th className="px-4 py-3">Expiry Postpone</th>
                   <th className="px-4 py-3">Adjustment HR</th>
                   <th className="px-4 py-3">Total Tersedia</th>
+                  <th className="px-4 py-3">Pending HR / Estimasi</th>
+                  <th className="px-4 py-3">Saldo Approval Legacy</th>
                   <th className="px-4 py-3">Postpone Expired</th>
                   <th className="px-4 py-3">PHL Aktif</th>
                   <th className="px-4 py-3">Expiry PHL</th>
@@ -2749,6 +2791,16 @@ function LeaveBalanceLifecycleTab({
                       <span className="inline-flex rounded-full bg-green-50 px-3 py-1 font-bold text-green-700">
                         {formatNumber(item.annual_total_available_days)} hari
                       </span>
+                    </td>
+                    <td className="px-4 py-4 align-top">
+                      {item.approval_pending_hr_days == null
+                        ? '—'
+                        : `${formatNumber(item.approval_pending_hr_days)} / ${formatNumber(item.approval_estimated_after_pending_days)} hari`}
+                    </td>
+                    <td className="px-4 py-4 align-top font-bold text-amber-800">
+                      {item.approval_legacy_remaining_days == null
+                        ? 'Belum tersedia'
+                        : `${formatNumber(item.approval_legacy_remaining_days)} hari`}
                     </td>
                     <td className="px-4 py-4 align-top text-red-700">
                       {formatNumber(item.postpone_expired_days)} hari
@@ -3615,7 +3667,7 @@ function DeleteConfirmModal({
   onConfirm: () => void
 }) {
   return (
-    <div className="harmony-modal-surface fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-5 backdrop-blur-sm">
+    <HarmonyPortaledOverlay role="dialog" aria-modal="true" aria-label="Konfirmasi hapus" className="harmony-modal-surface fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-5 backdrop-blur-sm">
       <div className="w-full max-w-lg overflow-hidden rounded-[32px] bg-white shadow-[0_30px_90px_rgba(0,0,0,0.24)]">
         <div className="relative overflow-hidden bg-[#1d1d1f] p-6 text-white">
           <div className="pointer-events-none absolute -right-12 -top-14 h-40 w-40 rounded-full bg-red-500/30 blur-3xl" />
@@ -3683,7 +3735,7 @@ function DeleteConfirmModal({
           </div>
         </div>
       </div>
-    </div>
+    </HarmonyPortaledOverlay>
   )
 }
 
@@ -4498,7 +4550,7 @@ function ModalShell({
   onClose: () => void
 }) {
   return (
-    <div className="harmony-modal-surface fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-5 backdrop-blur-sm">
+    <HarmonyPortaledOverlay role="dialog" aria-modal="true" aria-label="Detail pengajuan cuti" className="harmony-modal-surface fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-5 backdrop-blur-sm">
       <div className="flex max-h-[92vh] w-full max-w-4xl flex-col overflow-hidden rounded-[32px] bg-white shadow-[0_30px_90px_rgba(0,0,0,0.24)]">
         <div className="flex items-start justify-between gap-4 border-b border-black/5 p-6">
           <div>
@@ -4524,7 +4576,7 @@ function ModalShell({
           {children}
         </div>
       </div>
-    </div>
+    </HarmonyPortaledOverlay>
   )
 }
 
