@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Banknote, ClipboardCheck, Download, RefreshCw } from 'lucide-react'
 import { RemedClaimList } from '@/components/remed/RemedClaimList'
+import { RemedPrintLink } from '@/components/remed/RemedPrintLink'
 import { RemedPageHeader } from '@/components/remed/RemedPageHeader'
 import { FinanceReviewControls, HrReviewControls, PaymentControls } from '@/components/remed/ReviewControls'
 import { remedFetch } from '@/lib/remed-client'
@@ -54,11 +55,14 @@ export function RemedAdminQueue({ mode }: { mode: QueueMode }) {
     {error ? <div className="rounded-[22px] border border-red-100 bg-red-50 p-4 text-sm text-red-700">{error}</div> : null}
     <div className="harmony-unified-surface p-4 sm:p-5">
       <RemedClaimList claims={claims} showEmployee showBalanceImpact={mode !== 'payment'}
-        action={(claim) => mode === 'hr_review'
-          ? <HrReviewControls claim={claim} onDone={load} />
-          : mode === 'finance_review'
-            ? <FinanceReviewControls claim={claim} onDone={load} />
-            : <PaymentControls claim={claim} onDone={load} /> } />
+        action={(claim) => <div className="flex flex-col items-end gap-2">
+          <RemedPrintLink claimId={claim.id} role={mode === 'hr_review' ? 'hr' : 'finance'} compact />
+          {mode === 'hr_review'
+            ? <HrReviewControls claim={claim} onDone={load} />
+            : mode === 'finance_review'
+              ? <FinanceReviewControls claim={claim} onDone={load} />
+              : <PaymentControls claim={claim} onDone={load} />}
+        </div>} />
     </div>
   </section>
 }

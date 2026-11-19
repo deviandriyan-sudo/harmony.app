@@ -6,6 +6,7 @@ import { useMemo, useState } from 'react'
 import { Loader2, Search, Trash2 } from 'lucide-react'
 import { formatRemedDate, formatRupiah, REMED_STATUS_LABELS } from '@/lib/remed'
 import { remedFetch } from '@/lib/remed-client'
+import { RemedPrintLink } from '@/components/remed/RemedPrintLink'
 import type { RemedClaimStatus, RemedProcessHistory } from '@/types/remed'
 
 function statusLabel(value: string | null | undefined) {
@@ -26,10 +27,12 @@ function actorLabel(value: string | null | undefined) {
 export function RemedProcessHistory({
   history,
   allowDelete = false,
+  printRole,
   onDeleted,
 }: {
   history: RemedProcessHistory[]
   allowDelete?: boolean
+  printRole?: 'hr' | 'finance'
   onDeleted?: () => void | Promise<void>
 }) {
   const [query, setQuery] = useState('')
@@ -116,7 +119,7 @@ export function RemedProcessHistory({
                 <th className="px-5 py-3.5">Diproses Oleh</th>
                 <th className="px-5 py-3.5">Alasan / Catatan</th>
                 <th className="px-5 py-3.5 text-right">Nominal</th>
-                {allowDelete ? <th className="px-5 py-3.5 text-right">Aksi</th> : null}
+                {(allowDelete || printRole) ? <th className="px-5 py-3.5 text-right">Aksi</th> : null}
               </tr>
             </thead>
             <tbody className="divide-y divide-black/[0.055]">
@@ -164,8 +167,10 @@ export function RemedProcessHistory({
                         <p className="mt-1 text-xs harmony-text-secondary">Diajukan {formatRupiah(item.submitted_amount)}</p>
                       ) : null}
                     </td>
-                    {allowDelete ? (
+                    {(allowDelete || printRole) ? (
                       <td className="whitespace-nowrap px-5 py-4 text-right">
+                        <div className="flex flex-col items-end gap-2">
+                        {printRole && !item.is_deleted && item.claim_id ? <RemedPrintLink claimId={item.claim_id} role={printRole} compact /> : null}
                         {canPurge ? (
                           <button
                             type="button"
@@ -176,7 +181,8 @@ export function RemedProcessHistory({
                             {deleting ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
                             {deleting ? 'Menghapus...' : 'Hapus Riwayat'}
                           </button>
-                        ) : <span className="text-xs text-[#b0b4ba]">—</span>}
+                        ) : null}
+                        </div>
                       </td>
                     ) : null}
                   </tr>

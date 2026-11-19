@@ -707,7 +707,7 @@ export default function EmployeeLeaveApprovalPage() {
             // Never bypass the RPC balance check. Different HR lifecycle and
             // approval balances require reconciliation, not a manual credit.
             if (/saldo cuti.*tidak cukup/i.test(detail)) {
-              return `${detail} Angka ini berasal dari proses approval database. Jika berbeda dari saldo yang terlihat di Data Karyawan, minta HR memeriksa ringkasan lifecycle dan fungsi approval sebelum melakukan koreksi.`
+              return `${detail} Jika berbeda dari saldo yang terlihat di Data Karyawan, minta HR memeriksa ringkasan lifecycle dan fungsi approval sebelum melakukan koreksi. Approval memakai saldo legacy dan dapat dipengaruhi pengajuan yang masih menunggu HR; jangan menambah saldo hanya agar approval lolos.`
             }
             return detail || 'Gagal approve pengajuan. Pastikan function approve_leave_request_by_supervisor sudah tersedia.'
           })(),

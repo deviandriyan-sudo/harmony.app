@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { REMED_BUCKET } from '@/lib/remed'
 import { requireRemedApi, remedApiError } from '@/lib/server/remed-api-auth'
-import { enrichRemedClaims } from '@/lib/server/remed-data'
+import type { RemedClaim } from '@/types/remed'
 import { getRemedPrintSignatures } from '@/lib/server/remed-signatures'
 
 export async function GET(request: NextRequest, context: { params: Promise<{ id: string }> }) {
@@ -22,8 +22,25 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
       throw Object.assign(new Error('Anda tidak memiliki akses ke klaim ini.'), { status: 403 })
     }
 
-    const claims = await enrichRemedClaims(ctx.admin, [data])
-    const claim = claims[0]
+    // Printing needs only the claim, employee identity and claim type. Avoid
+    // coupling the form to entitlement/attachment lookups used by claim lists:
+    // an unrelated reporting-table error must not make a valid form disappear.
+    const [employeeResult, typeResult] = await Promise.all([
+      ctx.admin.from('employees')
+        .select('id,employee_number,full_name,department,position,email')
+        .eq('id', data.employee_id).maybeSingle(),
+      ctx.admin.from('remed_claim_types')
+        .select('id,code,name,description,is_active')
+        .eq('id', data.claim_type_id).maybeSingle(),
+    ])
+    const claim: RemedClaim = {
+      ...(data as RemedClaim),
+      employee: employeeResult.error ? null : employeeResult.data,
+      claim_type: typeResult.error ? null : typeResult.data,
+    }
+    const dataWarning = employeeResult.error || typeResult.error
+      ? 'Sebagian profil karyawan atau jenis klaim belum dapat dimuat. Form tetap dapat dicetak; periksa data sebelum digunakan.'
+      : null
     // A missing/ambiguous signature configuration must not hide a valid claim
     // from the authorized user. Print the document without signatures, but
     // report their unavailability; never fabricate an approval signature.
@@ -40,7 +57,7 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
         signatureError instanceof Error ? signatureError.name : 'lookup_error')
       signatureWarning = 'Data tanda tangan belum dapat dimuat. Periksa konfigurasi di HR Re-Med.'
     }
-    return NextResponse.json({ claim, signatures, signature_warning: signatureWarning },
+    return NextResponse.json({ claim, signatures, signature_warning: signatureWarning, data_warning: dataWarning },
       { headers: { 'Cache-Control': 'no-store' } })
   } catch (error) {
     const issue = remedApiError(error)

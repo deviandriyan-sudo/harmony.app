@@ -16,24 +16,36 @@ export function PaymentRequestPrint({ claimId }: { claimId: string }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [signatureWarning, setSignatureWarning] = useState('')
+  const [dataWarning, setDataWarning] = useState('')
+  const [retryAttempt, setRetryAttempt] = useState(0)
 
   useEffect(() => {
-    remedFetch<{ claim: RemedClaim; signatures: RemedPrintSignatures | null; signature_warning?: string | null }>(`/api/remed/claims/${claimId}`)
+    remedFetch<{ claim: RemedClaim; signatures: RemedPrintSignatures | null; signature_warning?: string | null; data_warning?: string | null }>(`/api/remed/claims/${claimId}`)
       .then((payload) => {
         setClaim(payload.claim)
         setSignatures(payload.signatures)
         setSignatureWarning(payload.signature_warning || '')
+        setDataWarning(payload.data_warning || '')
       })
       .catch((issue: unknown) => setError(issue instanceof Error ? issue.message : 'Gagal memuat form pembayaran.'))
       .finally(() => setLoading(false))
-  }, [claimId])
+  }, [claimId, retryAttempt])
 
   if (loading) {
     return <div className="flex min-h-[60vh] items-center justify-center"><Loader2 className="animate-spin harmony-text-success" /></div>
   }
 
   if (!claim) {
-    return <div className="mx-auto max-w-3xl p-8 text-center text-sm text-red-700">{error || 'Klaim tidak ditemukan.'}</div>
+    return (
+      <div role="alert" className="mx-auto mt-8 max-w-2xl rounded-2xl border border-red-200 bg-white p-6 text-center shadow-sm">
+        <p className="text-sm font-semibold text-red-700">Form pembayaran Re-Med belum dapat ditampilkan.</p>
+        <p className="mt-2 text-sm text-slate-700">{error || 'Klaim tidak ditemukan.'}</p>
+        <div className="mt-5 flex flex-wrap justify-center gap-2">
+          <button type="button" onClick={() => { setError(''); setLoading(true); setRetryAttempt(value => value + 1) }} className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white">Coba Lagi</button>
+          <button type="button" onClick={() => router.back()} className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-900">Kembali</button>
+        </div>
+      </div>
+    )
   }
 
   const approvedAmount = claim.approved_amount ?? (claim.status === 'legacy_record' ? claim.submitted_amount : null)
@@ -51,6 +63,7 @@ export function PaymentRequestPrint({ claimId }: { claimId: string }) {
         </button>
       </div>
 
+      {dataWarning && <p role="status" className="mb-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 print:hidden">{dataWarning}</p>}
       {signatureWarning && <p role="status" className="mb-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 print:hidden">{signatureWarning}</p>}
       <article className="harmony-print-document remed-payment-sheet rounded-[28px] border border-black/10 bg-white p-6 shadow-sm sm:p-9 print:rounded-none print:border-0 print:p-0 print:shadow-none">
         <header className="remed-print-head flex items-start justify-between gap-5 border-b-2 border-[#1d1d1f] pb-5">

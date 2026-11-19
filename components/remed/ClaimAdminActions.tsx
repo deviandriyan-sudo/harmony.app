@@ -2,10 +2,10 @@
 
 
 import { readErrorMessage } from '@/lib/error-utils'
-import { Loader2, Printer, Trash2 } from 'lucide-react'
+import { Loader2, Trash2 } from 'lucide-react'
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
 import { remedFetch } from '@/lib/remed-client'
+import { RemedPrintLink } from '@/components/remed/RemedPrintLink'
 import type { RemedClaim } from '@/types/remed'
 
 export function ClaimAdminActions({
@@ -17,12 +17,7 @@ export function ClaimAdminActions({
   role: 'hr' | 'finance'
   onDone: () => void
 }) {
-  const router = useRouter()
   const [deleting, setDeleting] = useState(false)
-
-  function printClaim() {
-    router.push(`/remed/${role}/claims/${claim.id}/print`)
-  }
 
   async function deleteClaim() {
     const reason = window.prompt(
@@ -57,13 +52,7 @@ export function ClaimAdminActions({
 
   return (
     <div className="harmony-action-group justify-end">
-      <button
-        type="button"
-        onClick={printClaim}
-        className="harmony-action-soft inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold transition"
-      >
-        <Printer size={14} /> Print Form
-      </button>
+      <RemedPrintLink claimId={claim.id} role={role} compact />
       <button
         type="button"
         onClick={deleteClaim}

@@ -10,6 +10,14 @@ type Summary = {
   annual_manual_adjustment_days?: number | null
   annual_total_available_days?: number | null
 }
+type BalanceDiagnostic = {
+  available: boolean
+  legacy_cycle_balance: number | null
+  active_legacy_cycles: number
+  pending_hr_reserved_days: number
+  pending_hr_request_count: number
+  note?: string
+}
 type Audit = {
   id: string
   previous_effective_balance: number
@@ -29,12 +37,13 @@ export function AnnualLeaveCorrection({employeeId, summary, onSaved}: {
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [history, setHistory] = useState<Audit[]>([])
+  const [diagnostic, setDiagnostic] = useState<BalanceDiagnostic | null>(null)
 
   useEffect(() => {
     if (!employeeId) return
     let cancelled = false
-    void harmonyFetch<{history:Audit[]}>(`/api/hr/leave/balance-correction?employee_id=${encodeURIComponent(employeeId)}`)
-      .then(x => { if (!cancelled) setHistory(x.history || []) })
+    void harmonyFetch<{history:Audit[],diagnostic?:BalanceDiagnostic}>(`/api/hr/leave/balance-correction?employee_id=${encodeURIComponent(employeeId)}`)
+      .then(x => { if (!cancelled) { setHistory(x.history || []); setDiagnostic(x.diagnostic || null) } })
       .catch((cause: unknown) => {
         if (!cancelled) setError(cause instanceof Error ? cause.message : 'Riwayat koreksi belum bisa dibaca; periksa ketersediaan tabel audit SQL.')
       })
@@ -56,12 +65,13 @@ export function AnnualLeaveCorrection({employeeId, summary, onSaved}: {
       await harmonyFetch('/api/hr/leave/balance-correction', {
         method:'POST',body:JSON.stringify({employee_id:employeeId,target_days:days,reason:reason.trim()}),
       })
-      setSuccess('Koreksi berhasil dicatat dan saldo lifecycle terverifikasi.')
+      setSuccess('Koreksi saldo lifecycle dicatat. Saldo legacy untuk approval dan reservasi pengajuan tidak otomatis berubah.')
       setTarget(''); setReason('')
       try {
         await onSaved()
-        const response = await harmonyFetch<{history:Audit[]}>(`/api/hr/leave/balance-correction?employee_id=${encodeURIComponent(employeeId)}`)
+        const response = await harmonyFetch<{history:Audit[],diagnostic?:BalanceDiagnostic}>(`/api/hr/leave/balance-correction?employee_id=${encodeURIComponent(employeeId)}`)
         setHistory(response.history || [])
+        setDiagnostic(response.diagnostic || null)
       } catch {
         setSuccess('Koreksi telah disimpan di database. Muat ulang halaman untuk memperbarui tampilan.')
       }
@@ -71,11 +81,13 @@ export function AnnualLeaveCorrection({employeeId, summary, onSaved}: {
   }
 
   const balance = Number(summary?.annual_total_available_days ?? 0)
+  const mismatch = diagnostic?.available && diagnostic.legacy_cycle_balance !== null &&
+    Math.abs(balance - diagnostic.legacy_cycle_balance) > 0.0001
   return (
     <details className="harmony-hr-form-disclosure harmony-leave-correction" aria-label="Koreksi saldo cuti">
       <summary className="harmony-hr-form-summary">
         <span className="harmony-hr-form-icon"><WalletCards size={18}/></span>
-        <span className="flex-1 min-w-0"><strong>Koreksi Saldo Cuti</strong><small>Penyesuaian HR dengan audit dan pemeriksaan database</small></span>
+        <span className="flex-1 min-w-0"><strong>Koreksi Saldo Cuti</strong><small>Saldo lifecycle dan audit koreksi; bukan penambahan saldo approval</small></span>
         <span className="harmony-hr-disclosure-indicator">Buka</span>
       </summary>
       <div className="harmony-hr-form-body space-y-3">
@@ -84,8 +96,23 @@ export function AnnualLeaveCorrection({employeeId, summary, onSaved}: {
           <div className="harmony-leave-value"><span>Postpone aktif</span><strong>{Number(summary?.postpone_active_days ?? 0)} hari</strong></div>
           <div className="harmony-leave-value"><span>Saldo efektif</span><strong>{balance} hari</strong></div>
         </div>
+        {diagnostic?.available && (
+          <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-950" role="note">
+            <p className="font-semibold">Pemeriksaan saldo approval (read-only)</p>
+            <div className="mt-2 grid gap-2 sm:grid-cols-3">
+              <p>Saldo legacy RPC: <strong>{diagnostic.legacy_cycle_balance === null ? 'Tidak ditemukan' : `${diagnostic.legacy_cycle_balance} hari`}</strong></p>
+              <p>Debit pengajuan menunggu HR: <strong>{diagnostic.pending_hr_reserved_days} hari</strong></p>
+              <p>Pengajuan menunggu HR: <strong>{diagnostic.pending_hr_request_count}</strong></p>
+            </div>
+            {(mismatch || diagnostic.active_legacy_cycles !== 1) && (
+              <p className="mt-2 font-semibold">Saldo lifecycle dan saldo approval berbeda. Koreksi saldo lifecycle tidak mengubah reservasi/ledger legacy. Jangan menaikkan saldo hanya agar approval lolos; periksa pengajuan yang masih menunggu HR.</p>
+            )}
+            {diagnostic.note && <p className="mt-2">{diagnostic.note}</p>}
+          </div>
+        )}
+        {diagnostic && !diagnostic.available && <p className="text-xs text-amber-800">Diagnostik saldo legacy belum tersedia; pemeriksaan histori tetap berjalan.</p>}
         {!summary && <p role="alert" className="text-xs font-semibold text-amber-700">Data lifecycle cuti belum dapat dimuat. Simpan koreksi dinonaktifkan untuk mencegah perubahan saldo yang tidak tervalidasi. Gunakan SQL diagnostik Stage 5 (read-only) untuk memeriksa RPC dan summary.</p>}
-        <p className="text-xs leading-relaxed harmony-text-secondary">Adjustment tercatat: {Number(summary?.annual_manual_adjustment_days ?? 0)} hari. Isi <strong>saldo akhir yang benar</strong>, bukan besarnya penambahan.</p>
+        <p className="text-xs leading-relaxed harmony-text-secondary">Adjustment tercatat: {Number(summary?.annual_manual_adjustment_days ?? 0)} hari. Isi <strong>saldo akhir yang benar</strong>, bukan besarnya penambahan. Koreksi ini hanya mengubah saldo lifecycle; tidak mengubah saldo legacy dan reservasi pada approval atasan.</p>
         <div className="grid gap-3 sm:grid-cols-[180px_1fr]">
           <label className="block"><span className="harmony-label">Saldo akhir (hari)</span><input inputMode="numeric" type="number" step="1" min="0" max="365" value={target} onChange={e=>setTarget(e.target.value)} placeholder={`Saat ini ${balance}`} className="harmony-input w-full"/></label>
           <label className="block"><span className="harmony-label">Alasan koreksi</span><textarea rows={2} maxLength={1000} value={reason} onChange={e=>setReason(e.target.value)} placeholder="Contoh: pembetulan adjustment historis berdasarkan verifikasi HR" className="harmony-input w-full"/></label>

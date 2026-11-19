@@ -43,7 +43,7 @@ export function RemedHistoryWorkspace({ role }: { role: 'hr' | 'finance' }) {
         </div>}
       />
       {error ? <div className="rounded-[22px] border border-red-100 bg-red-50 p-4 text-sm text-red-700">{error}</div> : null}
-      <RemedProcessHistory history={history} allowDelete={role === 'hr'} onDeleted={role === 'hr' ? load : undefined} />
+      <RemedProcessHistory history={history} printRole={role} allowDelete={role === 'hr'} onDeleted={role === 'hr' ? load : undefined} />
     </section>
   )
 }

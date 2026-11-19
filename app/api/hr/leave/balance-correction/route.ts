@@ -44,7 +44,73 @@ export async function GET(request: NextRequest) {
         ? 'Tabel audit koreksi cuti tidak tersedia. Periksa SQL_ONLY/02 dan jalankan diagnostik Stage 5 read-only.'
         : result.error.message), {status: missing ? 503 : 400})
     }
-    return NextResponse.json({success:true,history:result.data||[]},{headers:{'Cache-Control':'no-store'}})
+    // Best-effort, read-only reconciliation. Never make audit history depend on
+    // legacy schema access; a failed diagnostic must not change balances.
+    let diagnostic: {
+      available: boolean
+      legacy_cycle_balance: number | null
+      active_legacy_cycles: number
+      pending_hr_reserved_days: number
+      pending_hr_request_count: number
+      note?: string
+    } = {
+      available: false,
+      legacy_cycle_balance: null,
+      active_legacy_cycles: 0,
+      pending_hr_reserved_days: 0,
+      pending_hr_request_count: 0,
+    }
+    try {
+      const [cycles, requests, ledger] = await Promise.all([
+        db.from('employee_annual_leave_balances')
+          .select('id,status,cycle_start,cycle_end,remaining_days')
+          .eq('employee_id',employeeId),
+        db.from('leave_requests')
+          .select('id,request_type,status,supervisor_status,hr_status,total_days')
+          .eq('employee_id',employeeId).eq('request_type','annual_leave'),
+        db.from('employee_annual_leave_transactions')
+          .select('leave_request_id,transaction_type,transaction_days')
+          .eq('employee_id',employeeId),
+      ])
+      if (cycles.error || requests.error || ledger.error) {
+        throw new Error('Data saldo legacy atau reservasi belum bisa dibaca.')
+      }
+
+      const todayParts = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'Asia/Makassar', year: 'numeric', month: '2-digit', day: '2-digit',
+      }).formatToParts(new Date())
+      const part = (kind: string) => todayParts.find(item => item.type === kind)?.value || ''
+      const today = `${part('year')}-${part('month')}-${part('day')}`
+      const activeCycles = (cycles.data || []).filter(item =>
+        item.status === 'active' && item.cycle_start <= today && item.cycle_end >= today
+      ).sort((a,b) => String(a.cycle_start).localeCompare(String(b.cycle_start)))
+      const pending = (requests.data || []).filter(item =>
+        String(item.supervisor_status || '').toLowerCase() === 'approved' &&
+        !['approved','rejected','cancelled','canceled'].includes(String(item.hr_status || '').toLowerCase()) &&
+        !['rejected','cancelled','canceled'].includes(String(item.status || '').toLowerCase())
+      )
+      const ledgerByRequest = new Map<string,number>()
+      for (const item of ledger.data || []) {
+        if (!item.leave_request_id) continue
+        const direction = item.transaction_type === 'use' ? 1 : item.transaction_type === 'rollback' ? -1 : 0
+        ledgerByRequest.set(item.leave_request_id,
+          (ledgerByRequest.get(item.leave_request_id) || 0) + direction * Number(item.transaction_days || 0))
+      }
+      diagnostic = {
+        available: true,
+        legacy_cycle_balance: activeCycles.length > 0 ? Number(activeCycles[0].remaining_days || 0) : null,
+        active_legacy_cycles: activeCycles.length,
+        pending_hr_reserved_days: pending.reduce((total,item) =>
+          total + Math.max(0, ledgerByRequest.get(item.id) || 0),0),
+        pending_hr_request_count: pending.length,
+        ...(activeCycles.length !== 1 ? {
+          note: 'Jumlah siklus legacy aktif pada tanggal pemeriksaan bukan satu; perlu review HR.'
+        } : {}),
+      }
+    } catch {
+      diagnostic.note = 'Diagnostik legacy tidak tersedia; audit koreksi tetap bisa dibaca.'
+    }
+    return NextResponse.json({success:true,history:result.data||[],diagnostic},{headers:{'Cache-Control':'no-store'}})
   } catch (error) {
     const status = (error as {status?:number}).status || 400
     return NextResponse.json({error:message(error)},{status})
