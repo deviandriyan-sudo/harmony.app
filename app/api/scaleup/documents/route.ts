@@ -1,5 +1,6 @@
 import { NextRequest,NextResponse } from 'next/server'
 import { scaleupContext,requireScaleupEmployee,scaleupRouteError } from '@/lib/server/scaleup'
+import { validUploadFileSignature } from '@/lib/server/upload-validation'
 export const runtime='nodejs'
 const BUCKET='scaleup-private'
 const allowed=new Set(['application/pdf','image/png','image/jpeg'])
@@ -32,6 +33,8 @@ export async function POST(request:NextRequest) {
     const file=form.get('file')
     if(!(file instanceof File) || file.size<1 || file.size>8*1024*1024 || !allowed.has(file.type))
       throw Error('Dokumen harus PDF/JPG/PNG berukuran maksimum 8 MB.')
+    if(!(await validUploadFileSignature(file)))
+      throw Object.assign(new Error('Isi file tidak sesuai format PDF/JPG/PNG.'),{status:400})
     const requestId=String(form.get('request_id')||'')||null
     const recordId=String(form.get('record_id')||'')||null
     const category=String(form.get('category')||'supporting')

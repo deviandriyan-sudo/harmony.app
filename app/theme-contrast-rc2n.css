@@ -1,0 +1,135 @@
+/* HARMONY RC2N — Theme contrast harmonization.
+ * This layer is deliberately scoped to interactive UI. Do not alter printed
+ * documents, avatar/logo plates, or intentionally dark hero banners.
+ */
+@media screen {
+  html[data-harmony-theme='dark'] {
+    --harmony-rc2n-control:#173a60;
+    --harmony-rc2n-control-hover:#28527b;
+    --harmony-rc2n-control-border:rgba(155,203,242,.44);
+    --harmony-rc2n-control-text:#f3f9ff;
+  }
+  html[data-harmony-theme='light'] {
+    --harmony-rc2n-control:#f6faff;
+    --harmony-rc2n-control-hover:#e6f2ff;
+    --harmony-rc2n-control-border:rgba(68,114,169,.30);
+    --harmony-rc2n-control-text:#123252;
+  }
+
+  /* Stage 1: buttons previously retained a hard-coded light gradient in dark
+     mode despite inheriting white text; repair foreground and surface together. */
+  html[data-harmony-theme] .harmony-workspace :is(
+    .harmony-action-soft,.harmony-button-secondary,
+    .harmony-button-native-outline,.harmony-button-native-secondary
+  ) {
+    background:var(--harmony-rc2n-control) !important;
+    border-color:var(--harmony-rc2n-control-border) !important;
+    color:var(--harmony-rc2n-control-text) !important;
+  }
+  html[data-harmony-theme] .harmony-workspace :is(
+    .harmony-action-soft,.harmony-button-secondary,
+    .harmony-button-native-outline,.harmony-button-native-secondary
+  ):hover:not(:disabled) {
+    background:var(--harmony-rc2n-control-hover) !important;
+    color:var(--harmony-rc2n-control-text) !important;
+  }
+  html[data-harmony-theme] .harmony-workspace :is(
+    .harmony-action-soft,.harmony-button-secondary,
+    .harmony-button-native-outline,.harmony-button-native-secondary
+  ):disabled { opacity:.75 !important; }
+
+  html[data-harmony-theme='dark'] .harmony-workspace .harmony-action-info {
+    background:var(--h385-info-bg) !important;
+    color:var(--h385-info-ink) !important;
+    border-color:var(--harmony-rc2n-control-border) !important;
+  }
+  html[data-harmony-theme='dark'] .harmony-workspace .harmony-action-danger {
+    background:var(--h385-danger-bg) !important;
+    color:var(--h385-danger-ink) !important;
+    border-color:var(--harmony-rc2n-control-border) !important;
+  }
+
+  /* Stage 2: nested legacy white/gray cards. Applies to panels, not standalone
+     brand symbols, gradients, badges, or white-paper print templates. */
+  html[data-harmony-theme='dark'] :is(.harmony-workspace,.harmony-modal-surface) :is(div,section,article,aside)[class~='bg-white']:not(.harmony-print-document):not(.harmony-login-logo-plate),
+  html[data-harmony-theme='dark'] :is(.harmony-workspace,.harmony-modal-surface) :is(div,section,article,aside)[class*='bg-white/']:not(.harmony-print-document):not(.harmony-login-logo-plate) {
+    background-color:var(--h385-surface-subtle) !important;
+    border-color:var(--h385-glass-border) !important;
+  }
+  html[data-harmony-theme='dark'] :is(.harmony-workspace,.harmony-modal-surface) :is(div,section,article,aside)[class*='bg-[#f5f5f7]'],
+  html[data-harmony-theme='dark'] :is(.harmony-workspace,.harmony-modal-surface) :is(div,section,article,aside)[class*='bg-[#f2f3f5]'] {
+    background:var(--h385-surface-subtle) !important;
+    border-color:var(--h385-glass-border) !important;
+  }
+  html[data-harmony-theme='dark'] :is(.harmony-workspace,.harmony-modal-surface) :is(input,textarea,select)[class*='bg-white'],
+  html[data-harmony-theme='dark'] :is(.harmony-workspace,.harmony-modal-surface) :is(input,textarea,select)[class*='bg-[#f5f5f7]'] {
+    background:var(--harmony-rc2n-control) !important;
+    color:var(--harmony-rc2n-control-text) !important;
+    border-color:var(--harmony-rc2n-control-border) !important;
+    color-scheme:dark;
+  }
+
+  /* Legacy gray text is otherwise dark gray on deep blue after panel remap. */
+  html[data-harmony-theme='dark'] :is(.harmony-workspace,.harmony-modal-surface) :is(
+    [class~='text-gray-400'],[class~='text-gray-500'],[class~='text-gray-600'],
+    [class~='text-slate-400'],[class~='text-slate-500'],[class~='text-slate-600'],
+    [class~='text-zinc-500'],[class~='text-zinc-600']
+  ) {color:var(--h385-ink-soft) !important;}
+  html[data-harmony-theme='dark'] :is(.harmony-workspace,.harmony-modal-surface) :is(
+    [class~='text-gray-700'],[class~='text-gray-800'],[class~='text-gray-900'],
+    [class~='text-slate-700'],[class~='text-slate-800'],[class~='text-slate-900'],
+    [class~='text-zinc-700'],[class~='text-zinc-800'],[class~='text-zinc-900']
+  ) {color:var(--h385-ink) !important;}
+
+  /* Explicit semantic hero region is intentionally dark in both modes. */
+  html[data-harmony-theme] .harmony-workspace :is(
+    .harmony-reference-hero,.harmony-review-hero,.harmony-employee-hero,
+    .harmony-hero-v25,.harmony-glass-dark,.harmony-glass-role-hero,.scaleup-hero
+  ) :is(h1,h2,h3,h4,[class~='harmony-text-primary']) {color:#fff !important;}
+  html[data-harmony-theme] .harmony-workspace :is(
+    .harmony-reference-hero,.harmony-review-hero,.harmony-employee-hero,
+    .harmony-hero-v25,.harmony-glass-dark,.harmony-glass-role-hero,.scaleup-hero
+  ) :is(p,small,[class~='harmony-text-secondary'],[class~='harmony-text-muted']) {color:#e2effd !important;}
+
+  /* Stage 3: account recovery and Google callback panels are outside the role
+     workspace, so they need their own foreground/background pairing. */
+  html[data-harmony-theme='dark'] .harmony-public-shell > section:last-child {
+    background:var(--h385-surface) !important;
+    color:var(--h385-ink) !important;
+  }
+  html[data-harmony-theme='dark'] .harmony-public-shell > section:last-child :is(
+    div,button
+  )[class*='bg-[#f5f5f7]'] {
+    background:var(--h385-surface-subtle) !important;
+    border-color:var(--h385-glass-border) !important;
+    color:var(--h385-ink) !important;
+  }
+  html[data-harmony-theme='dark'] .harmony-public-shell > section:last-child [class*='bg-[#e8f2ff]'] {
+    background:var(--h385-info-bg) !important;
+    color:var(--h385-info-ink) !important;
+  }
+  html[data-harmony-theme='dark'] .harmony-public-shell > section:last-child :is(input,select,textarea) {
+    color:var(--h385-ink) !important;
+    caret-color:var(--h385-ink);
+  }
+  html[data-harmony-theme='dark'] .harmony-public-shell > section:last-child :is(input,textarea)::placeholder {
+    color:var(--h385-ink-muted) !important;
+    opacity:1;
+  }
+  html[data-harmony-theme='dark'] .harmony-public-shell > section:last-child .bg-blue-50 {
+    background:var(--h385-info-bg) !important;
+    color:var(--h385-info-ink) !important;
+    border-color:var(--h385-glass-border) !important;
+  }
+  html[data-harmony-theme='dark'] .harmony-public-shell > section:last-child .bg-red-50 {
+    background:var(--h385-danger-bg) !important;
+    color:var(--h385-danger-ink) !important;
+    border-color:var(--h385-glass-border) !important;
+  }
+
+  html[data-harmony-theme] :is(.harmony-workspace,.harmony-modal-surface,.harmony-public-shell)
+    :is(button,a,input,select,textarea):focus-visible {
+    outline:2px solid var(--h385-focus) !important;
+    outline-offset:3px;
+  }
+}

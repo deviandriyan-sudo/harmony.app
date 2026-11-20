@@ -1,5 +1,5 @@
 
-import { readErrorMessage } from '@/lib/error-utils'
+import { validUploadFileSignature } from '@/lib/server/upload-validation'
 import { unreferencedAttendanceProofPaths } from '@/lib/server/phl-evidence-preservation'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
@@ -50,7 +50,7 @@ function safeFileName(value: string) {
     .slice(-120) || 'file'
 }
 
-function validateFile(file: File) {
+async function validateFile(file: File) {
   const extension = clean(file.name).split('.').pop()?.toLowerCase() || ''
   if (!ALLOWED_EXTENSIONS.has(extension)) {
     return 'Format file tidak didukung. Gunakan PDF, JPG, PNG, WEBP, DOC/DOCX, atau XLS/XLSX.'
@@ -58,6 +58,10 @@ function validateFile(file: File) {
 
   if (file.size > MAX_FILE_BYTES) {
     return `Ukuran ${file.name} melebihi 10 MB.`
+  }
+
+  if (!(await validUploadFileSignature(file))) {
+    return 'Isi file tidak sesuai dengan format atau MIME dokumen.'
   }
 
   return ''
@@ -378,9 +382,9 @@ export async function GET(request: NextRequest) {
       success: true,
       attachments: data || [],
     })
-  } catch (error: unknown) {
+  } catch {
     return NextResponse.json(
-      { success: false, error: readErrorMessage(error) || 'Lampiran gagal dimuat.' },
+      { success: false, error: 'Lampiran gagal dimuat.' },
       { status: 500 },
     )
   }
@@ -486,7 +490,7 @@ export async function POST(request: NextRequest) {
       .filter((item): item is File => item instanceof File && item.size > 0)
 
     for (const file of files) {
-      const validation = validateFile(file)
+      const validation = await validateFile(file)
       if (validation) {
         return NextResponse.json({ success: false, error: validation }, { status: 400 })
       }
@@ -616,9 +620,9 @@ export async function POST(request: NextRequest) {
       attachments: attachments || [],
       message: `${attachments?.length || 0} dokumen pendukung tersimpan.`,
     })
-  } catch (error: unknown) {
+  } catch {
     return NextResponse.json(
-      { success: false, error: readErrorMessage(error) || 'Lampiran gagal disimpan.' },
+      { success: false, error: 'Lampiran gagal disimpan.' },
       { status: 500 },
     )
   }
@@ -755,9 +759,9 @@ export async function DELETE(request: NextRequest) {
       success: true,
       message: 'Lampiran draft berhasil dihapus.',
     })
-  } catch (error: unknown) {
+  } catch {
     return NextResponse.json(
-      { success: false, error: readErrorMessage(error) || 'Lampiran gagal dihapus.' },
+      { success: false, error: 'Lampiran gagal dihapus.' },
       { status: 500 },
     )
   }

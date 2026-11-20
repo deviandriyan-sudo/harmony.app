@@ -16,6 +16,7 @@ import {
 } from 'lucide-react'
 
 import { changeHarmonyPassword } from '@/lib/account-password'
+import { clearRecoveryCredentialsFromUrl, parseRecoveryCallback } from '@/lib/auth-recovery'
 import { supabase } from '@/lib/supabase'
 
 export default function ResetPasswordPage() {
@@ -33,53 +34,80 @@ export default function ResetPasswordPage() {
   const [message, setMessage] = useState('')
   const [messageType, setMessageType] = useState<'error' | 'info'>('info')
 
-  async function checkRecoverySession() {
-    setCheckingSession(true)
-
-    try {
-      const { data } = await supabase.auth.getSession()
-
-      if (data.session) {
-        setHasRecoverySession(true)
-        setMessage('Silakan masukkan password baru Anda.')
-        setMessageType('info')
-      } else {
-        setHasRecoverySession(false)
-        setMessage(
-          'Link reset password tidak valid atau sudah kedaluwarsa. Silakan minta link baru dari halaman login.'
-        )
-        setMessageType('error')
-      }
-    } catch (error: unknown) {
-      console.error(error)
-      setMessage(
-        readErrorMessage(error) ||
-          'Gagal memeriksa link reset password. Silakan coba lagi.'
-      )
-      setMessageType('error')
-    } finally {
-      setCheckingSession(false)
-    }
-  }
-
   useEffect(() => {
     let active = true
-    queueMicrotask(() => { if (active) void checkRecoverySession() })
+    let recoveryEventSeen = false
 
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'PASSWORD_RECOVERY' && session) {
-        setHasRecoverySession(true)
-        setMessage('Silakan masukkan password baru Anda.')
-        setMessageType('info')
-      }
+    const acceptRecovery = () => {
+      if (!active) return
+      recoveryEventSeen = true
+      setHasRecoverySession(true)
+      setCheckingSession(false)
+      setMessage('Link recovery valid. Silakan masukkan password baru Anda.')
+      setMessageType('info')
+    }
+
+    // Subscribe before handling the callback to avoid missing PASSWORD_RECOVERY.
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'PASSWORD_RECOVERY' && session) acceptRecovery()
     })
 
-    return () => {
-      active = false
-      subscription.unsubscribe()
+    async function verifyRecovery() {
+      const callback = parseRecoveryCallback(window.location.href)
+      try {
+        if (callback.kind === 'error') {
+          throw new Error('Link reset password tidak valid atau sudah kedaluwarsa. Silakan minta link baru.')
+        }
+        if (callback.kind === 'otp') {
+          const { error } = await supabase.auth.verifyOtp({ token_hash: callback.tokenHash, type: 'recovery' })
+          if (error) throw error
+        } else if (callback.kind === 'pkce') {
+          const { error } = await supabase.auth.exchangeCodeForSession(callback.code)
+          if (error) throw error
+        } else if (callback.kind === 'implicit') {
+          const { error } = await supabase.auth.setSession({
+            access_token: callback.accessToken,
+            refresh_token: callback.refreshToken,
+          })
+          if (error) {
+            // Supabase's implicit-flow auto-initialization may have already
+            // consumed the URL token. Accept that race only if the JWT from
+            // the link still identifies the authenticated current user.
+            const [linked, current] = await Promise.all([
+              supabase.auth.getUser(callback.accessToken),
+              supabase.auth.getUser(),
+            ])
+            if (linked.error || !linked.data.user || current.error ||
+                current.data.user?.id !== linked.data.user.id) throw error
+          }
+        }
+
+        // A stale unrelated login session must not be treated as proof that
+        // a password recovery email has been opened.
+        if (callback.kind === 'none' && !recoveryEventSeen) {
+          throw new Error('Buka halaman ini melalui link Lupa Password yang dikirim ke email Anda.')
+        }
+
+        const { data, error } = await supabase.auth.getUser()
+        if (error || !data.user) throw new Error('Sesi recovery tidak valid atau sudah kedaluwarsa.')
+
+        // Never keep recovery credentials in browser history after exchange.
+        if (callback.kind === 'otp' || callback.kind === 'pkce' || callback.kind === 'implicit') {
+          window.history.replaceState(null, '', clearRecoveryCredentialsFromUrl(window.location.href))
+        }
+        acceptRecovery()
+      } catch (error: unknown) {
+        if (!active || recoveryEventSeen) return
+        setHasRecoverySession(false)
+        setMessage(readErrorMessage(error) || 'Gagal memverifikasi link reset password.')
+        setMessageType('error')
+      } finally {
+        if (active) setCheckingSession(false)
+      }
     }
+
+    queueMicrotask(() => { if (active) void verifyRecovery() })
+    return () => { active = false; subscription.unsubscribe() }
   }, [])
 
   async function handleUpdatePassword(event: React.FormEvent<HTMLFormElement>) {

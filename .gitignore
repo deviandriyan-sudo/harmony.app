@@ -50,3 +50,5 @@ node_modules.zip
 /lint-stage*-results.json
 /npm-audit.json
 /npm-audit-production.json
+
+/harmony.app.zip

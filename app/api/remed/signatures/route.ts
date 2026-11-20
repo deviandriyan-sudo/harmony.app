@@ -7,6 +7,7 @@ import {
   safeFileName,
 } from '@/lib/remed'
 import { requireRemedApi, remedApiError } from '@/lib/server/remed-api-auth'
+import { validUploadSignature } from '@/lib/server/upload-validation'
 import { getRemedSignatureDisplay, getRemedSignatureManagement } from '@/lib/server/remed-signatures'
 
 export async function GET(request: NextRequest) {
@@ -78,6 +79,9 @@ export async function POST(request: NextRequest) {
     if (existingError) throw existingError
 
     const bytes = Buffer.from(await file.arrayBuffer())
+    if (!validUploadSignature(file.name, bytes, file.type)) {
+      throw Object.assign(new Error('Isi gambar tanda tangan tidak sesuai format PNG/JPG/WEBP.'), { status: 400 })
+    }
     uploadedPath = `${targetEmployeeId}/${Date.now()}-${safeFileName(file.name)}`
 
     const { error: uploadError } = await ctx.admin.storage

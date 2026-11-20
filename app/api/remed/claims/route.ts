@@ -11,6 +11,7 @@ import {
   safeFileName,
 } from '@/lib/remed'
 import { requireRemedApi, remedApiError } from '@/lib/server/remed-api-auth'
+import { uploadExpectedMime, validUploadFileSignature, validUploadSignature } from '@/lib/server/upload-validation'
 import { enrichRemedClaims } from '@/lib/server/remed-data'
 import { notifyRemedClaimSubmitted } from '@/lib/server/workflow-notifications'
 
@@ -44,7 +45,7 @@ function validateFiles(files: File[]) {
   for (const file of files) {
     const mimeType = inferredMimeType(file.name, file.type)
     if (file.size > REMED_MAX_FILE_SIZE) throw Object.assign(new Error(`File ${file.name} melebihi 10 MB.`), { status: 400 })
-    if (!REMED_ALLOWED_MIME_TYPES.has(mimeType)) throw Object.assign(new Error(`Format ${file.name} tidak didukung.`), { status: 400 })
+    if (!REMED_ALLOWED_MIME_TYPES.has(mimeType) || uploadExpectedMime(file.name) !== mimeType) throw Object.assign(new Error(`Format ${file.name} tidak didukung.`), { status: 400 })
   }
 }
 
@@ -74,7 +75,7 @@ function parseStagedReceipts(formData: FormData, employeeId: string) {
       throw Object.assign(new Error('Metadata upload kuitansi tidak sesuai dengan employee aktif.'), { status: 400 })
     }
     if (fileSize > REMED_MAX_FILE_SIZE) throw Object.assign(new Error(`File ${fileName} melebihi 10 MB.`), { status: 400 })
-    if (!REMED_ALLOWED_MIME_TYPES.has(mimeType)) throw Object.assign(new Error(`Format ${fileName} tidak didukung.`), { status: 400 })
+    if (!REMED_ALLOWED_MIME_TYPES.has(mimeType) || uploadExpectedMime(fileName) !== mimeType) throw Object.assign(new Error(`Format ${fileName} tidak didukung.`), { status: 400 })
 
     return { path, fileName, fileSize, mimeType }
   })
@@ -117,12 +118,32 @@ export async function POST(request: NextRequest) {
     const formData = await request.formData()
     const files = normalizeFiles(formData)
     validateFiles(files)
+    for (const file of files) {
+      if (!(await validUploadFileSignature(file))) {
+        throw Object.assign(new Error(`Isi bukti ${file.name} tidak sesuai format.`), { status: 400 })
+      }
+    }
     const stagedReceipts = parseStagedReceipts(formData, ctx.access.employee_id)
-    stagedReceipts.forEach((receipt) => stagedPaths.add(receipt.path))
-
     const receiptCount = files.length + stagedReceipts.length
     if (receiptCount < 1) throw Object.assign(new Error('Minimal 1 bukti kuitansi wajib diunggah.'), { status: 400 })
     if (receiptCount > REMED_MAX_FILES) throw Object.assign(new Error(`Maksimal ${REMED_MAX_FILES} file bukti.`), { status: 400 })
+    stagedReceipts.forEach((receipt) => stagedPaths.add(receipt.path))
+
+    // Signed direct uploads bypass the request body. Verify the actual stored
+    // bytes (not just metadata supplied by the browser) before issuing an RPC
+    // that creates financial claims. Never move unvalidated staged objects.
+    for (const receipt of stagedReceipts) {
+      const { data: stored, error: downloadError } = await ctx.admin.storage.from(REMED_BUCKET).download(receipt.path)
+      if (downloadError || !stored || stored.size !== receipt.fileSize || stored.size > REMED_MAX_FILE_SIZE) {
+        throw Object.assign(new Error('File bukti yang diunggah tidak ditemukan atau ukurannya berbeda.'), { status: 400 })
+      }
+      const bytes = new Uint8Array(await stored.arrayBuffer())
+      if (!validUploadSignature(receipt.fileName, bytes, receipt.mimeType)) {
+        throw Object.assign(new Error(`Isi bukti ${receipt.fileName} tidak sesuai format.`), { status: 400 })
+      }
+    }
+
+
 
     const claimTypeId = String(formData.get('claim_type_id') || '').trim()
     const treatmentDate = String(formData.get('treatment_date') || '').trim()

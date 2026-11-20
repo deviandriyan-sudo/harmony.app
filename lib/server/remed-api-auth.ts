@@ -107,9 +107,13 @@ export async function requireRemedApi(
 }
 
 export function remedApiError(error: unknown, fallback = 'Terjadi kesalahan pada Re-Med.') {
-  const value = error as { message?: string; status?: number }
+  const value = error as { message?: string; status?: number } | null
+  const requestedStatus = Number(value?.status)
+  const status = Number.isInteger(requestedStatus) && requestedStatus >= 400 && requestedStatus < 600
+    ? requestedStatus : 500
   return {
-    status: Number(value?.status || 500),
-    message: value?.message || fallback,
+    status,
+    // PostgreSQL, Storage and Auth internals must not be forwarded to browsers.
+    message: status < 500 ? (value?.message || fallback) : fallback,
   }
 }

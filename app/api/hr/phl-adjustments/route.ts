@@ -1,5 +1,6 @@
 
 import { readErrorMessage } from '@/lib/error-utils'
+import { validUploadFileSignature } from '@/lib/server/upload-validation'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 
@@ -43,7 +44,7 @@ function safeFileName(value: string) {
   )
 }
 
-function validateFile(file: File) {
+async function validateFile(file: File) {
   const extension = clean(file.name).split('.').pop()?.toLowerCase() || ''
 
   if (!ALLOWED_EXTENSIONS.has(extension)) {
@@ -52,6 +53,10 @@ function validateFile(file: File) {
 
   if (file.size > MAX_FILE_BYTES) {
     return `Ukuran ${file.name} melebihi 10 MB.`
+  }
+
+  if (!(await validUploadFileSignature(file))) {
+    return 'Isi file tidak sesuai dengan format atau MIME dokumen.'
   }
 
   return ''
@@ -225,7 +230,7 @@ export async function POST(request: NextRequest) {
     }
 
     for (const file of files) {
-      const validation = validateFile(file)
+      const validation = await validateFile(file)
       if (validation) {
         return NextResponse.json({ success: false, error: validation }, { status: 400 })
       }

@@ -1,3 +1,12 @@
+// This package intentionally excludes production SQL artifacts.
+// Preserve SQL-specific verification as BLOCKED, never as a false PASS.
+import { existsSync as rc2mExistsSync } from 'node:fs'
+const rc2mMissingSQL = ['SQL_ONLY/12_STAGE8_DATABASE_SECURITY_AND_CRON_DIAGNOSTIC_READ_ONLY.sql', 'SQL_ONLY/13_STAGE8_RESTRICT_INTERNAL_LIFECYCLE_RPC_OPTIONAL.sql'].filter(file => !rc2mExistsSync(file))
+if (rc2mMissingSQL.length) {
+  console.error('BLOCKED: SQL-only audit artifacts were deliberately excluded from the source package: ' + rc2mMissingSQL.join(', '))
+  process.exit(2)
+}
+
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
 const read = (p) => fs.readFileSync(p,'utf8')

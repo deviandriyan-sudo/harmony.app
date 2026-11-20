@@ -14,5 +14,6 @@ export async function requireProfileAccess(request: NextRequest, targetId?: stri
 }
 export function profileError(error: unknown) {
   const e = error as {message?:string,status?:number}
-  return {status: e.status && e.status>=400 && e.status<600 ? e.status : 500, message: e.status ? e.message : 'Permintaan gagal. Periksa konfigurasi database profil.'}
+  const status = Number.isInteger(e?.status) && Number(e.status) >= 400 && Number(e.status) < 600 ? Number(e.status) : 500
+  return {status, message: status < 500 ? e.message || 'Permintaan profil tidak dapat diproses.' : 'Permintaan profil gagal diproses.'}
 }

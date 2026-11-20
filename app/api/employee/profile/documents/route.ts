@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireProfileAccess, profileError } from '@/lib/server/employee-profile-auth'
 import { requireHarmonyApi } from '@/lib/server/user-api-auth'
 import { PROFILE_DOC_CATEGORIES } from '@/lib/profile-schema'
+import { validUploadSignature } from '@/lib/server/upload-validation'
 export const runtime = 'nodejs'
 const BUCKET='harmony-employee-private'
 const MAX_BYTES=8*1024*1024
@@ -18,9 +19,7 @@ export async function POST(request:NextRequest){
     if(!MIME[extension] || file.size<=0 || file.size>MAX_BYTES || (category==='avatar'&&!isImage) || (file.type&&file.type!==MIME[extension]))return NextResponse.json({message:'Format/ukuran file tidak valid (maks 8 MB).'}, {status:400})
     const id=crypto.randomUUID(),path=`${ctx.employeeId}/${id}.${extension}`
     const bytes=new Uint8Array(await file.arrayBuffer())
-    const hasPrefix=(magic:number[])=>magic.every((v,i)=>bytes[i]===v)
-    const magicOkay=extension==='pdf'?hasPrefix([37,80,68,70,45]):extension==='png'?hasPrefix([137,80,78,71,13,10,26,10]):['jpg','jpeg'].includes(extension)?hasPrefix([255,216,255]):extension==='webp'?hasPrefix([82,73,70,70])&&String.fromCharCode(...bytes.slice(8,12))==='WEBP':extension==='docx'?hasPrefix([80,75,3,4]):false
-    if(!magicOkay)return NextResponse.json({message:'Isi dokumen tidak sesuai format file.'},{status:400})
+    if(!validUploadSignature(file.name,bytes,file.type))return NextResponse.json({message:'Isi dokumen tidak sesuai format file.'},{status:400})
     const res=await ctx.admin.storage.from(BUCKET).upload(path,bytes,{contentType:MIME[extension],upsert:false})
     if(res.error) throw res.error
     const saved=await ctx.admin.from('harmony_employee_profile_documents').insert({id,employee_id:ctx.employeeId,category,storage_path:path,original_name:file.name.slice(0,180),mime_type:MIME[extension],size_bytes:file.size,uploaded_by:ctx.authUserId}).select('id').single()

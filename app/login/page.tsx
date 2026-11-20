@@ -178,20 +178,31 @@ export default function LoginPage() {
       return
     }
 
-    if (!email.trim()) {
-      setMessage('Masukkan email terlebih dahulu.')
+    const targetEmail = email.trim().toLowerCase()
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(targetEmail)) {
+      setMessage('Masukkan alamat email yang valid terlebih dahulu.')
       setMessageType('error')
       return
     }
 
     setLoading(true)
-    const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
-      redirectTo: `${window.location.origin}/reset-password`,
-    })
-
-    setMessage(error?.message || 'Link reset password telah dikirim jika akun tersedia.')
-    setMessageType(error ? 'error' : 'info')
-    setLoading(false)
+    setMessage('')
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(targetEmail, {
+        redirectTo: `${window.location.origin}/reset-password?flow=recovery`,
+      })
+      if (error) throw error
+      setMessage('Jika email terdaftar, link reset password akan dikirim. Periksa inbox dan spam. Link hanya bisa digunakan satu kali.')
+      setMessageType('info')
+    } catch (error: unknown) {
+      const original = readErrorMessage(error)
+      setMessage(/rate limit|too many|429|seconds/i.test(original)
+        ? 'Permintaan terlalu sering. Silakan coba kembali setelah beberapa saat.'
+        : 'Pengiriman link reset gagal. Periksa konfigurasi email dan URL redirect Supabase atau hubungi administrator.')
+      setMessageType('error')
+    } finally {
+      setLoading(false)
+    }
   }
 
   if (checkingSession) {

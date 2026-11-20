@@ -41,7 +41,9 @@
     "test:rc2h": "node scripts/test-rc2h-approval-integrity.mjs",
     "test:rc2h:sql": "node scripts/test-rc2h-approval-integrity.mjs --require-sql",
     "test:rc2i": "node scripts/test-rc2i-source-guards.mjs",
-    "test:rc2i:sql": "node scripts/test-rc2i-sql-artifacts.mjs"
+    "test:rc2i:sql": "node scripts/test-rc2i-sql-artifacts.mjs",
+    "test:upload-security": "node scripts/test-rc2m-upload-security.cjs",
+    "test:recovery-theme": "node scripts/test-rc2n-recovery-theme.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.107.0",

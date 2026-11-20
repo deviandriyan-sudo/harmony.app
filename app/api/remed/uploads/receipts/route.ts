@@ -9,6 +9,7 @@ import {
   safeFileName,
 } from '@/lib/remed'
 import { requireRemedApi, remedApiError } from '@/lib/server/remed-api-auth'
+import { uploadExpectedMime } from '@/lib/server/upload-validation'
 
 type ReceiptInput = {
   name?: string
@@ -51,7 +52,7 @@ function validateReceiptInputs(files: ReturnType<typeof normalizeReceiptInputs>)
     if (file.size > REMED_MAX_FILE_SIZE) {
       throw Object.assign(new Error(`File ${file.name} melebihi 10 MB.`), { status: 400 })
     }
-    if (!REMED_ALLOWED_MIME_TYPES.has(file.mimeType)) {
+    if (!REMED_ALLOWED_MIME_TYPES.has(file.mimeType) || uploadExpectedMime(file.name) !== file.mimeType) {
       throw Object.assign(new Error(`Format ${file.name} tidak didukung. Gunakan PDF/JPG/PNG/WEBP.`), { status: 400 })
     }
   }
