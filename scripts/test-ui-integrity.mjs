@@ -33,7 +33,14 @@ assert(tab.includes('aria-current={active ?'),'Navigation active accessibility m
 assert(tab.includes('harmony-subnav-more') && tab.includes('overflow'),'Progressive disclosure missing')
 assert(ui.includes('href={href}') && ui.includes('focus-visible'),'Quick links/accessibility missing')
 assert(css.includes('HARMONY UX V3.7.8') && css.includes('prefers-reduced-motion'),'Compact UI CSS missing')
-for(const action of ['/hr/attendance/upload','/employee/leave','/employee/phl','/employee/account','/remed/finance/payments']) {
- assert([read('app/hr/dashboard/page.tsx'),read('app/employee/dashboard/page.tsx'),read('components/remed/RemedAdminDashboard.tsx')].join('\n').includes(action),`Dashboard action missing ${action}`)
+// Approved RC2O: shortcuts are removed from dashboards; routes remain in navigation.
+const screens = [read('app/hr/dashboard/page.tsx'),read('app/employee/dashboard/page.tsx'),read('components/remed/RemedAdminDashboard.tsx')].join('\n')
+for(const action of ['/employee/leave','/employee/phl','/remed/finance/payments']) {
+ assert(screens.includes(action),`Critical role action missing ${action}`)
 }
+for(const action of ['/hr/attendance/upload','/employee/account']) {
+ assert(nav.includes(action),`Critical route missing from navigation ${action}`)
+}
+assert(read('app/hr/dashboard/page.tsx').includes('Monitoring Tidak Hadir') && read('app/hr/dashboard/page.tsx').includes('Perlu Tindakan HR'), 'HR monitoring/priority panel missing')
+assert(read('app/employee/dashboard/page.tsx').includes('Informasi & Approval Tim'), 'Supervisor unified panel missing')
 console.log(`HARMONY UI integrity PASS: ${routes.size} pages; preserved role actions, periods, document entry points`)

@@ -19,7 +19,7 @@ for(const required of ['harmony-login-campus','HarmonyThemeToggle','src="/logo.p
 }
 assert(login.includes('harmony-login-shutter--left') && login.includes('harmony-login-shutter--right'),'Login opening motion removed')
 assert(layout.includes('<HarmonyThemeProvider>') && layout.includes('<SystemMaintenanceGate>'), 'Theme or security gate missing from root layout')
-assert(sidebar.includes('HarmonyThemeToggle') && sidebar.includes('harmony-sidebar-theme'), 'Theme switch missing from sidebar')
+assert(!sidebar.includes('HarmonyThemeToggle') && read('components/layout/Topbar.tsx').includes('<HarmonyThemeToggle compact'), 'Theme switch must be single global control in topbar, not sidebar')
 for(const required of ['harmony-color-theme','prefers-color-scheme: dark','localStorage.setItem','window.addEventListener(\'storage\'','data',"document.documentElement.dataset.harmonyTheme"]) assert(provider.includes(required),`Missing theme persistence: ${required}`)
 for(const required of ['aria-pressed','aria-label="Aktifkan mode gelap"','aria-label="Aktifkan mode terang"']) assert(toggle.includes(required),`Theme toggle accessibility missing: ${required}`)
 for(const required of ["html[data-harmony-theme='dark']","html[data-harmony-theme='light']",'--h-color-text','--h-color-glass-border','--h-color-focus','url(\'/harmony-campus.jpg\')','prefers-reduced-motion','prefers-reduced-transparency']) assert(css.includes(required),`Theme tokens/fallbacks missing: ${required}`)

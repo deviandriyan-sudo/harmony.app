@@ -21,6 +21,7 @@ import { createPortal } from 'react-dom'
 import { usePathname, useRouter } from 'next/navigation'
 import { navigationSearchEntries, type NavigationRole } from '@/lib/navigation'
 
+import { HarmonyThemeToggle } from '@/components/theme/ThemeToggle'
 import { supabase } from '@/lib/supabase'
 import type {
   HarmonyActionTask,
@@ -564,14 +565,14 @@ export function Topbar({
 
   return (
     <header className="harmony-topbar sticky top-0 z-30 border-b">
-      <div className={`flex flex-col gap-4 px-5 py-4 sm:px-6 xl:flex-row xl:items-center xl:justify-between ${compact ? "min-h-[72px]" : "min-h-[108px]"}`}>
+      <div className={`flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 sm:px-5 ${compact ? "min-h-[58px]" : "min-h-[64px]"}`}>
         <div className={compact ? "sr-only" : "min-w-0"}>
-          <div className="harmony-topbar-badge mb-2.5 inline-flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-[11px] font-bold harmony-text-secondary">
+          <div className="harmony-topbar-badge hidden items-center gap-2 rounded-full border px-3.5 py-1.5 text-[11px] font-bold harmony-text-secondary">
             <Sparkles size={14} className="harmony-text-link" />
             {badge}
           </div>
 
-          <h1 className="truncate text-[28px] font-semibold tracking-[-0.045em] harmony-text-primary">
+          <h1 className="truncate text-[22px] font-semibold tracking-[-0.045em] harmony-text-primary">
             {title}
           </h1>
 
@@ -582,8 +583,8 @@ export function Topbar({
           )}
         </div>
 
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-          <div ref={searchRef} className="relative min-w-0 w-full sm:w-[360px] xl:w-[390px]">
+        <div className="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-2 sm:flex-initial">
+          <div ref={searchRef} className="relative min-w-0 w-full sm:w-[230px] xl:w-[280px]">
             <div className="harmony-topbar-search flex h-11 w-full min-w-0 items-center gap-3 rounded-full border px-4 transition focus-within:border-blue-300">
               <Search size={18} className="shrink-0 harmony-text-muted" aria-hidden="true" />
               <input
@@ -615,6 +616,7 @@ export function Topbar({
             )}
           </div>
 
+          <HarmonyThemeToggle compact className="harmony-theme-toggle-global" />
           <div ref={dropdownRef} className="relative">
             <button
               type="button"

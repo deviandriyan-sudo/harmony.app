@@ -76,5 +76,6 @@ const apiDir = path.join(root, 'app/api')
 function countApi(dir) { let count = 0; for (const ent of fs.readdirSync(dir, {withFileTypes:true})) { const full=path.join(dir,ent.name); if(ent.isDirectory())count+=countApi(full); else if(ent.name==='route.ts')count++ }return count }
 apis=countApi(apiDir)
 assert.equal(pages, 66, 'Original page inventory must remain unchanged')
-assert.equal(apis, 57, 'Original API inventory must remain unchanged')
+assert.equal(apis, 60, 'RC2O adds exactly three guarded read-only API routes')
+for (const expected of ['app/api/hr/dashboard/monitoring/route.ts','app/api/employee/dashboard/approval-summary/route.ts','app/api/remed/finance/summary/route.ts']) assert(fs.existsSync(path.join(root, expected)), `Missing RC2O read-only endpoint: ${expected}`)
 console.log(`PASS: RC2F modal route audit: ${pages} pages + ${apis} APIs; ${hits.length} fullscreen overlay roots checked; 0 unportaled routes (HR employee and shared portal already body-portaled).`)

@@ -676,6 +676,7 @@ export function TodayTeamAvailability() {
   const [items, setItems] = useState<TeamHistoryItem[]>([])
   const [message, setMessage] = useState('')
   const [selectedMonth, setSelectedMonth] = useState(currentMonthKey())
+  const [activeCategory,setActiveCategory] = useState<keyof typeof categoryMeta>('leave')
   const [monthOptions, setMonthOptions] = useState<MonthOption[]>(() =>
     buildMonthOptions(),
   )
@@ -869,7 +870,7 @@ export function TodayTeamAvailability() {
   }
 
   return (
-    <section className="rounded-[32px] border border-black/5 bg-white shadow-sm">
+    <section className="harmony-rc2o-team rounded-[20px] border shadow-sm">
       <div className="flex flex-col gap-4 border-b border-black/5 p-5 sm:p-6 xl:flex-row xl:items-center xl:justify-between">
         <div>
           <div className="flex flex-wrap items-center gap-2">
@@ -936,25 +937,16 @@ export function TodayTeamAvailability() {
         </div>
       )}
 
-      <div className="grid gap-4 p-5 sm:p-6 xl:grid-cols-3">
-        <HistoryColumn
-          category="leave"
-          items={grouped.leave}
-          loading={loading}
-          periodLabel={periodLabel}
-        />
-        <HistoryColumn
-          category="phl_claim"
-          items={grouped.phl_claim}
-          loading={loading}
-          periodLabel={periodLabel}
-        />
-        <HistoryColumn
-          category="absence"
-          items={grouped.absence}
-          loading={loading}
-          periodLabel={periodLabel}
-        />
+      <div className="flex flex-wrap gap-2 px-4 pt-4 sm:px-5" role="group" aria-label="Jenis informasi kehadiran tim">
+        {(Object.keys(categoryMeta) as Array<keyof typeof categoryMeta>).map(key => (
+          <button key={key} type="button" aria-pressed={activeCategory===key} onClick={()=>setActiveCategory(key)}
+            className={`harmony-rc2o-filter rounded-xl px-3 py-2 text-xs font-semibold ${activeCategory===key?'is-active':''}`}>
+            {categoryMeta[key].label} <span className="ml-1 opacity-75">{uniquePersonCount(grouped[key])}</span>
+          </button>
+        ))}
+      </div>
+      <div className="p-4 sm:p-5">
+        <HistoryColumn category={activeCategory} items={grouped[activeCategory]} loading={loading} periodLabel={periodLabel} />
       </div>
     </section>
   )

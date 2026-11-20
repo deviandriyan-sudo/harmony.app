@@ -9,6 +9,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { Loader2, Menu, ShieldAlert, X } from 'lucide-react'
 
 import { AppSidebar } from '@/components/layout/AppSidebar'
+import { HarmonyThemeToggle } from '@/components/theme/ThemeToggle'
 import { navigationForRole } from '@/lib/navigation'
 import { ModuleSubnav } from '@/components/layout/ModuleSubnav'
 import { REMED_ROLE_LABELS } from '@/lib/remed'
@@ -156,7 +157,13 @@ export default function RemedLayout({ children }: { children: React.ReactNode })
               </div>
             </div>
           </div>
-          <div className="harmony-workspace w-full min-w-0"><ModuleSubnav role={session.role} />{children}</div>
+          <div className="harmony-workspace w-full min-w-0">
+            <div className="harmony-rc2o-remed-topbar flex min-h-[56px] items-center justify-between gap-3 px-4 py-2.5 print:hidden sm:px-6">
+              <p className="truncate text-sm font-semibold harmony-text-primary">Re-Med · {REMED_ROLE_LABELS[session.role]}</p>
+              <HarmonyThemeToggle compact className="harmony-theme-toggle-global" />
+            </div>
+            <ModuleSubnav role={session.role} />{children}
+          </div>
         </main>
       </div>
     </div>
