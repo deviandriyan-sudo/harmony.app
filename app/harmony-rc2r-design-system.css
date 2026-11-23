@@ -1551,6 +1551,9 @@
     .harmony-mobile-topbar,.harmony-mobile-brand,.harmony-mobile-glass,
     .harmony-logo-glass,.harmony-topbar-action,.harmony-topbar-search,
     .harmony-theme-topbar,.harmony-theme-switch,.harmony-module-tab,
+    .harmony-workspace .harmony-rc2q-attendance-panel,
+    .harmony-workspace .harmony-rc2q-approved-metric,
+    .harmony-workspace .harmony-rc2q-today-summary,
     .harmony-workspace :is(
       .harmony-rc2o-panel,.harmony-card,.harmony-card-solid,.harmony-card-soft,
       .harmony-unified-surface,.harmony-reference-surface,
@@ -1574,6 +1577,9 @@
     .harmony-mobile-topbar,.harmony-mobile-brand,.harmony-mobile-glass,
     .harmony-logo-glass,.harmony-topbar-action,.harmony-topbar-search,
     .harmony-theme-topbar,.harmony-theme-switch,
+    .harmony-workspace .harmony-rc2q-attendance-panel,
+    .harmony-workspace .harmony-rc2q-approved-metric,
+    .harmony-workspace .harmony-rc2q-today-summary,
     .harmony-workspace :is(
       .harmony-rc2o-panel,.harmony-card,.harmony-unified-surface,
       .harmony-metric-card,.harmony-team-history,.harmony-attendance-history
