@@ -1004,4 +1004,81 @@
     color: var(--hrui-muted) !important;
   }
 
+  /* RC2T attendance: explicit foreground/background pairs for pills and row
+     controls. Preserve the existing status mapping and submit/review handlers. */
+  .harmony-attendance-history .harmony-attendance-offday-pill,
+  .harmony-attendance-history .harmony-attendance-request-pill,
+  .harmony-attendance-history .harmony-attendance-status-pill,
+  .harmony-attendance-history .harmony-attendance-approval-pill {
+    background: var(--hrui-subtle) !important;
+    color: var(--hrui-ink) !important;
+    border: 1px solid var(--hrui-border) !important;
+    white-space: normal;
+    text-align: center;
+    line-height: 1.4;
+  }
+  .harmony-attendance-history .harmony-attendance-status-pill:is(
+    [data-attendance-status='absent'],
+    [data-attendance-status='no_record'],
+    [data-attendance-status='incomplete']
+  ),
+  .harmony-attendance-history .harmony-attendance-approval-pill[data-approval-status='rejected'] {
+    background: #fee9eb !important;
+    color: #942536 !important;
+    border-color: #f5bfc8 !important;
+  }
+  .harmony-attendance-history .harmony-attendance-status-pill:is(
+    [data-attendance-status='present'],
+    [data-attendance-status='phl']
+  ),
+  .harmony-attendance-history .harmony-attendance-approval-pill[data-approval-status='approved'] {
+    background: #daf5e8 !important;
+    color: #155a40 !important;
+    border-color: #b5e6d1 !important;
+  }
+  .harmony-attendance-history .harmony-attendance-status-pill[data-attendance-status='late'],
+  .harmony-attendance-history .harmony-attendance-approval-pill[data-approval-status='pending'] {
+    background: #fff1d9 !important;
+    color: #855014 !important;
+    border-color: #f0d6a1 !important;
+  }
+  .harmony-attendance-history .harmony-attendance-request-pill.harmony-text-violet {
+    background: #ece7fa !important;
+    color: #514187 !important;
+    border-color: #d4c9f2 !important;
+  }
+  .harmony-attendance-history .harmony-attendance-request-pill.harmony-text-link {
+    background: #e5f0ff !important;
+    color: #15549c !important;
+    border-color: #c7dbf5 !important;
+  }
+  .harmony-attendance-history .harmony-attendance-checkbox {
+    color: var(--hrui-blue) !important;
+    border-color: var(--hrui-border) !important;
+    background: var(--hrui-subtle) !important;
+  }
+  .harmony-attendance-history .harmony-attendance-checkbox[title='Batalkan pilihan'] {
+    color: #fff !important;
+    background: #176cc8 !important;
+    border-color: #176cc8 !important;
+  }
+  .harmony-attendance-history .harmony-attendance-action-fill {
+    color: var(--hrui-blue) !important;
+    background: var(--hrui-subtle) !important;
+    border: 1px solid var(--hrui-border) !important;
+  }
+  .harmony-attendance-history .harmony-attendance-action-fill:hover:not(:disabled) {
+    background: var(--hrui-hover) !important;
+  }
+  .harmony-attendance-history .harmony-attendance-action-reset {
+    color: #a1283a !important;
+    background: #fff0f2 !important;
+    border: 1px solid #f2c7d0 !important;
+  }
+  html[data-harmony-theme='dark'] .harmony-attendance-history .harmony-attendance-action-reset {
+    color: #ffd2db !important;
+    background: #4b2e3a !important;
+    border-color: #8c5161 !important;
+  }
+
 }
