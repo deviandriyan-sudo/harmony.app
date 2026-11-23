@@ -1096,8 +1096,6 @@ export default function EmployeeLeavePage() {
         )}
 
         <div className="harmony-hero-v25 harmony-leave-hero p-5 sm:p-6">
-          <div className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-[#007aff]/35 blur-3xl" />
-          <div className="pointer-events-none absolute -bottom-28 -left-20 h-72 w-72 rounded-full bg-[#34c759]/20 blur-3xl" />
 
           <div className="relative flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div className="min-w-0">
