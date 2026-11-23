@@ -7,7 +7,7 @@
     justify-content: center;
     gap: 12px;
     min-height: 206px;
-    background: linear-gradient(110deg, #143e73 0%, #19558f 54%, #2b78b3 100%);
+    background: #183e64;
   }
   .harmony-rc2q-employee-hero::after {
     content: '';
@@ -21,13 +21,23 @@
     pointer-events: none;
     z-index: 0;
   }
+  /* Keep the real campus image as the employee dashboard's single visual moment. */
+  .harmony-rc2q-employee-hero h1,
+  .harmony-rc2q-employee-hero p {color:#ffffff !important;}
+  .harmony-rc2q-employee-hero .harmony-rc2o-hero-kicker {color:#cbddeb !important;}
+  .harmony-rc2q-employee-hero .harmony-rc2o-hero-button {
+    border-color:rgba(235,243,250,.3);
+    background:rgba(16,44,70,.76);
+    color:#ffffff !important;
+  }
+  .harmony-rc2q-employee-hero .harmony-rc2o-hero-button:hover {background:#26547c;}
   .harmony-rc2q-employee-hero > div:first-of-type {
     max-width: min(100%, 960px);
   }
   .harmony-rc2q-employee-hero > div:nth-of-type(2) {
     justify-content: flex-start;
   }
-  .harmony-rc2q-workflow {min-height:202px;}
+  .harmony-rc2q-workflow {min-height:148px;}
   .harmony-rc2q-workflow-empty {border:1px dashed var(--rc2o-panel-border);background:var(--rc2o-row-hover);color:var(--rc2o-muted);}
   .harmony-rc2q-progress-status {background:var(--rc2o-chip);color:var(--rc2o-ink);border:1px solid var(--rc2o-chip-border);}
   .harmony-rc2q-progress-track {list-style:none;padding:0;}
@@ -36,18 +46,18 @@
   .harmony-rc2q-progress-bar {background:var(--rc2o-chip-border);}
   .harmony-rc2q-progress-step.done .harmony-rc2q-progress-dot {color:#fff;border-color:#078d70;background:#078d70;}
   .harmony-rc2q-progress-step.done .harmony-rc2q-progress-bar {background:#078d70;}
-  .harmony-rc2q-progress-step.current .harmony-rc2q-progress-dot {color:#fff;background:#1d70be;border-color:#1d70be;box-shadow:0 0 0 4px rgba(29,112,190,.13);}
+  .harmony-rc2q-progress-step.current .harmony-rc2q-progress-dot {color:#fff;background:#1d70be;border-color:#1d70be;box-shadow:none;}
   .harmony-rc2q-progress-step.rejected .harmony-rc2q-progress-dot {color:#fff;background:#b42b47;border-color:#b42b47;}
   .harmony-rc2q-progress-step:last-child .harmony-rc2q-progress-bar {visibility:hidden;}
   .harmony-rc2q-attendance {color:var(--rc2o-ink)}
   .harmony-rc2q-attendance-panel,
   .harmony-rc2q-attendance>.harmony-card {background:var(--rc2o-panel);border:1px solid var(--rc2o-panel-border);border-radius:22px;box-shadow:var(--rc2o-shadow);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)}
   .harmony-rc2q-approved-pill {background:var(--rc2o-chip);border:1px solid var(--rc2o-chip-border);color:var(--rc2o-ink)}
-  .harmony-rc2q-approved-metric {border:1px solid var(--rc2o-panel-border);min-height:104px;}
-  .harmony-rc2q-approved-metric.blue {background:linear-gradient(135deg,rgba(205,230,255,.49),rgba(255,255,255,.04));}
-  .harmony-rc2q-approved-metric.green {background:linear-gradient(135deg,rgba(173,241,208,.31),rgba(255,255,255,.04));}
-  .harmony-rc2q-approved-metric.amber {background:linear-gradient(135deg,rgba(255,221,167,.27),rgba(255,255,255,.04));}
-  .harmony-rc2q-approved-metric.rose {background:linear-gradient(135deg,rgba(254,188,205,.25),rgba(255,255,255,.04));}
+  .harmony-rc2q-approved-metric {border:1px solid var(--rc2o-panel-border);min-height:92px;background:var(--rc2o-panel);border-radius:12px;}
+  .harmony-rc2q-approved-metric.blue {border-inline-start:3px solid #3579b4;}
+  .harmony-rc2q-approved-metric.green {border-inline-start:3px solid #378b74;}
+  .harmony-rc2q-approved-metric.amber {border-inline-start:3px solid #aa843a;}
+  .harmony-rc2q-approved-metric.rose {border-inline-start:3px solid #a96d79;}
   .harmony-rc2q-approved-metric p {color:var(--rc2o-ink)}
   .harmony-rc2q-approved-metric span {color:var(--rc2o-muted)}
   .harmony-rc2q-approved-metric .harmony-rc2q-metric-icon {background:var(--rc2o-chip);color:var(--rc2o-ink)}
