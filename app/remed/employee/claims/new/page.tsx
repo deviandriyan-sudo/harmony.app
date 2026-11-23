@@ -222,7 +222,7 @@ export default function NewRemedClaimPage() {
           </label>
         </div>
 
-        <div className="harmony-subtle-panel p-5">
+        <div className="harmony-remed-bank-panel harmony-subtle-panel p-5">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <h2 className="harmony-section-title">Rekening Pembayaran</h2>
