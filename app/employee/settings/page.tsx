@@ -684,7 +684,7 @@ function InputField({
         {label}
       </span>
 
-      <div className="flex min-h-12 items-center gap-3 rounded-[22px] border border-white/80 bg-white/60 px-4 shadow-sm transition focus-within:border-[#007aff]/40 focus-within:bg-white focus-within:shadow-md">
+      <div className="harmony-settings-input-shell flex min-h-12 items-center gap-3 rounded-xl border px-3 transition">
         {icon && (
           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[16px] bg-white/80 harmony-text-muted shadow-sm">
             {icon}
@@ -721,7 +721,7 @@ function TextareaField({
         {label}
       </span>
 
-      <div className="flex min-h-32 items-start gap-3 rounded-[22px] border border-white/80 bg-white/60 px-4 py-3 shadow-sm transition focus-within:border-[#007aff]/40 focus-within:bg-white focus-within:shadow-md">
+      <div className="harmony-settings-input-shell flex min-h-32 items-start gap-3 rounded-xl border px-3 py-3 transition">
         {icon && (
           <div className="mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-[16px] bg-white/80 harmony-text-muted shadow-sm">
             {icon}
@@ -758,7 +758,7 @@ function PasswordField({
         {label}
       </span>
 
-      <div className="flex min-h-12 items-center gap-3 rounded-[22px] border border-white/80 bg-white/60 px-4 shadow-sm transition focus-within:border-[#007aff]/40 focus-within:bg-white focus-within:shadow-md">
+      <div className="harmony-settings-input-shell flex min-h-12 items-center gap-3 rounded-xl border px-3 transition">
         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[16px] bg-white/80 harmony-text-muted shadow-sm">
           <Lock size={17} />
         </div>
