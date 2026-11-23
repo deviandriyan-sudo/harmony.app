@@ -62,7 +62,7 @@ export default function HRDashboardPage() {
     <main className="harmony-rc2o harmony-rc2o-hr harmony-glass-showcase mx-auto max-w-[1500px] space-y-4 p-4 sm:p-5 lg:p-6">
       <section className="harmony-rc2o-hero flex flex-wrap items-center justify-between gap-4 px-5 py-5 sm:px-7" aria-label="Ringkasan monitoring HR">
         <div className="relative z-10 min-w-0"><p className="harmony-rc2o-hero-kicker">HR / Operasional</p><h1 className="mt-1 text-[25px] font-semibold tracking-tight sm:text-[29px]">Monitoring kepegawaian</h1><p className="mt-1 text-sm">Kehadiran, pengajuan, dan aktivitas karyawan</p><p className="mt-2 text-xs opacity-80">Periode monitoring: {formatDate(date)} · {data?.updatedAt?'Data terakhir diperbarui '+new Date(data.updatedAt).toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Makassar'})+' WITA':'Belum diperbarui'}</p></div>
-        <button type="button" onClick={()=>void load()} disabled={refreshing} className="harmony-rc2o-hero-button relative z-10 inline-flex min-h-10 items-center gap-2 rounded-xl px-4 text-sm font-semibold disabled:opacity-60"><RefreshCcw size={16} className={refreshing?'animate-spin':''}/>Refresh</button>
+        <button type="button" onClick={()=>void load()} disabled={refreshing} className="harmony-rc2o-hero-button harmony-liquid-lit relative z-10 inline-flex min-h-10 items-center gap-2 rounded-xl px-4 text-sm font-semibold disabled:opacity-60"><RefreshCcw size={16} className={refreshing?'animate-spin':''}/>Refresh</button>
       </section>
       {error&&<div role="alert" className="harmony-rc2o-error flex items-center gap-2 rounded-2xl p-3 text-sm"><AlertTriangle size={16}/>{error}</div>}
       <div className="grid grid-cols-2 gap-3 xl:grid-cols-4" aria-busy={loading}>
