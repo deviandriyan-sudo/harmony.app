@@ -375,7 +375,7 @@ export default function EmployeeApprovalsPage() {
         description="Pusat approval untuk absensi, cuti/izin, dan PHL kerja bawahan."
       />
 
-      <section className="space-y-6 p-4 sm:p-6">
+      <section className="harmony-supervisor-dashboard space-y-5 p-4 sm:p-6">
         {errorMessage && (
           <div className="rounded-2xl border border-orange-200 bg-orange-50 p-4 text-sm leading-6 text-orange-700">
             <div className="mb-1 flex items-center gap-2 font-bold">
