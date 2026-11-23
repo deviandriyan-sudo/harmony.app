@@ -102,6 +102,42 @@
       linear-gradient(140deg,#101b29,#172638 55%,#132535);
   }
 
+  /* Optical recipes adapted from glass-ui/src/material.css (MIT, AndreyBegma).
+     Seven layers: adaptive filter, scrim, sheen, rim, meniscus, refraction ring and shadow. */
+  :root {
+    --harmony-glass-chrome-bg:
+      linear-gradient(var(--harmony-glass-sheen),var(--harmony-glass-sheen)),
+      var(--harmony-glass-scrim);
+    --harmony-glass-strong-bg:
+      linear-gradient(var(--harmony-glass-sheen),var(--harmony-glass-sheen)),
+      var(--harmony-glass-scrim-strong);
+    --harmony-glass-chrome-shadow:
+      inset 0 1px 0 var(--harmony-glass-spec),
+      inset 1px 1px 0 var(--harmony-glass-rim-light),
+      inset -1px -1px 0 var(--harmony-glass-rim-shade),
+      inset 0 -3px 3px -1px var(--harmony-glass-meniscus),
+      inset 0 0 18px -4px var(--harmony-glass-refract),
+      0 12px 32px var(--harmony-glass-drop);
+    --harmony-glass-strong-shadow:
+      inset 0 1px 0 var(--harmony-glass-spec),
+      inset 1px 1px 0 var(--harmony-glass-rim-light),
+      inset 5px 5px 1px -6px var(--harmony-glass-rim-light),
+      inset -1px -1px 0 var(--harmony-glass-rim-shade),
+      inset -5px -5px 1px -6px var(--harmony-glass-rim-shade),
+      inset 0 -3px 3px -1px var(--harmony-glass-meniscus),
+      inset 0 0 18px -4px var(--harmony-glass-refract),
+      0 20px 48px var(--harmony-glass-drop);
+    --harmony-glass-content-bg:
+      linear-gradient(145deg,var(--harmony-glass-content-sheen),transparent 38%),
+      var(--harmony-glass-content);
+    --harmony-glass-content-shadow:
+      inset 0 1px 0 var(--harmony-glass-spec),
+      inset 1px 1px 0 var(--harmony-glass-rim-light),
+      inset -1px -1px 0 var(--harmony-glass-rim-shade),
+      inset 0 -2px 3px -1px var(--harmony-glass-meniscus),
+      0 5px 19px var(--harmony-glass-drop);
+  }
+
   /* One token vocabulary, harmonized with the pre-existing h385/rc2o layers. */
   .harmony-workspace {
     --harmony-design-card-radius: var(--hrui-radius);
@@ -1228,8 +1264,10 @@
     background: var(--hrui-canvas);
   }
   .harmony-workspace {
-    --harmony-surface-glass: var(--hrui-glass-surface);
+    --harmony-surface-glass: var(--harmony-glass-content);
     --harmony-glass-border: var(--hrui-glass-rim);
+    background: var(--harmony-glass-ambient) !important;
+    color: var(--hrui-ink);
   }
   .harmony-sidebar-panel,
   .harmony-topbar,
@@ -1238,11 +1276,11 @@
   .harmony-popover-glass,
   .harmony-theme-popover,
   .harmony-mobile-topbar {
-    border-color: var(--hrui-glass-edge) !important;
-    background: var(--hrui-glass-surface) !important;
-    box-shadow: var(--hrui-glass-highlight), var(--hrui-glass-shadow) !important;
-    -webkit-backdrop-filter: var(--hrui-glass-filter) !important;
-    backdrop-filter: var(--hrui-glass-filter) !important;
+    border: 1px solid var(--harmony-glass-edge) !important;
+    background: var(--harmony-glass-chrome-bg) !important;
+    box-shadow: var(--harmony-glass-chrome-shadow) !important;
+    -webkit-backdrop-filter: var(--harmony-glass-filter) !important;
+    backdrop-filter: var(--harmony-glass-filter) !important;
   }
   .harmony-sidebar-panel,
   .harmony-topbar,
@@ -1254,36 +1292,47 @@
   .harmony-logo-glass,
   .harmony-sidebar-user,
   .harmony-topbar-badge {
-    border-color: var(--hrui-glass-edge) !important;
-    background: var(--hrui-glass-control) !important;
-    box-shadow: var(--hrui-glass-highlight), 0 5px 17px rgba(26,63,103,.08) !important;
-    -webkit-backdrop-filter: blur(17px) saturate(145%) !important;
-    backdrop-filter: blur(17px) saturate(145%) !important;
+    border: 1px solid var(--harmony-glass-edge) !important;
+    background: var(--harmony-glass-chrome-bg) !important;
+    box-shadow: var(--harmony-glass-chrome-shadow) !important;
+    -webkit-backdrop-filter: blur(14px) saturate(152%) !important;
+    backdrop-filter: blur(14px) saturate(152%) !important;
   }
   .harmony-topbar-search,
   .harmony-topbar-action,
   .harmony-theme-topbar,
   .harmony-theme-switch,
   .harmony-module-more {
-    border-color: var(--hrui-glass-edge) !important;
-    background: var(--hrui-glass-control) !important;
-    box-shadow: var(--hrui-glass-highlight), 0 4px 12px rgba(29,65,109,.07) !important;
+    border: 1px solid var(--harmony-glass-edge) !important;
+    background: var(--harmony-glass-chrome-bg) !important;
+    box-shadow: var(--harmony-glass-chrome-shadow) !important;
+    -webkit-backdrop-filter: blur(15px) saturate(145%) !important;
+    backdrop-filter: blur(15px) saturate(145%) !important;
   }
   .harmony-theme-popover {
-    background: var(--hrui-glass-surface) !important;
     color: var(--hrui-ink) !important;
+    border-color: var(--harmony-glass-edge) !important;
+    background: var(--harmony-glass-strong-bg) !important;
+    box-shadow: var(--harmony-glass-strong-shadow) !important;
+    -webkit-backdrop-filter: var(--harmony-glass-filter-strong) !important;
+    backdrop-filter: var(--harmony-glass-filter-strong) !important;
   }
   .harmony-sidebar-nav .harmony-nav-item.harmony-nav-active {
-    border: 1px solid rgba(218,237,255,.53) !important;
-    box-shadow: inset 0 1px 0 rgba(255,255,255,.48),
-      inset 0 -1px 0 rgba(0,29,70,.16), 0 6px 16px rgba(15,69,137,.17) !important;
+    border: 1px solid rgba(229,241,255,.42) !important;
+    background: #2468a8 !important;
+    color: #fff !important;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.40),
+      inset 0 -2px 2px rgba(0,35,89,.28),
+      inset 0 0 13px rgba(225,241,255,.13),
+      0 5px 14px rgba(17,78,151,.22) !important;
   }
   .harmony-module-tab.harmony-tab-active,
   .harmony-module-tab.harmony-tab-active-secondary,
   .harmony-theme-choice.is-selected {
-    border-color: var(--hrui-glass-rim) !important;
-    background: var(--hrui-glass-control) !important;
-    box-shadow: var(--hrui-glass-highlight) !important;
+    border: 1px solid var(--hrui-glass-rim) !important;
+    background: var(--harmony-glass-content) !important;
+    box-shadow: inset 0 1px 0 var(--harmony-glass-spec),
+      inset 0 -1px 1px var(--harmony-glass-meniscus) !important;
     color: var(--hrui-ink) !important;
   }
   .harmony-module-tab:not(.harmony-tab-active):not(.harmony-tab-active-secondary):hover,
@@ -1306,9 +1355,11 @@
   .harmony-remed-page-header,
   .scaleup-root :is(.scaleup-panel,.scaleup-metric) {
     border: 1px solid var(--hrui-glass-rim) !important;
-    background: var(--hrui-glass-surface) !important;
-    box-shadow: var(--hrui-glass-highlight), var(--hrui-glass-shadow) !important;
-    color: var(--hrui-ink);
+    background: var(--harmony-glass-content-bg) !important;
+    color: var(--hrui-ink) !important;
+    box-shadow: var(--harmony-glass-content-shadow) !important;
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
   }
   .harmony-workspace :is(
     .harmony-rc2o-panel,.harmony-card,.harmony-unified-surface,
@@ -1317,8 +1368,8 @@
   .harmony-profile-workspace .harmony-profile-panel,
   .harmony-remed-page-header,
   .scaleup-root .scaleup-panel {
-    -webkit-backdrop-filter: blur(13px) saturate(135%);
-    backdrop-filter: blur(13px) saturate(135%);
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
   }
   .harmony-workspace .harmony-glass-showcase-metric {
     -webkit-backdrop-filter: none;
@@ -1351,11 +1402,11 @@
      Keep focus trap, escape key, and close behavior in the existing portal. */
   .harmony-modal-surface .harmony-hr-edit-modal,
   body > .harmony-leave-request-modal .harmony-leave-modal-panel {
-    border: 1px solid var(--hrui-glass-edge) !important;
-    background: var(--hrui-glass-surface) !important;
-    box-shadow: var(--hrui-glass-highlight),0 24px 70px rgba(10,25,49,.24) !important;
-    -webkit-backdrop-filter: blur(22px) saturate(140%) !important;
-    backdrop-filter: blur(22px) saturate(140%) !important;
+    border: 1px solid var(--harmony-glass-edge) !important;
+    background: var(--harmony-glass-strong-bg) !important;
+    box-shadow: var(--harmony-glass-strong-shadow) !important;
+    -webkit-backdrop-filter: var(--harmony-glass-filter-strong) !important;
+    backdrop-filter: var(--harmony-glass-filter-strong) !important;
   }
 
   @media (max-width: 767px) {
@@ -1366,6 +1417,48 @@
     }
   }
 
+  /* RC2W: glass-ui pointer optics. One delegated MaterialLight listener
+     writes --harmony-lx/ly/lit to opted-in controls (not private data). */
+  .harmony-workspace::before,.harmony-workspace::after {
+    display: none !important;
+  }
+  .harmony-rc2q-employee-hero {
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.3),
+      0 10px 28px var(--harmony-glass-drop) !important;
+  }
+  .harmony-topbar-search input[type='search'] {
+    background: transparent !important;
+    border: 0 !important;
+    box-shadow: none !important;
+  }
+  .harmony-liquid-lit {
+    position: relative;
+    isolation: isolate;
+    transition: transform 140ms ease,border-color 180ms ease,
+      box-shadow 180ms ease !important;
+  }
+  .harmony-liquid-lit::before {
+    content: '';
+    position: absolute;
+    z-index: 0;
+    inset: 1px;
+    border-radius: inherit;
+    pointer-events: none;
+    opacity: var(--harmony-lit,0);
+    transition: opacity 180ms ease;
+    background: radial-gradient(185px circle at
+      var(--harmony-lx,50%) var(--harmony-ly,50%),
+      var(--harmony-glass-lit),transparent 70%);
+  }
+  .harmony-liquid-lit > * { position: relative; z-index: 1; }
+  .harmony-liquid-lit:active { transform: scale(.985); }
+  .harmony-sidebar-nav .harmony-liquid-lit:active { transform: scale(.992); }
+  @media (prefers-reduced-motion: reduce) {
+    .harmony-liquid-lit,.harmony-liquid-lit::before {
+      transition: none !important;
+      transform: none !important;
+    }
+  }
   /* Explicitly support transparency/contrast accessibility preferences.
      This intentionally overrides every glass material above. */
   @media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
