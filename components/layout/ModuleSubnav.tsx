@@ -68,14 +68,14 @@ function TabRow({tabs,pathname,secondary=false}:{tabs:NavigationTab[];pathname:s
 
   function tabLink(tab:NavigationTab,dropdown=false){const Icon=tabIcons[tab.title]||FileText;const active=best===tab.href
     return <Link key={tab.href} href={tab.href} onClick={event=>{keepAttendancePeriod(event,tab.href);if(dropdown)setOpened(false)}} aria-current={active ? 'page' : undefined}
-      className={`harmony-module-tab ${dropdown?'harmony-module-tab-menu':''} ${active?activeClass:''} inline-flex min-h-9 shrink-0 items-center gap-2 whitespace-nowrap rounded-xl px-3 py-2 text-xs font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500`}>
+      className={`harmony-module-tab harmony-liquid-lit ${dropdown?'harmony-module-tab-menu':''} ${active?activeClass:''} inline-flex min-h-9 shrink-0 items-center gap-2 whitespace-nowrap rounded-xl px-3 py-2 text-xs font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500`}>
       <Icon size={15} strokeWidth={2} aria-hidden="true"/>{tab.title}</Link>}
 
   return <div className={`harmony-subnav-row flex min-w-0 items-center gap-2 ${secondary?'border-t border-slate-200/45 pt-2':''}`}>
     <nav aria-label={secondary?'Halaman modul':'Navigasi modul'} className="flex min-w-0 flex-1 gap-1 overflow-x-auto overscroll-x-contain py-0.5">{visible.map(tab=>tabLink(tab))}</nav>
     {overflow.length>0&&<>
       <button ref={anchor} type="button" aria-expanded={opened} aria-haspopup="menu" onClick={()=>{ if(!opened) window.dispatchEvent(new Event('harmony:close-popovers')); setOpened(x=>!x)}}
-        className="harmony-subnav-more harmony-module-more inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-xl px-3 text-xs font-semibold text-slate-700 focus-visible:outline-2 focus-visible:outline-blue-500">
+        className="harmony-subnav-more harmony-module-more harmony-liquid-lit inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-xl px-3 text-xs font-semibold text-slate-700 focus-visible:outline-2 focus-visible:outline-blue-500">
         Lainnya <ChevronDown size={14} aria-hidden="true"/>
       </button>
       {opened&&typeof document!=='undefined'&&createPortal(<div ref={menu} role="menu" aria-label="Menu halaman lainnya"
