@@ -2363,8 +2363,8 @@ export default function EmployeeAttendancePage() {
           </div>
         )}
 
-        <div className="harmony-card overflow-hidden">
-          <div className="border-b border-black/5 p-4 sm:p-6">
+        <div className="harmony-card harmony-attendance-history overflow-hidden">
+          <div className="border-b border-black/5 p-4 sm:p-5">
             <div className="flex min-w-0 flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
               <div className="min-w-0">
                 <h2 className="text-lg font-semibold harmony-text-primary">
@@ -2378,7 +2378,7 @@ export default function EmployeeAttendancePage() {
               </div>
 
               <div className="flex w-full min-w-0 flex-col gap-3 xl:w-auto xl:max-w-none">
-                <div className="flex min-w-0 flex-wrap items-center gap-2 rounded-[24px] border border-[#d8e8ff] bg-[#f7fbff] p-3">
+                <div className="harmony-attendance-history-toolbar flex min-w-0 flex-wrap items-center gap-2 rounded-xl border p-2.5">
                   <div className="mr-1 flex items-center gap-2 text-xs font-bold harmony-text-link">
                     <CalendarDays size={15} />
                     Periode Absensi
@@ -2418,7 +2418,7 @@ export default function EmployeeAttendancePage() {
                     ))}
                   </select>
 
-                  <div className="inline-flex min-h-11 items-center rounded-2xl border border-[#d8e8ff] bg-white px-4 text-xs font-semibold harmony-text-primary">
+                  <div className="harmony-attendance-period-active inline-flex min-h-10 items-center rounded-xl border px-3 text-xs font-semibold harmony-text-primary">
                     Aktif: {getPeriodLabel(periodMonth)}
                   </div>
 
@@ -2456,7 +2456,7 @@ export default function EmployeeAttendancePage() {
 
           {!loading && (
             <>
-              <div className="flex flex-col gap-4 border-b border-black/5 bg-[#f5f5f7]/70 p-6 xl:flex-row xl:items-center xl:justify-between">
+              <div className="harmony-attendance-review-toolbar flex flex-col gap-4 border-b p-4 sm:p-5 xl:flex-row xl:items-center xl:justify-between">
                 <div>
                   <h3 className="text-base font-semibold harmony-text-primary">
                     Verifikasi Riwayat Absensi
