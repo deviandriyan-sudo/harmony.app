@@ -688,4 +688,269 @@
     border-color: var(--hrui-border) !important;
   }
 
+  /* RC2T: Native Windows/Chromium select popups were white while options
+     inherited the white text of the dark form. Use a deliberate light system
+     popup in BOTH themes; the closed control remains theme-aware. */
+  html[data-harmony-theme] select:not([multiple]) {
+    color-scheme: light !important;
+  }
+  html[data-harmony-theme] select:not([multiple]) :is(option,optgroup) {
+    color: #1a2d45 !important;
+    background-color: #ffffff !important;
+    font-weight: 500;
+  }
+  html[data-harmony-theme] select:not([multiple]) option:disabled {
+    color: #596b80 !important;
+  }
+  html[data-harmony-theme] :is(.harmony-workspace,.harmony-modal-surface,.scaleup-root)
+  :is(select.harmony-select,select.harmony-input,select.scaleup-input,select.harmony-profile-field) {
+    background: var(--hrui-input) !important;
+    color: var(--hrui-ink) !important;
+    border-color: var(--hrui-border) !important;
+    box-shadow: none !important;
+  }
+  html[data-harmony-theme] :is(.harmony-workspace,.harmony-modal-surface,.scaleup-root)
+  :is(select.harmony-select,select.harmony-input,select.scaleup-input,select.harmony-profile-field):focus-visible {
+    outline: 2px solid var(--hrui-focus) !important;
+    outline-offset: 2px;
+    box-shadow: none !important;
+  }
+  /* Keep date-input controls legible without forcing form options to dark mode. */
+  html[data-harmony-theme='dark'] :is(.harmony-workspace,.harmony-modal-surface,.scaleup-root)
+  input:is([type='date'],[type='time'],[type='datetime-local']) {
+    color-scheme: dark;
+  }
+
+  /* The leave form is a body portal, NOT a child of .harmony-workspace. */
+  body > .harmony-leave-request-modal .harmony-leave-modal-panel {
+    background: var(--hrui-modal) !important;
+    color: var(--hrui-ink) !important;
+    border-color: var(--hrui-border) !important;
+  }
+  body > .harmony-leave-request-modal .harmony-leave-modal-header {
+    background: var(--hrui-surface) !important;
+    border-color: var(--hrui-border) !important;
+    color: var(--hrui-ink) !important;
+  }
+  body > .harmony-leave-request-modal .harmony-leave-modal-panel
+  :is(.harmony-text-primary,.harmony-label) {
+    color: var(--hrui-ink) !important;
+  }
+  body > .harmony-leave-request-modal .harmony-leave-modal-panel
+  :is(.harmony-text-secondary,.harmony-text-muted,.harmony-disabled-text-secondary) {
+    color: var(--hrui-muted) !important;
+  }
+  body > .harmony-leave-request-modal .harmony-leave-modal-close {
+    background: var(--hrui-subtle) !important;
+    color: var(--hrui-ink) !important;
+    border-color: var(--hrui-border) !important;
+    box-shadow: none !important;
+  }
+  body > .harmony-leave-request-modal .harmony-leave-modal-close:hover {
+    background: var(--hrui-hover) !important;
+  }
+  body > .harmony-leave-request-modal .harmony-leave-modal-identity {
+    background: var(--hrui-subtle) !important;
+    color: var(--hrui-ink) !important;
+    border-color: var(--hrui-border) !important;
+  }
+  body > .harmony-leave-request-modal .harmony-leave-modal-identity
+  .harmony-text-link { color: var(--hrui-blue) !important; }
+  body > .harmony-leave-request-modal .harmony-leave-modal-tile {
+    background: var(--hrui-subtle) !important;
+    color: var(--hrui-ink) !important;
+    border-color: var(--hrui-border) !important;
+    border-left-width: 3px !important;
+    box-shadow: none !important;
+  }
+  body > .harmony-leave-request-modal .harmony-leave-modal-tile[data-tone='blue'] { border-left-color: #2879ce !important; }
+  body > .harmony-leave-request-modal .harmony-leave-modal-tile[data-tone='green'] { border-left-color: #168d75 !important; }
+  body > .harmony-leave-request-modal .harmony-leave-modal-tile[data-tone='purple'] { border-left-color: #8460c4 !important; }
+  body > .harmony-leave-request-modal .harmony-leave-modal-tile :is(p,small,strong) {
+    color: var(--hrui-ink) !important;
+    opacity: 1 !important;
+  }
+  body > .harmony-leave-request-modal .harmony-leave-modal-panel :is(input,textarea,select) {
+    background: var(--hrui-input) !important;
+    color: var(--hrui-ink) !important;
+    border-color: var(--hrui-border) !important;
+  }
+  body > .harmony-leave-request-modal .harmony-leave-modal-panel textarea::placeholder {
+    color: var(--hrui-muted) !important;
+  }
+  body > .harmony-leave-request-modal .harmony-leave-modal-panel form > :last-child {
+    background: var(--hrui-surface) !important;
+    border-color: var(--hrui-border) !important;
+    color: var(--hrui-muted) !important;
+  }
+  body > .harmony-leave-request-modal .harmony-leave-modal-panel form > :last-child .harmony-leave-submit {
+    background: #176cc8 !important;
+    color: #fff !important;
+  }
+
+  /* Supervisor: the approval list previously mixed dark surface with fixed
+     slate-950 headings; fix only this route, preserve all approval actions. */
+  .harmony-approval-leave-page {
+    background: var(--hrui-canvas) !important;
+    color: var(--hrui-ink);
+  }
+  .harmony-approval-leave-page .harmony-approval-leave-heading {
+    background: var(--hrui-surface) !important;
+    color: var(--hrui-ink);
+    border-color: var(--hrui-border) !important;
+  }
+  .harmony-approval-leave-page :is(.text-slate-950,.text-slate-900,.text-slate-800) {
+    color: var(--hrui-ink) !important;
+  }
+  .harmony-approval-leave-page :is(.text-slate-700,.text-slate-600,.text-slate-500) {
+    color: var(--hrui-muted) !important;
+  }
+  .harmony-approval-leave-page .harmony-approval-leave-toolbar {
+    background: var(--hrui-surface) !important;
+    border-color: var(--hrui-border) !important;
+  }
+  html[data-harmony-theme='dark'] .harmony-approval-leave-page
+  :is(.bg-slate-50,.bg-slate-100,.bg-white) {
+    background: var(--hrui-subtle) !important;
+  }
+  html[data-harmony-theme='dark'] .harmony-approval-leave-page table thead {
+    background: var(--hrui-subtle) !important;
+    color: var(--hrui-ink) !important;
+  }
+  html[data-harmony-theme='dark'] .harmony-approval-leave-page table tbody tr:nth-child(even) {
+    background: rgba(43,57,75,.76) !important;
+  }
+  .harmony-approval-leave-page input::placeholder { color: var(--hrui-muted) !important; }
+
+  /* Supervisor attendance table: text and status must survive zebra striping. */
+  .harmony-supervisor-attendance :is(.harmony-card,.harmony-metric-card) {
+    border-color: var(--hrui-border) !important;
+  }
+  html[data-harmony-theme='dark'] .harmony-supervisor-attendance table thead th {
+    background: var(--hrui-subtle) !important;
+    color: var(--hrui-ink) !important;
+  }
+  html[data-harmony-theme='dark'] .harmony-supervisor-attendance table tbody tr {
+    color: var(--hrui-ink) !important;
+    border-color: var(--hrui-border) !important;
+  }
+  html[data-harmony-theme='dark'] .harmony-supervisor-attendance table tbody tr:nth-child(even) {
+    background: rgba(46,62,81,.87) !important;
+  }
+  .harmony-supervisor-attendance :is(input,select) {
+    color: var(--hrui-ink) !important;
+    border-color: var(--hrui-border) !important;
+  }
+  .harmony-supervisor-attendance input::placeholder { color: var(--hrui-muted) !important; }
+
+  /* PHL statuses and expired requests: disabled approve must not look active. */
+  .harmony-supervisor-phl .harmony-phl-review-card {
+    background: var(--hrui-surface) !important;
+    color: var(--hrui-ink) !important;
+  }
+  .harmony-supervisor-phl .harmony-phl-info,
+  .harmony-supervisor-phl .harmony-phl-day-type {
+    background: var(--hrui-subtle) !important;
+    color: var(--hrui-ink) !important;
+    border-color: var(--hrui-border) !important;
+  }
+  .harmony-supervisor-phl .harmony-phl-approve:disabled {
+    background: var(--hrui-subtle) !important;
+    border: 1px solid var(--hrui-border) !important;
+    color: var(--hrui-muted) !important;
+    box-shadow: none !important;
+    opacity: 1 !important;
+    cursor: not-allowed;
+  }
+
+  /* Shared Re-Med heading and claim forms use one consistent material, not
+     fixed translucent white on navy. */
+  .harmony-remed-page-header {
+    background: var(--hrui-surface) !important;
+    border-color: var(--hrui-border) !important;
+    color: var(--hrui-ink) !important;
+    box-shadow: var(--hrui-shadow) !important;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+  .harmony-remed-page-header .harmony-text-primary,
+  .harmony-remed-claim-form-page .harmony-section-title {
+    color: var(--hrui-ink) !important;
+  }
+  .harmony-remed-page-header .harmony-text-secondary,
+  .harmony-remed-claim-form-page .harmony-section-copy {
+    color: var(--hrui-muted) !important;
+  }
+  .harmony-remed-claim-form-page .harmony-remed-claim-form {
+    background: var(--hrui-surface) !important;
+    color: var(--hrui-ink);
+    border-color: var(--hrui-border) !important;
+  }
+  .harmony-remed-claim-form-page .harmony-label {
+    color: var(--hrui-ink) !important;
+  }
+  .harmony-remed-claim-form-page :is(input,textarea,select):not([type='checkbox']) {
+    background: var(--hrui-input) !important;
+    color: var(--hrui-ink) !important;
+    border-color: var(--hrui-border) !important;
+  }
+  .harmony-remed-claim-form-page :is(input,textarea)::placeholder {
+    color: var(--hrui-muted) !important;
+    opacity: 1;
+  }
+
+  /* Account documents/settings: remove hardcoded pale slate surfaces that
+     made accordion labels and saved values unreadable in Dark Mode. */
+  .harmony-profile-workspace .harmony-profile-upload-bar,
+  .harmony-profile-workspace .harmony-profile-doc-group,
+  .harmony-account-settings-ui .harmony-account-readonly-item,
+  .harmony-account-settings-ui .harmony-settings-input-shell {
+    background: var(--hrui-subtle) !important;
+    border: 1px solid var(--hrui-border) !important;
+    color: var(--hrui-ink) !important;
+    box-shadow: none !important;
+  }
+  .harmony-profile-workspace .harmony-profile-doc-group[open] {
+    background: var(--hrui-surface-strong) !important;
+  }
+  .harmony-profile-workspace .harmony-profile-doc-group summary {
+    color: var(--hrui-ink) !important;
+  }
+  .harmony-profile-workspace .harmony-profile-upload-bar :is(label,p),
+  .harmony-profile-workspace .harmony-profile-doc-group
+  :is(.text-slate-950,.text-slate-900,.text-slate-800,.text-slate-700,.text-slate-600),
+  .harmony-account-settings-ui .harmony-account-readonly-item :is(p,small,strong) {
+    color: var(--hrui-ink) !important;
+  }
+  .harmony-profile-workspace .harmony-profile-doc-group .text-slate-500,
+  .harmony-profile-workspace .harmony-profile-doc-group .text-slate-400 {
+    color: var(--hrui-muted) !important;
+  }
+  .harmony-account-settings-ui .harmony-settings-input-shell:focus-within {
+    border-color: var(--hrui-focus) !important;
+    box-shadow: 0 0 0 2px rgba(72,143,215,.14) !important;
+  }
+  .harmony-account-settings-ui .harmony-settings-input-shell :is(input,textarea) {
+    background: transparent !important;
+    color: var(--hrui-ink) !important;
+    box-shadow: none !important;
+  }
+  .harmony-account-settings-ui .harmony-settings-input-shell :is(input,textarea)::placeholder {
+    color: var(--hrui-muted) !important;
+    opacity: 1;
+  }
+  .harmony-account-settings-ui .harmony-label {
+    color: var(--hrui-ink) !important;
+  }
+
+  @media (max-width: 640px) {
+    body > .harmony-leave-request-modal .harmony-leave-modal-panel {
+      max-height: calc(100dvh - 16px);
+      border-radius: 14px !important;
+    }
+    .harmony-remed-claim-form-page .harmony-remed-claim-form {
+      padding: 16px;
+    }
+  }
+
 }
