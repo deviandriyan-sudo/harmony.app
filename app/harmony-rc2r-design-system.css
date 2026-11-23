@@ -12,39 +12,55 @@
     --hrui-canvas: #f5f7f9;
     --hrui-ink: #1a2838;
     --hrui-muted: #536273;
-    --hrui-surface: #ffffff;
+    --hrui-surface: rgba(255,255,255,.78);
     --hrui-surface-strong: #ffffff;
     --hrui-subtle: #f1f4f7;
     --hrui-border: #dbe2e9;
     --hrui-hover: #eaf0f5;
-    --hrui-shadow: 0 2px 8px rgba(25,37,50,.045);
-    --hrui-shadow-hover: 0 3px 12px rgba(25,37,50,.065);
+    --hrui-shadow: 0 10px 30px rgba(34,55,80,.085), 0 2px 6px rgba(34,55,80,.035);
+    --hrui-shadow-hover: 0 12px 32px rgba(34,55,80,.12), 0 2px 7px rgba(34,55,80,.04);
     --hrui-focus: #176ec9;
     --hrui-blue: #176ac3;
     --hrui-blue-hover: #0d579f;
     --hrui-input: #f8fafc;
-    --hrui-nav: #ffffff;
-    --hrui-modal: #ffffff;
-    --hrui-radius: 14px;
+    --hrui-nav: rgba(245,249,255,.72);
+    --hrui-modal: rgba(249,252,255,.94);
+    --hrui-radius: 18px;
+    --hrui-glass-edge: rgba(255,255,255,.9);
+    --hrui-glass-rim: rgba(138,171,210,.38);
+    --hrui-glass-sheen: rgba(255,255,255,.55);
+    --hrui-glass-surface: linear-gradient(155deg,rgba(255,255,255,.82),rgba(235,245,255,.59) 54%,rgba(244,248,255,.72));
+    --hrui-glass-control: linear-gradient(150deg,rgba(255,255,255,.76),rgba(225,239,255,.50));
+    --hrui-glass-highlight: inset 0 1px 0 rgba(255,255,255,.96), inset 0 -1px 0 rgba(153,184,220,.17);
+    --hrui-glass-shadow: 0 14px 35px rgba(44,83,131,.12),0 3px 9px rgba(42,79,125,.055);
+    --hrui-glass-filter: blur(26px) saturate(165%);
   }
   html[data-harmony-theme='dark'] {
     --hrui-canvas: #141a21;
     --hrui-ink: #edf1f4;
     --hrui-muted: #aebcc8;
-    --hrui-surface: #222b35;
+    --hrui-surface: rgba(31,43,59,.84);
     --hrui-surface-strong: #26313c;
     --hrui-subtle: #2d3844;
     --hrui-border: #40505d;
     --hrui-hover: #344250;
-    --hrui-shadow: none;
-    --hrui-shadow-hover: none;
+    --hrui-shadow: 0 16px 42px rgba(0,0,0,.22), 0 2px 10px rgba(0,0,0,.08);
+    --hrui-shadow-hover: 0 18px 44px rgba(0,0,0,.26), 0 2px 10px rgba(0,0,0,.10);
     --hrui-focus: #9acaff;
     --hrui-blue: #a2cfff;
     --hrui-blue-hover: #c4e0ff;
     --hrui-input: #1a242e;
-    --hrui-nav: #1c2530;
-    --hrui-modal: #222b35;
-    --hrui-radius: 14px;
+    --hrui-nav: rgba(26,39,55,.74);
+    --hrui-modal: rgba(32,44,59,.96);
+    --hrui-radius: 18px;
+    --hrui-glass-edge: rgba(172,208,251,.35);
+    --hrui-glass-rim: rgba(113,160,213,.35);
+    --hrui-glass-sheen: rgba(162,196,233,.13);
+    --hrui-glass-surface: linear-gradient(155deg,rgba(50,72,99,.82),rgba(27,44,66,.68) 53%,rgba(38,55,77,.78));
+    --hrui-glass-control: linear-gradient(145deg,rgba(76,106,143,.43),rgba(42,63,91,.59));
+    --hrui-glass-highlight: inset 0 1px 0 rgba(202,224,252,.22), inset 0 -1px 0 rgba(5,19,37,.33);
+    --hrui-glass-shadow: 0 17px 42px rgba(0,6,18,.29),0 3px 12px rgba(0,10,25,.16);
+    --hrui-glass-filter: blur(26px) saturate(145%);
   }
 
   /* One token vocabulary, harmonized with the pre-existing h385/rc2o layers. */
@@ -60,11 +76,11 @@
   /* Navigation must remain compact, visible, and above content without
      introducing another portal or changing route/permission resolution. */
   .harmony-sidebar-panel {
-    border: 1px solid var(--hrui-border) !important;
-    background: var(--hrui-nav) !important;
-    box-shadow: var(--hrui-shadow) !important;
-    -webkit-backdrop-filter: blur(16px) saturate(112%);
-    backdrop-filter: blur(16px) saturate(112%);
+    border: 1px solid var(--hrui-glass-edge) !important;
+    background: var(--hrui-glass-surface) !important;
+    box-shadow: var(--hrui-glass-highlight), var(--hrui-glass-shadow) !important;
+    -webkit-backdrop-filter: var(--hrui-glass-filter) !important;
+    backdrop-filter: var(--hrui-glass-filter) !important;
   }
   .harmony-sidebar-header,.harmony-sidebar-footer {
     border-color: var(--hrui-border) !important;
@@ -89,17 +105,19 @@
     text-overflow: ellipsis;
   }
   .harmony-topbar {
-    border-color: var(--hrui-border) !important;
-    background: var(--hrui-nav) !important;
-    box-shadow: none;
-    -webkit-backdrop-filter: blur(14px) saturate(110%);
-    backdrop-filter: blur(14px) saturate(110%);
+    border-color: var(--hrui-glass-edge) !important;
+    background: var(--hrui-glass-surface) !important;
+    box-shadow: var(--hrui-glass-highlight), var(--hrui-glass-shadow) !important;
+    -webkit-backdrop-filter: var(--hrui-glass-filter) !important;
+    backdrop-filter: var(--hrui-glass-filter) !important;
   }
   .harmony-topbar-search {
     min-height: 40px;
-    border: 1px solid var(--hrui-border) !important;
-    background: var(--hrui-input) !important;
-    box-shadow: none !important;
+    border: 1px solid var(--hrui-glass-edge) !important;
+    background: var(--hrui-glass-control) !important;
+    box-shadow: var(--hrui-glass-highlight), 0 3px 10px rgba(32,73,115,.06) !important;
+    -webkit-backdrop-filter: blur(16px) saturate(145%);
+    backdrop-filter: blur(16px) saturate(145%);
   }
   .harmony-topbar-search:focus-within {
     border-color: var(--hrui-focus) !important;
@@ -107,10 +125,12 @@
   }
   .harmony-topbar-action,
   .harmony-theme-topbar {
-    border: 1px solid var(--hrui-border) !important;
-    background: var(--hrui-surface) !important;
+    border: 1px solid var(--hrui-glass-edge) !important;
+    background: var(--hrui-glass-control) !important;
     color: var(--hrui-ink) !important;
-    box-shadow: none;
+    box-shadow: var(--hrui-glass-highlight), 0 3px 10px rgba(32,73,115,.06) !important;
+    -webkit-backdrop-filter: blur(16px) saturate(145%);
+    backdrop-filter: blur(16px) saturate(145%);
   }
   .harmony-topbar-action:hover,.harmony-theme-topbar:hover {
     background: var(--hrui-hover) !important;
@@ -133,11 +153,11 @@
   .harmony-module-subnav,
   .harmony-subnav-portal,
   .harmony-popover-glass {
-    border: 1px solid var(--hrui-border) !important;
-    background: var(--hrui-surface) !important;
-    box-shadow: var(--hrui-shadow) !important;
-    -webkit-backdrop-filter: blur(14px);
-    backdrop-filter: blur(14px);
+    border: 1px solid var(--hrui-glass-edge) !important;
+    background: var(--hrui-glass-surface) !important;
+    box-shadow: var(--hrui-glass-highlight), var(--hrui-glass-shadow) !important;
+    -webkit-backdrop-filter: var(--hrui-glass-filter) !important;
+    backdrop-filter: var(--hrui-glass-filter) !important;
   }
   .harmony-module-tab:not(.harmony-tab-active):not(.harmony-tab-active-secondary):hover,
   .harmony-module-more:hover {
@@ -154,11 +174,11 @@
     .harmony-remed-claim-card,
     .harmony-employee-directory-card
   ) {
-    border-color: var(--hrui-border) !important;
+    border: 1px solid var(--hrui-glass-rim) !important;
     border-radius: var(--hrui-radius) !important;
-    background: var(--hrui-surface) !important;
+    background: var(--hrui-glass-surface) !important;
     color: var(--hrui-ink);
-    box-shadow: var(--hrui-shadow) !important;
+    box-shadow: var(--hrui-glass-highlight), var(--hrui-glass-shadow) !important;
   }
   .harmony-workspace .harmony-metric-card {
     border-color: var(--hrui-border) !important;
@@ -209,18 +229,19 @@
   }
   .harmony-glass-showcase .harmony-metric-card[data-tone],
   .harmony-workspace .harmony-metric-card[data-tone] {
-    background: var(--hrui-surface) !important;
+    background: var(--hrui-glass-surface) !important;
     color: var(--hrui-ink) !important;
-    border: 1px solid var(--hrui-border) !important;
-    box-shadow: var(--hrui-shadow) !important;
+    border: 1px solid var(--hrui-glass-rim) !important;
+    box-shadow: var(--hrui-glass-highlight), var(--hrui-glass-shadow) !important;
   }
   .harmony-glass-showcase .harmony-metric-card .harmony-glass-metric-icon {
     display: none !important;
   }
   .harmony-rc2o .harmony-rc2o-hero:not(.harmony-rc2q-employee-hero) {
-    background: var(--hrui-surface) !important;
-    border-color: var(--hrui-border) !important;
+    background: var(--hrui-glass-surface) !important;
+    border-color: var(--hrui-glass-rim) !important;
     color: var(--hrui-ink) !important;
+    box-shadow: var(--hrui-glass-highlight), var(--hrui-glass-shadow) !important;
   }
   .harmony-rc2o .harmony-rc2o-hero:not(.harmony-rc2q-employee-hero) :is(h1,p) {
     color: var(--hrui-ink) !important;
@@ -239,9 +260,10 @@
     color: #fff !important;
     border-color: rgba(235,243,250,.3) !important;
   }
+  /* The RC2U opaque override prevented the existing glass material. */
   .harmony-sidebar-panel {
-    -webkit-backdrop-filter: none !important;
-    backdrop-filter: none !important;
+    -webkit-backdrop-filter: var(--hrui-glass-filter) !important;
+    backdrop-filter: var(--hrui-glass-filter) !important;
   }
   .harmony-sidebar-nav .harmony-nav-item:not(.harmony-nav-active),
   .harmony-topbar-action {
