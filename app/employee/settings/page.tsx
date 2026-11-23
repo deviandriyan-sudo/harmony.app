@@ -357,7 +357,7 @@ export default function EmployeeSettingsPage() {
         description="Kelola data pribadi dan password akun employee."
       />
 
-      <section className="space-y-6 p-6">
+      <section className="harmony-account-settings-ui space-y-5 p-4 sm:p-6">
         {successMessage && (
           <div className="sticky top-4 z-30 rounded-2xl border border-green-200 bg-green-50 p-4 text-sm leading-6 text-green-700 shadow-[0_18px_45px_rgba(22,128,52,0.12)]">
             <div className="flex items-start justify-between gap-4">
@@ -647,7 +647,7 @@ function ReadOnlyItem({
   value: string
 }) {
   return (
-    <div className="flex items-center gap-3 rounded-[22px] border border-black/5 bg-white/70 p-4 shadow-sm">
+    <div className="harmony-account-readonly-item flex items-center gap-3 rounded-xl border p-3.5">
       <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#e8f2ff] harmony-text-link">
         {icon}
       </div>
