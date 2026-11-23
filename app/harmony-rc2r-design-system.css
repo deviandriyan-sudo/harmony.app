@@ -9,42 +9,42 @@
 @media screen {
   :root,
   html[data-harmony-theme='light'] {
-    --hrui-canvas: #f0f4f9;
-    --hrui-ink: #182d47;
-    --hrui-muted: #51657d;
-    --hrui-surface: rgba(255,255,255,.91);
+    --hrui-canvas: #f5f7fa;
+    --hrui-ink: #182333;
+    --hrui-muted: #526071;
+    --hrui-surface: rgba(255,255,255,.97);
     --hrui-surface-strong: #ffffff;
-    --hrui-subtle: rgba(237,244,251,.84);
-    --hrui-border: rgba(118,148,182,.24);
-    --hrui-hover: rgba(222,235,249,.66);
-    --hrui-shadow: 0 8px 24px rgba(32,62,102,.065), 0 2px 7px rgba(32,62,102,.035);
-    --hrui-shadow-hover: 0 12px 28px rgba(32,62,102,.095), 0 3px 10px rgba(32,62,102,.045);
-    --hrui-focus: #176ec9;
-    --hrui-blue: #176ac3;
-    --hrui-blue-hover: #0d579f;
-    --hrui-input: rgba(255,255,255,.94);
-    --hrui-nav: rgba(246,250,254,.9);
-    --hrui-modal: rgba(249,252,255,.985);
-    --hrui-radius: 18px;
+    --hrui-subtle: rgba(239,242,246,.97);
+    --hrui-border: rgba(41,61,83,.12);
+    --hrui-hover: rgba(225,233,243,.74);
+    --hrui-shadow: 0 1px 3px rgba(18,31,47,.05);
+    --hrui-shadow-hover: 0 3px 9px rgba(18,31,47,.08);
+    --hrui-focus: #155e9f;
+    --hrui-blue: #155e9f;
+    --hrui-blue-hover: #0d4b82;
+    --hrui-input: #ffffff;
+    --hrui-nav: #ffffff;
+    --hrui-modal: #ffffff;
+    --hrui-radius: 14px;
   }
   html[data-harmony-theme='dark'] {
-    --hrui-canvas: #121923;
-    --hrui-ink: #edf3fa;
-    --hrui-muted: #bfccd9;
-    --hrui-surface: rgba(35,46,61,.97);
-    --hrui-surface-strong: #263244;
-    --hrui-subtle: rgba(48,63,82,.93);
-    --hrui-border: rgba(166,189,212,.24);
-    --hrui-hover: rgba(107,137,171,.20);
-    --hrui-shadow: 0 9px 24px rgba(0,0,0,.18), 0 2px 7px rgba(0,0,0,.09);
-    --hrui-shadow-hover: 0 14px 30px rgba(0,0,0,.25), 0 3px 8px rgba(0,0,0,.12);
-    --hrui-focus: #9acaff;
-    --hrui-blue: #a2cfff;
-    --hrui-blue-hover: #c4e0ff;
-    --hrui-input: rgba(23,34,47,.98);
-    --hrui-nav: rgba(23,35,49,.985);
-    --hrui-modal: #243143;
-    --hrui-radius: 16px;
+    --hrui-canvas: #111821;
+    --hrui-ink: #edf1f6;
+    --hrui-muted: #b7c2cf;
+    --hrui-surface: rgba(29,39,51,.98);
+    --hrui-surface-strong: #222e3d;
+    --hrui-subtle: rgba(43,56,72,.96);
+    --hrui-border: rgba(193,205,218,.14);
+    --hrui-hover: rgba(92,111,134,.20);
+    --hrui-shadow: 0 1px 3px rgba(0,0,0,.08);
+    --hrui-shadow-hover: 0 3px 10px rgba(0,0,0,.15);
+    --hrui-focus: #a5cff8;
+    --hrui-blue: #c6e0fc;
+    --hrui-blue-hover: #edf7ff;
+    --hrui-input: rgba(25,35,47,.99);
+    --hrui-nav: rgba(24,33,45,.99);
+    --hrui-modal: #222e3d;
+    --hrui-radius: 14px;
   }
 
   /* One token vocabulary, harmonized with the pre-existing h385/rc2o layers. */
