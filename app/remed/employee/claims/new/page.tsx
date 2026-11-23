@@ -164,7 +164,7 @@ export default function NewRemedClaimPage() {
   }
 
   return (
-    <section className="mx-auto w-full max-w-5xl space-y-6 p-4 sm:p-6 lg:p-8">
+    <section className="harmony-remed-claim-form-page mx-auto w-full max-w-5xl space-y-5 p-4 sm:p-6 lg:p-8">
       <RemedPageHeader
         eyebrow="Re-Med · Employee"
         title="Ajukan Reimbursement"
@@ -172,7 +172,7 @@ export default function NewRemedClaimPage() {
         icon={FilePlus2}
       />
 
-      <form onSubmit={submit} className="harmony-unified-surface space-y-6 p-5 sm:p-7">
+      <form onSubmit={submit} className="harmony-remed-claim-form harmony-unified-surface space-y-6 p-5 sm:p-7">
         {message ? <div className="rounded-[18px] border border-red-100 bg-red-50 p-4 text-sm text-red-700">{message}</div> : null}
 
         <div>
