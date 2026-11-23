@@ -795,9 +795,9 @@ export default function EmployeeLeaveApprovalPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#f5f5f7] px-4 py-6 text-slate-950 sm:px-6 lg:px-8">
+    <main className="harmony-approval-leave-page min-h-screen px-4 py-6 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-7xl space-y-6">
-        <section className="harmony-unified-surface p-6 sm:p-8">
+        <section className="harmony-approval-leave-heading harmony-unified-surface p-5 sm:p-6">
           <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
             <div>
               <Link
@@ -873,7 +873,7 @@ export default function EmployeeLeaveApprovalPage() {
           <StatCard label="Rejected" value={stats.rejected} icon={XCircle} />
         </section>
 
-        <section className="harmony-unified-toolbar p-4 sm:p-5">
+        <section className="harmony-approval-leave-toolbar harmony-unified-toolbar p-4 sm:p-5">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div className="relative w-full lg:max-w-md">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
