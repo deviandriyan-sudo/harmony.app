@@ -1181,12 +1181,12 @@ export default function EmployeeLeavePage() {
           />
         </div>
 
-        <details className="harmony-employee-balance-breakdown rounded-[20px] border border-white/80 bg-white/70 px-4 py-3 shadow-sm">
-          <summary className="flex cursor-pointer list-none items-center justify-between gap-2 text-sm font-semibold text-slate-800 [&::-webkit-details-marker]:hidden">
+        <details className="harmony-employee-balance-breakdown harmony-leave-balance-panel rounded-[16px] border px-4 py-3">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-2 text-sm font-semibold harmony-text-primary [&::-webkit-details-marker]:hidden">
             <span>Saldo cuti tersedia: <strong className="text-blue-700">{annualRemaining} hari</strong></span>
             <span className="text-xs font-semibold text-blue-700">Rincian saldo</span>
           </summary>
-          <div className="mt-3 grid gap-2 border-t border-blue-100 pt-3 text-xs text-slate-600 sm:grid-cols-3">
+          <div className="mt-3 grid gap-2 border-t pt-3 text-xs harmony-text-secondary sm:grid-cols-3">
             <p>Cuti matang <strong className="ml-1 text-slate-800">{annualRegularRemaining} hari</strong></p>
             <p>Postpone aktif <strong className="ml-1 text-slate-800">{postponeActiveRemaining} hari</strong></p>
             <p>Adjustment HR <strong className="ml-1 text-slate-800">{annualManualAdjustment >= 0 ? '+' : ''}{annualManualAdjustment} hari</strong></p>
