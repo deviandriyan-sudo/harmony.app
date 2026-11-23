@@ -2626,7 +2626,7 @@ export default function EmployeeAttendancePage() {
                           </p>
 
                           {isOffDayNoAttendance ? (
-                            <span className="inline-flex rounded-full bg-white/80 px-3 py-1 text-xs font-bold harmony-text-secondary">
+                            <span className="harmony-attendance-offday-pill inline-flex rounded-full px-3 py-1 text-xs font-bold harmony-text-secondary">
                               {row.holiday_name ? "Libur" : "Weekend"}
                             </span>
                           ) : (
@@ -2823,7 +2823,7 @@ export default function EmployeeAttendancePage() {
 
                           <td className="px-3 py-3 align-top">
                             {isOffDayNoAttendance ? (
-                              <span className="inline-flex rounded-full bg-white/80 px-3 py-1 text-xs font-bold harmony-text-secondary">
+                              <span className="harmony-attendance-offday-pill inline-flex rounded-full px-3 py-1 text-xs font-bold harmony-text-secondary">
                                 {row.holiday_name ? "Libur" : "Weekend"}
                               </span>
                             ) : (
@@ -2858,7 +2858,7 @@ export default function EmployeeAttendancePage() {
                                 type="button"
                                 disabled={isReadOnlyPeriod || submittingPeriod}
                                 onClick={() => openEdit(row)}
-                                className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-2xl bg-[#e8f2ff] px-3 text-[11px] font-bold harmony-text-link transition hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
+                                className="harmony-attendance-action-fill inline-flex min-h-9 items-center justify-center gap-1.5 rounded-xl px-3 text-[11px] font-bold transition disabled:cursor-not-allowed disabled:opacity-60"
                               >
                                 <PencilLine size={15} />
                                 Lengkapi
@@ -2872,7 +2872,7 @@ export default function EmployeeAttendancePage() {
                                   !canShowResetButton(row)
                                 }
                                 onClick={() => handleResetVerification(row)}
-                                className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-2xl bg-red-50 px-3 text-[11px] font-bold text-red-700 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-40"
+                                className="harmony-attendance-action-reset inline-flex min-h-9 items-center justify-center gap-1.5 rounded-xl px-3 text-[11px] font-bold transition disabled:cursor-not-allowed disabled:opacity-60"
                                 title={
                                   canShowResetButton(row)
                                     ? "Reset data manual/verifikasi tanggal ini"
@@ -3471,7 +3471,7 @@ function AttendanceCheckButton({
       disabled={disabled}
       onClick={onClick}
       className={[
-        "mx-auto flex h-9 w-9 items-center justify-center rounded-2xl border text-xs font-bold transition disabled:cursor-not-allowed disabled:opacity-60",
+        "harmony-attendance-checkbox mx-auto flex h-9 w-9 items-center justify-center rounded-xl border text-xs font-bold transition disabled:cursor-not-allowed disabled:opacity-60",
         selected
           ? "border-[#007aff] bg-[#007aff] text-white shadow-sm"
           : "border-[#007aff]/30 bg-white harmony-text-link hover:border-[#007aff] hover:bg-[#e8f2ff]",
@@ -3496,7 +3496,7 @@ function RequestLabelBadge({
 }) {
   if (row.log?.phl_work_request_id) {
     return (
-      <span className="inline-flex rounded-full bg-[#f3e8ff] px-3 py-1 text-xs font-bold harmony-text-violet">
+      <span className="harmony-attendance-request-pill inline-flex rounded-full bg-[#f3e8ff] px-3 py-1 text-xs font-bold harmony-text-violet">
         PHL Approved
       </span>
     );
@@ -3504,7 +3504,7 @@ function RequestLabelBadge({
 
   if (isOffDayPHLOptOut(row, draft)) {
     return (
-      <span className="inline-flex rounded-full bg-[#e8f2ff] px-3 py-1 text-xs font-bold harmony-text-link">
+      <span className="harmony-attendance-request-pill inline-flex rounded-full bg-[#e8f2ff] px-3 py-1 text-xs font-bold harmony-text-link">
         Tidak Mengajukan PHL
       </span>
     );
@@ -3515,14 +3515,14 @@ function RequestLabelBadge({
 
   if (isOffDayWithoutAttendance(row, draft)) {
     return (
-      <span className="inline-flex rounded-full bg-white/80 px-3 py-1 text-xs font-bold harmony-text-secondary">
+      <span className="harmony-attendance-offday-pill inline-flex rounded-full px-3 py-1 text-xs font-bold harmony-text-secondary">
         {getOffDayLabel(row)}
       </span>
     );
   }
 
   return (
-    <span className="inline-flex rounded-full bg-[#f5f5f7] px-3 py-1 text-xs font-bold harmony-text-primary">
+    <span className="harmony-attendance-request-pill inline-flex rounded-full bg-[#f5f5f7] px-3 py-1 text-xs font-bold harmony-text-primary">
       {label}
     </span>
   );
@@ -3723,7 +3723,7 @@ function StatusBadge({
 
   return (
     <span
-      className={`inline-flex rounded-full px-3 py-1 text-xs font-bold capitalize ${className}`}
+      data-attendance-status={status} className={`harmony-attendance-status-pill inline-flex rounded-full px-3 py-1 text-xs font-bold capitalize ${className}`}
     >
       {formatStatus(status, log)}
     </span>
@@ -3742,7 +3742,7 @@ function ApprovalBadge({ status }: { status: string }) {
 
   return (
     <span
-      className={`inline-flex rounded-full px-3 py-1 text-xs font-bold ${className}`}
+      data-approval-status={status} className={`harmony-attendance-approval-pill inline-flex rounded-full px-3 py-1 text-xs font-bold ${className}`}
     >
       {formatApprovalStatus(status)}
     </span>
