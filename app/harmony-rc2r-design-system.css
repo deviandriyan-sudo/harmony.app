@@ -178,6 +178,85 @@
   /* The RC2Q photo mask and small left-justified hero actions remain intact. */
   .harmony-rc2q-employee-hero::before { opacity: .26; }
 
+  /* RC2U / Unslop: calm data-first surfaces. The real campus photo remains
+     the employee hero; the other decorative glass sculptures do not convey data. */
+  .harmony-glass-scene { display: none !important; }
+  .harmony-glass-showcase .harmony-glass-role-hero::before,
+  .harmony-glass-showcase .harmony-glass-role-hero::after,
+  .harmony-glass-showcase .harmony-glass-showcase-metric::before,
+  .harmony-hero-v25::before { content: none !important; }
+  .harmony-glass-showcase .harmony-glass-role-hero,
+  .harmony-hero-v25 {
+    background: #184971 !important;
+    border: 1px solid #466f91 !important;
+    box-shadow: none !important;
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+  }
+  .harmony-glass-showcase .harmony-glass-role-hero :is(h1,h2,h3,p),
+  .harmony-hero-v25 :is(h1,h2,h3,p) {
+    text-shadow: none !important;
+  }
+  .harmony-glass-showcase .harmony-glass-showcase-metric {
+    min-height: 90px;
+    padding: 16px !important;
+    transition: background-color 160ms ease, border-color 160ms ease;
+  }
+  .harmony-glass-showcase a.harmony-glass-showcase-metric:hover {
+    transform: none !important;
+    box-shadow: var(--hrui-shadow) !important;
+    background: var(--hrui-hover) !important;
+  }
+  .harmony-glass-showcase .harmony-metric-card[data-tone],
+  .harmony-workspace .harmony-metric-card[data-tone] {
+    background: var(--hrui-surface) !important;
+    color: var(--hrui-ink) !important;
+    border: 1px solid var(--hrui-border) !important;
+    box-shadow: var(--hrui-shadow) !important;
+  }
+  .harmony-glass-showcase .harmony-metric-card .harmony-glass-metric-icon {
+    display: none !important;
+  }
+  .harmony-rc2o .harmony-rc2o-hero:not(.harmony-rc2q-employee-hero) {
+    background: var(--hrui-surface) !important;
+    border-color: var(--hrui-border) !important;
+    color: var(--hrui-ink) !important;
+  }
+  .harmony-rc2o .harmony-rc2o-hero:not(.harmony-rc2q-employee-hero) :is(h1,p) {
+    color: var(--hrui-ink) !important;
+  }
+  .harmony-rc2o .harmony-rc2o-hero:not(.harmony-rc2q-employee-hero) p {
+    color: var(--hrui-muted) !important;
+  }
+  .harmony-rc2o .harmony-rc2o-hero:not(.harmony-rc2q-employee-hero) .harmony-rc2o-hero-button {
+    background: var(--hrui-subtle) !important;
+    color: var(--hrui-ink) !important;
+    border-color: var(--hrui-border) !important;
+    box-shadow: none !important;
+  }
+  .harmony-rc2q-employee-hero .harmony-rc2o-hero-button {
+    background: rgba(16,44,70,.76) !important;
+    color: #fff !important;
+    border-color: rgba(235,243,250,.3) !important;
+  }
+  .harmony-sidebar-panel {
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+  }
+  .harmony-sidebar-nav .harmony-nav-item:not(.harmony-nav-active),
+  .harmony-topbar-action {
+    box-shadow: none !important;
+  }
+  .harmony-workspace :is(.harmony-card,.harmony-card-solid,.harmony-card-soft) {
+    transition: background-color 160ms ease, border-color 160ms ease;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .harmony-glass-showcase *, .harmony-rc2o * {
+      animation: none !important;
+      transition: none !important;
+    }
+  }
+
   /* Forms are data-entry surfaces: crisp, never refracted or distorted. */
   .harmony-workspace :is(.harmony-input,.harmony-rc2o-input),
   .harmony-modal-surface :is(.harmony-input,.harmony-rc2o-input) {
