@@ -1324,8 +1324,8 @@ function LeaveRequestModal({
 
   return (
     <HarmonyModalPortal labelledBy={titleId} onClose={onClose} canClose={!submitting} className="harmony-leave-request-modal">
-      <div className="flex max-h-[94vh] w-full max-w-4xl flex-col overflow-hidden rounded-[32px] bg-white shadow-[0_30px_90px_rgba(0,0,0,0.24)]">
-        <div className="flex items-start justify-between gap-4 border-b border-black/5 p-5 sm:p-6">
+      <div className="harmony-leave-modal-panel flex max-h-[94vh] w-full max-w-4xl flex-col overflow-hidden rounded-[22px] shadow-[0_24px_70px_rgba(0,0,0,0.22)]">
+        <div className="harmony-leave-modal-header flex items-start justify-between gap-4 border-b p-5 sm:p-6">
           <div>
             <h2 id={titleId} className="text-xl font-semibold harmony-text-primary">
               Form Pengajuan Cuti / Izin / PHL
@@ -1343,7 +1343,7 @@ function LeaveRequestModal({
             onClick={onClose}
             aria-label="Tutup form pengajuan"
             disabled={submitting}
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#f5f5f7] harmony-text-primary transition hover:bg-[#e5e5ea] disabled:opacity-50"
+            className="harmony-leave-modal-close flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border harmony-text-primary transition disabled:opacity-50"
           >
             <X size={18} />
           </button>
@@ -1811,7 +1811,7 @@ function EmployeeIdentity({
   supervisorTwo: Employee | null
 }) {
   return (
-    <div className="rounded-[26px] border border-black/5 bg-[#f5f5f7]/70 p-4">
+    <div className="harmony-leave-modal-identity rounded-2xl border p-4">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex min-w-0 items-center gap-3">
           <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white harmony-text-link shadow-sm">
@@ -1950,7 +1950,7 @@ function InfoTile({
   }[tone]
 
   return (
-    <div className={`rounded-[22px] p-4 ${className}`}>
+    <div data-tone={tone} className={`harmony-leave-modal-tile rounded-xl border p-4 ${className}`}>
       <p className="text-xs font-bold uppercase tracking-wide opacity-70">
         {label}
       </p>
