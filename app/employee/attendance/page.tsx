@@ -2182,7 +2182,7 @@ export default function EmployeeAttendancePage() {
           </div>
         )}
 
-        <section aria-labelledby="harmony-approved-summary-title" className="harmony-rc2q-attendance-panel p-4 sm:p-5">
+        <section aria-labelledby="harmony-approved-summary-title" className="harmony-rc2q-attendance-panel harmony-liquid-lit harmony-liquid-surface p-4 sm:p-5">
           <header className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <h2 id="harmony-approved-summary-title" className="text-lg font-bold harmony-text-primary">Summary Periode</h2>
@@ -2202,7 +2202,7 @@ export default function EmployeeAttendancePage() {
           </div>
         </section>
 
-        <section aria-labelledby="harmony-today-attendance-title" className="harmony-rc2q-attendance-panel p-4 sm:p-5">
+        <section aria-labelledby="harmony-today-attendance-title" className="harmony-rc2q-attendance-panel harmony-liquid-lit harmony-liquid-surface p-4 sm:p-5">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div><h2 id="harmony-today-attendance-title" className="text-lg font-bold harmony-text-primary">Absensi Hari Ini</h2>
               <p className="mt-1 text-xs harmony-text-secondary">{formatDisplayDate(getTodayISO())} · Data manual tersimpan ke record absensi dan tetap mengikuti approval periode.</p></div>
