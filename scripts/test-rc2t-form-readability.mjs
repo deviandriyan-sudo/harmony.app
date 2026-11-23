@@ -7,6 +7,7 @@ const legacy = read('app/globals.css')
 const leave = read('app/employee/leave/page.tsx')
 const approvals = read('app/employee/approvals/leave/page.tsx')
 const attendanceApprovals = read('app/employee/approvals/attendance/page.tsx')
+const employeeAttendance = read('app/employee/attendance/page.tsx')
 const phlApprovals = read('app/employee/approvals/phl/page.tsx')
 const settings = read('app/employee/settings/page.tsx')
 const profile = read('components/profile/ProfileWorkspace.tsx')
@@ -42,6 +43,16 @@ for (const [name,file,terms] of [
   ['Attendance approval',attendanceApprovals,[
     'harmony-supervisor-attendance','harmony-approval-flow-note',
   ]],
+  ['Employee attendance',employeeAttendance,[
+    'harmony-attendance-status-pill','harmony-attendance-approval-pill',
+    'harmony-attendance-request-pill','harmony-attendance-action-fill',
+    'isFutureUnrecordedCalendarDay(row, draft)',
+    'row.date > getTodayISO()',
+    'status === "future_pending"',
+    'Belum berlangsung',
+    'handleSubmitPeriod',
+    'toggleSelectAllAttendance',
+  ]],
   ['PHL approval',phlApprovals,[
     'harmony-supervisor-phl','harmony-phl-day-type',
     'harmony-phl-info','harmony-phl-approve',
@@ -70,6 +81,8 @@ for (const component of [
   '.harmony-profile-doc-group',
   '.harmony-settings-input-shell',
   '.harmony-approval-flow-note',
+  '.harmony-attendance-status-pill',
+  '.harmony-attendance-action-fill',
 ]) contains(css,component,'CSS coverage')
 
 contains(legacy,'background: var(--hrui-modal, #f7fbff) !important',
