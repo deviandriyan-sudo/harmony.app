@@ -36,7 +36,7 @@ export default function RemedEmployeeDashboard() {
   const used = Number(ent?.legacy_used || 0) + Number(ent?.current_used || 0)
 
   return (
-    <section className="mx-auto w-full max-w-[1540px] space-y-4 p-4 sm:p-5 lg:p-6">
+    <section className="harmony-remed-employee-ui mx-auto w-full max-w-[1540px] space-y-4 p-4 sm:p-5 lg:p-6">
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div><h1 className="text-xl font-bold tracking-tight text-slate-900">Re-Med Karyawan</h1><p className="mt-1 text-xs text-slate-500">Ringkasan dan tindakan utama</p></div>
         <div className="flex flex-wrap gap-2">
