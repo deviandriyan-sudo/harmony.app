@@ -129,7 +129,7 @@ export default function PHLApprovalPage() {
   return (
     <>
       <Topbar title="Approval Saldo PHL" description="Review pengajuan saldo PHL bawahan melalui workflow khusus PHL." />
-      <section className="space-y-4 p-4 sm:p-6">
+      <section className="harmony-supervisor-phl space-y-4 p-4 sm:p-6">
         {message && (
           <div className={[
             'rounded-2xl border p-4 text-sm leading-6',
