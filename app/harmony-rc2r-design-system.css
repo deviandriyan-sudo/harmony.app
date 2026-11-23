@@ -1182,4 +1182,187 @@
     border-color: #8c5161 !important;
   }
 
+  /* RC2V — one Liquid Glass material language for the interactive shell.
+     Navigation gets strong translucency; data tables, inputs and row cards
+     stay solid for contrast. No shader, canvas, new JS or network dependency. */
+  .harmony-shell {
+    background: var(--hrui-canvas);
+  }
+  .harmony-workspace {
+    --harmony-surface-glass: var(--hrui-glass-surface);
+    --harmony-glass-border: var(--hrui-glass-rim);
+  }
+  .harmony-sidebar-panel,
+  .harmony-topbar,
+  .harmony-module-subnav,
+  .harmony-subnav-portal,
+  .harmony-popover-glass,
+  .harmony-theme-popover,
+  .harmony-mobile-topbar {
+    border-color: var(--hrui-glass-edge) !important;
+    background: var(--hrui-glass-surface) !important;
+    box-shadow: var(--hrui-glass-highlight), var(--hrui-glass-shadow) !important;
+    -webkit-backdrop-filter: var(--hrui-glass-filter) !important;
+    backdrop-filter: var(--hrui-glass-filter) !important;
+  }
+  .harmony-sidebar-panel,
+  .harmony-topbar,
+  .harmony-module-subnav {
+    border-radius: clamp(14px, 1.4vw, 22px) !important;
+  }
+  .harmony-mobile-brand,
+  .harmony-mobile-glass,
+  .harmony-logo-glass,
+  .harmony-sidebar-user,
+  .harmony-topbar-badge {
+    border-color: var(--hrui-glass-edge) !important;
+    background: var(--hrui-glass-control) !important;
+    box-shadow: var(--hrui-glass-highlight), 0 5px 17px rgba(26,63,103,.08) !important;
+    -webkit-backdrop-filter: blur(17px) saturate(145%) !important;
+    backdrop-filter: blur(17px) saturate(145%) !important;
+  }
+  .harmony-topbar-search,
+  .harmony-topbar-action,
+  .harmony-theme-topbar,
+  .harmony-theme-switch,
+  .harmony-module-more {
+    border-color: var(--hrui-glass-edge) !important;
+    background: var(--hrui-glass-control) !important;
+    box-shadow: var(--hrui-glass-highlight), 0 4px 12px rgba(29,65,109,.07) !important;
+  }
+  .harmony-theme-popover {
+    background: var(--hrui-glass-surface) !important;
+    color: var(--hrui-ink) !important;
+  }
+  .harmony-sidebar-nav .harmony-nav-item.harmony-nav-active {
+    border: 1px solid rgba(218,237,255,.53) !important;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.48),
+      inset 0 -1px 0 rgba(0,29,70,.16), 0 6px 16px rgba(15,69,137,.17) !important;
+  }
+  .harmony-module-tab.harmony-tab-active,
+  .harmony-module-tab.harmony-tab-active-secondary,
+  .harmony-theme-choice.is-selected {
+    border-color: var(--hrui-glass-rim) !important;
+    background: var(--hrui-glass-control) !important;
+    box-shadow: var(--hrui-glass-highlight) !important;
+    color: var(--hrui-ink) !important;
+  }
+  .harmony-module-tab:not(.harmony-tab-active):not(.harmony-tab-active-secondary):hover,
+  .harmony-topbar-action:hover,
+  .harmony-theme-topbar:hover {
+    border-color: var(--hrui-glass-rim) !important;
+    background: var(--hrui-glass-control) !important;
+    box-shadow: var(--hrui-glass-highlight),0 5px 17px rgba(29,65,109,.10) !important;
+  }
+
+  /* The outer content layer is frosted once, not every nested table cell.
+     Background stays tinted to preserve reading contrast under glass. */
+  .harmony-workspace :is(
+    .harmony-rc2o-panel,.harmony-card,.harmony-card-solid,.harmony-card-soft,
+    .harmony-unified-surface,.harmony-reference-surface,.harmony-review-metric,
+    .harmony-remed-claim-card,.harmony-employee-directory-card,
+    .harmony-metric-card,.harmony-team-history,.harmony-attendance-history
+  ),
+  .harmony-profile-workspace .harmony-profile-panel,
+  .harmony-remed-page-header,
+  .scaleup-root :is(.scaleup-panel,.scaleup-metric) {
+    border: 1px solid var(--hrui-glass-rim) !important;
+    background: var(--hrui-glass-surface) !important;
+    box-shadow: var(--hrui-glass-highlight), var(--hrui-glass-shadow) !important;
+    color: var(--hrui-ink);
+  }
+  .harmony-workspace :is(
+    .harmony-rc2o-panel,.harmony-card,.harmony-unified-surface,
+    .harmony-team-history,.harmony-attendance-history
+  ),
+  .harmony-profile-workspace .harmony-profile-panel,
+  .harmony-remed-page-header,
+  .scaleup-root .scaleup-panel {
+    -webkit-backdrop-filter: blur(13px) saturate(135%);
+    backdrop-filter: blur(13px) saturate(135%);
+  }
+  .harmony-workspace .harmony-glass-showcase-metric {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+  /* Never glassify data entry or dense rows: no transparency behind text. */
+  .harmony-workspace :is(input,textarea,select,.harmony-input,.harmony-rc2o-input),
+  .harmony-modal-surface :is(input,textarea,select),
+  .harmony-profile-workspace .harmony-profile-field,
+  .scaleup-root :is(input,textarea,select),
+  .harmony-remed-claim-form-page :is(input,textarea,select) {
+    background: var(--hrui-input) !important;
+    color: var(--hrui-ink) !important;
+    border-color: var(--hrui-border) !important;
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+  }
+  .harmony-workspace :is(table,.harmony-table) :is(th,td) {
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+  }
+
+  /* Modal is a top-level portal; only the sheet is luminous, not its fields.
+     Keep focus trap, escape key, and close behavior in the existing portal. */
+  .harmony-modal-surface .harmony-hr-edit-modal,
+  body > .harmony-leave-request-modal .harmony-leave-modal-panel {
+    border: 1px solid var(--hrui-glass-edge) !important;
+    background: var(--hrui-glass-surface) !important;
+    box-shadow: var(--hrui-glass-highlight),0 24px 70px rgba(10,25,49,.24) !important;
+    -webkit-backdrop-filter: blur(22px) saturate(140%) !important;
+    backdrop-filter: blur(22px) saturate(140%) !important;
+  }
+
+  /* Explicitly support transparency/contrast accessibility preferences.
+     This intentionally overrides every glass material above. */
+  @media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
+    .harmony-sidebar-panel,.harmony-topbar,.harmony-module-subnav,
+    .harmony-subnav-portal,.harmony-popover-glass,.harmony-theme-popover,
+    .harmony-mobile-topbar,.harmony-mobile-brand,.harmony-mobile-glass,
+    .harmony-logo-glass,.harmony-topbar-action,.harmony-topbar-search,
+    .harmony-theme-topbar,.harmony-theme-switch,.harmony-module-tab,
+    .harmony-workspace :is(
+      .harmony-rc2o-panel,.harmony-card,.harmony-card-solid,.harmony-card-soft,
+      .harmony-unified-surface,.harmony-reference-surface,
+      .harmony-metric-card,.harmony-team-history,.harmony-attendance-history
+    ),
+    .harmony-profile-workspace .harmony-profile-panel,
+    .harmony-remed-page-header,
+    .scaleup-root :is(.scaleup-panel,.scaleup-metric),
+    .harmony-modal-surface .harmony-hr-edit-modal,
+    body > .harmony-leave-request-modal .harmony-leave-modal-panel {
+      background: var(--hrui-surface-strong) !important;
+      border-color: var(--hrui-border) !important;
+      -webkit-backdrop-filter: none !important;
+      backdrop-filter: none !important;
+      box-shadow: var(--hrui-shadow) !important;
+    }
+  }
+  @supports not ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
+    .harmony-sidebar-panel,.harmony-topbar,.harmony-module-subnav,
+    .harmony-subnav-portal,.harmony-popover-glass,.harmony-theme-popover,
+    .harmony-mobile-topbar,.harmony-mobile-brand,.harmony-mobile-glass,
+    .harmony-logo-glass,.harmony-topbar-action,.harmony-topbar-search,
+    .harmony-theme-topbar,.harmony-theme-switch,
+    .harmony-workspace :is(
+      .harmony-rc2o-panel,.harmony-card,.harmony-unified-surface,
+      .harmony-metric-card,.harmony-team-history,.harmony-attendance-history
+    ),
+    .harmony-profile-workspace .harmony-profile-panel,
+    .harmony-remed-page-header,.scaleup-root .scaleup-panel,
+    .harmony-modal-surface .harmony-hr-edit-modal,
+    body > .harmony-leave-request-modal .harmony-leave-modal-panel {
+      background: var(--hrui-surface-strong) !important;
+      -webkit-backdrop-filter: none !important;
+      backdrop-filter: none !important;
+    }
+  }
+  @media (max-width: 767px) {
+    .harmony-sidebar-panel,.harmony-topbar,.harmony-mobile-topbar,
+    .harmony-module-subnav,.harmony-subnav-portal {
+      -webkit-backdrop-filter: blur(16px) saturate(135%) !important;
+      backdrop-filter: blur(16px) saturate(135%) !important;
+    }
+  }
+
 }
