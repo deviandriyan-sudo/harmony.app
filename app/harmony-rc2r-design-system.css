@@ -221,9 +221,7 @@
   .harmony-workspace :is(.harmony-table,table) tbody td {
     vertical-align: middle;
   }
-  .harmony-modal-surface > div {
-    max-height: min(92vh, 920px);
-  }
+  /* Modal sizing/scroll locking remain owned by the original portal. */
   .harmony-modal-surface .harmony-hr-edit-modal {
     border-color: var(--hrui-border) !important;
     background: var(--hrui-modal) !important;
