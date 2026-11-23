@@ -1,0 +1,301 @@
+/*
+ * HARMONY RC2R — restrained enterprise glass design system.
+ * Sources consulted as design references: Unslop, React Bits, Liquid Glass React,
+ * next-themes, shadcn Glass UI, Glass UI (main/develop).
+ * No external executable code, remote resources, shaders or extra dependencies.
+ * This layer is screen-only; print, business workflows, routes and permissions
+ * are intentionally outside its scope.
+ */
+@media screen {
+  html[data-harmony-theme='light'] {
+    --hrui-canvas: #f0f4f9;
+    --hrui-ink: #182d47;
+    --hrui-muted: #51657d;
+    --hrui-surface: rgba(255,255,255,.91);
+    --hrui-surface-strong: #fff;
+    --hrui-subtle: rgba(237,244,251,.84);
+    --hrui-border: rgba(118,148,182,.24);
+    --hrui-hover: rgba(222,235,249,.66);
+    --hrui-shadow: 0 8px 24px rgba(32,62,102,.065), 0 2px 7px rgba(32,62,102,.035);
+    --hrui-shadow-hover: 0 12px 28px rgba(32,62,102,.095), 0 3px 10px rgba(32,62,102,.045);
+    --hrui-focus: #176ec9;
+    --hrui-blue: #176ac3;
+    --hrui-blue-hover: #0d579f;
+    --hrui-input: rgba(255,255,255,.94);
+    --hrui-nav: rgba(246,250,254,.9);
+    --hrui-modal: rgba(249,252,255,.985);
+    --hrui-radius: 18px;
+  }
+  html[data-harmony-theme='dark'] {
+    --hrui-canvas: #101a29;
+    --hrui-ink: #eef5fc;
+    --hrui-muted: #b5c8db;
+    --hrui-surface: rgba(28,43,62,.95);
+    --hrui-surface-strong: #1d314b;
+    --hrui-subtle: rgba(39,59,83,.93);
+    --hrui-border: rgba(142,174,211,.24);
+    --hrui-hover: rgba(72,101,134,.35);
+    --hrui-shadow: 0 10px 28px rgba(0,0,0,.17), 0 2px 8px rgba(0,0,0,.10);
+    --hrui-shadow-hover: 0 14px 32px rgba(0,0,0,.23), 0 2px 10px rgba(0,0,0,.15);
+    --hrui-focus: #8fc3ff;
+    --hrui-blue: #77b7fa;
+    --hrui-blue-hover: #a5d4ff;
+    --hrui-input: rgba(34,53,77,.94);
+    --hrui-nav: rgba(25,41,61,.97);
+    --hrui-modal: rgba(24,40,61,.985);
+    --hrui-radius: 18px;
+  }
+
+  /* One token vocabulary, harmonized with the pre-existing h385/rc2o layers. */
+  .harmony-workspace {
+    --harmony-design-card-radius: var(--hrui-radius);
+    color: var(--hrui-ink);
+  }
+  .harmony-workspace :is(.harmony-rc2o-panel-title,.harmony-page-title,.harmony-section-title),
+  .harmony-topbar h1 {
+    letter-spacing: -.025em;
+  }
+
+  /* Navigation must remain compact, visible, and above content without
+     introducing another portal or changing route/permission resolution. */
+  .harmony-sidebar-panel {
+    border: 1px solid var(--hrui-border) !important;
+    background: var(--hrui-nav) !important;
+    box-shadow: var(--hrui-shadow) !important;
+    -webkit-backdrop-filter: blur(16px) saturate(112%);
+    backdrop-filter: blur(16px) saturate(112%);
+  }
+  .harmony-sidebar-header,.harmony-sidebar-footer {
+    border-color: var(--hrui-border) !important;
+  }
+  .harmony-sidebar-nav .harmony-nav-item {
+    border-radius: 13px !important;
+    transition: background-color 160ms ease, color 160ms ease, box-shadow 160ms ease;
+  }
+  .harmony-sidebar-nav .harmony-nav-item:not(.harmony-nav-active):hover {
+    background: var(--hrui-hover) !important;
+  }
+  .harmony-sidebar-nav .harmony-nav-item.harmony-nav-active {
+    background: linear-gradient(115deg,#1b79d0,#145db4) !important;
+    color: #fff !important;
+    box-shadow: 0 4px 11px rgba(20,95,170,.19) !important;
+  }
+  .harmony-sidebar-nav .harmony-nav-item.harmony-nav-active .harmony-nav-icon {
+    color: #fff !important;
+    background: rgba(255,255,255,.14) !important;
+  }
+  .harmony-sidebar-panel .harmony-side-detail p {
+    text-overflow: ellipsis;
+  }
+  .harmony-topbar {
+    border-color: var(--hrui-border) !important;
+    background: var(--hrui-nav) !important;
+    box-shadow: 0 3px 14px rgba(34,67,104,.04);
+    -webkit-backdrop-filter: blur(14px) saturate(110%);
+    backdrop-filter: blur(14px) saturate(110%);
+  }
+  .harmony-topbar-search {
+    min-height: 40px;
+    border: 1px solid var(--hrui-border) !important;
+    background: var(--hrui-input) !important;
+    box-shadow: none !important;
+  }
+  .harmony-topbar-search:focus-within {
+    border-color: var(--hrui-focus) !important;
+    box-shadow: 0 0 0 3px rgba(68,148,239,.10) !important;
+  }
+  .harmony-topbar-action,
+  .harmony-theme-topbar {
+    border: 1px solid var(--hrui-border) !important;
+    background: var(--hrui-surface) !important;
+    color: var(--hrui-ink) !important;
+    box-shadow: 0 2px 6px rgba(35,62,97,.04);
+  }
+  .harmony-topbar-action:hover,.harmony-theme-topbar:hover {
+    background: var(--hrui-hover) !important;
+  }
+  /* Notification icon stays accessible; title remains in the button for SR. */
+  .harmony-topbar-action[aria-controls='harmony-notification-panel'] {
+    width: 42px;
+    min-width: 42px;
+    height: 42px;
+    padding: 0 !important;
+    font-size: 0 !important;
+  }
+  .harmony-topbar-action[aria-controls='harmony-notification-panel'] svg {
+    width: 19px;
+    height: 19px;
+  }
+
+  /* Secondary navigation, real cards, and modal surfaces get identical
+     border/elevation rather than repeated fluorescent gradients and glows. */
+  .harmony-module-subnav,
+  .harmony-subnav-portal,
+  .harmony-popover-glass {
+    border: 1px solid var(--hrui-border) !important;
+    background: var(--hrui-surface) !important;
+    box-shadow: var(--hrui-shadow) !important;
+    -webkit-backdrop-filter: blur(14px);
+    backdrop-filter: blur(14px);
+  }
+  .harmony-module-tab:not(.harmony-tab-active):not(.harmony-tab-active-secondary):hover,
+  .harmony-module-more:hover {
+    background: var(--hrui-hover) !important;
+  }
+  .harmony-workspace :is(
+    .harmony-rc2o-panel,
+    .harmony-card,
+    .harmony-card-solid,
+    .harmony-card-soft,
+    .harmony-unified-surface,
+    .harmony-reference-surface,
+    .harmony-review-metric,
+    .harmony-remed-claim-card,
+    .harmony-employee-directory-card
+  ) {
+    border-color: var(--hrui-border) !important;
+    border-radius: var(--hrui-radius) !important;
+    background: var(--hrui-surface) !important;
+    color: var(--hrui-ink);
+    box-shadow: var(--hrui-shadow) !important;
+  }
+  .harmony-workspace .harmony-metric-card {
+    border-color: var(--hrui-border) !important;
+    border-radius: var(--hrui-radius) !important;
+    box-shadow: var(--hrui-shadow) !important;
+    transition: box-shadow 160ms ease, transform 160ms ease;
+  }
+  .harmony-workspace a.harmony-metric-card:hover {
+    transform: translateY(-1px);
+    box-shadow: var(--hrui-shadow-hover) !important;
+  }
+  .harmony-workspace :is(.harmony-rc2q-workflow,.harmony-rc2q-attendance-panel) {
+    border-color: var(--hrui-border) !important;
+    border-radius: var(--hrui-radius) !important;
+    box-shadow: var(--hrui-shadow) !important;
+  }
+  /* The RC2Q photo mask and small left-justified hero actions remain intact. */
+  .harmony-rc2q-employee-hero::before { opacity: .26; }
+
+  /* Forms are data-entry surfaces: crisp, never refracted or distorted. */
+  .harmony-workspace :is(.harmony-input,.harmony-rc2o-input),
+  .harmony-modal-surface :is(.harmony-input,.harmony-rc2o-input) {
+    border: 1px solid var(--hrui-border) !important;
+    background: var(--hrui-input) !important;
+    color: var(--hrui-ink) !important;
+    box-shadow: none !important;
+  }
+  .harmony-workspace :is(.harmony-input,.harmony-rc2o-input):focus-visible,
+  .harmony-modal-surface :is(input,select,textarea):focus-visible {
+    border-color: var(--hrui-focus) !important;
+    outline: 2px solid var(--hrui-focus) !important;
+    outline-offset: 2px;
+  }
+  .harmony-workspace :is(input,select,textarea):disabled {
+    cursor: not-allowed;
+    opacity: .69;
+  }
+  .harmony-workspace :is(.harmony-button-native,.harmony-workspace-action,.harmony-rc2o-hero-button) {
+    border-radius: 12px !important;
+    transition: background-color 170ms ease, box-shadow 170ms ease, transform 170ms ease;
+  }
+  .harmony-workspace :is(button,a,input,select,textarea):focus-visible,
+  .harmony-sidebar-panel :is(button,a):focus-visible,
+  .harmony-theme-anchor :is(button):focus-visible {
+    outline: 2px solid var(--hrui-focus) !important;
+    outline-offset: 2px;
+  }
+
+  /* Tables remain opaque enough to read, with no shader/filter over rows. */
+  .harmony-workspace :is(.harmony-table,table) {
+    border-collapse: separate;
+    border-spacing: 0;
+  }
+  .harmony-workspace :is(.harmony-table,table) thead th {
+    font-weight: 700;
+    letter-spacing: .005em;
+  }
+  .harmony-workspace :is(.harmony-table,table) tbody tr {
+    transition: background-color 120ms ease;
+  }
+  .harmony-workspace :is(.harmony-table,table) tbody td {
+    vertical-align: middle;
+  }
+  .harmony-modal-surface > div {
+    max-height: min(92vh, 920px);
+  }
+  .harmony-modal-surface .harmony-hr-edit-modal {
+    border-color: var(--hrui-border) !important;
+    background: var(--hrui-modal) !important;
+    box-shadow: 0 22px 64px rgba(12,28,51,.22) !important;
+  }
+
+  /* CSS liquid highlight for small controls, no third-party renderer. */
+  .harmony-theme-topbar,.harmony-topbar-action {
+    position: relative;
+    overflow: visible;
+    transition: background-color 160ms ease, box-shadow 160ms ease !important;
+  }
+  .harmony-theme-topbar:hover,.harmony-topbar-action:hover {
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.23), 0 4px 12px rgba(32,62,102,.09) !important;
+  }
+  .harmony-theme-popover {
+    border-color: var(--hrui-border) !important;
+    background: var(--hrui-surface-strong) !important;
+    color: var(--hrui-ink) !important;
+    box-shadow: var(--hrui-shadow-hover) !important;
+    -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: blur(12px);
+  }
+  .harmony-theme-choice {
+    color: var(--hrui-muted);
+    transition: background-color 140ms ease,color 140ms ease;
+  }
+  .harmony-theme-choice:hover { background: var(--hrui-hover); color: var(--hrui-ink); }
+  .harmony-theme-choice.is-selected {
+    background: var(--hrui-subtle);
+    color: var(--hrui-blue);
+  }
+  .harmony-theme-switch {
+    border-color: var(--hrui-border) !important;
+  }
+  .harmony-theme-switch button.is-selected {
+    background: var(--hrui-subtle) !important;
+    color: var(--hrui-blue) !important;
+  }
+  .harmony-theme-switch button:focus-visible {
+    outline: 2px solid var(--hrui-focus);
+    outline-offset: 1px;
+  }
+
+  /* Keep responsive layout behavior owned by existing route components. */
+  @media (max-width: 768px) {
+    .harmony-topbar { -webkit-backdrop-filter: blur(9px); backdrop-filter: blur(9px); }
+    .harmony-sidebar-panel { -webkit-backdrop-filter: blur(9px); backdrop-filter: blur(9px); }
+    .harmony-module-subnav { border-radius: 15px !important; }
+    .harmony-rc2q-employee-hero::before { opacity: .1; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .harmony-workspace :is(.harmony-metric-card,.harmony-button-native,.harmony-workspace-action,.harmony-rc2o-hero-button),
+    .harmony-sidebar-nav .harmony-nav-item,
+    .harmony-theme-choice,.harmony-theme-topbar,.harmony-topbar-action {
+      transition: none !important;
+      animation: none !important;
+      transform: none !important;
+    }
+  }
+  @media (prefers-reduced-transparency: reduce) {
+    .harmony-sidebar-panel,.harmony-topbar,.harmony-module-subnav,
+    .harmony-subnav-portal,.harmony-popover-glass,.harmony-theme-popover {
+      -webkit-backdrop-filter: none !important;
+      backdrop-filter: none !important;
+      background: var(--hrui-surface-strong) !important;
+    }
+  }
+  @supports not (backdrop-filter: blur(1px)) {
+    .harmony-sidebar-panel,.harmony-topbar,.harmony-module-subnav,
+    .harmony-subnav-portal,.harmony-popover-glass,.harmony-theme-popover {
+      background: var(--hrui-surface-strong) !important;
+    }
+  }
+}
