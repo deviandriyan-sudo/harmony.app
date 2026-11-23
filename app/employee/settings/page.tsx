@@ -555,7 +555,7 @@ export default function EmployeeSettingsPage() {
               </div>
 
               <form onSubmit={handleSaveProfile} className="space-y-5 p-6">
-                <div className="rounded-[24px] border border-blue-100 bg-[#e8f2ff]/65 p-4 text-sm leading-6 text-[#305b86]">
+                <div className="harmony-settings-instruction rounded-xl border p-4 text-sm leading-6">
                   Isi data yang ingin disimpan. Setelah berhasil, form akan dikosongkan.
                   Data lama di database akan otomatis diganti dengan data terbaru.
                   {lastSavedAt ? ` Terakhir disimpan pukul ${lastSavedAt}.` : ''}
