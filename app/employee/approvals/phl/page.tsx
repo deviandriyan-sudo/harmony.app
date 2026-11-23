@@ -16,6 +16,7 @@ import {
 } from 'lucide-react'
 
 import { Topbar } from '@/components/layout/Topbar'
+import { phlWorkApprovalExpired, phlWorkExpiryDate } from '@/lib/phl-work-expiry'
 import {
   fetchPHLWorkRequests,
   formatPHLMinutes,
@@ -86,6 +87,10 @@ export default function PHLApprovalPage() {
   }
 
   async function decide(item: PHLWorkRequest, decision: 'approve' | 'reject') {
+    if (decision === 'approve' && phlWorkApprovalExpired(item.work_date)) {
+      setMessage({ type: 'error', text: 'Pengajuan ini sudah melewati masa berlaku 90 hari dari tanggal pelaksanaan. Approval tidak tersedia; cek histori dan koordinasikan penyelesaiannya dengan HR.' })
+      return
+    }
     const defaultText = decision === 'approve' ? 'Disetujui oleh atasan.' : ''
     const note = window.prompt(
       decision === 'approve' ? 'Catatan approval atasan:' : 'Alasan penolakan:',
@@ -124,7 +129,7 @@ export default function PHLApprovalPage() {
   return (
     <>
       <Topbar title="Approval Saldo PHL" description="Review pengajuan saldo PHL bawahan melalui workflow khusus PHL." />
-      <section className="space-y-6 p-4 sm:p-6">
+      <section className="space-y-4 p-4 sm:p-6">
         {message && (
           <div className={[
             'rounded-2xl border p-4 text-sm leading-6',
@@ -137,12 +142,12 @@ export default function PHLApprovalPage() {
           </div>
         )}
 
-        <div className="harmony-hero-v25 p-6 sm:p-7">
+        <div className="harmony-hero-v25 p-5 sm:p-6">
           <div className="relative flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
             <div>
               <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-4 py-2 text-xs font-semibold text-white/75"><ShieldCheck size={15} />Supervisor PHL</div>
-              <h1 className="mt-5 text-3xl font-semibold tracking-[-0.04em] md:text-5xl">Review Pengajuan Saldo PHL</h1>
-              <p className="mt-4 max-w-2xl text-sm leading-7 text-white/65">Pastikan Surat Tugas, tujuan penugasan, dan durasi minimal 4 jam sudah sesuai. Jika absensi belum tercatat, approval akan menyinkronkan jam form ke absensi secara otomatis.</p>
+              <h1 className="mt-3 text-2xl font-semibold tracking-[-0.04em] md:text-3xl">Review Pengajuan Saldo PHL</h1>
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-white/85">Pastikan Surat Tugas, tujuan penugasan, dan durasi minimal 4 jam sudah sesuai. Jika absensi belum tercatat, approval akan menyinkronkan jam form ke absensi secara otomatis.</p>
             </div>
             <div className="grid grid-cols-3 gap-3 xl:min-w-[420px]">
               <Metric label="Pending" value={counts.pending} />
@@ -201,6 +206,9 @@ export default function PHLApprovalPage() {
                       <StatusBadge status={item.status} />
                       <span className="rounded-full bg-[#f5f5f7] px-3 py-1 text-xs font-bold harmony-text-secondary">{dayTypeLabel(item.work_day_type)}</span>
                       {item.origin === 'legacy_attendance' && <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-bold text-amber-700">Migrasi Absensi Lama</span>}
+                      {item.status === 'pending_supervisor' && phlWorkApprovalExpired(item.work_date) && (
+                        <span className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-bold text-amber-800">Lewat 90 hari</span>
+                      )}
                     </div>
                     <h2 className="mt-3 text-lg font-semibold harmony-text-primary">{item.full_name || '-'}</h2>
                     <p className="mt-1 text-xs harmony-text-muted">{item.employee_number || '-'} · {item.department || '-'} · {item.position || '-'}</p>
@@ -234,6 +242,11 @@ export default function PHLApprovalPage() {
                   <p className="mt-4 rounded-2xl border border-black/5 bg-white p-3 text-xs leading-5 harmony-text-secondary">Catatan: <strong>{item.supervisor_note}</strong></p>
                 )}
 
+                {item.status === 'pending_supervisor' && phlWorkApprovalExpired(item.work_date) && (
+                  <p role="status" className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900">
+                    Masa berlaku PHL berakhir {phlWorkExpiryDate(item.work_date) || '-'}. Persetujuan tidak tersedia sesuai aturan 90 hari. Penolakan tetap dapat diproses; untuk kasus legacy koordinasikan dengan HR.
+                  </p>
+                )}
                 {item.status === 'pending_supervisor' && (
                   <div className="mt-5 grid grid-cols-2 gap-3">
                     <button
@@ -246,12 +259,12 @@ export default function PHLApprovalPage() {
                     </button>
                     <button
                       type="button"
-                      disabled={processing === item.id}
+                      disabled={processing === item.id || phlWorkApprovalExpired(item.work_date)}
                       onClick={() => void decide(item, 'approve')}
                       className="inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl bg-[#007aff] px-4 text-sm font-bold text-white disabled:opacity-50"
                     >
                       {processing === item.id ? <Loader2 size={17} className="animate-spin" /> : <CheckCircle2 size={17} />}
-                      Approve +1 PHL
+                      {phlWorkApprovalExpired(item.work_date) ? 'Tidak dapat approve' : 'Approve +1 PHL'}
                     </button>
                   </div>
                 )}

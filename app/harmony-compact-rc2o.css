@@ -87,12 +87,12 @@
   @media(max-width:900px){.harmony-login-shell{min-height:0}.harmony-login-brand-content{padding:22px}.harmony-login-form-inner{padding:30px 24px 25px}}
 }
 @media screen {
-  /* Employee team presence: one focused category at a time, no three nested columns. */
+  /* Employee team presence: three independent, compact categories; supervisor approvals remain separate. */
   .harmony-rc2o .harmony-rc2o-team{background:var(--rc2o-panel);border-color:var(--rc2o-panel-border);box-shadow:var(--rc2o-shadow);backdrop-filter:blur(16px)}
   .harmony-rc2o .harmony-rc2o-team>div:first-child{padding:16px 20px;gap:12px;border-color:var(--rc2o-panel-border)}
   .harmony-rc2o .harmony-rc2o-team h2{font-size:17px;letter-spacing:-.025em}
   .harmony-rc2o .harmony-rc2o-team .max-h-\[720px\]{max-height:480px}
-  .harmony-rc2o .harmony-rc2o-team .rounded-\[28px\]{border-radius:16px;background:transparent;border-color:var(--rc2o-panel-border);padding:12px}
+  .harmony-rc2o .harmony-rc2o-team .rounded-\[28px\]{border-radius:16px;background:var(--rc2o-row-hover);border-color:var(--rc2o-panel-border);padding:12px}
   .harmony-rc2o .harmony-rc2o-team article{border-radius:16px;background:var(--rc2o-input);border-color:var(--rc2o-panel-border);box-shadow:none;padding:13px}
   .harmony-rc2o .harmony-rc2o-team>div:first-child label{background:var(--rc2o-input)!important;border-color:var(--rc2o-panel-border)!important}
   .harmony-rc2o .harmony-rc2o-team>div:first-child select{color:var(--rc2o-ink)!important}

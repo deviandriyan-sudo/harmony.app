@@ -44,7 +44,8 @@
     "test:rc2i:sql": "node scripts/test-rc2i-sql-artifacts.mjs",
     "test:upload-security": "node scripts/test-rc2m-upload-security.cjs",
     "test:recovery-theme": "node scripts/test-rc2n-recovery-theme.mjs",
-    "test:workspace:rc2o": "node scripts/test-rc2o-workspace.cjs"
+    "test:workspace:rc2o": "node scripts/test-rc2o-workspace.cjs",
+    "test:rc2p:dashboard-phl": "node scripts/test-rc2p-dashboard-phl.cjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.107.0",

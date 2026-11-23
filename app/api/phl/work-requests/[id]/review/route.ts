@@ -4,6 +4,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { harmonyApiError, requireHarmonyApi } from '@/lib/server/user-api-auth'
 import { isPHLSupervisorOf, notifyPHLWorkDecision } from '@/lib/server/phl-work'
 import { phlAttendanceLinkIssue } from '@/lib/phl-attendance-link-policy'
+import { phlWorkApprovalExpired } from '@/lib/phl-work-expiry'
 
 export const runtime = 'nodejs'
 
@@ -347,6 +348,16 @@ export async function POST(
       return NextResponse.json(
         { success: false, error: 'Anda bukan atasan yang terhubung dengan employee ini.' },
         { status: 403 },
+      )
+    }
+
+    // The approval RPC refuses work dates older than 90 days. Check BEFORE
+    // syncing attendance (a separate DB call), preventing transient writes
+    // and best-effort rollback when the RPC would inevitably reject it.
+    if (decision === 'approve' && phlWorkApprovalExpired(clean(target.work_date))) {
+      return NextResponse.json(
+        { success: false, error: 'PHL sudah melewati masa berlaku 90 hari dari tanggal pelaksanaan.', code: 'PHL_EXPIRED' },
+        { status: 409, headers: { 'Cache-Control': 'no-store' } },
       )
     }
 

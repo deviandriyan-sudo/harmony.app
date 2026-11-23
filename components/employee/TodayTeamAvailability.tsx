@@ -676,7 +676,6 @@ export function TodayTeamAvailability() {
   const [items, setItems] = useState<TeamHistoryItem[]>([])
   const [message, setMessage] = useState('')
   const [selectedMonth, setSelectedMonth] = useState(currentMonthKey())
-  const [activeCategory,setActiveCategory] = useState<keyof typeof categoryMeta>('leave')
   const [monthOptions, setMonthOptions] = useState<MonthOption[]>(() =>
     buildMonthOptions(),
   )
@@ -937,16 +936,18 @@ export function TodayTeamAvailability() {
         </div>
       )}
 
-      <div className="flex flex-wrap gap-2 px-4 pt-4 sm:px-5" role="group" aria-label="Jenis informasi kehadiran tim">
-        {(Object.keys(categoryMeta) as Array<keyof typeof categoryMeta>).map(key => (
-          <button key={key} type="button" aria-pressed={activeCategory===key} onClick={()=>setActiveCategory(key)}
-            className={`harmony-rc2o-filter rounded-xl px-3 py-2 text-xs font-semibold ${activeCategory===key?'is-active':''}`}>
-            {categoryMeta[key].label} <span className="ml-1 opacity-75">{uniquePersonCount(grouped[key])}</span>
-          </button>
+      {/* Cuti, klaim PHL dan ketidakhadiran adalah tiga jenis informasi,
+          bukan tiga approval. Selalu tampilkan masing-masing secara mandiri. */}
+      <div className="grid min-w-0 gap-3 p-4 sm:p-5 md:grid-cols-2 xl:grid-cols-3" aria-label="Informasi kehadiran tim berdasarkan kategori">
+        {(Object.keys(categoryMeta) as Array<keyof typeof categoryMeta>).map((category) => (
+          <HistoryColumn
+            key={category}
+            category={category}
+            items={grouped[category]}
+            loading={loading}
+            periodLabel={periodLabel}
+          />
         ))}
-      </div>
-      <div className="p-4 sm:p-5">
-        <HistoryColumn category={activeCategory} items={grouped[activeCategory]} loading={loading} periodLabel={periodLabel} />
       </div>
     </section>
   )
@@ -968,7 +969,7 @@ function HistoryColumn({
   const peopleCount = uniquePersonCount(items)
 
   return (
-    <div className="rounded-[28px] border border-black/5 bg-[#f5f5f7]/60 p-4">
+    <div className="min-w-0 self-start rounded-[28px] border border-black/5 bg-[#f5f5f7]/60 p-4">
       <div className="mb-4 flex items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
           <div
@@ -998,7 +999,7 @@ function HistoryColumn({
           {meta.emptyLabel(periodLabel)}
         </div>
       ) : (
-        <div className="max-h-[720px] space-y-3 overflow-y-auto pr-1">
+        <div className="max-h-[720px] space-y-3 overflow-y-auto overscroll-contain pr-1">
           {items.map((item) => (
             <HistoryPersonCard key={item.id} item={item} />
           ))}
@@ -1053,6 +1054,7 @@ function HistoryPersonCard({ item }: { item: TeamHistoryItem }) {
             </span>
           </div>
 
+          {(item.jobPending || item.handoverTo) && (
           <div className="mt-3 rounded-2xl bg-[#f5f5f7]/85 p-3">
             <div className="flex items-start gap-2">
               <BriefcaseBusiness
@@ -1064,19 +1066,20 @@ function HistoryPersonCard({ item }: { item: TeamHistoryItem }) {
                 <p className="text-[11px] font-bold uppercase tracking-wide harmony-text-muted">
                   Job pending
                 </p>
-                <p className="mt-1 whitespace-pre-line break-words text-xs leading-5 harmony-text-primary">
-                  {item.jobPending || 'Belum ada detail job pending.'}
-                </p>
+                {item.jobPending ? (
+                  <p className="mt-1 whitespace-pre-line break-words text-xs leading-5 harmony-text-primary">{item.jobPending}</p>
+                ) : <p className="mt-1 text-xs harmony-text-muted">Tidak ada job pending.</p>}
 
-                <p className="mt-2 text-[11px] font-bold uppercase tracking-wide harmony-text-muted">
-                  Pengganti / PIC
-                </p>
-                <p className="mt-1 break-words text-xs leading-5 harmony-text-primary">
-                  {item.handoverTo || 'Belum ditentukan.'}
-                </p>
+                {item.handoverTo && (
+                  <>
+                    <p className="mt-2 text-[11px] font-bold uppercase tracking-wide harmony-text-muted">Pengganti / PIC</p>
+                    <p className="mt-1 break-words text-xs leading-5 harmony-text-primary">{item.handoverTo}</p>
+                  </>
+                )}
               </div>
             </div>
           </div>
+          )}
         </div>
       </div>
     </article>
