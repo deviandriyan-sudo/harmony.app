@@ -537,11 +537,69 @@
   /* SCALE UP already owns its own layout; align its materials and text to
      the HARMONY palette, do not change approval stages or user actions. */
   .scaleup-root {
+    --harmony-surface: var(--hrui-surface-strong);
     --harmony-surface-glass: var(--hrui-surface);
     --harmony-border: var(--hrui-border);
     --harmony-text: var(--hrui-ink);
+    --harmony-text-secondary: var(--hrui-muted);
     --harmony-text-muted: var(--hrui-muted);
     color: var(--hrui-ink);
+  }
+  .scaleup-root .scaleup-hero {
+    border-radius: 20px;
+    padding: clamp(21px,3vw,30px);
+    box-shadow: var(--hrui-shadow);
+  }
+  .scaleup-root .scaleup-hero h1 {
+    font-size: clamp(32px,4vw,44px);
+    letter-spacing: -.045em;
+  }
+  .scaleup-root .scaleup-toolbar { margin: 13px 0; }
+  .scaleup-root .scaleup-metrics { gap: 10px; }
+  .scaleup-root .scaleup-metric {
+    padding: 16px;
+    border-radius: 16px !important;
+    gap: 6px;
+  }
+  .scaleup-root .scaleup-metric strong {
+    font-size: 25px;
+    color: var(--hrui-ink) !important;
+  }
+  .scaleup-root .scaleup-panel { padding: 19px; border-radius: 16px !important; }
+  .scaleup-root .scaleup-panel-header { margin-bottom: 10px; }
+  .scaleup-root .scaleup-panel h2 { font-size: 16px; letter-spacing: -.02em; }
+  .scaleup-root :is(.scaleup-metric small,.scaleup-empty,.scaleup-row small) {
+    font-size: 12.5px;
+    line-height: 1.55;
+  }
+  .scaleup-root .scaleup-tabs {
+    background: var(--hrui-subtle) !important;
+    border-color: var(--hrui-border) !important;
+    border-radius: 13px;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+  .scaleup-root .scaleup-tabs button {
+    color: var(--hrui-ink) !important;
+    opacity: .88;
+  }
+  .scaleup-root .scaleup-tabs button.active {
+    background: #146c9d !important;
+    color: #fff !important;
+    opacity: 1;
+  }
+  .scaleup-root .scaleup-dropdown {
+    background: var(--hrui-surface-strong) !important;
+    color: var(--hrui-ink) !important;
+    border-color: var(--hrui-border) !important;
+  }
+  .scaleup-root .scaleup-field :is(input,textarea,select) {
+    color: var(--hrui-ink) !important;
+    background: var(--hrui-input) !important;
+    border-color: var(--hrui-border) !important;
+  }
+  html[data-harmony-theme='dark'] .scaleup-root .scaleup-field :is(input,textarea,select) {
+    color-scheme: dark;
   }
   .scaleup-root :is(.scaleup-panel,.scaleup-metric,.scaleup-request,.scaleup-record) {
     background: var(--hrui-surface) !important;
