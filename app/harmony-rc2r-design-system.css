@@ -1,8 +1,9 @@
 /*
  * HARMONY RC2R — restrained enterprise glass design system.
- * Sources consulted as design references: Unslop, React Bits, Liquid Glass React,
- * next-themes, shadcn Glass UI, Glass UI (main/develop).
- * No external executable code, remote resources, shaders or extra dependencies.
+ * RC2W includes adapted MIT optical material code from AndreyBegma/glass-ui.
+ * Earlier references: Unslop, React Bits, Liquid Glass React, next-themes,
+ * shadcn Glass UI and Glass UI. No remote scripts, shader or new dependency.
+ * License notice: docs/licenses/GLASS_UI_MIT.txt.
  * This layer is screen-only; print, business workflows, routes and permissions
  * are intentionally outside its scope.
  */
@@ -104,7 +105,7 @@
 
   /* Optical recipes adapted from glass-ui/src/material.css (MIT, AndreyBegma).
      Seven layers: adaptive filter, scrim, sheen, rim, meniscus, refraction ring and shadow. */
-  :root {
+  :root, html[data-harmony-theme='light'], html[data-harmony-theme='dark'] {
     --harmony-glass-chrome-bg:
       linear-gradient(var(--harmony-glass-sheen),var(--harmony-glass-sheen)),
       var(--harmony-glass-scrim);
@@ -1417,6 +1418,16 @@
     }
   }
 
+  /* The login shell uses the same premium optical surface, without
+     changing credentials, recovery callbacks or any input behavior. */
+  .harmony-login-shell {
+    border: 1px solid var(--harmony-glass-edge) !important;
+    background: var(--harmony-glass-strong-bg) !important;
+    box-shadow: var(--harmony-glass-strong-shadow) !important;
+    -webkit-backdrop-filter: var(--harmony-glass-filter-strong) !important;
+    backdrop-filter: var(--harmony-glass-filter-strong) !important;
+  }
+  /* The photo is unchanged; the optical material only applies to its frame. */
   /* RC2W: glass-ui pointer optics. One delegated MaterialLight listener
      writes --harmony-lx/ly/lit to opted-in controls (not private data). */
   .harmony-workspace::before,.harmony-workspace::after {
@@ -1462,7 +1473,7 @@
   /* Explicitly support transparency/contrast accessibility preferences.
      This intentionally overrides every glass material above. */
   @media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
-    .harmony-sidebar-panel,.harmony-topbar,.harmony-module-subnav,
+    .harmony-login-shell,.harmony-sidebar-panel,.harmony-topbar,.harmony-module-subnav,
     .harmony-subnav-portal,.harmony-popover-glass,.harmony-theme-popover,
     .harmony-mobile-topbar,.harmony-mobile-brand,.harmony-mobile-glass,
     .harmony-logo-glass,.harmony-topbar-action,.harmony-topbar-search,
@@ -1485,7 +1496,7 @@
     }
   }
   @supports not ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
-    .harmony-sidebar-panel,.harmony-topbar,.harmony-module-subnav,
+    .harmony-login-shell,.harmony-sidebar-panel,.harmony-topbar,.harmony-module-subnav,
     .harmony-subnav-portal,.harmony-popover-glass,.harmony-theme-popover,
     .harmony-mobile-topbar,.harmony-mobile-brand,.harmony-mobile-glass,
     .harmony-logo-glass,.harmony-topbar-action,.harmony-topbar-search,
