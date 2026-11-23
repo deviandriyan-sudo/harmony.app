@@ -57,9 +57,10 @@
     --harmony-glass-inset-bg: rgba(222,237,250,.63);
     --harmony-glass-panel-filter: blur(15px) saturate(160%);
     --harmony-glass-ambient:
-      radial-gradient(950px 560px at 3% 0%,rgba(48,127,211,.19),transparent 70%),
-      radial-gradient(760px 480px at 100% 48%,rgba(41,145,195,.13),transparent 72%),
-      linear-gradient(140deg,#e7f0f8,#f4f8fc 53%,#eaf3f9);
+      radial-gradient(850px 600px at 0% 0%,rgba(45,128,212,.30),transparent 68%),
+      radial-gradient(670px 530px at 96% 38%,rgba(51,154,203,.25),transparent 73%),
+      radial-gradient(620px 530px at 52% 100%,rgba(157,193,237,.20),transparent 76%),
+      linear-gradient(140deg,#dcebf7,#edf5fc 56%,#deedf9);
   }
   html[data-harmony-theme='dark'] {
     --hrui-canvas: #141a21;
@@ -108,9 +109,10 @@
     --harmony-glass-inset-bg: rgba(25,47,72,.70);
     --harmony-glass-panel-filter: blur(15px) saturate(155%);
     --harmony-glass-ambient:
-      radial-gradient(950px 600px at 4% 0%,rgba(27,98,165,.28),transparent 70%),
-      radial-gradient(800px 520px at 100% 35%,rgba(24,115,151,.17),transparent 72%),
-      linear-gradient(140deg,#101b29,#172638 55%,#132535);
+      radial-gradient(950px 650px at 0% 0%,rgba(31,118,200,.39),transparent 72%),
+      radial-gradient(750px 560px at 100% 33%,rgba(29,135,191,.28),transparent 76%),
+      radial-gradient(710px 600px at 52% 100%,rgba(57,100,173,.19),transparent 74%),
+      linear-gradient(142deg,#0d1d30,#122a42 53%,#0c2438);
   }
 
   /* Optical recipes adapted from glass-ui/src/material.css (MIT, AndreyBegma).
@@ -1440,6 +1442,65 @@
     backdrop-filter: var(--harmony-glass-filter-strong) !important;
   }
   /* The photo is unchanged; the optical material only applies to its frame. */
+  /* RC2X: restore the real RC2Q attendance selectors that were missed by
+     RC2V/RC2W's shared card selector. Optical surface remains legible. */
+  .harmony-workspace .harmony-rc2q-attendance-panel {
+    background: var(--harmony-glass-panel-bg) !important;
+    border: 1px solid var(--harmony-glass-edge) !important;
+    box-shadow: var(--harmony-glass-chrome-shadow) !important;
+    -webkit-backdrop-filter: var(--harmony-glass-panel-filter) !important;
+    backdrop-filter: var(--harmony-glass-panel-filter) !important;
+    border-radius: 20px !important;
+  }
+  .harmony-rc2q-attendance .harmony-rc2q-approved-metric {
+    background: var(--harmony-glass-metric-bg) !important;
+    border: 1px solid var(--hrui-glass-rim) !important;
+    border-inline-start-width: 3px !important;
+    box-shadow: var(--harmony-glass-content-shadow) !important;
+    border-radius: 16px !important;
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+  }
+  .harmony-rc2q-attendance .harmony-rc2q-approved-metric.blue { border-inline-start-color:#3579b4 !important; }
+  .harmony-rc2q-attendance .harmony-rc2q-approved-metric.green { border-inline-start-color:#378b74 !important; }
+  .harmony-rc2q-attendance .harmony-rc2q-approved-metric.amber { border-inline-start-color:#aa843a !important; }
+  .harmony-rc2q-attendance .harmony-rc2q-approved-metric.rose { border-inline-start-color:#a96d79 !important; }
+  .harmony-rc2q-attendance .harmony-rc2q-today-summary {
+    background: var(--harmony-glass-inset-bg) !important;
+    border-color: var(--hrui-glass-rim) !important;
+    box-shadow: inset 0 1px 0 var(--harmony-glass-spec) !important;
+  }
+  .harmony-rc2q-attendance .harmony-rc2q-approved-pill {
+    background: var(--harmony-glass-metric-bg) !important;
+    box-shadow: inset 0 1px 0 var(--harmony-glass-spec) !important;
+  }
+  .harmony-rc2q-attendance .harmony-attendance-history-toolbar {
+    border-color: var(--hrui-glass-rim) !important;
+    background: var(--harmony-glass-inset-bg) !important;
+  }
+  .harmony-sidebar-nav .harmony-nav-item.harmony-nav-active .harmony-side-detail,
+  .harmony-sidebar-nav .harmony-nav-item.harmony-nav-active :is(svg,.harmony-nav-icon) {
+    color: #fff !important;
+  }
+  .harmony-topbar-search:focus-within {
+    outline: 2px solid var(--hrui-focus);
+    outline-offset: 2px;
+  }
+  .harmony-topbar-search input[type='search'],
+  .harmony-topbar-search input[type='search']:focus,
+  .harmony-topbar-search input[type='search']:focus-visible {
+    appearance: none !important;
+    background: transparent !important;
+    border: 0 !important;
+    outline: none !important;
+    box-shadow: none !important;
+    min-width: 0;
+  }
+  /* Broad glass sheets respond to pointer light, never compress on click. */
+  .harmony-liquid-surface:active {
+    transform: none !important;
+  }
+
   /* RC2W: glass-ui pointer optics. One delegated MaterialLight listener
      writes --harmony-lx/ly/lit to opted-in controls (not private data). */
   .harmony-workspace::before,.harmony-workspace::after {
