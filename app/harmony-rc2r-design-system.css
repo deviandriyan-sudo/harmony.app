@@ -1286,11 +1286,17 @@
     backdrop-filter: none;
   }
   /* Never glassify data entry or dense rows: no transparency behind text. */
-  .harmony-workspace :is(input,textarea,select,.harmony-input,.harmony-rc2o-input),
-  .harmony-modal-surface :is(input,textarea,select),
+  .harmony-workspace :is(
+    input:not([type='checkbox']):not([type='radio']):not([type='file']):not([type='color']),
+    textarea,select,.harmony-input,.harmony-rc2o-input
+  ),
+  .harmony-modal-surface :is(
+    input:not([type='checkbox']):not([type='radio']):not([type='file']):not([type='color']),
+    textarea,select
+  ),
   .harmony-profile-workspace .harmony-profile-field,
-  .scaleup-root :is(input,textarea,select),
-  .harmony-remed-claim-form-page :is(input,textarea,select) {
+  .scaleup-root :is(input:not([type='checkbox']):not([type='radio']):not([type='file']),textarea,select),
+  .harmony-remed-claim-form-page :is(input:not([type='checkbox']):not([type='radio']):not([type='file']),textarea,select) {
     background: var(--hrui-input) !important;
     color: var(--hrui-ink) !important;
     border-color: var(--hrui-border) !important;
@@ -1311,6 +1317,14 @@
     box-shadow: var(--hrui-glass-highlight),0 24px 70px rgba(10,25,49,.24) !important;
     -webkit-backdrop-filter: blur(22px) saturate(140%) !important;
     backdrop-filter: blur(22px) saturate(140%) !important;
+  }
+
+  @media (max-width: 767px) {
+    .harmony-sidebar-panel,.harmony-topbar,.harmony-mobile-topbar,
+    .harmony-module-subnav,.harmony-subnav-portal {
+      -webkit-backdrop-filter: blur(16px) saturate(135%) !important;
+      backdrop-filter: blur(16px) saturate(135%) !important;
+    }
   }
 
   /* Explicitly support transparency/contrast accessibility preferences.
@@ -1355,13 +1369,6 @@
       background: var(--hrui-surface-strong) !important;
       -webkit-backdrop-filter: none !important;
       backdrop-filter: none !important;
-    }
-  }
-  @media (max-width: 767px) {
-    .harmony-sidebar-panel,.harmony-topbar,.harmony-mobile-topbar,
-    .harmony-module-subnav,.harmony-subnav-portal {
-      -webkit-backdrop-filter: blur(16px) saturate(135%) !important;
-      backdrop-filter: blur(16px) saturate(135%) !important;
     }
   }
 
