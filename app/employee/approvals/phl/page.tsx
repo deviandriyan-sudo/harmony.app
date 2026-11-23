@@ -199,12 +199,12 @@ export default function PHLApprovalPage() {
         ) : (
           <div className="grid gap-4 xl:grid-cols-2">
             {filtered.map((item) => (
-              <article key={item.id} className="harmony-card p-5 sm:p-6">
+              <article key={item.id} className="harmony-phl-review-card harmony-card p-4 sm:p-5">
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                   <div>
                     <div className="flex flex-wrap items-center gap-2">
                       <StatusBadge status={item.status} />
-                      <span className="rounded-full bg-[#f5f5f7] px-3 py-1 text-xs font-bold harmony-text-secondary">{dayTypeLabel(item.work_day_type)}</span>
+                      <span className="harmony-phl-day-type rounded-full px-3 py-1 text-xs font-bold harmony-text-secondary">{dayTypeLabel(item.work_day_type)}</span>
                       {item.origin === 'legacy_attendance' && <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-bold text-amber-700">Migrasi Absensi Lama</span>}
                       {item.status === 'pending_supervisor' && phlWorkApprovalExpired(item.work_date) && (
                         <span className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-bold text-amber-800">Lewat 90 hari</span>
@@ -261,7 +261,7 @@ export default function PHLApprovalPage() {
                       type="button"
                       disabled={processing === item.id || phlWorkApprovalExpired(item.work_date)}
                       onClick={() => void decide(item, 'approve')}
-                      className="inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl bg-[#007aff] px-4 text-sm font-bold text-white disabled:opacity-50"
+                      className="harmony-phl-approve inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#007aff] px-4 text-sm font-bold text-white"
                     >
                       {processing === item.id ? <Loader2 size={17} className="animate-spin" /> : <CheckCircle2 size={17} />}
                       {phlWorkApprovalExpired(item.work_date) ? 'Tidak dapat approve' : 'Approve +1 PHL'}
@@ -278,11 +278,11 @@ export default function PHLApprovalPage() {
 }
 
 function Metric({ label, value }: { label: string; value: number }) {
-  return <div className="rounded-2xl border border-white/10 bg-white/10 p-4"><p className="text-[11px] font-bold uppercase tracking-wide text-white/45">{label}</p><p className="mt-2 text-2xl font-semibold text-white">{value}</p></div>
+  return <div className="rounded-2xl border border-white/10 bg-white/10 p-4"><p className="text-[11px] font-bold uppercase tracking-wide text-white/90">{label}</p><p className="mt-2 text-2xl font-semibold text-white">{value}</p></div>
 }
 
 function Info({ label, value, icon }: { label: string; value: string; icon: ReactNode }) {
-  return <div className="rounded-2xl bg-[#f5f5f7] p-3"><div className="flex items-center gap-2 harmony-text-link">{icon}<span className="text-[11px] font-bold uppercase tracking-wide harmony-text-muted">{label}</span></div><p className="mt-2 text-sm font-bold harmony-text-primary">{value}</p></div>
+  return <div className="harmony-phl-info rounded-xl p-3"><div className="flex items-center gap-2 harmony-text-link">{icon}<span className="text-[11px] font-bold uppercase tracking-wide harmony-text-muted">{label}</span></div><p className="mt-2 text-sm font-bold harmony-text-primary">{value}</p></div>
 }
 
 function StatusBadge({ status }: { status: string }) {
