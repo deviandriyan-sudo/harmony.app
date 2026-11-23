@@ -7,13 +7,13 @@ import { useEffect, useMemo, useState } from 'react'
 import { AlertTriangle, ArrowRight, CalendarDays, CheckCircle2, HeartPulse, RefreshCcw, WalletCards } from 'lucide-react'
 
 import { TodayTeamAvailability } from '@/components/employee/TodayTeamAvailability'
+import { EmployeeWorkflowProgress, type WorkflowOverview } from '@/components/employee/EmployeeWorkflowProgress'
 import { Topbar } from '@/components/layout/Topbar'
 import { CompactMetric } from '@/components/dashboard/CompactMetric'
 import { getCurrentPeriodMonthWita, getCutoffRange } from '@/lib/attendance-reporting'
 import { supabase } from '@/lib/supabase'
 import { harmonyFetch } from '@/lib/harmony-client'
 import { getApprovalStageLabel } from '@/lib/leave-workflow-status'
-import { witaToday } from '@/lib/dashboard-monitoring'
 
 type AppUser = {
   id: string
@@ -94,12 +94,16 @@ export default function EmployeeDashboardPage() {
   const [employee, setEmployee] = useState<Employee | null>(null)
   const [balance, setBalance] = useState<BalanceSummary | null>(null)
   const [attendance, setAttendance] = useState<AttendanceRow[]>([])
-  const [requests, setRequests] = useState<RequestItem[]>([])
+  const [, setRequests] = useState<RequestItem[]>([])
   const [attendancePeriodStatus, setAttendancePeriodStatus] = useState<string | null>(null)
   const [remedAvailable, setRemedAvailable] = useState<number | null>(null)
+  const [scaleupProgress, setScaleupProgress] = useState<WorkflowOverview>(null)
+  const [remedProgress, setRemedProgress] = useState<WorkflowOverview>(null)
+  const [scaleupUnavailable, setScaleupUnavailable] = useState(false)
+  const [remedUnavailable, setRemedUnavailable] = useState(false)
   const [supervisorApprovals, setSupervisorApprovals] = useState<{items:{id:string;name:string;category:string;date:string;href:string;status:string}[];total:number}|null>(null)
-  const [debtOutstandingDays, setDebtOutstandingDays] = useState(0)
-  const [debtNextMaturity, setDebtNextMaturity] = useState<string | null>(null)
+  const [, setDebtOutstandingDays] = useState(0)
+  const [, setDebtNextMaturity] = useState<string | null>(null)
 
   const periodMonth = useMemo(() => getCurrentPeriodMonthWita(), [])
   const periodRange = useMemo(() => getCutoffRange(periodMonth), [periodMonth])
@@ -146,16 +150,49 @@ export default function EmployeeDashboardPage() {
       setEmployee(employeeData)
       // Optional read-only dashboard summaries; failure must never block salary,
       // leave balance, attendance or existing request workflows.
-      const [attendanceSummary, remedSummary, supervisorSummary] = await Promise.allSettled([
+      const [attendanceSummary, remedSummary, supervisorSummary, scaleupSummary] = await Promise.allSettled([
         supabase.from('attendance_period_confirmations').select('employee_status,supervisor_status,hr_status,is_locked').eq('employee_id',employeeData.id).eq('period_month',periodMonth).maybeSingle(),
         harmonyFetch<{entitlement?:{available_amount?:number}|null}>('/api/remed/dashboard'),
         harmonyFetch<{items:{id:string;name:string;category:string;date:string;href:string;status:string}[];total:number}>('/api/employee/dashboard/approval-summary'),
+        harmonyFetch<{ requests: { requester_employee_id: string; training?: {title?:string}; approval_status: string; stages?: {stage_order:number;label:string;status:string}[]; submitted_at?:string }[] }>('/api/scaleup'),
       ])
       setAttendancePeriodStatus(attendanceSummary.status==='fulfilled' && !attendanceSummary.value.error
         ? (attendanceSummary.value.data?.is_locked ? 'Final' : attendanceSummary.value.data?.employee_status||'Belum konfirmasi') : null)
       setRemedAvailable(remedSummary.status==='fulfilled' && remedSummary.value.entitlement
         ? Number(remedSummary.value.entitlement.available_amount??0) : null)
       setSupervisorApprovals(supervisorSummary.status==='fulfilled'?supervisorSummary.value:null)
+      setScaleupUnavailable(scaleupSummary.status !== 'fulfilled')
+      setRemedUnavailable(remedSummary.status !== 'fulfilled' || (remedSummary.status === 'fulfilled' && (remedSummary.value as {role?:string}).role !== 'employee'))
+      if (scaleupSummary.status === 'fulfilled') {
+        const mine = (scaleupSummary.value.requests || []).filter(row=>row.requester_employee_id===employeeData.id)
+        const latest = mine[0]
+        const stages=(latest?.stages || []).slice().sort((a,b)=>a.stage_order-b.stage_order)
+        const finalStatus=String(latest?.approval_status||'').toLowerCase()
+        setScaleupProgress(latest ? {
+          title: latest.training?.title || 'Training Request',
+          subtitle: latest.submitted_at ? `Diajukan ${new Date(latest.submitted_at).toLocaleDateString('id-ID')}` : 'Progres persetujuan',
+          status: finalStatus==='approved'?'Disetujui':finalStatus==='rejected'?'Ditolak':finalStatus==='revision_required'?'Perlu revisi':'Dalam proses',
+          steps: stages.length>0 ? stages.map(stage=>({
+            label: stage.label,
+            status: stage.status==='approved'?'done' as const:stage.status==='rejected'?'rejected' as const:stage.status==='pending'?'current' as const:'waiting' as const,
+          })) : [{label:finalStatus==='approved'?'Disetujui':'Pengajuan',status:finalStatus==='approved'?'done' as const:'current' as const}],
+        } : null)
+      } else setScaleupProgress(null)
+      if (remedSummary.status === 'fulfilled') {
+        const data=remedSummary.value as { recentClaims?: {status:string;claim_number?:string;created_at?:string}[] }
+        const latest=(data as {role?:string}).role==='employee'?data.recentClaims?.[0]:undefined
+        const status=String(latest?.status||'')
+        const phase=status==='pending_hr'||status==='rejected_hr'?1:status==='pending_finance'||status==='rejected_finance'?2:status==='waiting_payment'?3:status==='paid'?4:0
+        const stopped=status.startsWith('rejected') || status==='cancelled'
+        const labels=['Pengajuan','Review HR','Review Finance','Pembayaran','Selesai']
+        const statusNames:Record<string,string>={pending_hr:'Menunggu HR',pending_finance:'Menunggu Finance',waiting_payment:'Menunggu pembayaran',paid:'Sudah dibayar',rejected_hr:'Ditolak HR',rejected_finance:'Ditolak Finance',cancelled:'Dibatalkan',legacy_record:'Arsip'}
+        setRemedProgress(latest?{
+          title:latest.claim_number||'Klaim Re-Med',
+          subtitle:latest.created_at?`Diajukan ${new Date(latest.created_at).toLocaleDateString('id-ID')}`:'Progres klaim',
+          status:statusNames[status]||'Periksa status',
+          steps:labels.map((label,index)=>({label,status:status==='paid'?'done' as const:stopped && index===phase?'rejected' as const:index<phase?'done' as const:index===phase?'current' as const:'waiting' as const})),
+        }:null)
+      } else setRemedProgress(null)
 
       const balancePayload = await harmonyFetch<{
         balance_summary?: BalanceSummary | null
@@ -316,22 +353,13 @@ export default function EmployeeDashboardPage() {
   const recordedAttendance = attendance.filter(row=>Boolean(row.check_in || row.check_out || row.manual_check_in || row.manual_check_out)).length
   const annualBalance = balance ? Number(balance.annual_total_available_days ?? 0) : null
   const phlBalance = Number(balance?.phl_total_available_days ?? employee?.phl_balance ?? 0)
-  const rejectedRequests = requests.filter(item=>/ditolak/i.test(item.status))
-  const expiryDate=balance?.next_phl_expiry || null
-  const phlExpiryDays=expiryDate?Math.ceil((Date.parse(expiryDate+'T00:00:00Z')-Date.parse(witaToday()+'T00:00:00Z'))/86400000):null
-  const tasks = [
-    ...(attendancePeriodStatus && !['submitted','approved','Final'].includes(attendancePeriodStatus)
-      ? [{key:'attendance',title:'Konfirmasi absensi belum selesai',hint:`Periode ${periodRange.label}`,href:'/employee/attendance'}] : []),
-    ...rejectedRequests.slice(0,2).map(item=>({key:`${item.type}-${item.id}`,title:`Periksa pengajuan ${item.label}`,hint:'Pengajuan ditolak, periksa alasan dan ketentuannya',href:item.type==='phl'?'/employee/phl':'/employee/leave'})),
-    ...(phlExpiryDays!==null && phlExpiryDays>=0 && phlExpiryDays<=14 && phlBalance>0 ? [{key:'phl-expiry',title:'Periksa masa berlaku saldo PHL',hint:`Berlaku hingga ${formatDate(expiryDate)}`,href:'/employee/phl'}] : []),
-  ].slice(0,5)
   return <>
     <Topbar title="Beranda" compact />
     <main className="harmony-rc2o harmony-rc2o-employee harmony-glass-showcase mx-auto max-w-[1500px] space-y-4 p-4 sm:p-5 lg:p-6">
       {message&&<div role="alert" className="harmony-rc2o-error flex items-center gap-2 rounded-2xl p-3 text-sm"><AlertTriangle size={16}/>{message}</div>}
-      <section className="harmony-rc2o-hero flex min-h-[140px] flex-wrap items-center justify-between gap-3 px-5 py-5 sm:px-7">
+      <section className="harmony-rc2o-hero harmony-rc2q-employee-hero flex min-h-[140px] flex-wrap items-center justify-between gap-3 px-5 py-5 sm:px-7">
         <div className="relative z-10 min-w-0"><p className="harmony-rc2o-hero-kicker">PERSONAL EMPLOYEE WORKSPACE</p><h1 className="mt-1 text-[24px] font-bold tracking-tight sm:text-[28px]">Selamat datang kembali, <span>{employee?.full_name || appUser?.email || 'Karyawan'}</span></h1><p className="mt-1 text-sm">Pantau pekerjaan, pengajuan, dan informasi kepegawaian Anda dalam satu tempat.</p><p className="mt-2 text-xs opacity-80">{employee?.department||'Unit kerja belum tersedia'} · {periodRange.label} · {attendancePeriodStatus ? `Absensi: ${attendancePeriodStatus}`:'Status konfirmasi diperiksa di menu Absensi'}</p></div>
-        <div className="relative z-10 flex flex-wrap gap-2"><Link href="#harmony-perlu-tindakan" className="harmony-rc2o-hero-button inline-flex min-h-10 items-center gap-2 rounded-xl px-3 text-xs font-semibold">Lihat Tugas Saya <ArrowRight size={14}/></Link><Link href="/employee/leave" className="harmony-rc2o-hero-button inline-flex min-h-10 items-center gap-2 rounded-xl px-3 text-xs font-semibold">Ajukan Cuti / Izin</Link><button type="button" onClick={()=>void fetchDashboardData()} disabled={refreshing} aria-label="Refresh dashboard" className="harmony-rc2o-hero-button flex h-10 w-10 items-center justify-center rounded-xl disabled:opacity-60"><RefreshCcw size={16} className={refreshing?'animate-spin':''}/></button></div>
+        <div className="relative z-10 flex flex-wrap gap-2"><Link href="#harmony-approval-progress" className="harmony-rc2o-hero-button inline-flex min-h-10 items-center gap-2 rounded-xl px-3 text-xs font-semibold">Lihat Progres <ArrowRight size={14}/></Link><Link href="/employee/leave" className="harmony-rc2o-hero-button inline-flex min-h-10 items-center gap-2 rounded-xl px-3 text-xs font-semibold">Ajukan Cuti / Izin</Link><button type="button" onClick={()=>void fetchDashboardData()} disabled={refreshing} aria-label="Refresh dashboard" className="harmony-rc2o-hero-button flex h-10 w-10 items-center justify-center rounded-xl disabled:opacity-60"><RefreshCcw size={16} className={refreshing?'animate-spin':''}/></button></div>
       </section>
       <div className="grid grid-cols-2 gap-3 xl:grid-cols-4" aria-busy={loading}>
         <CompactMetric label="Saldo Cuti" value={loading?'…':annualBalance===null?'—':`${annualBalance} hari`} icon={CalendarDays} href="/employee/leave"/>
@@ -339,12 +367,10 @@ export default function EmployeeDashboardPage() {
         <CompactMetric label="Status Kehadiran" value={loading?'…':attendancePeriodStatus||`${recordedAttendance} tercatat`} icon={CheckCircle2} href="/employee/attendance"/>
         <CompactMetric label="Re-Med" value={loading?'…':remedAvailable===null?'Lihat hak':`Rp ${new Intl.NumberFormat('id-ID',{notation:'compact',maximumFractionDigits:1}).format(remedAvailable)}`} icon={HeartPulse} href="/remed/employee/dashboard" accent="amber"/>
       </div>
-      <section id="harmony-perlu-tindakan" className="harmony-rc2o-panel scroll-mt-24 overflow-hidden"><div className="p-4 sm:p-5"><h2 className="harmony-rc2o-panel-title">Perlu Tindakan</h2><p className="harmony-rc2o-muted mt-1 text-xs">Hanya hal yang membutuhkan perhatian atau pengecekan Anda.</p></div><div className="harmony-rc2o-divider"/>
-        {loading?<p role="status" className="harmony-rc2o-muted p-5 text-sm">Memuat tindakan...</p>:tasks.length===0?<p className="harmony-rc2o-muted p-5 text-sm">Tidak ada tugas mendesak yang terdeteksi. Pengajuan tetap tersedia melalui menu utama.</p>:tasks.map(task=><Link key={task.key} href={task.href} className="harmony-rc2o-row flex items-center justify-between gap-3 border-b px-4 py-3 last:border-0"><span className="min-w-0"><span className="harmony-rc2o-strong block truncate text-sm font-semibold">{task.title}</span><span className="harmony-rc2o-muted block truncate text-xs">{task.hint}</span></span><ArrowRight size={17} className="harmony-rc2o-link shrink-0"/></Link>)}
-      </section>
-      {supervisorApprovals && supervisorApprovals.total>0 && <section className="harmony-rc2o-panel overflow-hidden"><div className="flex flex-wrap items-start justify-between gap-2 p-4 sm:p-5"><div><h2 className="harmony-rc2o-panel-title">Informasi & Approval Tim</h2><p className="harmony-rc2o-muted mt-1 text-xs">{supervisorApprovals.total} pengajuan bawahan memerlukan review Anda.</p></div><Link href="/employee/approvals" className="harmony-rc2o-link text-xs font-semibold">Buka Approval Tim →</Link></div><div className="harmony-rc2o-divider"/>{supervisorApprovals.items.map(item=><div key={item.id} className="harmony-rc2o-row flex flex-wrap items-center gap-3 border-b px-4 py-3 last:border-0"><div className="min-w-[160px] flex-1"><p className="harmony-rc2o-strong truncate text-sm font-semibold">{item.name}</p><p className="harmony-rc2o-muted mt-0.5 text-xs">{item.category} · {item.date}</p></div><div className="flex shrink-0 gap-2"><Link href={item.href} aria-label={`Tinjau persetujuan ${item.name}`} className="harmony-rc2o-approve rounded-xl px-3 py-2 text-xs font-semibold">Setujui</Link><Link href={item.href} aria-label={`Tinjau penolakan ${item.name}`} className="harmony-rc2o-reject rounded-xl px-3 py-2 text-xs font-semibold">Tolak</Link></div></div>)}<p className="harmony-rc2o-muted border-t px-4 py-3 text-xs">Kedua tombol membuka halaman Approval Tim. Konfirmasi Setujui/Tolak tetap dilakukan pada formulir approval existing, tidak otomatis dari dashboard.</p></section>}
-      <details className="harmony-rc2o-panel overflow-hidden"><summary className="harmony-rc2o-strong flex cursor-pointer items-center justify-between px-4 py-3 text-sm font-semibold">Informasi Saldo Lainnya <span className="harmony-rc2o-link text-xs">Lihat detail ↓</span></summary><div className="harmony-rc2o-divider"/><div className="grid gap-3 p-4 sm:grid-cols-2"><InfoRow label="Postpone aktif" value={`${Number(balance?.postpone_active_days||0)} hari`}/>{debtOutstandingDays>0&&<InfoRow label="Hutang cuti" value={`${debtOutstandingDays} hari`}/>}{debtOutstandingDays>0&&<InfoRow label="Target pelunasan" value={formatDate(debtNextMaturity)}/>}<InfoRow label="Masa berlaku PHL" value={formatDate(balance?.next_phl_expiry)}/><Link href="/employee/phl" className="harmony-rc2o-link flex items-center gap-2 p-3 text-xs font-semibold">Ajukan Saldo PHL <ArrowRight size={14}/></Link></div></details>
+      <div className="flex justify-end"><Link href="/employee/phl" className="harmony-rc2o-link text-xs font-semibold">Ajukan Saldo PHL →</Link></div>
+      <EmployeeWorkflowProgress scaleup={scaleupProgress} remed={remedProgress} scaleupUnavailable={scaleupUnavailable} remedUnavailable={remedUnavailable}/>
       <TodayTeamAvailability/>
+      {supervisorApprovals && supervisorApprovals.total>0 && <section className="harmony-rc2o-panel overflow-hidden"><div className="flex flex-wrap items-start justify-between gap-2 p-4 sm:p-5"><div><h2 className="harmony-rc2o-panel-title">Informasi & Approval Tim</h2><p className="harmony-rc2o-muted mt-1 text-xs">{supervisorApprovals.total} pengajuan bawahan memerlukan review Anda.</p></div><Link href="/employee/approvals" className="harmony-rc2o-link text-xs font-semibold">Buka Approval Tim →</Link></div><div className="harmony-rc2o-divider"/>{supervisorApprovals.items.map(item=><div key={item.id} className="harmony-rc2o-row flex flex-wrap items-center gap-3 border-b px-4 py-3 last:border-0"><div className="min-w-[160px] flex-1"><p className="harmony-rc2o-strong truncate text-sm font-semibold">{item.name}</p><p className="harmony-rc2o-muted mt-0.5 text-xs">{item.category} · {item.date}</p></div><div className="flex shrink-0 gap-2"><Link href={item.href} aria-label={`Tinjau persetujuan ${item.name}`} className="harmony-rc2o-approve rounded-xl px-3 py-2 text-xs font-semibold">Setujui</Link><Link href={item.href} aria-label={`Tinjau penolakan ${item.name}`} className="harmony-rc2o-reject rounded-xl px-3 py-2 text-xs font-semibold">Tolak</Link></div></div>)}<p className="harmony-rc2o-muted border-t px-4 py-3 text-xs">Kedua tombol membuka halaman Approval Tim. Konfirmasi Setujui/Tolak tetap dilakukan pada formulir approval existing, tidak otomatis dari dashboard.</p></section>}
     </main>
   </>
 }
@@ -382,5 +408,3 @@ function formatDate(value?: string | null) {
   if (Number.isNaN(date.getTime())) return value
   return new Intl.DateTimeFormat('id-ID', { day: '2-digit', month: 'short', year: 'numeric' }).format(date)
 }
-
-function InfoRow({ label, value }: { label: string; value: string }) { return <div className="flex items-center justify-between gap-3 rounded-2xl bg-[#f5f5f7] px-4 py-3"><span className="text-xs font-semibold harmony-text-secondary">{label}</span><span className="text-right text-xs font-bold harmony-text-primary">{value}</span></div> }

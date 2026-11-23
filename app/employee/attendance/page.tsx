@@ -11,7 +11,6 @@ import {
   Clock3,
   Download,
   FileText,
-  Fingerprint,
   Lock,
   LockOpen,
   PencilLine,
@@ -24,6 +23,7 @@ import {
 } from "lucide-react";
 
 import { Topbar } from "@/components/layout/Topbar";
+import { approvedLeaveTotal, approvedMetric, latestApprovedAttendanceSnapshot, type ApprovedAttendanceSnapshot } from '@/lib/attendance-approved-snapshot';
 import { HarmonyModalPortal } from "@/components/ui/HarmonyModalPortal";
 import { downloadRawCsv, downloadStyledWorkbook } from "@/lib/export/styled-workbook";
 import { estimatedLateMinutes, lateDescription, minutesBetween } from "@/lib/export/attendance-details";
@@ -273,6 +273,9 @@ export default function EmployeeAttendancePage() {
   const [employee, setEmployee] = useState<EmployeeProfile | null>(null);
   const [logs, setLogs] = useState<AttendanceLog[]>([]);
   const [holidays, setHolidays] = useState<Holiday[]>([]);
+  const [approvedSnapshot, setApprovedSnapshot] = useState<ApprovedAttendanceSnapshot | null>(null);
+  const [approvedSummaryError, setApprovedSummaryError] = useState(false);
+  const [todayMode, setTodayMode] = useState<'normal' | 'manual'>('normal');
   const [periodConfirmation, setPeriodConfirmation] =
     useState<AttendancePeriodConfirmation | null>(null);
   const [requestTypes, setRequestTypes] = useState<HarmonyRequestTypeDefinition[]>(
@@ -424,47 +427,15 @@ export default function EmployeeAttendancePage() {
     selectableRows.length > 0 &&
     selectableRows.every((row) => selectedDates.includes(row.date));
 
-  const latestLog = logs[logs.length - 1] || null;
-
-  // Satu tanggal hanya boleh masuk SATU kartu ringkasan.
-  // Ini mencegah manual attendance terhitung sebagai Hadir + Incomplete
-  // atau Hadir + Tanpa Data secara bersamaan.
-  // Satu periode maksimal 31 hari; hitung ulang dari draft terbaru setiap render.
-  // Menghindari memo yang berisiko menggunakan callback getDraft dari render lama.
-  const summaryBuckets = calendarRows.map((row) =>
-    classifyAttendanceSummary(row, getDraft(row)),
-  );
-
-  const presentCount = summaryBuckets.filter(
-    (bucket) => bucket === "present",
-  ).length;
-
-  const incompleteCount = summaryBuckets.filter(
-    (bucket) => bucket === "incomplete",
-  ).length;
-
-  
-
-  const phlCandidateCount = summaryBuckets.filter(
-    (bucket) => bucket === "phl",
-  ).length;
-
-  const periodTotals = useMemo(
-    () => calculatePeriodTotals(calendarRows, holidays, rowDrafts),
-    [calendarRows, holidays, rowDrafts],
-  );
-
-  const absentCount = periodTotals.absent;
-  const leaveActivityCount =
-    periodTotals.leave +
-    periodTotals.permit +
-    periodTotals.sick +
-    periodTotals.officialTravel;
-
   const onPeriodLoad = useEffectEvent(fetchData)
   useEffect(() => {
     onPeriodLoad();
   }, [periodMonth]);
+
+  const onTodayEntryLoad = useEffectEvent(loadLiveManualAttendance);
+  useEffect(() => {
+    if (employee?.id && employee.machine_pin) void onTodayEntryLoad(getTodayISO());
+  }, [employee?.id, employee?.machine_pin]);
 
   async function fetchData(resetMessage = true) {
     setLoading(true);
@@ -539,6 +510,16 @@ export default function EmployeeAttendancePage() {
     }
 
     setEmployee(employeeData);
+
+    // Only the last confirmed supervisor/HR-approved period is shown above
+    // the active history. No current unapproved draft is counted in this KPI.
+    const approvedResult = await supabase.from('attendance_period_confirmations')
+      .select('period_start,period_end,supervisor_status,hr_status,total_work_days,total_present_days,total_late_days,total_incomplete_days,total_absent_days,total_sick_days,total_permit_days,total_leave_days,total_phl_days')
+      .eq('employee_id',employeeData.id)
+      .order('period_end',{ascending:false})
+      .limit(18);
+    setApprovedSummaryError(Boolean(approvedResult.error));
+    setApprovedSnapshot(approvedResult.error ? null : latestApprovedAttendanceSnapshot((approvedResult.data || []) as ApprovedAttendanceSnapshot[]));
 
     const { data: holidayData, error: holidayError } = await supabase
       .from("holidays")
@@ -1215,9 +1196,15 @@ export default function EmployeeAttendancePage() {
       const savedPeriod =
         result?.period_month || getPeriodMonthForDate(savedDate);
 
-      setLiveManualOpen(false);
-      setLiveManualRecord(null);
-      setLiveManualForm(createLiveManualForm());
+      // The legacy modal closes after saving another date; inline today's
+      // form stays open and reloads the persisted record instead.
+      if (liveManualOpen) {
+        setLiveManualOpen(false);
+        setLiveManualRecord(null);
+        setLiveManualForm(createLiveManualForm());
+      } else {
+        await loadLiveManualAttendance(savedDate);
+      }
 
       setSuccessMessage(
         [
@@ -2160,10 +2147,10 @@ export default function EmployeeAttendancePage() {
     <>
       <Topbar
         title="Absensi"
-        description="Cek absensi periode, lengkapi data manual, pilih keterangan kehadiran/ketidakhadiran, lalu submit ke atasan."
+        compact
       />
 
-      <section className="space-y-6 p-4 md:p-6">
+      <section className="harmony-rc2q-attendance mx-auto max-w-[1700px] space-y-4 p-4 md:p-5">
         {successMessage && (
           <div role="status" data-harmony-feedback="success" className="rounded-2xl border border-green-200 bg-green-50 p-4 text-sm leading-6 text-green-700">
             <div className="mb-1 flex items-center gap-2 font-bold">
@@ -2195,51 +2182,76 @@ export default function EmployeeAttendancePage() {
           </div>
         )}
 
-        <div className="relative overflow-hidden rounded-[30px] border border-[#007aff]/15 bg-[#eef6ff] p-5 shadow-sm sm:p-6">
-          <div className="pointer-events-none absolute -right-16 -top-20 h-52 w-52 rounded-full bg-[#007aff]/10 blur-3xl" />
-
-          <div className="relative flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
-            <div className="max-w-3xl">
-              <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-[#007aff]/15 bg-white px-3 py-1.5 text-xs font-bold harmony-text-link shadow-sm">
-                <Clock3 size={15} />
-                Absensi Harian · Tidak Menunggu Periode
-              </div>
-
-              <h2 className="text-xl font-semibold tracking-tight harmony-text-primary sm:text-2xl">
-                Sedang bekerja di luar kantor dan tidak bisa fingerprint?
-              </h2>
-
-              <p className="mt-2 text-sm leading-6 harmony-text-secondary">
-                Simpan jam masuk/pulang manual dan bukti langsung pada hari
-                kejadian. Data akan otomatis ikut muncul pada periode absensi
-                yang sesuai, meskipun file fingerprint periode tersebut belum
-                di-upload HR.
-              </p>
-
-              <div className="mt-3 flex flex-wrap gap-2 text-[11px] font-semibold harmony-text-secondary">
-                <span className="rounded-full bg-white px-3 py-1.5 shadow-sm">
-                  Tersimpan langsung ke database
-                </span>
-                <span className="rounded-full bg-white px-3 py-1.5 shadow-sm">
-                  Bukti tidak hilang saat upload fingerprint
-                </span>
-                <span className="rounded-full bg-white px-3 py-1.5 shadow-sm">
-                  Approval tetap lewat Submit Periode
-                </span>
-              </div>
+        <section aria-labelledby="harmony-approved-summary-title" className="harmony-rc2q-attendance-panel p-4 sm:p-5">
+          <header className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h2 id="harmony-approved-summary-title" className="text-lg font-bold harmony-text-primary">Summary Periode</h2>
+              <p className="mt-1 text-xs harmony-text-secondary">Ringkasan periode terakhir yang telah disetujui, bukan periode berjalan yang belum selesai.</p>
             </div>
-
-            <button
-              type="button"
-              onClick={openLiveManualAttendance}
-              disabled={loading || !employee}
-              className="inline-flex min-h-12 shrink-0 items-center justify-center gap-2 rounded-[18px] bg-[#007aff] px-6 text-sm font-bold text-white shadow-sm transition hover:bg-[#0066d6] disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              <Clock3 size={18} />
-              Absen Manual Sekarang
-            </button>
+            <span className="harmony-rc2q-approved-pill rounded-full px-3 py-2 text-xs font-semibold">
+              {approvedSnapshot ? `${formatDisplayDate(approvedSnapshot.period_start || '')} – ${formatDisplayDate(approvedSnapshot.period_end || '')} · ${approvedSnapshot.hr_status === 'finalized'?'Final HR':'Disetujui Atasan'}` : approvedSummaryError ? 'Ringkasan belum dapat dimuat' : 'Belum ada periode disetujui'}
+            </span>
+          </header>
+          <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-3 2xl:grid-cols-6" aria-label="Ringkasan periode disetujui">
+            <ApprovedAttendanceMetric title="Total Hari Kerja" value={approvedMetric(approvedSnapshot?.total_work_days)} tone="blue" icon={<CalendarDays size={19}/>}/>
+            <ApprovedAttendanceMetric title="Hadir" value={approvedMetric(approvedSnapshot?.total_present_days)} tone="green" icon={<CheckCircle2 size={19}/>}/>
+            <ApprovedAttendanceMetric title="Terlambat" value={approvedMetric(approvedSnapshot?.total_late_days)} tone="amber" icon={<Clock3 size={19}/>}/>
+            <ApprovedAttendanceMetric title="Tidak Hadir" value={approvedMetric(approvedSnapshot?.total_absent_days)} tone="rose" icon={<AlertTriangle size={19}/>}/>
+            <ApprovedAttendanceMetric title="Cuti / Izin / Sakit" value={approvedLeaveTotal(approvedSnapshot)} tone="blue" icon={<FileText size={19}/>}/>
+            <ApprovedAttendanceMetric title="PHL Tertaut" value={approvedMetric(approvedSnapshot?.total_phl_days)} tone="green" icon={<CalendarDays size={19}/>}/>
           </div>
-        </div>
+        </section>
+
+        <section aria-labelledby="harmony-today-attendance-title" className="harmony-rc2q-attendance-panel p-4 sm:p-5">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div><h2 id="harmony-today-attendance-title" className="text-lg font-bold harmony-text-primary">Absensi Hari Ini</h2>
+              <p className="mt-1 text-xs harmony-text-secondary">{formatDisplayDate(getTodayISO())} · Data manual tersimpan ke record absensi dan tetap mengikuti approval periode.</p></div>
+            <div className="flex flex-wrap items-center gap-2">
+              <button type="button" onClick={()=>void openLiveManualAttendance()} disabled={loading||!employee} className="harmony-rc2o-link rounded-xl px-2 py-2 text-xs font-semibold disabled:opacity-50">Input Tanggal Lain</button>
+            <div className="harmony-rc2q-mode flex rounded-2xl p-1" role="group" aria-label="Jenis kehadiran">
+              <button type="button" aria-pressed={todayMode==='normal'} onClick={()=>setTodayMode('normal')} className={`rounded-xl px-4 py-2 text-xs font-bold ${todayMode==='normal'?'selected':''}`}>Hadir Normal (Mesin)</button>
+              <button type="button" aria-pressed={todayMode==='manual'} onClick={()=>setTodayMode('manual')} className={`rounded-xl px-4 py-2 text-xs font-bold ${todayMode==='manual'?'selected':''}`}>Hadir Manual</button>
+            </div>
+            </div>
+          </div>
+          {todayMode==='normal'?<div className="harmony-rc2q-today-summary mt-4 flex flex-wrap items-center justify-between gap-4 rounded-2xl p-4">
+            <div className="flex flex-wrap gap-6">
+              <div><p className="harmony-rc2o-muted text-xs">Fingerprint masuk</p><p className="harmony-rc2o-strong mt-1 text-lg font-bold">{liveManualRecord?.check_in||'—'}</p></div>
+              <div><p className="harmony-rc2o-muted text-xs">Fingerprint pulang</p><p className="harmony-rc2o-strong mt-1 text-lg font-bold">{liveManualRecord?.check_out||'—'}</p></div>
+              <div><p className="harmony-rc2o-muted text-xs">Sumber data</p><p className="harmony-rc2o-strong mt-1 text-sm font-semibold">{liveManualRecord?.check_in||liveManualRecord?.check_out?'Rekaman mesin':'Belum tercatat'}</p></div>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <button type="button" onClick={()=>void loadLiveManualAttendance(getTodayISO())} disabled={liveManualLoading || !employee?.machine_pin} className="harmony-button-secondary text-xs"><RefreshCcw size={15}/> Perbarui</button>
+              {!(liveManualRecord?.check_in||liveManualRecord?.check_out)&&<button type="button" onClick={()=>setTodayMode('manual')} className="harmony-button-primary text-xs">Isi Absensi Manual</button>}
+            </div>
+            <p className="harmony-rc2o-muted w-full text-xs">Hadir Normal menampilkan fingerprint yang tercatat. Jika tidak tersedia, gunakan Hadir Manual dengan dokumen; sistem tidak membuat fingerprint buatan.</p>
+          </div>:<div className="mt-4 space-y-4">
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              <label className="text-xs font-semibold harmony-text-secondary">Jam Masuk Manual
+                <input type="time" value={liveManualForm.manual_check_in} onChange={e=>updateLiveManualForm('manual_check_in',e.target.value)} disabled={liveManualLoading||liveManualSaving} className="harmony-input mt-1 w-full"/>
+              </label>
+              <label className="text-xs font-semibold harmony-text-secondary">Jam Pulang Manual
+                <input type="time" value={liveManualForm.manual_check_out} onChange={e=>updateLiveManualForm('manual_check_out',e.target.value)} disabled={liveManualLoading||liveManualSaving} className="harmony-input mt-1 w-full"/>
+              </label>
+              <label className="text-xs font-semibold harmony-text-secondary sm:col-span-2">Keterangan / Alasan
+                <input type="text" value={liveManualForm.reason} onChange={e=>updateLiveManualForm('reason',e.target.value)} disabled={liveManualLoading||liveManualSaving} placeholder="Alasan tidak fingerprint / pekerjaan luar kantor" className="harmony-input mt-1 w-full"/>
+              </label>
+            </div>
+            <HarmonyPendingAttachmentPicker
+              files={liveManualForm.proof_files}
+              onChange={(files)=>updateLiveManualForm('proof_files',files)}
+              required={!liveManualForm.existing_proof_url}
+              label="Dokumen Pendukung"
+              description="Wajib minimal 1 bukti untuk absensi manual baru, maksimal 3 file."
+              disabled={liveManualLoading||liveManualSaving}
+              maxFiles={liveManualForm.existing_proof_url?2:3}
+            />
+            {liveManualForm.existing_proof_url&&<p className="harmony-rc2o-muted text-xs">Dokumen sebelumnya sudah tersimpan: {liveManualForm.existing_proof_name||'Tersedia'}</p>}
+            <div className="flex flex-wrap items-center justify-between gap-3"><p className="harmony-rc2o-muted text-xs">Dapat diisi hari ini dan dilengkapi sebelum submit periode. Jam manual tidak menggantikan data fingerprint asli.</p>
+              <button type="button" onClick={()=>void saveLiveManualAttendance()} disabled={!employee?.machine_pin||liveManualLoading||liveManualSaving} className="harmony-button-primary shrink-0 disabled:opacity-50"><Save size={16}/>{liveManualSaving?'Menyimpan...':'Simpan Absensi'}</button>
+            </div>
+          </div>}
+        </section>
 
         {isPeriodLocked && (
           <div className="rounded-[28px] border border-red-200 bg-red-50 p-5 text-sm leading-6 text-red-700">
@@ -2356,7 +2368,7 @@ export default function EmployeeAttendancePage() {
             <div className="flex min-w-0 flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
               <div className="min-w-0">
                 <h2 className="text-lg font-semibold harmony-text-primary">
-                  Rekap Absensi Pribadi
+                  Riwayat Absensi
                 </h2>
 
                 <p className="mt-1 text-sm harmony-text-secondary">
@@ -2444,167 +2456,10 @@ export default function EmployeeAttendancePage() {
 
           {!loading && (
             <>
-              <div className="border-b border-black/5 p-6">
-                <div className="rounded-[28px] border border-black/5 bg-[#1d1d1f] p-6 text-white">
-                  <div className="flex items-center gap-4">
-                    <div className="flex h-14 w-14 items-center justify-center rounded-3xl bg-white/10 text-white">
-                      <Fingerprint size={24} />
-                    </div>
-
-                    <div className="min-w-0">
-                      <h3 className="truncate text-xl font-semibold">
-                        {employee?.full_name || appUser?.email || "Employee"}
-                      </h3>
-
-                      <p className="mt-1 text-sm text-white/55">
-                        {employee?.employee_number || "-"} · {" "}
-                        {employee?.department || "-"}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                    <ProfileRow
-                      label="Machine PIN"
-                      value={employee?.machine_pin || "-"}
-                    />
-                    <ProfileRow
-                      label="Jabatan"
-                      value={employee?.position || "-"}
-                    />
-                    <ProfileRow
-                      label="Periode"
-                      value={getPeriodLabel(periodMonth)}
-                    />
-                    <ProfileRow
-                      label="Status Akses"
-                      value={
-                        isPeriodLocked
-                          ? "Locked by HR"
-                          : isSupervisorRejected
-                            ? "Revisi Aktif"
-                            : isProcessReadOnly
-                              ? "Read Only"
-                              : "Unlocked"
-                      }
-                    />
-                  </div>
-                </div>
-
-                <div className="sticky top-4 z-20 mt-5 space-y-5 rounded-[30px] border border-black/5 bg-white/90 p-4 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/80 sm:p-5">
-                  <div className="rounded-[28px] border border-black/5 bg-white/70 p-5 shadow-sm">
-                    <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                      <div>
-                        <h3 className="text-lg font-semibold harmony-text-primary">
-                          Ringkasan Terakhir
-                        </h3>
-
-                        <p className="mt-1 text-sm harmony-text-secondary">
-                          Snapshot absensi terakhir dan ringkasan periode aktif.
-                        </p>
-                      </div>
-                    </div>
-
-                    {latestLog ? (
-                      <div className="mt-5 grid gap-4 sm:grid-cols-2 2xl:grid-cols-4">
-                        <MiniInfoCard
-                          title="Tanggal"
-                          value={formatDisplayDate(latestLog.attendance_date)}
-                        />
-                        <MiniInfoCard
-                          title="Check In"
-                          value={latestLog.check_in || "-"}
-                        />
-                        <MiniInfoCard
-                          title="Check Out"
-                          value={latestLog.check_out || "-"}
-                        />
-                        <MiniInfoCard
-                          title="Status"
-                          value={formatStatus(
-                            latestLog.status || "present",
-                            latestLog,
-                          )}
-                        />
-                      </div>
-                    ) : (
-                      <div className="mt-5 rounded-[24px] border border-dashed border-black/10 bg-[#f5f5f7]/70 p-6 text-sm harmony-text-secondary">
-                        Belum ada data absensi pada periode ini, tetapi employee
-                        tetap bisa menambahkan keterangan manual per tanggal
-                        selama periode belum dikunci atau belum disubmit.
-                      </div>
-                    )}
-                  </div>
-
-                  <div>
-                    <div className="mb-3 flex items-center justify-between gap-3">
-                      <div>
-                        <h3 className="text-base font-semibold harmony-text-primary">
-                          Summary Periode
-                        </h3>
-                        <p className="mt-1 text-sm harmony-text-secondary">
-                          Ringkasan kehadiran periode aktif tepat di atas detail absensi.
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
-                      <SummaryCard
-                        title="Total Hari Kerja"
-                        value={String(periodTotals.totalWorkDays)}
-                        description="Senin–Jumat, tidak termasuk hari libur"
-                        icon={<CalendarDays size={22} />}
-                        tone="blue"
-                      />
-
-                      <SummaryCard
-                        title="Hadir"
-                        value={String(presentCount)}
-                        description="Hari dengan kehadiran"
-                        icon={<CheckCircle2 size={22} />}
-                        tone="green"
-                      />
-
-                      <SummaryCard
-                        title="Belum Selesai"
-                        value={String(incompleteCount)}
-                        description="Jam masuk/pulang perlu dilengkapi"
-                        icon={<AlertTriangle size={22} />}
-                        tone="red"
-                      />
-
-                      <SummaryCard
-                        title="Ketidakhadiran"
-                        value={String(absentCount)}
-                        description="Tanpa data / alpa di hari kerja"
-                        icon={<Clock3 size={22} />}
-                        tone="orange"
-                      />
-
-                      <SummaryCard
-                        title="Cuti / Izin"
-                        value={String(leaveActivityCount)}
-                        description="Cuti/izin pada hari kerja saja"
-                        icon={<FileText size={22} />}
-                        tone="blue"
-                      />
-
-                      <SummaryCard
-                        title="PHL Tertaut"
-                        value={String(phlCandidateCount)}
-                        description="Approved melalui workflow PHL"
-                        icon={<CalendarDays size={22} />}
-                        tone="purple"
-                      />
-                    </div>
-                  </div>
-                </div>
-              </div>
-
               <div className="flex flex-col gap-4 border-b border-black/5 bg-[#f5f5f7]/70 p-6 xl:flex-row xl:items-center xl:justify-between">
                 <div>
                   <h3 className="text-base font-semibold harmony-text-primary">
-                    Konfirmasi Absensi Periode
+                    Verifikasi Riwayat Absensi
                   </h3>
 
                   <p className="mt-1 text-sm leading-6 harmony-text-secondary">
@@ -2682,10 +2537,10 @@ export default function EmployeeAttendancePage() {
                   >
                     <Send size={18} />
                     {submittingPeriod
-                      ? "Mengirim Seluruh Periode..."
+                      ? "Mengirim..."
                       : isSupervisorRejected
-                        ? "Kirim Ulang Seluruh Periode"
-                        : "Submit Seluruh Periode ke Atasan"}
+                        ? "Kirim Ulang"
+                        : "Submit"}
                   </button>
                 </div>
               </div>
@@ -3074,6 +2929,13 @@ export default function EmployeeAttendancePage() {
       </section>
     </>
   );
+}
+
+function ApprovedAttendanceMetric({title,value,tone,icon}:{title:string;value:string;tone:'blue'|'green'|'amber'|'rose';icon:ReactNode}) {
+  return <div className={`harmony-rc2q-approved-metric ${tone} rounded-2xl p-3.5`}>
+    <div className="flex items-start justify-between gap-2"><span className="text-xs font-semibold">{title}</span><span aria-hidden="true" className="harmony-rc2q-metric-icon rounded-xl p-2">{icon}</span></div>
+    <p className="mt-1 text-2xl font-bold" aria-label={`${title}: ${value}`}>{value}</p>
+  </div>
 }
 
 function LiveManualAttendanceModal({
@@ -3829,74 +3691,6 @@ function LockInfo({ label, value }: { label: string; value: string }) {
   );
 }
 
-function SummaryCard({
-  title,
-  value,
-  description,
-  icon,
-  tone,
-}: {
-  title: string;
-  value: string;
-  description: string;
-  icon: ReactNode;
-  tone: "blue" | "green" | "orange" | "red" | "purple";
-}) {
-  const toneClass = {
-    blue: "harmony-text-link bg-[#e8f2ff]",
-    green: "harmony-text-success bg-[#eaf8ee]",
-    orange: "harmony-text-warning bg-[#fff4e5]",
-    red: "text-red-700 bg-red-50",
-    purple: "harmony-text-violet bg-[#f7edfc]",
-  }[tone];
-
-  return (
-    <div className="harmony-metric-card p-6">
-      <div className="flex items-center justify-between gap-4">
-        <div className="min-w-0">
-          <p className="truncate text-sm harmony-text-secondary">{title}</p>
-
-          <h3 className="mt-2 truncate text-3xl font-semibold tracking-tight harmony-text-primary">
-            {value}
-          </h3>
-
-          <p className="mt-1 line-clamp-1 text-xs leading-5 harmony-text-muted">
-            {description}
-          </p>
-        </div>
-
-        <div className={`rounded-2xl p-3 ${toneClass}`}>{icon}</div>
-      </div>
-    </div>
-  );
-}
-
-function MiniInfoCard({ title, value }: { title: string; value: string }) {
-  return (
-    <div className="rounded-[22px] border border-black/5 bg-[#f5f5f7]/70 p-4">
-      <p className="truncate text-xs font-semibold harmony-text-secondary">{title}</p>
-
-      <p className="mt-2 truncate text-xl font-semibold harmony-text-primary">
-        {value}
-      </p>
-    </div>
-  );
-}
-
-function ProfileRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="min-w-0 rounded-2xl bg-white/10 px-4 py-3">
-      <span className="block text-[11px] font-semibold uppercase tracking-wide text-white/45">
-        {label}
-      </span>
-
-      <span className="mt-1 block break-words text-sm font-semibold leading-5 text-white">
-        {value}
-      </span>
-    </div>
-  );
-}
-
 function StatusBadge({
   status,
   log,
@@ -4176,72 +3970,6 @@ function getDayStatus(
   if (log?.absence_request_type) return log.absence_request_type;
   if (log?.status) return log.status;
   if (isWeekend || isHoliday) return "off_day";
-
-  return "no_record";
-}
-
-type AttendanceSummaryBucket =
-  | "present"
-  | "incomplete"
-  | "no_record"
-  | "phl"
-  | "other";
-
-function classifyAttendanceSummary(
-  row: CalendarDayRow,
-  draft: RowDraft,
-): AttendanceSummaryBucket {
-  const meta = getDailyTypeMeta(draft.daily_type);
-
-  // Leave yang melewati weekend/libur tetap merupakan off-day, bukan cuti.
-  if (isLeaveRequestOnOffDay(row, draft)) {
-    return "other";
-  }
-
-  // Cuti, izin, sakit, tugas luar, alpa, klaim PHL, dll tidak boleh
-  // ikut dihitung sebagai "Tanpa Data".
-  if (meta.isAbsenceLike) {
-    return "other";
-  }
-
-  if (isPotentialPHL(row, draft)) {
-    return "phl";
-  }
-
-  const effectiveIn = getEffectiveCheckIn(row, draft);
-  const effectiveOut = getEffectiveCheckOut(row, draft);
-  const hasAnyAttendanceTime = Boolean(effectiveIn || effectiveOut);
-
-  // Hadir = pasangan jam efektif lengkap, baik dari fingerprint,
-  // manual, maupun kombinasi fingerprint + manual.
-  if (effectiveIn && effectiveOut) {
-    return "present";
-  }
-
-  // Hanya salah satu sisi tersedia.
-  if (hasAnyAttendanceTime) {
-    return "incomplete";
-  }
-
-  // Weekend/libur tanpa aktivitas bukan "Tanpa Data".
-  if (row.is_weekend || row.holiday_name) {
-    return "other";
-  }
-
-  // Jika ada record keterangan employee meskipun tanpa jam,
-  // jangan duplikasi sebagai Tanpa Data.
-  const hasEmployeeExplanation = Boolean(
-    row.log?.absence_request_type ||
-      row.log?.absence_request_label ||
-      row.log?.employee_daily_note ||
-      row.log?.correction_reason ||
-      draft.employee_daily_note ||
-      draft.daily_type !== "present",
-  );
-
-  if (hasEmployeeExplanation) {
-    return "other";
-  }
 
   return "no_record";
 }

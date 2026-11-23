@@ -1,0 +1,41 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import ts from 'typescript';
+const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
+const read = rel => fs.readFileSync(path.join(root,rel),'utf8');
+async function tsExports(rel) {
+  const transformed=ts.transpileModule(read(rel),{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText;
+  return import('data:text/javascript;base64,'+Buffer.from(transformed).toString('base64'));
+}
+const {latestApprovedAttendanceSnapshot,approvedMetric,approvedLeaveTotal}=await tsExports('lib/attendance-approved-snapshot.ts');
+function row(overrides={}){return {period_start:'2026-09-11',period_end:'2026-10-10',supervisor_status:'approved',hr_status:'ready_for_hr',total_work_days:22,total_present_days:19,total_late_days:1,total_incomplete_days:0,total_absent_days:1,total_sick_days:1,total_permit_days:0,total_leave_days:1,total_phl_days:0,...overrides};}
+assert.equal(latestApprovedAttendanceSnapshot([row({period_end:'2026-11-10',supervisor_status:'pending',hr_status:'waiting_supervisor'}),row()]).period_end,'2026-10-10','Current unapproved period must not replace approved history');
+assert.equal(latestApprovedAttendanceSnapshot([row({period_end:'2026-08-10'}),row({period_end:'2026-10-10'})]).period_end,'2026-10-10','Show latest approved, not oldest');
+assert.equal(latestApprovedAttendanceSnapshot([row({hr_status:'rejected_by_supervisor'}),row({period_end:'2026-08-10',hr_status:'finalized'})]).period_end,'2026-08-10','Rejected is not approved');
+assert.equal(latestApprovedAttendanceSnapshot([row({hr_status:'waiting_hr',supervisor_status:'pending'})]),null);
+assert.equal(latestApprovedAttendanceSnapshot([row({hr_status:'rejected',supervisor_status:'approved'})]),null, 'HR rejection must exclude the period');
+assert.equal(approvedMetric(null),'—','Unknown metrics must not be zero');
+assert.equal(approvedMetric(0),'0','Approved zero is a valid count');
+assert.equal(approvedLeaveTotal(row()),'2');
+assert.equal(approvedLeaveTotal(row({total_sick_days:null})),'—');
+const dash=read('app/employee/dashboard/page.tsx');
+const attendance=read('app/employee/attendance/page.tsx');
+const css=read('app/harmony-rc2q-employee-attendance.css');
+const theme=read('app/layout.tsx');
+for(const x of ['EmployeeWorkflowProgress','TodayTeamAvailability','supervisorApprovals','Ajukan Saldo PHL','/api/scaleup','/api/remed/dashboard']) assert(dash.includes(x),`Dashboard lost ${x}`);
+assert(!dash.includes('harmony-perlu-tindakan'),'Removed panel must not be rendered');
+for(const x of ['Summary Periode','Absensi Hari Ini','Riwayat Absensi','Hadir Normal (Mesin)','Hadir Manual','Dokumen Pendukung','approvedSnapshot','latestApprovedAttendanceSnapshot','saveLiveManualAttendance','handleSubmitPeriod','toggleSelectAllAttendance','Centang Semua','"Submit"','saveInlineManualVerification','handleResetVerification','Input Tanggal Lain']) assert(attendance.includes(x),`Attendance lost ${x}`);
+assert(attendance.includes("/api/employee/attendance/manual-entry"),'Manual submit must use existing authenticated endpoint');
+assert(attendance.includes("liveManualRecord?.check_in"),'Normal must display actual fingerprint and not fabricate record');
+assert(attendance.includes('registerHarmonySubmissionAttachments'),'Preserve attachment workflow');
+assert(attendance.includes('isPeriodLocked') && attendance.includes('isSupervisorRejected'),'Preserve lock and supervisor reject handling');
+assert(!attendance.includes('Submit Seluruh Periode ke Atasan"'),'Replace old long button label');
+assert(!attendance.includes('Ringkasan Terakhir'),'Remove redundant summary block');
+assert(!attendance.includes('Aksi Cepat'),'No quick actions block');
+assert(theme.includes('harmony-rc2q-employee-attendance.css'),'Presentation styles must be imported');
+assert(css.includes('@media screen'),'Print unaffected by RC2Q CSS');
+const fn=read('components/employee/EmployeeWorkflowProgress.tsx');
+assert(fn.includes('Lihat Semua') && fn.includes('step.status'), 'Stage progress uses actual statuses and links');
+console.log('RC2Q employee dashboard & attendance PASS: latest approved selection, safe normal/manual split, stage progress, existing submit/attachments preserved');

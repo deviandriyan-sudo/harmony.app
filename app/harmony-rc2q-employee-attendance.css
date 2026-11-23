@@ -1,0 +1,50 @@
+/* RC2Q — Employee dashboard and attendance presentation only. Print is intentionally excluded. */
+@media screen {
+  .harmony-rc2q-employee-hero {
+    background:
+      linear-gradient(90deg, rgba(17,60,110,.98) 0%, rgba(20,80,139,.95) 47%, rgba(20,80,139,.56) 72%, rgba(20,80,139,.08) 100%),
+      url('/harmony-campus.jpg') right center / auto 100% no-repeat,
+      linear-gradient(115deg,#154880,#4188c8);
+  }
+  .harmony-rc2q-workflow {min-height:202px;}
+  .harmony-rc2q-workflow-empty {border:1px dashed var(--rc2o-panel-border);background:var(--rc2o-row-hover);color:var(--rc2o-muted);}
+  .harmony-rc2q-progress-status {background:var(--rc2o-chip);color:var(--rc2o-ink);border:1px solid var(--rc2o-chip-border);}
+  .harmony-rc2q-progress-track {list-style:none;padding:0;}
+  .harmony-rc2q-progress-step {min-width:0;}
+  .harmony-rc2q-progress-dot {color:var(--rc2o-muted);border-color:var(--rc2o-panel-border);background:var(--rc2o-input);}
+  .harmony-rc2q-progress-bar {background:var(--rc2o-chip-border);}
+  .harmony-rc2q-progress-step.done .harmony-rc2q-progress-dot {color:#fff;border-color:#078d70;background:#078d70;}
+  .harmony-rc2q-progress-step.done .harmony-rc2q-progress-bar {background:#078d70;}
+  .harmony-rc2q-progress-step.current .harmony-rc2q-progress-dot {color:#fff;background:#1d70be;border-color:#1d70be;box-shadow:0 0 0 4px rgba(29,112,190,.13);}
+  .harmony-rc2q-progress-step.rejected .harmony-rc2q-progress-dot {color:#fff;background:#b42b47;border-color:#b42b47;}
+  .harmony-rc2q-progress-step:last-child .harmony-rc2q-progress-bar {visibility:hidden;}
+  .harmony-rc2q-attendance {color:var(--rc2o-ink)}
+  .harmony-rc2q-attendance-panel,
+  .harmony-rc2q-attendance>.harmony-card {background:var(--rc2o-panel);border:1px solid var(--rc2o-panel-border);border-radius:22px;box-shadow:var(--rc2o-shadow);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)}
+  .harmony-rc2q-approved-pill {background:var(--rc2o-chip);border:1px solid var(--rc2o-chip-border);color:var(--rc2o-ink)}
+  .harmony-rc2q-approved-metric {border:1px solid var(--rc2o-panel-border);min-height:104px;}
+  .harmony-rc2q-approved-metric.blue {background:linear-gradient(135deg,rgba(205,230,255,.49),rgba(255,255,255,.04));}
+  .harmony-rc2q-approved-metric.green {background:linear-gradient(135deg,rgba(173,241,208,.31),rgba(255,255,255,.04));}
+  .harmony-rc2q-approved-metric.amber {background:linear-gradient(135deg,rgba(255,221,167,.27),rgba(255,255,255,.04));}
+  .harmony-rc2q-approved-metric.rose {background:linear-gradient(135deg,rgba(254,188,205,.25),rgba(255,255,255,.04));}
+  .harmony-rc2q-approved-metric p {color:var(--rc2o-ink)}
+  .harmony-rc2q-approved-metric span {color:var(--rc2o-muted)}
+  .harmony-rc2q-approved-metric .harmony-rc2q-metric-icon {background:var(--rc2o-chip);color:var(--rc2o-ink)}
+  .harmony-rc2q-mode {background:var(--rc2o-chip);border:1px solid var(--rc2o-chip-border);gap:2px;}
+  .harmony-rc2q-mode button {color:var(--rc2o-muted);transition:background 180ms,color 180ms;}
+  .harmony-rc2q-mode button.selected {background:#1d70be;color:#fff;box-shadow:0 3px 12px rgba(20,95,175,.16)}
+  .harmony-rc2q-today-summary {background:var(--rc2o-row-hover);border:1px solid var(--rc2o-panel-border)}
+  .harmony-rc2q-attendance .harmony-input {background:var(--rc2o-input)!important;border-color:var(--rc2o-chip-border)!important;color:var(--rc2o-ink)!important}
+  .harmony-rc2q-attendance .harmony-card>.border-b:first-child {background:transparent;border-color:var(--rc2o-panel-border)}
+  .harmony-rc2q-attendance .harmony-card>.border-b.bg-\[\#f5f5f7\]\/70 {background:var(--rc2o-row-hover);border-color:var(--rc2o-panel-border)}
+  .harmony-rc2q-attendance :is(button,a,input,select,textarea):focus-visible {outline:2px solid #4296ed;outline-offset:2px;}
+  html[data-harmony-theme='dark'] .harmony-rc2q-approved-metric {background:linear-gradient(145deg,rgba(75,113,156,.22),rgba(30,50,76,.38))}
+  html[data-harmony-theme='dark'] .harmony-rc2q-attendance :is(.harmony-card,.harmony-input) {color:var(--rc2o-ink)}
+  @media(max-width:720px) {
+    .harmony-rc2q-employee-hero {background:linear-gradient(110deg,rgba(14,57,108,.97),rgba(33,110,184,.91)),url('/harmony-campus.jpg') right center / cover no-repeat;}
+    .harmony-rc2q-progress-track {overflow-x:auto;padding-bottom:6px;}
+    .harmony-rc2q-progress-step {min-width:72px;}
+    .harmony-rc2q-attendance .harmony-card>.border-b:first-child {padding:14px;}
+  }
+  @media(prefers-reduced-motion:reduce){.harmony-rc2q-mode button {transition:none!important}}
+}
