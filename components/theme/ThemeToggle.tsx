@@ -56,7 +56,7 @@ export function HarmonyThemeToggle({ compact = false, className = '' }: Props) {
           title={`Tampilan: ${preference === 'system' ? 'Sistem' : theme === 'dark' ? 'Gelap' : 'Terang'}`}
           aria-expanded={opened}
           aria-controls="harmony-theme-choices"
-          className="harmony-theme-topbar inline-flex h-10 w-10 items-center justify-center rounded-2xl border"
+          className="harmony-theme-topbar harmony-liquid-lit inline-flex h-10 w-10 items-center justify-center rounded-2xl border"
         >
           <CurrentIcon size={18} aria-hidden="true" />
         </button>
