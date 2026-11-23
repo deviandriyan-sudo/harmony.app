@@ -357,9 +357,17 @@ export default function EmployeeDashboardPage() {
     <Topbar title="Beranda" compact />
     <main className="harmony-rc2o harmony-rc2o-employee harmony-glass-showcase mx-auto max-w-[1500px] space-y-4 p-4 sm:p-5 lg:p-6">
       {message&&<div role="alert" className="harmony-rc2o-error flex items-center gap-2 rounded-2xl p-3 text-sm"><AlertTriangle size={16}/>{message}</div>}
-      <section className="harmony-rc2o-hero harmony-rc2q-employee-hero flex min-h-[140px] flex-wrap items-center justify-between gap-3 px-5 py-5 sm:px-7">
-        <div className="relative z-10 min-w-0"><p className="harmony-rc2o-hero-kicker">PERSONAL EMPLOYEE WORKSPACE</p><h1 className="mt-1 text-[24px] font-bold tracking-tight sm:text-[28px]">Selamat datang kembali, <span>{employee?.full_name || appUser?.email || 'Karyawan'}</span></h1><p className="mt-1 text-sm">Pantau pekerjaan, pengajuan, dan informasi kepegawaian Anda dalam satu tempat.</p><p className="mt-2 text-xs opacity-80">{employee?.department||'Unit kerja belum tersedia'} · {periodRange.label} · {attendancePeriodStatus ? `Absensi: ${attendancePeriodStatus}`:'Status konfirmasi diperiksa di menu Absensi'}</p></div>
-        <div className="relative z-10 flex flex-wrap gap-2"><Link href="#harmony-approval-progress" className="harmony-rc2o-hero-button inline-flex min-h-10 items-center gap-2 rounded-xl px-3 text-xs font-semibold">Lihat Progres <ArrowRight size={14}/></Link><Link href="/employee/leave" className="harmony-rc2o-hero-button inline-flex min-h-10 items-center gap-2 rounded-xl px-3 text-xs font-semibold">Ajukan Cuti / Izin</Link><button type="button" onClick={()=>void fetchDashboardData()} disabled={refreshing} aria-label="Refresh dashboard" className="harmony-rc2o-hero-button flex h-10 w-10 items-center justify-center rounded-xl disabled:opacity-60"><RefreshCcw size={16} className={refreshing?'animate-spin':''}/></button></div>
+      <section className="harmony-rc2o-hero harmony-rc2q-employee-hero harmony-unslop-employee-hero flex min-h-[190px] flex-wrap items-center justify-between gap-3 px-5 py-6 sm:px-7">
+        <div className="relative z-10 min-w-0">
+          <p className="harmony-rc2o-hero-kicker">Portal karyawan</p>
+          <h1 className="mt-1 text-[26px] font-medium tracking-tight sm:text-[30px]">Ringkasan kepegawaian</h1>
+          <p className="mt-2 text-sm">{employee?.full_name || appUser?.email || 'Karyawan'} · {employee?.department || 'Unit belum tersedia'}</p>
+          <p className="mt-1 text-[13px] opacity-90">Periode {periodRange.label} · {attendancePeriodStatus ? `Absensi: ${attendancePeriodStatus}` : 'Status absensi tersedia di menu Kehadiran'}</p>
+        </div>
+        <div className="harmony-unslop-hero-actions relative z-10 flex flex-wrap gap-2">
+          <Link href="/employee/leave" className="harmony-rc2o-hero-button harmony-unslop-hero-primary inline-flex min-h-10 items-center gap-2 rounded-[9px] px-4 text-[13px] font-medium">Ajukan cuti / izin <ArrowRight size={15}/></Link>
+          <Link href="#harmony-approval-progress" className="harmony-rc2o-hero-button harmony-unslop-hero-secondary inline-flex min-h-10 items-center gap-2 rounded-[9px] px-4 text-[13px] font-medium">Status pengajuan</Link>
+        </div>
       </section>
       <div className="grid grid-cols-2 gap-3 xl:grid-cols-4" aria-busy={loading}>
         <CompactMetric label="Saldo Cuti" value={loading?'…':annualBalance===null?'—':`${annualBalance} hari`} icon={CalendarDays} href="/employee/leave"/>
@@ -367,7 +375,10 @@ export default function EmployeeDashboardPage() {
         <CompactMetric label="Status Kehadiran" value={loading?'…':attendancePeriodStatus||`${recordedAttendance} tercatat`} icon={CheckCircle2} href="/employee/attendance"/>
         <CompactMetric label="Re-Med" value={loading?'…':remedAvailable===null?'Lihat hak':`Rp ${new Intl.NumberFormat('id-ID',{notation:'compact',maximumFractionDigits:1}).format(remedAvailable)}`} icon={HeartPulse} href="/remed/employee/dashboard" accent="amber"/>
       </div>
-      <div className="flex justify-end"><Link href="/employee/phl" className="harmony-rc2o-link text-xs font-semibold">Ajukan Saldo PHL →</Link></div>
+      <div className="harmony-unslop-dashboard-tools flex items-center justify-end gap-3">
+        <Link href="/employee/phl" className="harmony-rc2o-link text-[13px] font-medium">Ajukan saldo PHL</Link>
+        <button type="button" onClick={() => void fetchDashboardData()} disabled={refreshing} aria-label="Perbarui ringkasan dashboard" title="Perbarui ringkasan" className="harmony-unslop-refresh inline-flex h-9 w-9 items-center justify-center rounded-[9px] border disabled:opacity-60"><RefreshCcw size={16} className={refreshing ? 'animate-spin' : ''}/></button>
+      </div>
       <EmployeeWorkflowProgress scaleup={scaleupProgress} remed={remedProgress} scaleupUnavailable={scaleupUnavailable} remedUnavailable={remedUnavailable}/>
       <TodayTeamAvailability/>
       {supervisorApprovals && supervisorApprovals.total>0 && <section className="harmony-rc2o-panel overflow-hidden"><div className="flex flex-wrap items-start justify-between gap-2 p-4 sm:p-5"><div><h2 className="harmony-rc2o-panel-title">Informasi & Approval Tim</h2><p className="harmony-rc2o-muted mt-1 text-xs">{supervisorApprovals.total} pengajuan bawahan memerlukan review Anda.</p></div><Link href="/employee/approvals" className="harmony-rc2o-link text-xs font-semibold">Buka Approval Tim →</Link></div><div className="harmony-rc2o-divider"/>{supervisorApprovals.items.map(item=><div key={item.id} className="harmony-rc2o-row flex flex-wrap items-center gap-3 border-b px-4 py-3 last:border-0"><div className="min-w-[160px] flex-1"><p className="harmony-rc2o-strong truncate text-sm font-semibold">{item.name}</p><p className="harmony-rc2o-muted mt-0.5 text-xs">{item.category} · {item.date}</p></div><div className="flex shrink-0 gap-2"><Link href={item.href} aria-label={`Tinjau persetujuan ${item.name}`} className="harmony-rc2o-approve rounded-xl px-3 py-2 text-xs font-semibold">Setujui</Link><Link href={item.href} aria-label={`Tinjau penolakan ${item.name}`} className="harmony-rc2o-reject rounded-xl px-3 py-2 text-xs font-semibold">Tolak</Link></div></div>)}<p className="harmony-rc2o-muted border-t px-4 py-3 text-xs">Kedua tombol membuka halaman Approval Tim. Konfirmasi Setujui/Tolak tetap dilakukan pada formulir approval existing, tidak otomatis dari dashboard.</p></section>}
