@@ -10,6 +10,7 @@ import './harmony-rc2q-employee-attendance.css'
 import './harmony-rc2r-design-system.css'
 import { SystemMaintenanceGate } from '@/components/system/SystemMaintenanceGate'
 import { HarmonyThemeProvider } from '@/components/theme/ThemeProvider'
+import { HarmonyMaterialLight } from '@/components/theme/HarmonyMaterialLight'
 import { HarmonyModalFeedbackLayer } from '@/components/ui/HarmonyModalFeedbackLayer'
 
 export const metadata: Metadata = {
@@ -30,7 +31,7 @@ export default function RootLayout({
       lang="id"
       className="h-full antialiased"
     >
-      <body className="min-h-full flex flex-col"><HarmonyThemeProvider><SystemMaintenanceGate>{children}</SystemMaintenanceGate><HarmonyModalFeedbackLayer /></HarmonyThemeProvider></body>
+      <body className="min-h-full flex flex-col"><HarmonyThemeProvider><HarmonyMaterialLight /><SystemMaintenanceGate>{children}</SystemMaintenanceGate><HarmonyModalFeedbackLayer /></HarmonyThemeProvider></body>
     </html>
   )
 }
