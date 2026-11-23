@@ -7,6 +7,7 @@
  * are intentionally outside its scope.
  */
 @media screen {
+  :root,
   html[data-harmony-theme='light'] {
     --hrui-canvas: #f0f4f9;
     --hrui-ink: #182d47;
@@ -570,6 +571,63 @@
     .harmony-attendance-history .harmony-attendance-history-toolbar { padding: 9px !important; }
     .harmony-attendance-history .harmony-attendance-history-toolbar select { flex: 1 1 140px !important; width: auto !important; }
     .harmony-profile-workspace .harmony-profile-panel { border-radius: 15px !important; }
+  }
+
+  /* Explicit supervisor metrics use consistent opaque tiles, avoiding the
+     near-white boxes and low-contrast labels previously seen in Dark Mode. */
+  .harmony-supervisor-dashboard .harmony-supervisor-hero {
+    background: linear-gradient(114deg,#174475,#1c6dae) !important;
+  }
+  .harmony-supervisor-dashboard .harmony-approval-hero-metric {
+    background: rgba(9,43,79,.34) !important;
+    color: #fff !important;
+    border-color: rgba(220,238,255,.33) !important;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+  .harmony-supervisor-dashboard .harmony-approval-hero-metric p {
+    color: #fff !important;
+  }
+  .harmony-supervisor-dashboard .harmony-approval-module {
+    background: var(--hrui-surface) !important;
+    border-color: var(--hrui-border) !important;
+  }
+  .harmony-supervisor-dashboard .harmony-approval-module-metric,
+  .harmony-supervisor-dashboard .harmony-approval-module-highlight {
+    background: var(--hrui-subtle) !important;
+    color: var(--hrui-ink) !important;
+    border-color: var(--hrui-border) !important;
+  }
+  .harmony-supervisor-dashboard .harmony-approval-module-metric:hover {
+    background: var(--hrui-hover) !important;
+  }
+  .harmony-supervisor-dashboard .harmony-approval-module :is(
+    .harmony-text-primary,.harmony-text-secondary
+  ) { opacity: 1 !important; }
+  .harmony-supervisor-dashboard .harmony-approval-module .harmony-text-primary {
+    color: var(--hrui-ink) !important;
+  }
+  .harmony-supervisor-dashboard .harmony-approval-module .harmony-text-secondary {
+    color: var(--hrui-muted) !important;
+  }
+  .harmony-supervisor-dashboard .harmony-approval-module-highlight p {
+    color: var(--hrui-ink) !important;
+  }
+  /* Cuti detail uses a semantic disclosure, not bright gray with white labels. */
+  .harmony-employee-leave-page .harmony-leave-balance-panel {
+    background: var(--hrui-subtle) !important;
+    border-color: var(--hrui-border) !important;
+    color: var(--hrui-ink) !important;
+    box-shadow: none !important;
+  }
+  .harmony-employee-leave-page .harmony-leave-balance-panel :is(
+    summary, summary span, p, strong
+  ) { color: var(--hrui-ink) !important; }
+  .harmony-employee-leave-page .harmony-leave-balance-panel .harmony-text-secondary {
+    color: var(--hrui-muted) !important;
+  }
+  .harmony-employee-leave-page .harmony-leave-balance-panel > div {
+    border-color: var(--hrui-border) !important;
   }
 
 }
