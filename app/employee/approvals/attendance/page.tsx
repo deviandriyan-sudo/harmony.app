@@ -384,7 +384,7 @@ export default function EmployeeAttendanceApprovalListPage() {
         description="Review absensi bawahan yang sudah disubmit sebelum diteruskan ke HR."
       />
 
-      <section className="space-y-5 p-4 sm:p-5 xl:p-6">
+      <section className="harmony-supervisor-attendance space-y-5 p-4 sm:p-5 xl:p-6">
         {errorMessage && (
           <div className="rounded-2xl border border-orange-200 bg-orange-50 p-4 text-sm leading-6 text-orange-700">
             <div className="mb-1 flex items-center gap-2 font-bold">
