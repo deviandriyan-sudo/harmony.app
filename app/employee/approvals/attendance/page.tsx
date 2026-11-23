@@ -726,7 +726,7 @@ export default function EmployeeAttendanceApprovalListPage() {
           )}
         </div>
 
-        <div className="rounded-[28px] border border-[#cfe3ff] bg-[#f4f9ff] p-5 text-sm leading-6 text-[#41607d]">
+        <div className="harmony-approval-flow-note rounded-xl border p-4 text-sm leading-6">
           <div className="flex items-start gap-3">
             <div className="rounded-2xl bg-white p-2.5 harmony-text-link shadow-sm">
               <Eye size={18} />
