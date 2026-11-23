@@ -585,7 +585,7 @@ export function Topbar({
 
         <div className="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-2 sm:flex-initial">
           <div ref={searchRef} className="relative min-w-0 w-full sm:w-[230px] xl:w-[280px]">
-            <div className="harmony-topbar-search flex h-11 w-full min-w-0 items-center gap-3 rounded-full border px-4 transition focus-within:border-blue-300">
+            <div className="harmony-topbar-search flex h-10 w-full min-w-0 items-center gap-2 rounded-xl border px-3 transition-colors focus-within:border-blue-300">
               <Search size={18} className="shrink-0 harmony-text-muted" aria-hidden="true" />
               <input
                 type="search"
@@ -623,7 +623,7 @@ export function Topbar({
               onClick={handleToggleNotification}
               aria-controls="harmony-notification-panel"
               aria-expanded={isOpen}
-              className="harmony-topbar-action relative flex h-11 items-center justify-center gap-2 rounded-full border px-4 text-sm font-semibold harmony-text-primary transition"
+              className="harmony-topbar-action relative flex h-10 items-center justify-center gap-2 rounded-xl border px-3 text-sm font-medium harmony-text-primary transition-colors"
             >
               <span className="relative">
                 <Bell size={18} className="harmony-text-link" />
