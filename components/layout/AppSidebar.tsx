@@ -87,7 +87,7 @@ export function AppSidebar({ menu, title = 'HARMONY', userName = 'HARMONY User',
             const active = isNavigationActive(pathname, item)
             const Icon = item.icon
             return <Link key={item.href} href={item.href} aria-label={item.title} onClick={onNavigate} aria-current={active ? 'page' : undefined}
-              className={`harmony-nav-item harmony-motion-nav ${active ? 'harmony-nav-active' : ''} ${item.remed ? 'harmony-nav-remed' : ''} group flex h-10 items-center gap-2 rounded-[9px] px-2 text-slate-700 transition-colors duration-200 focus-visible:outline-2 focus-visible:outline-blue-500`}>
+              className={`harmony-nav-item harmony-liquid-lit harmony-motion-nav ${active ? 'harmony-nav-active' : ''} ${item.remed ? 'harmony-nav-remed' : ''} group flex h-10 items-center gap-2 rounded-[9px] px-2 text-slate-700 transition-colors duration-200 focus-visible:outline-2 focus-visible:outline-blue-500`}>
               <span className={`harmony-nav-icon flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${active ? 'bg-white/10 text-white' : item.remed ? 'bg-emerald-50 text-emerald-700' : 'bg-white/65 text-slate-600 group-hover:text-blue-600'}`}><Icon size={19} strokeWidth={2} /></span>
               <span className={`harmony-side-detail min-w-0 flex-1 truncate text-[13px] font-semibold ${active ? 'text-white' : 'text-slate-700'}`}>{item.title}</span>
             </Link>
