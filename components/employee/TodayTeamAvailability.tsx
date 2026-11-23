@@ -869,7 +869,7 @@ export function TodayTeamAvailability() {
   }
 
   return (
-    <section className="harmony-rc2o-team rounded-[20px] border shadow-sm">
+    <section className="harmony-rc2o-team harmony-team-history rounded-[20px] border shadow-sm">
       <div className="flex flex-col gap-4 border-b border-black/5 p-5 sm:p-6 xl:flex-row xl:items-center xl:justify-between">
         <div>
           <div className="flex flex-wrap items-center gap-2">
@@ -896,7 +896,7 @@ export function TodayTeamAvailability() {
         </div>
 
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-          <label className="flex min-h-11 items-center gap-2 rounded-2xl border border-black/5 bg-[#f5f5f7] px-3 shadow-sm">
+          <label className="harmony-team-period-filter flex min-h-11 items-center gap-2 rounded-xl border px-3">
             <CalendarDays size={16} className="shrink-0 harmony-text-link" />
             <span className="sr-only">Pilih periode bulan</span>
             <select
@@ -913,7 +913,7 @@ export function TodayTeamAvailability() {
             </select>
           </label>
 
-          <div className="rounded-2xl bg-[#f5f5f7] px-4 py-3 text-sm">
+          <div className="harmony-team-total rounded-xl px-4 py-3 text-sm">
             <span className="font-bold harmony-text-primary">{totalPeople}</span>{' '}
             <span className="harmony-text-secondary">orang terdata</span>
           </div>
@@ -922,7 +922,7 @@ export function TodayTeamAvailability() {
             type="button"
             onClick={fetchMonthData}
             disabled={loading}
-            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl border border-black/5 bg-white px-4 text-sm font-bold harmony-text-primary shadow-sm transition hover:bg-[#f5f5f7] disabled:cursor-not-allowed disabled:opacity-60"
+            className="harmony-team-refresh inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border px-4 text-sm font-semibold harmony-text-primary transition disabled:cursor-not-allowed disabled:opacity-60"
           >
             <RefreshCcw size={16} className={loading ? 'animate-spin' : ''} />
             Refresh
@@ -969,7 +969,7 @@ function HistoryColumn({
   const peopleCount = uniquePersonCount(items)
 
   return (
-    <div className="min-w-0 self-start rounded-[28px] border border-black/5 bg-[#f5f5f7]/60 p-4">
+    <div className="harmony-team-column min-w-0 self-start rounded-[18px] border p-3 sm:p-4">
       <div className="mb-4 flex items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
           <div
@@ -991,11 +991,11 @@ function HistoryColumn({
       </div>
 
       {loading ? (
-        <div className="rounded-2xl border border-dashed border-black/10 bg-white p-4 text-sm font-semibold harmony-text-secondary">
+        <div className="harmony-team-empty rounded-xl border border-dashed p-4 text-sm font-semibold harmony-text-secondary">
           Memuat data...
         </div>
       ) : items.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-black/10 bg-white p-4 text-sm leading-6 harmony-text-secondary">
+        <div className="harmony-team-empty rounded-xl border border-dashed p-4 text-sm leading-6 harmony-text-secondary">
           {meta.emptyLabel(periodLabel)}
         </div>
       ) : (
@@ -1011,9 +1011,9 @@ function HistoryColumn({
 
 function HistoryPersonCard({ item }: { item: TeamHistoryItem }) {
   return (
-    <article className="rounded-[24px] border border-black/5 bg-white p-4 shadow-sm">
+    <article className="harmony-team-person rounded-[15px] border p-3.5">
       <div className="flex items-start gap-3">
-        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#1d1d1f] text-sm font-bold text-white">
+        <div className="harmony-team-avatar flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-sm font-bold">
           {initials(item.employeeName)}
         </div>
 
@@ -1041,12 +1041,12 @@ function HistoryPersonCard({ item }: { item: TeamHistoryItem }) {
           </div>
 
           <div className="mt-3 flex flex-wrap gap-2">
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-[#f5f5f7] px-3 py-1 text-xs font-bold harmony-text-primary">
+            <span className="harmony-team-chip inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold harmony-text-primary">
               <UserRound size={13} />
               {item.categoryLabel}
             </span>
 
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-[#f5f5f7] px-3 py-1 text-xs font-semibold harmony-text-secondary">
+            <span className="harmony-team-chip inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold harmony-text-secondary">
               <Clock3 size={13} />
               {item.startDate === item.endDate
                 ? formatDate(item.startDate)
@@ -1055,7 +1055,7 @@ function HistoryPersonCard({ item }: { item: TeamHistoryItem }) {
           </div>
 
           {(item.jobPending || item.handoverTo) && (
-          <div className="mt-3 rounded-2xl bg-[#f5f5f7]/85 p-3">
+          <div className="harmony-team-handover mt-3 rounded-xl p-3">
             <div className="flex items-start gap-2">
               <BriefcaseBusiness
                 size={15}
