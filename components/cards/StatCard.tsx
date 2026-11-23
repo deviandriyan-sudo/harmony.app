@@ -1,28 +1,19 @@
 import type { LucideIcon } from 'lucide-react'
 
-export function StatCard({
-  title,
-  value,
-  description,
-  icon: Icon,
-}: {
+type StatCardProps = {
   title: string
   value: string
   description: string
   icon: LucideIcon
-}) {
+}
+
+/** Shared stat: label, figure, context. No decorative icon tile or gradients. */
+export function StatCard({ title, value, description }: StatCardProps) {
   return (
-    <div className="harmony-metric-card p-5 sm:p-6">
-      <div className="flex items-start justify-between gap-4">
-        <div className="min-w-0">
-          <p className="text-[11px] font-bold uppercase tracking-[0.12em] harmony-text-muted">{title}</p>
-          <h3 className="mt-2.5 text-[28px] font-semibold tracking-[-0.04em] harmony-text-primary">{value}</h3>
-          <p className="mt-1.5 text-[12px] leading-5 harmony-text-secondary">{description}</p>
-        </div>
-        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[15px] border border-blue-100 bg-blue-50 text-blue-600 shadow-sm">
-          <Icon size={20} strokeWidth={2.1} />
-        </div>
-      </div>
+    <div className="harmony-metric-card harmony-unslop-metric rounded-[14px] border p-4 sm:p-5">
+      <p className="harmony-metric-label text-[13px] font-medium harmony-text-secondary">{title}</p>
+      <p className="harmony-metric-value mt-2 break-words text-[28px] font-semibold leading-none tabular-nums harmony-text-primary">{value}</p>
+      <p className="mt-2 text-[13px] leading-5 harmony-text-secondary">{description}</p>
     </div>
   )
 }
