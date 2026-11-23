@@ -34,6 +34,26 @@
     --hrui-glass-highlight: inset 0 1px 0 rgba(255,255,255,.96), inset 0 -1px 0 rgba(153,184,220,.17);
     --hrui-glass-shadow: 0 14px 35px rgba(44,83,131,.12),0 3px 9px rgba(42,79,125,.055);
     --hrui-glass-filter: blur(26px) saturate(165%);
+    /* Seven-layer optics adapted from AndreyBegma/glass-ui (MIT). */
+    --harmony-glass-sheen: rgba(255,255,255,.15);
+    --harmony-glass-scrim: rgba(235,246,255,.61);
+    --harmony-glass-scrim-strong: rgba(241,249,255,.78);
+    --harmony-glass-edge: rgba(255,255,255,.89);
+    --harmony-glass-spec: rgba(255,255,255,.99);
+    --harmony-glass-rim-light: rgba(255,255,255,.93);
+    --harmony-glass-rim-shade: rgba(62,110,167,.20);
+    --harmony-glass-meniscus: rgba(67,116,170,.19);
+    --harmony-glass-refract: rgba(255,255,255,.76);
+    --harmony-glass-drop: rgba(25,69,122,.19);
+    --harmony-glass-lit: rgba(255,255,255,.34);
+    --harmony-glass-filter: blur(29px) saturate(180%) brightness(1.08);
+    --harmony-glass-filter-strong: blur(36px) saturate(182%) brightness(1.12);
+    --harmony-glass-content: rgba(253,254,255,.92);
+    --harmony-glass-content-sheen: rgba(255,255,255,.5);
+    --harmony-glass-ambient:
+      radial-gradient(950px 560px at 3% 0%,rgba(48,127,211,.19),transparent 70%),
+      radial-gradient(760px 480px at 100% 48%,rgba(41,145,195,.13),transparent 72%),
+      linear-gradient(140deg,#e7f0f8,#f4f8fc 53%,#eaf3f9);
   }
   html[data-harmony-theme='dark'] {
     --hrui-canvas: #141a21;
@@ -61,6 +81,25 @@
     --hrui-glass-highlight: inset 0 1px 0 rgba(202,224,252,.22), inset 0 -1px 0 rgba(5,19,37,.33);
     --hrui-glass-shadow: 0 17px 42px rgba(0,6,18,.29),0 3px 12px rgba(0,10,25,.16);
     --hrui-glass-filter: blur(26px) saturate(145%);
+    --harmony-glass-sheen: rgba(196,224,255,.065);
+    --harmony-glass-scrim: rgba(21,37,55,.69);
+    --harmony-glass-scrim-strong: rgba(25,42,62,.84);
+    --harmony-glass-edge: rgba(156,202,247,.37);
+    --harmony-glass-spec: rgba(218,237,255,.30);
+    --harmony-glass-rim-light: rgba(174,214,255,.54);
+    --harmony-glass-rim-shade: rgba(1,10,27,.51);
+    --harmony-glass-meniscus: rgba(1,9,23,.50);
+    --harmony-glass-refract: rgba(144,202,255,.38);
+    --harmony-glass-drop: rgba(0,8,22,.45);
+    --harmony-glass-lit: rgba(173,217,255,.17);
+    --harmony-glass-filter: blur(29px) saturate(168%) brightness(.85);
+    --harmony-glass-filter-strong: blur(36px) saturate(173%) brightness(.79);
+    --harmony-glass-content: rgba(32,44,59,.94);
+    --harmony-glass-content-sheen: rgba(166,207,244,.08);
+    --harmony-glass-ambient:
+      radial-gradient(950px 600px at 4% 0%,rgba(27,98,165,.28),transparent 70%),
+      radial-gradient(800px 520px at 100% 35%,rgba(24,115,151,.17),transparent 72%),
+      linear-gradient(140deg,#101b29,#172638 55%,#132535);
   }
 
   /* One token vocabulary, harmonized with the pre-existing h385/rc2o layers. */
