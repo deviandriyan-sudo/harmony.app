@@ -2548,7 +2548,9 @@ export default function EmployeeAttendancePage() {
               <div className="grid gap-3 p-4 2xl:hidden">
                 {calendarRows.map((row) => {
                   const draft = getDraft(row);
-                  const displayStatus = getDisplayStatus(row, draft);
+                  const displayStatus = isFutureUnrecordedCalendarDay(row, draft)
+                    ? "future_pending"
+                    : getDisplayStatus(row, draft);
                   const isSelected = selectedDates.includes(row.date);
                   const isOffDayNoAttendance = isOffDayWithoutAttendance(
                     row,
@@ -2746,7 +2748,9 @@ export default function EmployeeAttendancePage() {
                   <tbody>
                     {calendarRows.map((row) => {
                       const draft = getDraft(row);
-                      const displayStatus = getDisplayStatus(row, draft);
+                      const displayStatus = isFutureUnrecordedCalendarDay(row, draft)
+                    ? "future_pending"
+                    : getDisplayStatus(row, draft);
                       const isSelected = selectedDates.includes(row.date);
                       const isOffDayNoAttendance = isOffDayWithoutAttendance(
                         row,
@@ -3487,6 +3491,20 @@ function AttendanceCheckButton({
   );
 }
 
+/** UI-only flag: do not classify an unelapsed date as employee absence.
+ * It does not modify approval, persisted logs, exports or cutoff calculations. */
+function isFutureUnrecordedCalendarDay(row: CalendarDayRow, draft: RowDraft) {
+  return (
+    row.date > getTodayISO() &&
+    !row.is_weekend &&
+    !row.holiday_name &&
+    !row.log?.id &&
+    draft.daily_type === "absent" &&
+    !getEffectiveCheckIn(row, draft) &&
+    !getEffectiveCheckOut(row, draft)
+  );
+}
+
 function RequestLabelBadge({
   row,
   draft,
@@ -3494,6 +3512,10 @@ function RequestLabelBadge({
   row: CalendarDayRow;
   draft: RowDraft;
 }) {
+  if (isFutureUnrecordedCalendarDay(row, draft)) {
+    return <span className="harmony-attendance-request-pill inline-flex rounded-full px-3 py-1 text-xs font-bold harmony-text-secondary">Belum tercatat</span>;
+  }
+
   if (row.log?.phl_work_request_id) {
     return (
       <span className="harmony-attendance-request-pill inline-flex rounded-full bg-[#f3e8ff] px-3 py-1 text-xs font-bold harmony-text-violet">
@@ -3539,6 +3561,15 @@ function ValidationInfo({
   const phl = isPotentialPHL(row, draft);
   const noRecord = !row.log;
   const meta = getDailyTypeMeta(draft.daily_type);
+
+  if (isFutureUnrecordedCalendarDay(row, draft)) {
+    return (
+      <div className="space-y-1">
+        <p className="text-xs font-bold harmony-text-secondary">Belum berlangsung</p>
+        <p className="text-xs leading-5 harmony-text-muted">Menunggu tanggal kehadiran.</p>
+      </div>
+    );
+  }
 
   if (row.log?.phl_work_request_id) {
     return (
@@ -3699,7 +3730,9 @@ function StatusBadge({
   log?: AttendanceLog | null;
 }) {
   const className =
-    status === "present"
+    status === "future_pending"
+      ? "bg-[#e7edf3] harmony-text-secondary"
+      : status === "present"
       ? "bg-green-50 text-green-700"
       : status === "late"
         ? "bg-orange-50 text-orange-700"
@@ -4408,6 +4441,7 @@ function formatStatus(status: string, log?: AttendanceLog | null) {
   if (status === "official_travel") return "Tugas Luar";
   if (status === "holiday") return "Holiday";
   if (status === "weekend") return "Weekend";
+  if (status === "future_pending") return "Belum berlangsung";
   if (status === "no_record") return "Tanpa Data";
 
   return status;
