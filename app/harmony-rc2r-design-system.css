@@ -992,4 +992,16 @@
     color: var(--hrui-muted) !important;
   }
 
+  .harmony-supervisor-attendance .harmony-approval-flow-note {
+    background: var(--hrui-subtle) !important;
+    color: var(--hrui-ink) !important;
+    border-color: var(--hrui-border) !important;
+  }
+  .harmony-supervisor-attendance .harmony-approval-flow-note p {
+    color: var(--hrui-ink) !important;
+  }
+  .harmony-supervisor-attendance .harmony-approval-flow-note p + p {
+    color: var(--hrui-muted) !important;
+  }
+
 }
