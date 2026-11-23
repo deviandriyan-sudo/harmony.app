@@ -27,23 +27,23 @@
     --hrui-radius: 18px;
   }
   html[data-harmony-theme='dark'] {
-    --hrui-canvas: #101a29;
-    --hrui-ink: #eef5fc;
-    --hrui-muted: #b5c8db;
-    --hrui-surface: rgba(28,43,62,.95);
-    --hrui-surface-strong: #1d314b;
-    --hrui-subtle: rgba(39,59,83,.93);
-    --hrui-border: rgba(142,174,211,.24);
-    --hrui-hover: rgba(72,101,134,.35);
-    --hrui-shadow: 0 10px 28px rgba(0,0,0,.17), 0 2px 8px rgba(0,0,0,.10);
-    --hrui-shadow-hover: 0 14px 32px rgba(0,0,0,.23), 0 2px 10px rgba(0,0,0,.15);
-    --hrui-focus: #8fc3ff;
-    --hrui-blue: #77b7fa;
-    --hrui-blue-hover: #a5d4ff;
-    --hrui-input: rgba(34,53,77,.94);
-    --hrui-nav: rgba(25,41,61,.97);
-    --hrui-modal: rgba(24,40,61,.985);
-    --hrui-radius: 18px;
+    --hrui-canvas: #121923;
+    --hrui-ink: #edf3fa;
+    --hrui-muted: #bfccd9;
+    --hrui-surface: rgba(35,46,61,.97);
+    --hrui-surface-strong: #263244;
+    --hrui-subtle: rgba(48,63,82,.93);
+    --hrui-border: rgba(166,189,212,.24);
+    --hrui-hover: rgba(107,137,171,.20);
+    --hrui-shadow: 0 9px 24px rgba(0,0,0,.18), 0 2px 7px rgba(0,0,0,.09);
+    --hrui-shadow-hover: 0 14px 30px rgba(0,0,0,.25), 0 3px 8px rgba(0,0,0,.12);
+    --hrui-focus: #9acaff;
+    --hrui-blue: #a2cfff;
+    --hrui-blue-hover: #c4e0ff;
+    --hrui-input: rgba(23,34,47,.98);
+    --hrui-nav: rgba(23,35,49,.985);
+    --hrui-modal: #243143;
+    --hrui-radius: 16px;
   }
 
   /* One token vocabulary, harmonized with the pre-existing h385/rc2o layers. */
@@ -296,4 +296,280 @@
       background: var(--hrui-surface-strong) !important;
     }
   }
+  /* RC2S: resolve old-theme / new-theme conflicts at the token source. Legacy
+     semantic names stay available for unchanged HR, Finance and Re-Med routes.
+     Status colors remain owned by their semantic success/warning/danger tokens. */
+  html[data-harmony-theme='light'] {
+    --rc2o-panel: var(--hrui-surface);
+    --rc2o-panel-border: var(--hrui-border);
+    --rc2o-input: var(--hrui-input);
+    --rc2o-row-hover: var(--hrui-hover);
+    --rc2o-shadow: var(--hrui-shadow);
+    --h5-panel: var(--hrui-surface);
+    --h5-panel-ink: var(--hrui-ink);
+    --h5-panel-soft: var(--hrui-muted);
+  }
+  html[data-harmony-theme='dark'] {
+    --rc2o-bg: var(--hrui-canvas);
+    --rc2o-ink: var(--hrui-ink);
+    --rc2o-muted: var(--hrui-muted);
+    --rc2o-panel: var(--hrui-surface);
+    --rc2o-panel-border: var(--hrui-border);
+    --rc2o-input: var(--hrui-input);
+    --rc2o-row-hover: var(--hrui-hover);
+    --rc2o-chip: var(--hrui-subtle);
+    --rc2o-chip-border: var(--hrui-border);
+    --rc2o-shadow: var(--hrui-shadow);
+    --h5-panel: var(--hrui-surface);
+    --h5-panel-nested: var(--hrui-subtle);
+    --h5-panel-border: var(--hrui-border);
+    --h5-panel-ink: var(--hrui-ink);
+    --h5-panel-soft: var(--hrui-muted);
+    --h385-ink: var(--hrui-ink);
+    --h385-ink-soft: var(--hrui-muted);
+    --h385-ink-muted: var(--hrui-muted);
+    --h385-surface: var(--hrui-surface);
+    --h385-surface-strong: var(--hrui-surface-strong);
+    --h385-glass-border: var(--hrui-border);
+    --h385-table-row: rgba(32,43,58,.96);
+    --h385-table-hover: rgba(71,95,124,.4);
+  }
+
+  /* Employees / Dashboard — real row backgrounds, not competing white/blue
+     utility classes inherited from older versions. */
+  .harmony-workspace .harmony-team-history {
+    background: var(--hrui-surface) !important;
+    border-color: var(--hrui-border) !important;
+    border-radius: var(--hrui-radius) !important;
+    color: var(--hrui-ink);
+  }
+  .harmony-team-history .harmony-team-period-filter,
+  .harmony-team-history .harmony-team-total,
+  .harmony-team-history .harmony-team-refresh {
+    background: var(--hrui-subtle) !important;
+    color: var(--hrui-ink) !important;
+    border-color: var(--hrui-border) !important;
+    box-shadow: none !important;
+  }
+  .harmony-team-history .harmony-team-period-filter select {
+    color: var(--hrui-ink) !important;
+    background: transparent !important;
+    color-scheme: normal;
+  }
+  html[data-harmony-theme='dark'] .harmony-team-history .harmony-team-period-filter select {
+    color-scheme: dark;
+  }
+  .harmony-team-history .harmony-team-column {
+    background: var(--hrui-subtle) !important;
+    border-color: var(--hrui-border) !important;
+    min-width: 0;
+  }
+  .harmony-team-history .harmony-team-person,
+  .harmony-team-history .harmony-team-empty {
+    background: var(--hrui-surface-strong) !important;
+    border-color: var(--hrui-border) !important;
+    box-shadow: none !important;
+    color: var(--hrui-ink) !important;
+  }
+  .harmony-team-history .harmony-team-avatar {
+    background: #2464a9 !important;
+    color: #fff !important;
+  }
+  .harmony-team-history .harmony-team-chip,
+  .harmony-team-history .harmony-team-handover {
+    background: var(--hrui-subtle) !important;
+    border-color: var(--hrui-border) !important;
+  }
+  .harmony-team-history .harmony-team-person .harmony-text-primary,
+  .harmony-team-history .harmony-team-column .harmony-text-primary {
+    color: var(--hrui-ink) !important;
+    opacity: 1 !important;
+  }
+  .harmony-team-history .harmony-team-person .harmony-text-secondary,
+  .harmony-team-history .harmony-team-column .harmony-text-secondary,
+  .harmony-team-history .harmony-team-person .harmony-text-muted,
+  .harmony-team-history .harmony-team-column .harmony-text-muted {
+    color: var(--hrui-muted) !important;
+    opacity: 1 !important;
+  }
+  .harmony-team-history .harmony-team-person .harmony-text-link {
+    color: var(--hrui-blue) !important;
+  }
+  .harmony-team-history .harmony-team-refresh:hover {
+    background: var(--hrui-hover) !important;
+  }
+
+  /* Attendance — period chooser is a compact toolbar instead of a bright
+     full-width panel sitting on top of a dark report. No approval logic edited. */
+  .harmony-workspace .harmony-attendance-history {
+    background: var(--hrui-surface) !important;
+    border-color: var(--hrui-border) !important;
+  }
+  .harmony-attendance-history .harmony-attendance-history-toolbar,
+  .harmony-attendance-history .harmony-attendance-period-active {
+    background: var(--hrui-subtle) !important;
+    color: var(--hrui-ink) !important;
+    border-color: var(--hrui-border) !important;
+  }
+  .harmony-attendance-history .harmony-attendance-history-toolbar :is(select,input) {
+    background: var(--hrui-input) !important;
+    border-color: var(--hrui-border) !important;
+    color: var(--hrui-ink) !important;
+    min-height: 38px;
+    border-radius: 10px !important;
+  }
+  .harmony-attendance-history .harmony-attendance-review-toolbar {
+    background: var(--hrui-subtle) !important;
+    border-color: var(--hrui-border) !important;
+  }
+  .harmony-workspace .harmony-button-secondary:not(:disabled) {
+    background: var(--hrui-subtle) !important;
+    color: var(--hrui-ink) !important;
+    border: 1px solid var(--hrui-border) !important;
+    border-radius: 11px !important;
+    box-shadow: none !important;
+  }
+  .harmony-workspace .harmony-button-secondary:not(:disabled):hover {
+    background: var(--hrui-hover) !important;
+  }
+  .harmony-attendance-history .harmony-button-secondary {
+    min-height: 38px !important;
+    padding: 7px 12px !important;
+    font-size: 12px !important;
+  }
+  .harmony-attendance-history :is(table,.harmony-table) {
+    font-variant-numeric: tabular-nums;
+  }
+  html[data-harmony-theme='dark'] .harmony-attendance-history :is(table,.harmony-table) tbody tr {
+    color: var(--hrui-ink) !important;
+  }
+  html[data-harmony-theme='dark'] .harmony-attendance-history :is(table,.harmony-table) thead th {
+    color: var(--hrui-ink) !important;
+    background: var(--hrui-subtle) !important;
+  }
+  html[data-harmony-theme='dark'] .harmony-attendance-history :is(table,.harmony-table) tbody tr:nth-child(even) {
+    background: rgba(38,53,72,.7) !important;
+  }
+
+  /* Account profile — explicit semantic form components replace the old
+     hard-coded translucent gray cards, and input contrast works in both modes. */
+  .harmony-profile-workspace {
+    --harmony-profile-text: var(--hrui-ink);
+    --harmony-profile-muted: var(--hrui-muted);
+    color: var(--hrui-ink);
+  }
+  .harmony-profile-workspace .harmony-profile-hero {
+    border-color: rgba(207,230,255,.34) !important;
+    background: linear-gradient(112deg,#164b86 0%,#296aab 63%,#3f83bb 100%) !important;
+    box-shadow: var(--hrui-shadow) !important;
+  }
+  .harmony-profile-workspace .harmony-profile-panel {
+    background: var(--hrui-surface) !important;
+    border-color: var(--hrui-border) !important;
+    box-shadow: var(--hrui-shadow) !important;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+  .harmony-profile-workspace .harmony-profile-field {
+    color: var(--hrui-ink) !important;
+    background: var(--hrui-input) !important;
+    border-color: var(--hrui-border) !important;
+    box-shadow: none !important;
+    color-scheme: normal;
+  }
+  html[data-harmony-theme='dark'] .harmony-profile-workspace .harmony-profile-field {
+    color-scheme: dark;
+  }
+  .harmony-profile-workspace .harmony-profile-field::placeholder {
+    color: var(--hrui-muted) !important;
+    opacity: 1;
+  }
+  .harmony-profile-workspace .harmony-profile-field:focus-visible {
+    border-color: var(--hrui-focus) !important;
+    outline: 2px solid var(--hrui-focus);
+    outline-offset: 1px;
+    box-shadow: none !important;
+  }
+  .harmony-profile-workspace .harmony-profile-panel :is(
+    label, h2, h3, h4, p, small, strong
+  ):is(.text-slate-900,.text-slate-800,.text-slate-700,.text-slate-600) {
+    color: var(--hrui-ink) !important;
+  }
+  .harmony-profile-workspace .harmony-profile-panel :is(
+    label, p, span, small
+  ):is(.text-slate-500,.text-slate-400) {
+    color: var(--hrui-muted) !important;
+  }
+  .harmony-profile-workspace .harmony-profile-panel button[aria-current='page'] {
+    background: #1868bd !important;
+    color: #fff !important;
+    border-color: #2b8cde !important;
+  }
+  .harmony-profile-workspace .harmony-profile-panel button:not([aria-current='page']):hover {
+    background: var(--hrui-hover) !important;
+  }
+  .harmony-profile-workspace .harmony-profile-panel :is(
+    .harmony-text-primary,.harmony-text-secondary,.harmony-text-muted
+  ) {
+    color: var(--hrui-ink);
+  }
+
+  /* Supervisor and Re-Med dashboards use the same neutral panels as HR,
+     without muddy bright gray tiles against navy backgrounds. */
+  .harmony-supervisor-dashboard > .harmony-hero-v25 {
+    border-radius: 20px !important;
+    box-shadow: var(--hrui-shadow) !important;
+  }
+  .harmony-supervisor-dashboard .harmony-card,
+  .harmony-remed-employee-ui .harmony-unified-surface {
+    border-color: var(--hrui-border) !important;
+    border-radius: var(--hrui-radius) !important;
+    box-shadow: var(--hrui-shadow) !important;
+  }
+  .harmony-remed-employee-ui :is(.harmony-section-title,h1,h2,h3) {
+    color: var(--hrui-ink) !important;
+  }
+  .harmony-remed-employee-ui :is(.harmony-text-secondary,.harmony-text-muted) {
+    color: var(--hrui-muted) !important;
+  }
+
+  /* SCALE UP already owns its own layout; align its materials and text to
+     the HARMONY palette, do not change approval stages or user actions. */
+  .scaleup-root {
+    --harmony-surface-glass: var(--hrui-surface);
+    --harmony-border: var(--hrui-border);
+    --harmony-text: var(--hrui-ink);
+    --harmony-text-muted: var(--hrui-muted);
+    color: var(--hrui-ink);
+  }
+  .scaleup-root :is(.scaleup-panel,.scaleup-metric,.scaleup-request,.scaleup-record) {
+    background: var(--hrui-surface) !important;
+    color: var(--hrui-ink) !important;
+    border-color: var(--hrui-border) !important;
+    box-shadow: var(--hrui-shadow) !important;
+  }
+  .scaleup-root :is(.scaleup-metric small,.scaleup-caption,.scaleup-empty,.scaleup-row small) {
+    color: var(--hrui-muted) !important;
+    opacity: 1;
+  }
+  .scaleup-root :is(.scaleup-input,.scaleup-selected) {
+    color: var(--hrui-ink) !important;
+    background: var(--hrui-input) !important;
+    border-color: var(--hrui-border) !important;
+  }
+  html[data-harmony-theme='dark'] .scaleup-root :is(.scaleup-input,.scaleup-selected) {
+    color-scheme: dark;
+  }
+  .scaleup-root .scaleup-panel-header h2 {
+    color: var(--hrui-ink) !important;
+  }
+
+  /* Phone layout: avoid huge toolbars, card padding and horizontal overflow. */
+  @media (max-width: 760px) {
+    .harmony-team-history .harmony-team-column { padding: 12px !important; }
+    .harmony-attendance-history .harmony-attendance-history-toolbar { padding: 9px !important; }
+    .harmony-attendance-history .harmony-attendance-history-toolbar select { flex: 1 1 140px !important; width: auto !important; }
+    .harmony-profile-workspace .harmony-profile-panel { border-radius: 15px !important; }
+  }
+
 }
