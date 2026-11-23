@@ -52,7 +52,8 @@
     "test:rc2t:uiux": "node scripts/test-rc2t-form-readability.mjs",
     "test:rc2u:unslop": "node scripts/test-rc2u-unslop.mjs",
     "test:rc2v:glass": "node scripts/test-rc2v-liquid-glass.mjs",
-    "test:rc2w:glass": "node scripts/test-rc2w-optical-glass.mjs"
+    "test:rc2w:glass": "node scripts/test-rc2w-optical-glass.mjs",
+    "test:rc2x:glass": "node scripts/test-rc2x-visible-glass.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.107.0",
