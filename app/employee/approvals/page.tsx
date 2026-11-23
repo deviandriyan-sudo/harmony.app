@@ -386,27 +386,27 @@ export default function EmployeeApprovalsPage() {
           </div>
         )}
 
-        <div className="harmony-hero-v25 p-6 sm:p-7">
+        <div className="harmony-hero-v25 harmony-supervisor-hero p-5 sm:p-6">
           <div className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-[#007aff]/35 blur-3xl" />
           <div className="pointer-events-none absolute -bottom-28 -left-20 h-72 w-72 rounded-full bg-[#34c759]/20 blur-3xl" />
 
-          <div className="relative flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
+          <div className="relative flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
             <div>
-              <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-4 py-2 text-xs font-semibold text-white/75 backdrop-blur-xl">
+              <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-[11px] font-semibold text-white/90">
                 <ShieldCheck size={15} className="text-[#5ac8fa]" />
                 Supervisor Approval Center
               </div>
 
-              <h1 className="max-w-4xl text-3xl font-semibold tracking-[-0.045em] md:text-5xl">
+              <h1 className="max-w-4xl text-2xl font-semibold tracking-tight md:text-3xl">
                 Approval Tim
               </h1>
 
-              <p className="mt-5 max-w-2xl text-sm leading-7 text-white/62">
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-white/90">
                 Review pengajuan bawahan dalam satu tempat. Absensi tetap per periode, cuti/izin mengikuti workflow HR, sedangkan PHL kerja mempunyai approval khusus yang langsung membentuk saldo.
               </p>
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-2 xl:min-w-[580px] 2xl:grid-cols-4">
+            <div className="grid gap-2 sm:grid-cols-2 xl:min-w-[500px] 2xl:grid-cols-4">
               <HeroMetric label="Bawahan" value={String(subordinates.length)} />
               <HeroMetric label="Absensi Pending" value={String(attendanceSummary.pending)} />
               <HeroMetric label="Cuti Pending" value={String(leaveSummary.pending)} />
@@ -434,7 +434,7 @@ export default function EmployeeApprovalsPage() {
           loading={loading}
         />
 
-        <div className="grid gap-6 xl:grid-cols-3">
+        <div className="grid gap-3 xl:grid-cols-3">
           <ApprovalModuleCard
             title="Approval Absensi"
             description="Review absensi bawahan per periode. PHL kerja tidak lagi dibentuk dari cutoff absensi."
@@ -923,10 +923,10 @@ function ApprovalModuleCard({
   }[tone]
 
   return (
-    <div className="group harmony-metric-card block overflow-hidden p-0">
-      <Link href={href} className="block border-b border-black/5 p-6 transition hover:bg-black/[0.02] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[#007aff]">
+    <div className="group harmony-metric-card harmony-approval-module block overflow-hidden p-0">
+      <Link href={href} className="block border-b border-black/5 p-4 transition hover:bg-black/[0.02] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[#007aff] sm:p-5">
         <div className="flex items-start justify-between gap-4">
-          <div className={`flex h-14 w-14 items-center justify-center rounded-3xl ${toneClass}`}>
+          <div className={`flex h-11 w-11 items-center justify-center rounded-xl ${toneClass}`}>
             {icon}
           </div>
 
@@ -936,39 +936,39 @@ function ApprovalModuleCard({
           </div>
         </div>
 
-        <h3 className="mt-6 text-2xl font-semibold tracking-tight harmony-text-primary">
+        <h3 className="mt-4 text-lg font-semibold tracking-tight harmony-text-primary">
           {title}
         </h3>
 
-        <p className="mt-3 text-sm leading-6 harmony-text-secondary">
+        <p className="mt-2 text-sm leading-6 harmony-text-secondary">
           {description}
         </p>
       </Link>
 
-      <div className="grid gap-3 border-b border-black/5 p-6 md:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2 border-b border-black/5 p-4 md:grid-cols-4 sm:p-5">
         {metrics.map((item) => (
           <Link
             key={item.label}
             href={metricHref ? metricHref(item.label) : href}
             aria-label={`Lihat ${item.label}: ${item.value} - ${title}`}
-            className="rounded-[20px] bg-[#f5f5f7]/80 p-4 transition hover:bg-[#e8f2ff] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#007aff]"
+            className="harmony-approval-module-metric rounded-xl p-3 transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#007aff]"
           >
             <p className="text-xs font-semibold harmony-text-secondary">
               {item.label}
             </p>
 
-            <p className="mt-2 text-2xl font-semibold harmony-text-primary">
+            <p className="mt-1 text-xl font-semibold harmony-text-primary">
               {item.value}
             </p>
           </Link>
         ))}
       </div>
 
-      <div className="space-y-3 p-6">
+      <div className="space-y-2 p-4 sm:p-5">
         {highlights.map((item) => (
           <div
             key={item}
-            className="flex items-start gap-3 rounded-2xl bg-[#f5f5f7]/70 px-4 py-3"
+            className="harmony-approval-module-highlight flex items-start gap-2.5 rounded-lg px-3 py-2.5"
           >
             <div className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-white text-green-700 shadow-sm">
               <CheckCircle2 size={13} />
@@ -994,8 +994,8 @@ function HeroMetric({
   value: string
 }) {
   return (
-    <div className="rounded-[24px] border border-white/10 bg-white/10 p-4 backdrop-blur-xl">
-      <p className="text-xs font-semibold uppercase tracking-wide text-white/45">
+    <div className="harmony-approval-hero-metric rounded-xl border border-white/20 bg-white/10 p-3">
+      <p className="text-[11px] font-semibold uppercase tracking-wide text-white/90">
         {label}
       </p>
 
