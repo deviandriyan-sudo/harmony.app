@@ -41,8 +41,8 @@ const OPTIONS:Record<string,{value:string;label:string}[]>={
 }
 const DATE_FIELDS=new Set(['birth_date','married_since','npwp_registered','signed_at','birth'])
 const DOC_GROUPS=['Foto profil','Identitas','Kepesertaan BPJS','Pendidikan','Administrasi','Keluarga','Lainnya','Arsip']
-const PILL='rounded-2xl border border-white/70 bg-white/50 shadow-[inset_0_1px_1px_rgba(255,255,255,.85),0_9px_26px_rgba(28,63,114,.07)] backdrop-blur-xl'
-const FIELD='mt-1.5 w-full rounded-xl border border-white/75 bg-white/65 px-3 py-2.5 text-sm text-slate-900 shadow-[inset_0_1px_1px_#fff] outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 disabled:bg-white/35 disabled:text-slate-600'
+const PILL='harmony-profile-panel rounded-[18px] border'
+const FIELD='harmony-profile-field mt-1.5 w-full rounded-xl border px-3 py-2.5 text-sm outline-none focus:ring-2 disabled:opacity-70'
 function formatMoney(n:number|null){return n===null?'—':new Intl.NumberFormat('id-ID',{style:'currency',currency:'IDR',maximumFractionDigits:0}).format(n)}
 function parseRows(s:string):Record<string,string>[]{try{const v=JSON.parse(s||'[]');return Array.isArray(v)?v.slice(0,30).filter(x=>x&&typeof x==='object'):[]}catch{return []}}
 function GenericInput({field,label,value,onChange,disabled}:{field:string;label:string;value:string;onChange:(v:string)=>void;disabled:boolean}){
@@ -117,8 +117,8 @@ export function ProfileWorkspace({employeeId,readOnly=false,initialSection='iden
  }catch(e){setMessage(e instanceof Error?e.message:'Verifikasi gagal')}finally{setBusy(false)}}
  if(loading)return <div className="flex min-h-40 items-center justify-center gap-2 text-sm text-slate-600"><Loader2 size={18} className="animate-spin"/>Memuat akun karyawan...</div>
  if(!data)return <div className="rounded-2xl bg-rose-50 p-5 text-rose-700">{message||'Profil tidak tersedia.'}</div>
- return <div className="space-y-4 pb-12">
-  <header className="relative overflow-hidden rounded-[26px] border border-white/70 bg-[linear-gradient(118deg,rgba(38,103,193,.85),rgba(108,166,232,.70),rgba(183,209,250,.64))] p-5 text-white shadow-[inset_0_2px_3px_rgba(255,255,255,.48),0_16px_34px_rgba(20,60,121,.13)] backdrop-blur-2xl sm:p-6">
+ return <div className="harmony-profile-workspace space-y-4 pb-12">
+  <header className="harmony-profile-hero relative overflow-hidden rounded-[20px] border p-5 text-white sm:p-6">
    <div className="pointer-events-none absolute inset-x-8 top-0 h-px bg-white/80"/>
    <div className="flex flex-wrap items-center gap-4">
     <div className="relative shrink-0">
