@@ -47,7 +47,8 @@
     "test:workspace:rc2o": "node scripts/test-rc2o-workspace.cjs",
     "test:rc2p:dashboard-phl": "node scripts/test-rc2p-dashboard-phl.cjs",
     "test:rc2q:frontends": "node scripts/test-rc2q-frontends.mjs",
-    "test:rc2r:uiux": "node scripts/test-rc2r-uiux.mjs"
+    "test:rc2r:uiux": "node scripts/test-rc2r-uiux.mjs",
+    "test:rc2s:uiux": "node scripts/test-rc2s-visual-system.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.107.0",
