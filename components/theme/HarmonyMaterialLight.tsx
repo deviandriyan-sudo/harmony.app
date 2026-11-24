@@ -4,7 +4,7 @@
  * Adapted from AndreyBegma/glass-ui src/material-light.tsx (MIT).
  * Copyright (c) 2026 AndreyBegma.
  * Original: https://github.com/AndreyBegma/glass-ui
- * See docs/THIRD_PARTY_GLASS_NOTICES.md for the full MIT notice.
+ * See docs/licenses/GLASS_UI_MIT.txt for the full MIT notice.
  *
  * A single delegated listener illuminates only opted-in chrome surfaces.
  * No canvas, external scripts, tracking, network requests or GPU shaders.
@@ -17,14 +17,17 @@ export function HarmonyMaterialLight() {
     const reduceTransparency = window.matchMedia('(prefers-reduced-transparency: reduce)')
     const increaseContrast = window.matchMedia('(prefers-contrast: more)')
     const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)')
-    if (!canHover.matches || reduceTransparency.matches || increaseContrast.matches || reduceMotion.matches) return
+    const mediaQueries = [canHover, reduceTransparency, increaseContrast, reduceMotion]
 
     let active: HTMLElement | null = null
     let lastFrame = 0
+    let listening = false
+
     const reset = () => {
       if (active) active.style.setProperty('--harmony-lit', '0')
       active = null
     }
+
     const move = (event: PointerEvent) => {
       if (!(event.target instanceof Element)) {
         reset()
@@ -44,11 +47,34 @@ export function HarmonyMaterialLight() {
       next.style.setProperty('--harmony-lit', '1')
       active = next
     }
-    document.addEventListener('pointermove', move, { passive: true })
+
+    // Accessibility and pointer capabilities can change without a page reload.
+    // Detach the expensive move handler immediately when illumination is disabled.
+    const enabled = () =>
+      canHover.matches && !reduceTransparency.matches &&
+      !increaseContrast.matches && !reduceMotion.matches
+
+    const syncListeners = () => {
+      const shouldListen = enabled()
+      if (shouldListen && !listening) {
+        document.addEventListener('pointermove', move, { passive: true })
+        listening = true
+      } else if (!shouldListen && listening) {
+        document.removeEventListener('pointermove', move)
+        listening = false
+      }
+      lastFrame = 0
+      reset()
+    }
+
+    mediaQueries.forEach((query) => query.addEventListener('change', syncListeners))
     document.addEventListener('pointerleave', reset)
     window.addEventListener('blur', reset)
+    syncListeners()
+
     return () => {
-      document.removeEventListener('pointermove', move)
+      mediaQueries.forEach((query) => query.removeEventListener('change', syncListeners))
+      if (listening) document.removeEventListener('pointermove', move)
       document.removeEventListener('pointerleave', reset)
       window.removeEventListener('blur', reset)
       reset()
