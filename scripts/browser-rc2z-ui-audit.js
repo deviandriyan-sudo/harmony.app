@@ -1,3 +1,4 @@
+/* global window, document, CSS, matchMedia, getComputedStyle */
 /*
  * HARMONY RC2Z — read-only browser computed-style probe.
  * Paste the complete contents into Chrome/Edge DevTools Console on a LOCAL QA
