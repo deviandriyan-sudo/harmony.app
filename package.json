@@ -54,7 +54,11 @@
     "test:rc2v:glass": "node scripts/test-rc2v-liquid-glass.mjs",
     "test:rc2w:glass": "node scripts/test-rc2w-optical-glass.mjs",
     "test:rc2x:glass": "node scripts/test-rc2x-visible-glass.mjs",
-    "test:rc2y:accessibility": "node scripts/test-rc2y-accessibility.mjs"
+    "test:rc2y:accessibility": "node scripts/test-rc2y-accessibility.mjs",
+    "test:rc2z:glass": "node scripts/test-rc2z-liquid-glass.mjs",
+    "test:rc2zc:attendance": "node scripts/test-rc2zc-attendance-layout.mjs",
+    "test:rc2ze:attendance": "node scripts/test-rc2ze-attendance-composition.mjs",
+    "test:rc2zh:attendance": "node scripts/test-rc2zh-attendance-verification.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.107.0",

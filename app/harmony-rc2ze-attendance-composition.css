@@ -1,0 +1,410 @@
+/* HARMONY RC2ZE — Attendance composition refinements.
+ * Responsive two-column workflow with colour-coded metrics and balanced actions.
+ * Imported last, scoped to Attendance and SCALE UP metrics, screen only.
+ * Attendance workflow, authorization, uploads and print remain unchanged.
+ */
+@media screen {
+  html[data-harmony-theme='light'] {
+    --ze-ink: #18334f;
+    --ze-muted: #496882;
+    --ze-border: rgba(134,183,229,.43);
+    --ze-surface: linear-gradient(138deg,rgba(246,252,255,.86),rgba(216,237,252,.67));
+    --ze-sheet: linear-gradient(148deg,rgba(252,254,255,.73),rgba(219,239,255,.54));
+    --ze-tile-shadow: inset 0 1px 0 rgba(255,255,255,.96),inset 0 -2px 0 rgba(118,174,232,.09),0 12px 28px rgba(28,83,148,.13);
+  }
+  html[data-harmony-theme='dark'] {
+    --ze-ink: #ebf5ff;
+    --ze-muted: #afcce6;
+    --ze-border: rgba(137,192,247,.32);
+    --ze-surface: linear-gradient(145deg,rgba(28,63,99,.90),rgba(17,43,75,.92));
+    --ze-sheet: linear-gradient(145deg,rgba(46,83,123,.78),rgba(19,49,83,.81));
+    --ze-tile-shadow: inset 0 1px 0 rgba(200,230,255,.32),inset 0 -2px 0 rgba(1,19,45,.30),0 14px 31px rgba(0,13,37,.30);
+  }
+
+  /* SCALE UP-style summary: optical colour panels, icon on top, text + value below. */
+  html[data-harmony-theme] .harmony-attendance-summary-grid {
+    align-items: stretch;
+    gap: clamp(10px,1.1vw,16px) !important;
+  }
+  html[data-harmony-theme] .harmony-rc2q-attendance .harmony-attendance-summary-grid .harmony-rc2q-approved-metric.harmony-attendance-stat-tile {
+    --ze-tile-start: #e7f2ff;
+    --ze-tile-end: #c5dfff;
+    --ze-accent: #2a7dd1;
+    --ze-icon-bg: rgba(55,139,220,.14);
+    display: flex !important;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: flex-start;
+    min-width: 0;
+    min-height: 145px;
+    height: 100%;
+    padding: 15px 16px !important;
+    border: 1px solid var(--ze-border) !important;
+    border-radius: 23px !important;
+    background: linear-gradient(143deg,var(--ze-tile-start),var(--ze-tile-end)) !important;
+    color: var(--ze-ink) !important;
+    box-shadow: var(--ze-tile-shadow) !important;
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+    transition: transform .2s ease, border-color .2s ease, box-shadow .2s ease;
+  }
+  html[data-harmony-theme] .harmony-rc2q-attendance .harmony-attendance-summary-grid .harmony-rc2q-approved-metric.harmony-attendance-stat-tile:hover {
+    transform: translateY(-2px);
+    border-color: var(--ze-accent) !important;
+    box-shadow: var(--ze-tile-shadow), 0 6px 20px rgba(46,120,205,.13) !important;
+  }
+  html[data-harmony-theme] .harmony-attendance-summary-grid .harmony-attendance-stat-icon {
+    display: grid !important;
+    place-items: center;
+    min-width: 39px;
+    width: 39px;
+    height: 39px;
+    padding: 8px !important;
+    border-radius: 13px !important;
+    color: var(--ze-accent) !important;
+    background: var(--ze-icon-bg) !important;
+  }
+  html[data-harmony-theme] .harmony-attendance-summary-grid .harmony-attendance-stat-body {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-width: 0;
+    width: 100%;
+    margin-top: 10px;
+  }
+  html[data-harmony-theme] .harmony-attendance-summary-grid .harmony-attendance-stat-label {
+    display: block;
+    font-size: 12px;
+    font-weight: 650;
+    line-height: 1.35;
+    color: var(--ze-muted) !important;
+  }
+  html[data-harmony-theme] .harmony-attendance-summary-grid .harmony-attendance-stat-value {
+    display: block;
+    margin-top: auto;
+    padding-top: 6px;
+    font-size: clamp(22px,1.6vw,28px);
+    font-weight: 760;
+    line-height: 1.15;
+    font-variant-numeric: tabular-nums;
+    color: var(--ze-ink) !important;
+  }
+
+  html[data-harmony-theme='light'] .harmony-attendance-stat-tile[data-palette='sky'] { --ze-tile-start: #eaf4ff !important; --ze-tile-end: #cce3ff !important; --ze-accent: #256fc1; --ze-icon-bg: #d9eaff; }
+  html[data-harmony-theme='light'] .harmony-attendance-stat-tile[data-palette='mint'] { --ze-tile-start: #edfcf7 !important; --ze-tile-end: #c7f1e3 !important; --ze-accent: #168b6d; --ze-icon-bg: #d3f3e8; }
+  html[data-harmony-theme='light'] .harmony-attendance-stat-tile[data-palette='honey'] { --ze-tile-start: #fff9e9 !important; --ze-tile-end: #ffe7bd !important; --ze-accent: #ad711c; --ze-icon-bg: #ffeac9; }
+  html[data-harmony-theme='light'] .harmony-attendance-stat-tile[data-palette='rose'] { --ze-tile-start: #fff1f3 !important; --ze-tile-end: #ffdce3 !important; --ze-accent: #ba5273; --ze-icon-bg: #ffe1e9; }
+  html[data-harmony-theme='light'] .harmony-attendance-stat-tile[data-palette='lavender'] { --ze-tile-start: #f3f1ff !important; --ze-tile-end: #ddd9ff !important; --ze-accent: #665ac0; --ze-icon-bg: #e6e2ff; }
+  html[data-harmony-theme='light'] .harmony-attendance-stat-tile[data-palette='aqua'] { --ze-tile-start: #ecfaff !important; --ze-tile-end: #caedf3 !important; --ze-accent: #19859e; --ze-icon-bg: #d7f1f6; }
+  html[data-harmony-theme='dark'] .harmony-attendance-stat-tile[data-palette='sky'] { --ze-tile-start: #284c7a; --ze-tile-end: #173758; --ze-accent: #8ac3ff; --ze-icon-bg: rgba(76,156,247,.22); }
+  html[data-harmony-theme='dark'] .harmony-attendance-stat-tile[data-palette='mint'] { --ze-tile-start: #1c5b51; --ze-tile-end: #17453f; --ze-accent: #8fe8c4; --ze-icon-bg: rgba(76,204,154,.2); }
+  html[data-harmony-theme='dark'] .harmony-attendance-stat-tile[data-palette='honey'] { --ze-tile-start: #625029; --ze-tile-end: #463a23; --ze-accent: #f8d28a; --ze-icon-bg: rgba(232,169,73,.19); }
+  html[data-harmony-theme='dark'] .harmony-attendance-stat-tile[data-palette='rose'] { --ze-tile-start: #643d56; --ze-tile-end: #492a40; --ze-accent: #ffbbcf; --ze-icon-bg: rgba(240,108,158,.19); }
+  html[data-harmony-theme='dark'] .harmony-attendance-stat-tile[data-palette='lavender'] { --ze-tile-start: #453e77; --ze-tile-end: #302d5a; --ze-accent: #d6c8ff; --ze-icon-bg: rgba(159,121,241,.2); }
+  html[data-harmony-theme='dark'] .harmony-attendance-stat-tile[data-palette='aqua'] { --ze-tile-start: #245968; --ze-tile-end: #1b4154; --ze-accent: #95e3f1; --ze-icon-bg: rgba(68,181,204,.22); }
+
+  /* Also give SCALE UP metric cards actual color identity without changing their data. */
+  html[data-harmony-theme='light'] .scaleup-metrics .scaleup-metric:nth-child(1) { background: linear-gradient(142deg,#eaf3ff,#d0e5ff) !important; }
+  html[data-harmony-theme='light'] .scaleup-metrics .scaleup-metric:nth-child(2) { background: linear-gradient(142deg,#f0ecff,#ded6ff) !important; }
+  html[data-harmony-theme='light'] .scaleup-metrics .scaleup-metric:nth-child(3) { background: linear-gradient(142deg,#eafbf3,#ccefdc) !important; }
+  html[data-harmony-theme='light'] .scaleup-metrics .scaleup-metric:nth-child(4) { background: linear-gradient(142deg,#fff8e8,#fce7bd) !important; }
+  html[data-harmony-theme='dark'] .scaleup-metrics .scaleup-metric:nth-child(1) { background: linear-gradient(142deg,#31537c,#1c385b) !important; }
+  html[data-harmony-theme='dark'] .scaleup-metrics .scaleup-metric:nth-child(2) { background: linear-gradient(142deg,#474279,#302d59) !important; }
+  html[data-harmony-theme='dark'] .scaleup-metrics .scaleup-metric:nth-child(3) { background: linear-gradient(142deg,#285b4b,#1a4238) !important; }
+  html[data-harmony-theme='dark'] .scaleup-metrics .scaleup-metric:nth-child(4) { background: linear-gradient(142deg,#64502e,#453920) !important; }
+  html[data-harmony-theme] .scaleup-metrics .scaleup-metric { color: var(--ze-ink) !important; }
+  html[data-harmony-theme] .scaleup-metrics .scaleup-metric :is(small,strong) { color: var(--ze-ink) !important; }
+
+  /* One glass sheet, two content sections on wide containers; no giant empty columns. */
+  html[data-harmony-theme] .harmony-attendance-unified {
+    container: attendance-sheet / inline-size;
+    min-width: 0;
+    background: var(--ze-sheet) !important;
+  }
+  html[data-harmony-theme] .harmony-attendance-unified .harmony-attendance-unified-shell {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    gap: 0;
+    min-width: 0;
+    align-items: stretch;
+  }
+  html[data-harmony-theme] .harmony-attendance-unified :is(.harmony-attendance-history-section,.harmony-attendance-today-shell) {
+    min-width: 0;
+    padding: clamp(16px,1.35vw,24px) !important;
+  }
+  html[data-harmony-theme] .harmony-attendance-unified .harmony-attendance-history-section {
+    border: 0 !important;
+    background: linear-gradient(138deg,rgba(247,252,255,.42),rgba(213,234,255,.22)) !important;
+  }
+  html[data-harmony-theme] .harmony-attendance-unified .harmony-attendance-today-shell {
+    border-top: 1px solid var(--ze-border) !important;
+    background: linear-gradient(148deg,rgba(238,250,255,.40),rgba(205,235,251,.23)) !important;
+  }
+  @container attendance-sheet (min-width: 1100px) {
+    html[data-harmony-theme] .harmony-attendance-unified .harmony-attendance-unified-shell {
+      grid-template-columns: minmax(0,1fr) minmax(0,1fr) !important;
+    }
+    html[data-harmony-theme] .harmony-attendance-unified .harmony-attendance-today-shell {
+      border-top: 0 !important;
+      border-inline-start: 1px solid var(--ze-border) !important;
+    }
+  }
+  html[data-harmony-theme] .harmony-attendance-unified .harmony-attendance-section-header {
+    min-height: 64px;
+    align-items: flex-start;
+    margin-bottom: 12px;
+  }
+  html[data-harmony-theme] .harmony-attendance-unified .harmony-attendance-history-toolbar-compact {
+    display: flex !important;
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
+    gap: 12px !important;
+    border: 1px solid var(--ze-border) !important;
+    padding: 14px !important;
+    min-height: 132px;
+    width: 100%;
+    background: var(--ze-surface) !important;
+    border-radius: 18px !important;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.5) !important;
+  }
+  html[data-harmony-theme] .harmony-attendance-unified .harmony-attendance-period-fields {
+    display: grid !important;
+    grid-template-columns: minmax(0,1fr) minmax(0,130px);
+    gap: 9px;
+    align-items: center;
+    width: 100%;
+  }
+  html[data-harmony-theme] .harmony-attendance-unified .harmony-attendance-period-label {
+    grid-column: 1 / -1;
+    margin: 0;
+  }
+  html[data-harmony-theme] .harmony-attendance-unified .harmony-attendance-period-fields .harmony-attendance-period-select,
+  html[data-harmony-theme] .harmony-attendance-unified .harmony-attendance-period-fields .harmony-attendance-year-select {
+    width: 100% !important;
+    max-width: none !important;
+    min-width: 0 !important;
+    flex: none !important;
+  }
+  html[data-harmony-theme] .harmony-attendance-unified .harmony-attendance-export-actions {
+    display: grid !important;
+    grid-template-columns: repeat(3,minmax(0,1fr));
+    gap: 8px !important;
+    width: 100% !important;
+  }
+
+  /* IMPORTANT: same button dimensions across Excel, CSV and Refresh, not arbitrary content widths. */
+  html[data-harmony-theme] .harmony-attendance-unified .harmony-attendance-export-actions > button,
+  html[data-harmony-theme] .harmony-attendance-unified .harmony-attendance-today-quick-actions > button {
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: center;
+    gap: 7px !important;
+    min-width: 0 !important;
+    width: 100% !important;
+    height: 42px !important;
+    min-height: 42px !important;
+    max-height: 42px;
+    padding: 0 11px !important;
+    margin: 0 !important;
+    border-radius: 12px !important;
+    font-size: 12px !important;
+    font-weight: 650;
+    line-height: 1.2;
+    white-space: nowrap !important;
+    box-sizing: border-box;
+  }
+  html[data-harmony-theme] .harmony-attendance-unified .harmony-attendance-export-actions > button > svg,
+  html[data-harmony-theme] .harmony-attendance-unified .harmony-attendance-today-quick-actions > button > svg {
+    width: 15px;
+    height: 15px;
+    flex-shrink: 0;
+  }
+  @container attendance-sheet (max-width: 650px) {
+    html[data-harmony-theme] .harmony-attendance-unified .harmony-attendance-export-actions {
+      grid-template-columns: repeat(2,minmax(0,1fr));
+    }
+    html[data-harmony-theme] .harmony-attendance-unified .harmony-attendance-export-actions > button:last-child {
+      grid-column: 1 / -1;
+    }
+  }
+  html[data-harmony-theme] .harmony-attendance-unified .harmony-attendance-date-action {
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: center;
+    min-width: 148px;
+    min-height: 42px;
+    height: 42px;
+    padding: 0 13px !important;
+    border: 1px solid var(--ze-border) !important;
+    border-radius: 12px !important;
+    background: var(--ze-surface) !important;
+    color: var(--ze-ink) !important;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.62),0 4px 12px rgba(42,105,164,.10) !important;
+    font-size: 12px !important;
+    font-weight: 650;
+    white-space: nowrap;
+  }
+  html[data-harmony-theme] .harmony-attendance-unified .harmony-attendance-today-stage {
+    background: var(--ze-surface) !important;
+    border: 1px solid var(--ze-border) !important;
+    padding: 14px !important;
+    border-radius: 18px !important;
+    min-width: 0;
+  }
+  html[data-harmony-theme] .harmony-attendance-unified .harmony-attendance-today-stats {
+    display: grid !important;
+    grid-template-columns: repeat(2,minmax(0,1fr)) !important;
+    gap: 10px !important;
+  }
+  html[data-harmony-theme] .harmony-attendance-unified .harmony-attendance-clock-card-action {
+    min-height: 93px;
+    padding: 13px !important;
+    border-radius: 16px !important;
+    background: linear-gradient(145deg,rgba(216,235,255,.80),rgba(236,247,255,.56)) !important;
+    border: 1px solid var(--ze-border) !important;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.79),0 6px 15px rgba(31,88,147,.07) !important;
+  }
+  html[data-harmony-theme] .harmony-attendance-unified .harmony-attendance-clock-card-action:nth-child(2) {
+    background: linear-gradient(143deg,rgba(207,245,233,.78),rgba(236,252,249,.55)) !important;
+  }
+  html[data-harmony-theme='dark'] .harmony-attendance-unified .harmony-attendance-clock-card-action {
+    background: linear-gradient(145deg,rgba(43,87,132,.92),rgba(27,56,92,.83)) !important;
+  }
+  html[data-harmony-theme='dark'] .harmony-attendance-unified .harmony-attendance-clock-card-action:nth-child(2) {
+    background: linear-gradient(145deg,rgba(28,101,87,.9),rgba(18,68,65,.85)) !important;
+  }
+  html[data-harmony-theme] .harmony-attendance-unified .harmony-attendance-source-panel {
+    display: grid !important;
+    grid-template-columns: minmax(0,1fr) auto;
+    gap: 12px;
+    min-width: 0;
+    padding: 12px 14px !important;
+    border: 1px solid var(--ze-border) !important;
+    background: rgba(226,240,255,.25) !important;
+  }
+  html[data-harmony-theme] .harmony-attendance-unified .harmony-attendance-today-quick-actions {
+    display: grid !important;
+    grid-template-columns: repeat(2,148px);
+    gap: 8px !important;
+    margin: 0;
+  }
+  @container attendance-sheet (max-width: 800px) {
+    html[data-harmony-theme] .harmony-attendance-unified .harmony-attendance-source-panel {
+      grid-template-columns: minmax(0,1fr);
+    }
+    html[data-harmony-theme] .harmony-attendance-unified .harmony-attendance-today-quick-actions {
+      grid-template-columns: repeat(2,minmax(0,1fr));
+    }
+  }
+  @container attendance-sheet (max-width: 400px) {
+    html[data-harmony-theme] .harmony-attendance-unified .harmony-attendance-today-stats,
+    html[data-harmony-theme] .harmony-attendance-unified .harmony-attendance-today-quick-actions {
+      grid-template-columns: minmax(0,1fr) !important;
+    }
+    html[data-harmony-theme] .harmony-attendance-unified .harmony-attendance-period-fields {
+      grid-template-columns: minmax(0,1fr) minmax(0,100px);
+    }
+  }
+
+  /* Verification buttons same baseline, heights and visual weight. */
+  html[data-harmony-theme] .harmony-attendance-unified .harmony-attendance-review-toolbar {
+    display: flex !important;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px !important;
+    min-width: 0;
+    padding: 18px 22px !important;
+    background: var(--ze-sheet) !important;
+  }
+  html[data-harmony-theme] .harmony-attendance-unified .harmony-attendance-review-actions {
+    display: flex !important;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 9px !important;
+    min-width: 0;
+    width: auto;
+    margin-inline-start: auto;
+  }
+  html[data-harmony-theme] .harmony-attendance-unified .harmony-attendance-review-actions > button {
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: center;
+    min-height: 44px !important;
+    height: 44px !important;
+    min-width: 164px !important;
+    width: auto !important;
+    padding-inline: 16px !important;
+    border-radius: 13px !important;
+    flex: 0 0 auto;
+    font-size: 12px !important;
+    font-weight: 700;
+    box-sizing: border-box;
+    white-space: nowrap;
+  }
+  @container attendance-sheet (max-width: 650px) {
+    html[data-harmony-theme] .harmony-attendance-unified .harmony-attendance-review-actions {
+      display: grid !important;
+      width: 100%;
+      grid-template-columns: repeat(2,minmax(0,1fr));
+      margin: 0;
+    }
+    html[data-harmony-theme] .harmony-attendance-unified .harmony-attendance-review-actions > button {
+      min-width: 0 !important;
+      width: 100% !important;
+      padding-inline: 8px !important;
+      white-space: normal;
+    }
+    html[data-harmony-theme] .harmony-attendance-unified .harmony-attendance-review-actions > button:nth-child(3) {
+      grid-column: 1 / -1;
+    }
+  }
+
+  /* Clear focus & animation opt-outs; respect user's OS preferences. */
+  html[data-harmony-theme] .harmony-attendance-unified :is(button,select):focus-visible,
+  html[data-harmony-theme] .harmony-attendance-summary-grid .harmony-attendance-stat-tile:focus-visible {
+    outline: 2px solid var(--hrui-focus) !important;
+    outline-offset: 3px;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    html[data-harmony-theme] .harmony-attendance-summary-grid .harmony-attendance-stat-tile,
+    html[data-harmony-theme] .harmony-attendance-clock-card-action,
+    html[data-harmony-theme] .harmony-attendance-clock-card-action::after {
+      animation: none !important;
+      transition: none !important;
+      transform: none !important;
+    }
+  }
+  @media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
+    html[data-harmony-theme] .harmony-attendance-unified,
+    html[data-harmony-theme] .harmony-attendance-unified :is(.harmony-attendance-history-section,.harmony-attendance-today-shell,.harmony-attendance-today-stage,.harmony-attendance-history-toolbar-compact),
+    html[data-harmony-theme] .scaleup-metrics .scaleup-metric {
+      background: var(--hrui-surface-strong) !important;
+      -webkit-backdrop-filter: none !important;
+      backdrop-filter: none !important;
+    }
+    html[data-harmony-theme] .harmony-attendance-summary-grid .harmony-attendance-stat-tile {
+      background: var(--hrui-surface-strong) !important;
+      color: var(--h-color-text,var(--ze-ink)) !important;
+    }
+  }
+}
+
+@media screen {
+  html[data-harmony-theme] .harmony-attendance-source-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 9px;
+    min-height: 27px;
+    padding: 4px 10px;
+    border: 1px solid var(--ze-border);
+    border-radius: 999px;
+    background: rgba(222,239,255,.43);
+    color: var(--ze-muted);
+    font-size: 11px;
+    font-weight: 650;
+  }
+}

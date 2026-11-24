@@ -11,6 +11,23 @@ import { clearRemedUiSession } from '@/lib/remed-session-client'
 import { isNavigationActive, type NavigationItem } from '@/lib/navigation'
 import { useEmployeeAvatar } from '@/components/profile/useEmployeeAvatar'
 
+
+
+type NavTone = 'home' | 'attendance' | 'request' | 'approval' | 'scaleup' | 'remed' | 'account' | 'default'
+
+function getNavTone(item: NavigationItem): NavTone {
+  const href = item.href.toLowerCase()
+  const title = item.title.toLowerCase()
+  if (item.remed || href.includes('/remed') || title.includes('re-med')) return 'remed'
+  if (href.includes('/attendance') || title.includes('kehadiran') || title.includes('absensi')) return 'attendance'
+  if (href.includes('/leave') || href.includes('/request') || title.includes('pengajuan') || title.includes('cuti')) return 'request'
+  if (href.includes('/approval') || title.includes('approval')) return 'approval'
+  if (href.includes('/scale-up') || title.includes('scale up')) return 'scaleup'
+  if (href.includes('/profile') || href.includes('/settings') || title.includes('akun') || title.includes('pengaturan')) return 'account'
+  if (href === '/employee' || href === '/hr' || title.includes('beranda') || title.includes('dashboard')) return 'home'
+  return 'default'
+}
+
 type Props = {
   menu: NavigationItem[]
   title?: string
@@ -86,9 +103,11 @@ export function AppSidebar({ menu, title = 'HARMONY', userName = 'HARMONY User',
           {menu.map(item => {
             const active = isNavigationActive(pathname, item)
             const Icon = item.icon
+            const tone = getNavTone(item)
             return <Link key={item.href} href={item.href} aria-label={item.title} onClick={onNavigate} aria-current={active ? 'page' : undefined}
-              className={`harmony-nav-item harmony-liquid-lit harmony-motion-nav ${active ? 'harmony-nav-active' : ''} ${item.remed ? 'harmony-nav-remed' : ''} group flex h-10 items-center gap-2 rounded-[9px] px-2 text-slate-700 transition-colors duration-200 focus-visible:outline-2 focus-visible:outline-blue-500`}>
-              <span className={`harmony-nav-icon flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${active ? 'bg-white/10 text-white' : item.remed ? 'bg-emerald-50 text-emerald-700' : 'bg-white/65 text-slate-600 group-hover:text-blue-600'}`}><Icon size={19} strokeWidth={2} /></span>
+              data-nav-tone={tone}
+              className={`harmony-nav-item harmony-liquid-lit harmony-motion-nav harmony-nav-tone-${tone} ${active ? 'harmony-nav-active' : ''} ${item.remed ? 'harmony-nav-remed' : ''} group flex h-10 items-center gap-2 rounded-[9px] px-2 text-slate-700 transition-colors duration-200 focus-visible:outline-2 focus-visible:outline-blue-500`}>
+              <span className={`harmony-nav-icon harmony-nav-icon-tone-${tone} flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${active ? 'bg-white/10 text-white' : item.remed ? 'bg-emerald-50 text-emerald-700' : 'bg-white/65 text-slate-600 group-hover:text-blue-600'}`}><Icon size={19} strokeWidth={2} /></span>
               <span className={`harmony-side-detail min-w-0 flex-1 truncate text-[13px] font-semibold ${active ? 'text-white' : 'text-slate-700'}`}>{item.title}</span>
             </Link>
           })}

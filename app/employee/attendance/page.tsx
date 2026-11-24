@@ -419,10 +419,6 @@ export default function EmployeeAttendancePage() {
     return calendarRows;
   }, [calendarRows]);
 
-  const selectedRows = useMemo(() => {
-    return selectableRows.filter((row) => selectedDates.includes(row.date));
-  }, [selectableRows, selectedDates]);
-
   const allRowsSelected =
     selectableRows.length > 0 &&
     selectableRows.every((row) => selectedDates.includes(row.date));
@@ -2192,66 +2188,17 @@ export default function EmployeeAttendancePage() {
               {approvedSnapshot ? `${formatDisplayDate(approvedSnapshot.period_start || '')} – ${formatDisplayDate(approvedSnapshot.period_end || '')} · ${approvedSnapshot.hr_status === 'finalized'?'Final HR':'Disetujui Atasan'}` : approvedSummaryError ? 'Ringkasan belum dapat dimuat' : 'Belum ada periode disetujui'}
             </span>
           </header>
-          <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-3 2xl:grid-cols-6" aria-label="Ringkasan periode disetujui">
-            <ApprovedAttendanceMetric title="Total Hari Kerja" value={approvedMetric(approvedSnapshot?.total_work_days)} tone="blue" icon={<CalendarDays size={19}/>}/>
-            <ApprovedAttendanceMetric title="Hadir" value={approvedMetric(approvedSnapshot?.total_present_days)} tone="green" icon={<CheckCircle2 size={19}/>}/>
-            <ApprovedAttendanceMetric title="Terlambat" value={approvedMetric(approvedSnapshot?.total_late_days)} tone="amber" icon={<Clock3 size={19}/>}/>
-            <ApprovedAttendanceMetric title="Tidak Hadir" value={approvedMetric(approvedSnapshot?.total_absent_days)} tone="rose" icon={<AlertTriangle size={19}/>}/>
-            <ApprovedAttendanceMetric title="Cuti / Izin / Sakit" value={approvedLeaveTotal(approvedSnapshot)} tone="blue" icon={<FileText size={19}/>}/>
-            <ApprovedAttendanceMetric title="PHL Tertaut" value={approvedMetric(approvedSnapshot?.total_phl_days)} tone="green" icon={<CalendarDays size={19}/>}/>
+          <div className="harmony-attendance-summary-grid mt-4 grid grid-cols-2 gap-3 lg:grid-cols-3 2xl:grid-cols-6" aria-label="Ringkasan periode disetujui">
+            <ApprovedAttendanceMetric palette="sky" title="Total Hari Kerja" value={approvedMetric(approvedSnapshot?.total_work_days)} tone="blue" icon={<CalendarDays size={19}/>}/>
+            <ApprovedAttendanceMetric palette="mint" title="Hadir" value={approvedMetric(approvedSnapshot?.total_present_days)} tone="green" icon={<CheckCircle2 size={19}/>}/>
+            <ApprovedAttendanceMetric palette="honey" title="Terlambat" value={approvedMetric(approvedSnapshot?.total_late_days)} tone="amber" icon={<Clock3 size={19}/>}/>
+            <ApprovedAttendanceMetric palette="rose" title="Tidak Hadir" value={approvedMetric(approvedSnapshot?.total_absent_days)} tone="rose" icon={<AlertTriangle size={19}/>}/>
+            <ApprovedAttendanceMetric palette="lavender" title="Cuti / Izin / Sakit" value={approvedLeaveTotal(approvedSnapshot)} tone="blue" icon={<FileText size={19}/>}/>
+            <ApprovedAttendanceMetric palette="aqua" title="PHL Tertaut" value={approvedMetric(approvedSnapshot?.total_phl_days)} tone="green" icon={<CalendarDays size={19}/>}/>
           </div>
         </section>
 
-        <section aria-labelledby="harmony-today-attendance-title" className="harmony-rc2q-attendance-panel harmony-liquid-lit harmony-liquid-surface p-4 sm:p-5">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div><h2 id="harmony-today-attendance-title" className="text-lg font-bold harmony-text-primary">Absensi Hari Ini</h2>
-              <p className="mt-1 text-xs harmony-text-secondary">{formatDisplayDate(getTodayISO())} · Data manual tersimpan ke record absensi dan tetap mengikuti approval periode.</p></div>
-            <div className="flex flex-wrap items-center gap-2">
-              <button type="button" onClick={()=>void openLiveManualAttendance()} disabled={loading||!employee} className="harmony-rc2o-link rounded-xl px-2 py-2 text-xs font-semibold disabled:opacity-50">Input Tanggal Lain</button>
-            <div className="harmony-rc2q-mode flex rounded-2xl p-1" role="group" aria-label="Jenis kehadiran">
-              <button type="button" aria-pressed={todayMode==='normal'} onClick={()=>setTodayMode('normal')} className={`rounded-xl px-4 py-2 text-xs font-bold ${todayMode==='normal'?'selected':''}`}>Hadir Normal (Mesin)</button>
-              <button type="button" aria-pressed={todayMode==='manual'} onClick={()=>setTodayMode('manual')} className={`rounded-xl px-4 py-2 text-xs font-bold ${todayMode==='manual'?'selected':''}`}>Hadir Manual</button>
-            </div>
-            </div>
-          </div>
-          {todayMode==='normal'?<div className="harmony-rc2q-today-summary mt-4 flex flex-wrap items-center justify-between gap-4 rounded-2xl p-4">
-            <div className="flex flex-wrap gap-6">
-              <div><p className="harmony-rc2o-muted text-xs">Fingerprint masuk</p><p className="harmony-rc2o-strong mt-1 text-lg font-bold">{liveManualRecord?.check_in||'—'}</p></div>
-              <div><p className="harmony-rc2o-muted text-xs">Fingerprint pulang</p><p className="harmony-rc2o-strong mt-1 text-lg font-bold">{liveManualRecord?.check_out||'—'}</p></div>
-              <div><p className="harmony-rc2o-muted text-xs">Sumber data</p><p className="harmony-rc2o-strong mt-1 text-sm font-semibold">{liveManualRecord?.check_in||liveManualRecord?.check_out?'Rekaman mesin':'Belum tercatat'}</p></div>
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <button type="button" onClick={()=>void loadLiveManualAttendance(getTodayISO())} disabled={liveManualLoading || !employee?.machine_pin} className="harmony-button-secondary text-xs"><RefreshCcw size={15}/> Perbarui</button>
-              {!(liveManualRecord?.check_in||liveManualRecord?.check_out)&&<button type="button" onClick={()=>setTodayMode('manual')} className="harmony-button-primary text-xs">Isi Absensi Manual</button>}
-            </div>
-            <p className="harmony-rc2o-muted w-full text-xs">Hadir Normal menampilkan fingerprint yang tercatat. Jika tidak tersedia, gunakan Hadir Manual dengan dokumen; sistem tidak membuat fingerprint buatan.</p>
-          </div>:<div className="mt-4 space-y-4">
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-              <label className="text-xs font-semibold harmony-text-secondary">Jam Masuk Manual
-                <input type="time" value={liveManualForm.manual_check_in} onChange={e=>updateLiveManualForm('manual_check_in',e.target.value)} disabled={liveManualLoading||liveManualSaving} className="harmony-input mt-1 w-full"/>
-              </label>
-              <label className="text-xs font-semibold harmony-text-secondary">Jam Pulang Manual
-                <input type="time" value={liveManualForm.manual_check_out} onChange={e=>updateLiveManualForm('manual_check_out',e.target.value)} disabled={liveManualLoading||liveManualSaving} className="harmony-input mt-1 w-full"/>
-              </label>
-              <label className="text-xs font-semibold harmony-text-secondary sm:col-span-2">Keterangan / Alasan
-                <input type="text" value={liveManualForm.reason} onChange={e=>updateLiveManualForm('reason',e.target.value)} disabled={liveManualLoading||liveManualSaving} placeholder="Alasan tidak fingerprint / pekerjaan luar kantor" className="harmony-input mt-1 w-full"/>
-              </label>
-            </div>
-            <HarmonyPendingAttachmentPicker
-              files={liveManualForm.proof_files}
-              onChange={(files)=>updateLiveManualForm('proof_files',files)}
-              required={!liveManualForm.existing_proof_url}
-              label="Dokumen Pendukung"
-              description="Wajib minimal 1 bukti untuk absensi manual baru, maksimal 3 file."
-              disabled={liveManualLoading||liveManualSaving}
-              maxFiles={liveManualForm.existing_proof_url?2:3}
-            />
-            {liveManualForm.existing_proof_url&&<p className="harmony-rc2o-muted text-xs">Dokumen sebelumnya sudah tersimpan: {liveManualForm.existing_proof_name||'Tersedia'}</p>}
-            <div className="flex flex-wrap items-center justify-between gap-3"><p className="harmony-rc2o-muted text-xs">Dapat diisi hari ini dan dilengkapi sebelum submit periode. Jam manual tidak menggantikan data fingerprint asli.</p>
-              <button type="button" onClick={()=>void saveLiveManualAttendance()} disabled={!employee?.machine_pin||liveManualLoading||liveManualSaving} className="harmony-button-primary shrink-0 disabled:opacity-50"><Save size={16}/>{liveManualSaving?'Menyimpan...':'Simpan Absensi'}</button>
-            </div>
-          </div>}
-        </section>
+
 
         {isPeriodLocked && (
           <div className="rounded-[28px] border border-red-200 bg-red-50 p-5 text-sm leading-6 text-red-700">
@@ -2363,27 +2310,22 @@ export default function EmployeeAttendancePage() {
           </div>
         )}
 
-        <div className="harmony-card harmony-attendance-history overflow-hidden">
-          <div className="border-b border-black/5 p-4 sm:p-5">
-            <div className="flex min-w-0 flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-              <div className="min-w-0">
-                <h2 className="text-lg font-semibold harmony-text-primary">
-                  Riwayat Absensi
-                </h2>
-
-                <p className="mt-1 text-sm harmony-text-secondary">
-                  Periode {formatDisplayDate(periodRange.start)} s.d.{" "}
-                  {formatDisplayDate(periodRange.end)}.
-                </p>
+        <div className="harmony-card harmony-rc2q-attendance-panel harmony-liquid-lit harmony-liquid-surface harmony-attendance-history harmony-attendance-unified overflow-hidden">
+          <div className="harmony-attendance-unified-shell">
+            <section className="harmony-attendance-section harmony-attendance-history-section border-b border-black/5 px-4 py-4 sm:px-5">
+              <div className="harmony-attendance-section-header">
+                <div>
+                  <h3 className="text-lg font-bold harmony-text-primary">Riwayat Absensi</h3>
+                  <p className="mt-1 text-xs harmony-text-secondary">Periode {formatDisplayDate(periodRange.start)} s.d. {formatDisplayDate(periodRange.end)}.</p>
+                </div>
+                <span className="harmony-attendance-period-active rounded-xl border px-3 py-2 text-xs font-semibold harmony-text-primary">
+                  Aktif: {getPeriodLabel(periodMonth)}
+                </span>
               </div>
 
-              <div className="flex w-full min-w-0 flex-col gap-3 xl:w-auto xl:max-w-none">
-                <div className="harmony-attendance-history-toolbar flex min-w-0 flex-wrap items-center gap-2 rounded-xl border p-2.5">
-                  <div className="mr-1 flex items-center gap-2 text-xs font-bold harmony-text-link">
-                    <CalendarDays size={15} />
-                    Periode Absensi
-                  </div>
-
+              <div className="harmony-attendance-history-toolbar harmony-attendance-history-toolbar-compact" role="group" aria-label="Filter dan ekspor riwayat absensi">
+                <div className="harmony-attendance-period-fields">
+                  <span className="harmony-attendance-period-label text-xs font-bold harmony-text-link"><CalendarDays size={16} aria-hidden="true" /> Periode Absensi</span>
                   <select
                     aria-label="Pilih bulan periode absensi"
                     value={normalizePeriodMonth(periodMonth).split("-")[1]}
@@ -2392,15 +2334,12 @@ export default function EmployeeAttendancePage() {
                         updatePeriodPart(current, "month", event.target.value),
                       )
                     }
-                    className="harmony-input min-w-0 flex-1 sm:w-[180px] xl:flex-none"
+                    className="harmony-input harmony-attendance-period-select"
                   >
                     {ATTENDANCE_MONTH_OPTIONS.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
+                      <option key={option.value} value={option.value}>{option.label}</option>
                     ))}
                   </select>
-
                   <select
                     aria-label="Pilih tahun periode absensi"
                     value={Number(normalizePeriodMonth(periodMonth).split("-")[0])}
@@ -2409,44 +2348,80 @@ export default function EmployeeAttendancePage() {
                         updatePeriodPart(current, "year", event.target.value),
                       )
                     }
-                    className="harmony-input min-w-0 w-[120px]"
+                    className="harmony-input harmony-attendance-year-select"
                   >
                     {getAttendanceYearOptions().map((year) => (
-                      <option key={year} value={year}>
-                        {year}
-                      </option>
+                      <option key={year} value={year}>{year}</option>
                     ))}
                   </select>
-
-                  <div className="harmony-attendance-period-active inline-flex min-h-10 items-center rounded-xl border px-3 text-xs font-semibold harmony-text-primary">
-                    Aktif: {getPeriodLabel(periodMonth)}
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={exportExcel}
-                    className="harmony-button-secondary ml-auto w-full sm:ml-0 sm:w-auto"
-                  >
-                    <Download size={18} />
-                    Excel Berwarna
+                </div>
+                <div className="harmony-attendance-export-actions">
+                  <button type="button" onClick={exportExcel} className="harmony-button-secondary">
+                    <Download size={16} aria-hidden="true" /> Excel Berwarna
                   </button>
-                  <button type="button" onClick={exportCsv} className="harmony-button-secondary w-full sm:w-auto">
-                    <Download size={16} /> CSV Raw
+                  <button type="button" onClick={exportCsv} className="harmony-button-secondary">
+                    <Download size={16} aria-hidden="true" /> CSV Raw
                   </button>
-
-                  <button
-                    type="button"
-                    onClick={() => fetchData()}
-                    className="harmony-button-secondary w-full sm:w-auto"
-                  >
-                    <RefreshCcw size={18} />
-                    Refresh
+                  <button type="button" onClick={() => fetchData()} className="harmony-button-secondary">
+                    <RefreshCcw size={16} aria-hidden="true" /> Refresh
                   </button>
                 </div>
               </div>
-            </div>
+            </section>
+
+            <section aria-labelledby="harmony-today-attendance-title" className="harmony-attendance-section harmony-attendance-today-shell px-4 py-4 sm:px-5" data-manual-active={todayMode === 'manual'}>
+              <div className="harmony-attendance-section-header">
+                <div>
+                  <h2 id="harmony-today-attendance-title" className="text-lg font-bold harmony-text-primary">Absensi Hari Ini</h2>
+                  <p className="mt-1 text-xs harmony-text-secondary">{formatDisplayDate(getTodayISO())}</p>
+                  <span className="harmony-attendance-source-chip">Hadir Normal (Mesin)</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => { setTodayMode('manual'); void openLiveManualAttendance(); }}
+                  disabled={loading || !employee}
+                  className="harmony-rc2o-link harmony-attendance-date-action rounded-xl px-3 py-2 text-xs font-semibold disabled:opacity-50"
+                >
+                  Input Tanggal Lain
+                </button>
+              </div>
+
+              <div className="harmony-attendance-today-stage">
+                <div className="harmony-attendance-today-stats" aria-label="Status kehadiran hari ini">
+                  <button type="button" onClick={() => { setTodayMode('manual'); void openLiveManualAttendance(); }} aria-label="Isi jam kehadiran manual melalui modal" className="harmony-attendance-clock-card harmony-attendance-clock-card-action">
+                    <span className="harmony-attendance-clock-icon"><Clock3 size={19} aria-hidden="true" /></span>
+                    <div>
+                      <span className="harmony-attendance-clock-label">Check In</span>
+                      <strong className="harmony-attendance-clock-value">{liveManualRecord?.check_in || liveManualRecord?.manual_check_in || liveManualRecord?.requested_check_in || '—'}</strong>
+                    </div>
+                  </button>
+
+                  <button type="button" onClick={() => { setTodayMode('manual'); void openLiveManualAttendance(); }} aria-label="Isi jam pulang manual melalui modal" className="harmony-attendance-clock-card harmony-attendance-clock-card-action">
+                    <span className="harmony-attendance-clock-icon checkout"><Timer size={19} aria-hidden="true" /></span>
+                    <div>
+                      <span className="harmony-attendance-clock-label">Check Out</span>
+                      <strong className="harmony-attendance-clock-value">{liveManualRecord?.check_out || liveManualRecord?.manual_check_out || liveManualRecord?.requested_check_out || '—'}</strong>
+                    </div>
+                  </button>
+                </div>
+
+                <div className="harmony-attendance-source-panel">
+                  <div className="harmony-attendance-source-copy">
+                    <span className="harmony-attendance-clock-label">Sumber data</span>
+                    <strong className="harmony-attendance-clock-value harmony-attendance-clock-source">{liveManualRecord?.check_in || liveManualRecord?.check_out ? 'Rekaman mesin' : liveManualRecord?.manual_check_in || liveManualRecord?.manual_check_out || liveManualRecord?.requested_check_in || liveManualRecord?.requested_check_out ? 'Manual tersimpan' : 'Belum tercatat'}</strong>
+                  </div>
+                  <div className="harmony-attendance-today-quick-actions">
+                    <button type="button" onClick={() => { setTodayMode('normal'); void loadLiveManualAttendance(getTodayISO()); }} disabled={liveManualLoading || !employee?.machine_pin} className="harmony-button-secondary text-xs"><RefreshCcw size={15}/> Perbarui</button>
+                    <button type="button" onClick={() => { setTodayMode('manual'); void openLiveManualAttendance(); }} className="harmony-button-primary text-xs">
+                      <Save size={15} /> Hadir Manual
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </section>
           </div>
 
+          <section aria-labelledby="harmony-attendance-verification-title" className="harmony-attendance-verification-card">
           {loading && (
             <div className="flex items-center gap-3 p-6 text-sm harmony-text-secondary">
               <RefreshCcw size={18} className="animate-spin" />
@@ -2456,44 +2431,11 @@ export default function EmployeeAttendancePage() {
 
           {!loading && (
             <>
-              <div className="harmony-attendance-review-toolbar flex flex-col gap-4 border-b p-4 sm:p-5 xl:flex-row xl:items-center xl:justify-between">
-                <div>
-                  <h3 className="text-base font-semibold harmony-text-primary">
-                    Verifikasi Riwayat Absensi
-                  </h3>
-
-                  <p className="mt-1 text-sm leading-6 harmony-text-secondary">
-                    Centang seluruh hari sebagai tanda verifikasi employee. Setelah
-                    checklist 100%, tombol Submit/Kirim Ulang akan mengirim seluruh
-                    data relevan periode tanggal 11 sampai 10 ke atasan.
-                  </p>
-
-                  <p className="mt-1 text-xs font-semibold harmony-text-link">
-                    Checklist review: {selectedRows.length} dari {selectableRows.length}{" "}
-                    hari. Submit tetap mencakup seluruh periode.
-                  </p>
-
-                  {!isPeriodComplete && !isReadOnlyPeriod && (
-                    <p className="mt-2 text-xs font-bold text-orange-700">
-                      Periode belum selesai. Submit periode penuh tersedia mulai {formatDisplayDate(periodRange.end)}.
-                    </p>
-                  )}
-
-                  {isSupervisorRejected && !isReadOnlyPeriod && (
-                    <p className="mt-2 text-xs font-bold text-red-700">
-                      Mode revisi aktif. Lengkapi data yang ditolak lalu kirim ulang seluruh periode.
-                    </p>
-                  )}
-
-                  {isReadOnlyPeriod && (
-                    <p className="mt-2 text-xs font-bold text-orange-700">
-                      Tombol konfirmasi nonaktif karena periode sudah disubmit
-                      atau dikunci.
-                    </p>
-                  )}
-                </div>
-
-                <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
+              <header className="harmony-attendance-review-toolbar">
+                <h3 id="harmony-attendance-verification-title" className="harmony-attendance-verification-title harmony-text-primary">
+                  Verifikasi Riwayat Absensi
+                </h3>
+                <div className="harmony-attendance-review-actions">
                   <button
                     type="button"
                     onClick={toggleSelectAllAttendance}
@@ -2543,7 +2485,7 @@ export default function EmployeeAttendancePage() {
                         : "Submit"}
                   </button>
                 </div>
-              </div>
+              </header>
 
               <div className="grid gap-3 p-4 2xl:hidden">
                 {calendarRows.map((row) => {
@@ -2900,6 +2842,7 @@ export default function EmployeeAttendancePage() {
               </div>
             </>
           )}
+          </section>
         </div>
 
         {liveManualOpen && (
@@ -2935,10 +2878,13 @@ export default function EmployeeAttendancePage() {
   );
 }
 
-function ApprovedAttendanceMetric({title,value,tone,icon}:{title:string;value:string;tone:'blue'|'green'|'amber'|'rose';icon:ReactNode}) {
-  return <div className={`harmony-rc2q-approved-metric ${tone} rounded-2xl p-3.5`}>
-    <div className="flex items-start justify-between gap-2"><span className="text-xs font-semibold">{title}</span><span aria-hidden="true" className="harmony-rc2q-metric-icon rounded-xl p-2">{icon}</span></div>
-    <p className="mt-1 text-2xl font-bold" aria-label={`${title}: ${value}`}>{value}</p>
+function ApprovedAttendanceMetric({title,value,tone,palette,icon}:{title:string;value:string;tone:'blue'|'green'|'amber'|'rose';palette:'sky'|'mint'|'honey'|'rose'|'lavender'|'aqua';icon:ReactNode}) {
+  return <div data-palette={palette} className={`harmony-rc2q-approved-metric harmony-attendance-stat-tile ${tone} rounded-2xl p-3.5`}>
+    <span aria-hidden="true" className="harmony-rc2q-metric-icon harmony-attendance-stat-icon rounded-xl p-2">{icon}</span>
+    <div className="harmony-attendance-stat-body">
+      <span className="harmony-attendance-stat-label">{title}</span>
+      <strong className="harmony-attendance-stat-value" aria-label={`${title}: ${value}`}>{value}</strong>
+    </div>
   </div>
 }
 
