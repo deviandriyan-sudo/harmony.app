@@ -21,7 +21,7 @@ const required = [
   ['attendance review toolbar',attendance,'harmony-attendance-review-toolbar'],
   ['supervisor compact module',approvals,'harmony-approval-module'],
   ['supervisor metrics',approvals,'harmony-approval-hero-metric'],
-  ['leave details',leave,'harmony-leave-balance-panel'],
+  ['leave dual request cards',leave,'harmony-leave-action-grid'],
   ['remed scoped surface',remed,'harmony-remed-employee-ui'],
   ['login-independent css scope',css,'@media screen'],
   ['dark palette',css,"html[data-harmony-theme='dark']"],

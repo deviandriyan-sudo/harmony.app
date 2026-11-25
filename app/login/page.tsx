@@ -19,7 +19,6 @@ import {
   UserRound,
 } from 'lucide-react'
 
-import { HarmonyThemeToggle } from '@/components/theme/ThemeToggle'
 import { harmonyFetch } from '@/lib/harmony-client'
 import { supabase } from '@/lib/supabase'
 
@@ -260,7 +259,6 @@ export default function LoginPage() {
             <div className="harmony-login-panel-corner harmony-login-panel-corner--bottom" aria-hidden="true" />
 
             <div className="harmony-login-form-inner">
-              <HarmonyThemeToggle className="harmony-login-theme-control" />
               <header className="harmony-login-intro harmony-login-reveal harmony-login-reveal--2">
                 <span className="harmony-login-secure"><Lock size={13} aria-hidden="true" /> SECURE LOGIN <span className="harmony-login-secure-dot" /></span>
                 <p className="harmony-login-overline">YOUR WORKSPACE AWAITS</p>

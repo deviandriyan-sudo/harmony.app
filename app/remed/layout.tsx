@@ -9,13 +9,13 @@ import { usePathname, useRouter } from 'next/navigation'
 import { Loader2, Menu, ShieldAlert, X } from 'lucide-react'
 
 import { AppSidebar } from '@/components/layout/AppSidebar'
-import { HarmonyThemeToggle } from '@/components/theme/ThemeToggle'
 import { navigationForRole } from '@/lib/navigation'
 import { ModuleSubnav } from '@/components/layout/ModuleSubnav'
 import { REMED_ROLE_LABELS } from '@/lib/remed'
 import { hasSupervisorAssignments } from '@/lib/supervisor-navigation'
 import { getRemedUiSession } from '@/lib/remed-session-client'
 import type { RemedSession } from '@/types/remed'
+import { HarmonyAccessState } from '@/components/system/HarmonyAccessState'
 
 export default function RemedLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter()
@@ -84,18 +84,14 @@ export default function RemedLayout({ children }: { children: React.ReactNode })
 
   if (!session) {
     return (
-      <main className="harmony-access-state flex min-h-screen items-center justify-center bg-[#f5f5f7] p-6">
-        <div className="w-full max-w-md rounded-[32px] border border-red-100 bg-white p-8 text-center shadow-[0_24px_70px_rgba(15,23,42,0.12)]">
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-red-50 text-red-600">
-            <ShieldAlert size={26} />
-          </div>
-          <h1 className="mt-5 text-xl font-semibold harmony-text-primary">Akses Re-Med Ditolak</h1>
-          <p className="mt-2 text-sm leading-6 harmony-text-secondary">{message}</p>
-          <button type="button" onClick={() => router.replace('/login')} className="mt-5 rounded-2xl bg-[#1d1d1f] px-5 py-3 text-sm font-semibold text-white">
-            Kembali ke HARMONY
-          </button>
-        </div>
-      </main>
+      <HarmonyAccessState
+        title="Akses Re-Med Ditolak"
+        message={message}
+        tone="danger"
+        icon={<ShieldAlert size={28} />}
+        actionLabel="Kembali ke HARMONY"
+        onAction={() => router.replace('/login')}
+      />
     )
   }
 
@@ -160,8 +156,7 @@ export default function RemedLayout({ children }: { children: React.ReactNode })
           <div className="harmony-workspace w-full min-w-0">
             <div className="harmony-rc2o-remed-topbar flex min-h-[56px] items-center justify-between gap-3 px-4 py-2.5 print:hidden sm:px-6">
               <p className="truncate text-sm font-semibold harmony-text-primary">Re-Med · {REMED_ROLE_LABELS[session.role]}</p>
-              <HarmonyThemeToggle compact className="harmony-theme-toggle-global" />
-            </div>
+                </div>
             <ModuleSubnav role={session.role} />{children}
           </div>
         </main>
@@ -178,14 +173,11 @@ function roleHome(role: RemedSession['role']) {
 
 function AccessLoading({ message }: { message: string }) {
   return (
-    <main className="harmony-access-state flex min-h-screen items-center justify-center bg-[#f5f5f7] p-6">
-      <div className="w-full max-w-md rounded-[32px] border border-black/5 bg-white p-8 text-center shadow-[0_24px_70px_rgba(15,23,42,0.12)]">
-        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[#e8f7f1] harmony-text-success">
-          <Loader2 size={26} className="animate-spin" />
-        </div>
-        <h1 className="mt-5 text-xl font-semibold harmony-text-primary">Memeriksa Akses Re-Med</h1>
-        <p className="mt-2 text-sm leading-6 harmony-text-secondary">{message}</p>
-      </div>
-    </main>
+    <HarmonyAccessState
+      title="Memeriksa Akses Re-Med"
+      message={message}
+      tone="remed"
+      icon={<Loader2 size={30} className="animate-spin" />}
+    />
   )
 }

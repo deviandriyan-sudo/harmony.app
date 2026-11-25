@@ -86,6 +86,7 @@ function TabRow({tabs,pathname,secondary=false}:{tabs:NavigationTab[];pathname:s
 }
 export function ModuleSubnav({role}:{role:NavigationRole}){
   const pathname=usePathname()
+  if(role==='employee' && pathname==='/employee/approvals') return null
   const activeModule=resolveModule(role,pathname)
   if(!activeModule)return null
   const details=resolveDetailTabs(role,pathname)

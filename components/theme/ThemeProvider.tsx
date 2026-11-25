@@ -15,13 +15,13 @@ type ThemeContextValue = {
 const STORAGE_KEY = 'harmony-color-theme'
 const CHANGE_EVENT = 'harmony-color-theme-changed'
 const ThemeContext = createContext<ThemeContextValue | null>(null)
-let storageUnavailableSelection: HarmonyThemePreference | null = null
-
-function systemTheme(): HarmonyTheme {
-  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
-}
+const storageUnavailableSelection: HarmonyThemePreference | null = null
 
 function readPreference(): HarmonyThemePreference {
+  return 'light'
+}
+
+function readOriginalPreferenceForMigration(): HarmonyThemePreference {
   try {
     const stored = window.localStorage.getItem(STORAGE_KEY)
     if (stored === 'dark' || stored === 'light' || stored === 'system') return stored
@@ -32,8 +32,7 @@ function readPreference(): HarmonyThemePreference {
 }
 
 function readTheme(): HarmonyTheme {
-  const selected = readPreference()
-  return selected === 'system' ? systemTheme() : selected
+  return 'light'
 }
 
 function applyTheme(theme: HarmonyTheme, preference: HarmonyThemePreference) {
@@ -57,25 +56,27 @@ function subscribeTheme(callback: () => void) {
 const clientReady = () => true
 const serverReady = () => false
 const serverTheme = (): HarmonyTheme => 'light'
-const serverPreference = (): HarmonyThemePreference => 'system'
+const serverPreference = (): HarmonyThemePreference => 'light'
 
 export function HarmonyThemeProvider({ children }: { children: ReactNode }) {
   const theme = useSyncExternalStore(subscribeTheme, readTheme, serverTheme)
   const preference = useSyncExternalStore(subscribeTheme, readPreference, serverPreference)
   const ready = useSyncExternalStore(subscribeTheme, clientReady, serverReady)
 
-  useEffect(() => { applyTheme(theme, preference) }, [theme, preference])
+  useEffect(() => {
+    // Existing Dark/System preferences are retired; retain the single provider.
+    const previous = readOriginalPreferenceForMigration()
+    if (previous !== 'light') {
+      try { window.localStorage.setItem(STORAGE_KEY, 'light') } catch { /* private browsing */ }
+    }
+    applyTheme('light', 'light')
+  }, [theme, preference])
 
   const setTheme = useCallback((value: HarmonyThemePreference) => {
-    if (value !== 'light' && value !== 'dark' && value !== 'system') return
-    const resolved = value === 'system' ? systemTheme() : value
-    applyTheme(resolved, value)
-    try {
-      window.localStorage.setItem(STORAGE_KEY, value)
-      storageUnavailableSelection = null
-    } catch {
-      storageUnavailableSelection = value
-    }
+    void value
+    // Backward-compatible API: no switcher or consumer can enable dark again.
+    applyTheme('light', 'light')
+    try { window.localStorage.setItem(STORAGE_KEY, 'light') } catch { /* private browsing */ }
     window.dispatchEvent(new Event(CHANGE_EVENT))
   }, [])
 

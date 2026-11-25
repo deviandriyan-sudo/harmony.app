@@ -1,0 +1,443 @@
+/*
+ * HARMONY RC3D — Approval Tim liquid glass refinement.
+ * Design keeps approval workflow intact while reducing visual clutter.
+ */
+@media screen {
+  html[data-harmony-theme='light'] .harmony-approval-unslop {
+    --approval-ink: #183451;
+    --approval-muted: #55708a;
+    --approval-border: rgba(124, 168, 212, 0.34);
+    --approval-stroke: rgba(255, 255, 255, 0.72);
+    --approval-shell: linear-gradient(135deg, rgba(255,255,255,0.56), rgba(229,243,255,0.34) 46%, rgba(202,229,255,0.28));
+    --approval-shadow: 0 18px 42px rgba(66, 112, 160, 0.14), inset 0 1px 0 rgba(255,255,255,0.82);
+    color: var(--approval-ink);
+    max-width: 1720px;
+    margin-inline: auto;
+  }
+
+  html[data-harmony-theme='light'] .harmony-approval-unslop :is(.harmony-approval-toolbar, .harmony-approval-module, .harmony-approval-directory) {
+    position: relative;
+    overflow: hidden;
+    border-radius: 34px !important;
+    border: 1px solid var(--approval-border) !important;
+    background: var(--approval-shell) !important;
+    box-shadow: var(--approval-shadow) !important;
+    -webkit-backdrop-filter: blur(26px) saturate(1.35);
+    backdrop-filter: blur(26px) saturate(1.35);
+    isolation: isolate;
+  }
+
+  html[data-harmony-theme='light'] .harmony-approval-unslop :is(.harmony-approval-toolbar, .harmony-approval-module, .harmony-approval-directory)::before {
+    content: "";
+    position: absolute;
+    inset: 1px;
+    border-radius: inherit;
+    border: 1px solid rgba(255,255,255,0.5);
+    pointer-events: none;
+    opacity: 0.72;
+  }
+
+  html[data-harmony-theme='light'] .harmony-approval-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 18px;
+    padding: 18px 22px;
+  }
+  html[data-harmony-theme='light'] .harmony-approval-toolbar::after,
+  html[data-harmony-theme='light'] .harmony-approval-module::after {
+    content: "";
+    position: absolute;
+    right: -10%;
+    top: -24%;
+    width: 46%;
+    height: 82%;
+    background: radial-gradient(circle, rgba(139, 201, 255, 0.30) 0%, rgba(139, 201, 255, 0.10) 35%, transparent 72%);
+    pointer-events: none;
+    z-index: -1;
+  }
+  html[data-harmony-theme='light'] .harmony-approval-toolbar-pills {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    min-width: 0;
+  }
+  html[data-harmony-theme='light'] .harmony-approval-toolbar-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    min-height: 40px;
+    padding: 0 15px;
+    border-radius: 999px;
+    border: 1px solid rgba(132, 171, 210, 0.34);
+    background: linear-gradient(180deg, rgba(255,255,255,0.72), rgba(240,247,255,0.64));
+    color: var(--approval-ink);
+    font-size: 12px;
+    font-weight: 700;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.92), 0 6px 20px rgba(77, 122, 170, 0.10);
+    white-space: nowrap;
+  }
+  html[data-harmony-theme='light'] .harmony-approval-toolbar-pill.is-period { color: #244c73; }
+  html[data-harmony-theme='light'] .harmony-approval-toolbar-pill.is-blue { background: linear-gradient(180deg, rgba(234,245,255,0.92), rgba(220,238,255,0.78)); }
+  html[data-harmony-theme='light'] .harmony-approval-toolbar-pill.is-gold { background: linear-gradient(180deg, rgba(255,246,225,0.92), rgba(251,239,198,0.74)); }
+  html[data-harmony-theme='light'] .harmony-approval-toolbar-pill.is-violet { background: linear-gradient(180deg, rgba(246,239,255,0.92), rgba(235,224,255,0.78)); }
+  html[data-harmony-theme='light'] .harmony-approval-toolbar-pill.is-green { background: linear-gradient(180deg, rgba(230,249,240,0.96), rgba(210,242,228,0.8)); }
+
+  html[data-harmony-theme='light'] .harmony-approval-toolbar-controls {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  html[data-harmony-theme='light'] .harmony-approval-toolbar-controls label { width: 180px; }
+  html[data-harmony-theme='light'] .harmony-approval-toolbar-controls label.harmony-approval-toolbar-year { width: 110px; }
+  html[data-harmony-theme='light'] .harmony-approval-toolbar-controls .harmony-input {
+    width: 100%;
+    min-height: 46px !important;
+    height: 46px !important;
+    border-radius: 999px !important;
+    border: 1px solid rgba(132, 171, 210, 0.42) !important;
+    background: linear-gradient(180deg, rgba(255,255,255,0.88), rgba(242,248,255,0.8)) !important;
+    color: var(--approval-ink) !important;
+    padding: 0 16px !important;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.96), 0 8px 22px rgba(82, 124, 170, 0.08) !important;
+    font-size: 14px;
+  }
+  html[data-harmony-theme='light'] .harmony-approval-refresh {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-height: 46px;
+    padding: 0 18px;
+    border-radius: 999px;
+    border: 1px solid rgba(132, 171, 210, 0.42);
+    background: linear-gradient(180deg, rgba(255,255,255,0.90), rgba(240,246,255,0.80));
+    color: #204360;
+    font-size: 14px;
+    font-weight: 800;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.94), 0 10px 22px rgba(72, 112, 160, 0.09);
+    transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+  }
+  html[data-harmony-theme='light'] .harmony-approval-refresh:hover {
+    transform: translateY(-1px);
+    border-color: rgba(96, 151, 206, 0.55);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.98), 0 14px 28px rgba(72, 112, 160, 0.14);
+  }
+  html[data-harmony-theme='light'] .harmony-approval-refresh:disabled { opacity: .62; cursor: not-allowed; }
+
+  html[data-harmony-theme='light'] .harmony-approval-module-grid {
+    display: grid;
+    gap: 18px;
+    align-items: stretch;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  html[data-harmony-theme='light'] .harmony-approval-module {
+    --approval-tone: #1767a8;
+    --approval-tone-soft: rgba(205, 230, 255, 0.82);
+    --approval-tone-border: rgba(70, 138, 200, 0.28);
+    min-width: 0;
+    padding: 18px;
+    background:
+      radial-gradient(circle at 84% 16%, rgba(125, 194, 255, 0.28), transparent 34%),
+      linear-gradient(145deg, rgba(255,255,255,0.66), rgba(236,245,255,0.44) 50%, rgba(218,235,255,0.34)) !important;
+  }
+  html[data-harmony-theme='light'] .harmony-approval-module-purple {
+    --approval-tone: #7557c7;
+    --approval-tone-soft: rgba(236, 229, 255, 0.88);
+    --approval-tone-border: rgba(149, 117, 255, 0.28);
+    background:
+      radial-gradient(circle at 84% 16%, rgba(188, 165, 255, 0.26), transparent 34%),
+      linear-gradient(145deg, rgba(255,255,255,0.66), rgba(248,243,255,0.44) 50%, rgba(237,228,255,0.32)) !important;
+  }
+  html[data-harmony-theme='light'] .harmony-approval-module-green {
+    --approval-tone: #14896d;
+    --approval-tone-soft: rgba(221, 246, 234, 0.90);
+    --approval-tone-border: rgba(80, 172, 139, 0.28);
+    background:
+      radial-gradient(circle at 84% 16%, rgba(135, 224, 186, 0.24), transparent 34%),
+      linear-gradient(145deg, rgba(255,255,255,0.66), rgba(239,251,246,0.44) 50%, rgba(224,246,236,0.32)) !important;
+  }
+  html[data-harmony-theme='light'] .harmony-approval-module-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 14px;
+    min-height: 108px;
+    padding-bottom: 14px;
+  }
+  html[data-harmony-theme='light'] .harmony-approval-module-identity { display: flex; align-items: flex-start; gap: 14px; min-width: 0; }
+  html[data-harmony-theme='light'] .harmony-approval-module-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 52px;
+    height: 52px;
+    flex: 0 0 52px;
+    border-radius: 18px;
+    color: var(--approval-tone);
+    background: linear-gradient(180deg, rgba(255,255,255,0.92), var(--approval-tone-soft));
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.98), 0 10px 26px rgba(66, 112, 160, 0.12);
+  }
+  html[data-harmony-theme='light'] .harmony-approval-module-icon svg { width: 23px; height: 23px; }
+  html[data-harmony-theme='light'] .harmony-approval-module-header h3 {
+    margin: 2px 0 0;
+    color: var(--approval-ink) !important;
+    font-size: 18px;
+    line-height: 1.28;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+  }
+  html[data-harmony-theme='light'] .harmony-approval-module-header p {
+    margin: 6px 0 0;
+    color: var(--approval-muted) !important;
+    font-size: 13px;
+    line-height: 1.6;
+    max-width: 28ch;
+  }
+  html[data-harmony-theme='light'] .harmony-approval-module-open {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-height: 42px;
+    padding: 0 14px;
+    border-radius: 999px;
+    border: 1px solid rgba(255,255,255,0.7);
+    background: linear-gradient(180deg, rgba(255,255,255,0.92), rgba(246,250,255,0.72));
+    color: var(--approval-tone);
+    font-size: 13px;
+    font-weight: 800;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.96), 0 10px 22px rgba(88, 127, 173, 0.10);
+    transition: transform .18s ease, box-shadow .18s ease;
+  }
+  html[data-harmony-theme='light'] .harmony-approval-module-open:hover {
+    transform: translateY(-1px);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.98), 0 14px 26px rgba(88, 127, 173, 0.14);
+  }
+
+  html[data-harmony-theme='light'] .harmony-approval-module-metrics {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0,1fr));
+    gap: 10px;
+    background: transparent;
+    border: 0;
+  }
+  html[data-harmony-theme='light'] .harmony-approval-unslop .harmony-approval-module-metric {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 6px;
+    min-height: 88px;
+    padding: 14px 15px;
+    border-radius: 22px !important;
+    border: 1px solid rgba(255,255,255,0.70);
+    background: linear-gradient(180deg, rgba(255,255,255,0.78), rgba(240,246,255,0.72)) !important;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.94), 0 10px 24px rgba(73, 112, 158, 0.08) !important;
+    text-decoration: none;
+    transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+  }
+  html[data-harmony-theme='light'] .harmony-approval-unslop .harmony-approval-module-metric:hover {
+    transform: translateY(-1px);
+    border-color: var(--approval-tone-border);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.98), 0 14px 28px rgba(73, 112, 158, 0.12) !important;
+  }
+  html[data-harmony-theme='light'] .harmony-approval-module-metric span {
+    font-size: 11px;
+    line-height: 1.45;
+    font-weight: 700;
+    color: var(--approval-muted) !important;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+  html[data-harmony-theme='light'] .harmony-approval-module-metric strong {
+    font-size: 28px;
+    line-height: 1;
+    font-weight: 800;
+    color: var(--approval-ink) !important;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.03em;
+  }
+  html[data-harmony-theme='light'] .harmony-approval-module-metric.is-pending {
+    border-color: var(--approval-tone-border);
+    background: linear-gradient(180deg, rgba(255,255,255,0.86), var(--approval-tone-soft)) !important;
+  }
+  html[data-harmony-theme='light'] .harmony-approval-module-metric.is-pending strong { color: var(--approval-tone) !important; }
+
+  html[data-harmony-theme='light'] .harmony-approval-module-details {
+    margin-top: 12px;
+    border-radius: 22px;
+    border: 1px solid rgba(255,255,255,0.6);
+    background: linear-gradient(180deg, rgba(255,255,255,0.58), rgba(241,247,255,0.46));
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.92);
+    overflow: hidden;
+  }
+  html[data-harmony-theme='light'] .harmony-approval-module-details summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    cursor: pointer;
+    list-style: none;
+    padding: 12px 16px;
+    color: #46657f;
+    font-size: 13px;
+    font-weight: 700;
+    user-select: none;
+  }
+  html[data-harmony-theme='light'] .harmony-approval-module-details summary::-webkit-details-marker { display: none; }
+  html[data-harmony-theme='light'] .harmony-approval-module-details[open] summary svg { transform: rotate(180deg); }
+  html[data-harmony-theme='light'] .harmony-approval-module-details-body {
+    border-top: 1px solid rgba(182, 204, 227, 0.34);
+    padding: 0 16px 14px;
+  }
+  html[data-harmony-theme='light'] .harmony-approval-module-highlight {
+    display: flex;
+    align-items: flex-start;
+    gap: 9px;
+    padding-top: 10px;
+    color: var(--approval-muted) !important;
+    font-size: 12px;
+    line-height: 1.55;
+  }
+  html[data-harmony-theme='light'] .harmony-approval-module-highlight svg {
+    flex-shrink: 0;
+    margin-top: 1px;
+    color: var(--approval-tone);
+  }
+
+  html[data-harmony-theme='light'] .harmony-approval-unslop .harmony-approval-directory {
+    overflow: hidden;
+  }
+  html[data-harmony-theme='light'] .harmony-approval-directory-summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    min-height: 84px;
+    padding: 18px 22px;
+    cursor: pointer;
+    list-style: none;
+  }
+  html[data-harmony-theme='light'] .harmony-approval-directory-summary::-webkit-details-marker { display: none; }
+  html[data-harmony-theme='light'] .harmony-approval-directory-title,
+  html[data-harmony-theme='light'] .harmony-approval-directory-trailing {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  html[data-harmony-theme='light'] .harmony-approval-directory-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    border-radius: 16px;
+    background: linear-gradient(180deg, rgba(255,255,255,0.9), rgba(233,243,255,0.84));
+    color: #1b68a8;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.96), 0 10px 22px rgba(88, 127, 173, 0.10);
+  }
+  html[data-harmony-theme='light'] .harmony-approval-directory-title h2 {
+    margin: 0;
+    font-size: 18px;
+    line-height: 1.28;
+    font-weight: 800;
+    color: var(--approval-ink) !important;
+    letter-spacing: -0.02em;
+  }
+  html[data-harmony-theme='light'] .harmony-approval-directory-title p {
+    margin: 3px 0 0;
+    font-size: 12px;
+    line-height: 1.45;
+    color: var(--approval-muted) !important;
+  }
+  html[data-harmony-theme='light'] .harmony-approval-directory-count {
+    display: inline-flex;
+    align-items: center;
+    min-height: 36px;
+    padding: 0 14px;
+    border-radius: 999px;
+    background: linear-gradient(180deg, rgba(233,243,255,0.92), rgba(219,235,255,0.84));
+    color: #285d8e;
+    font-size: 12px;
+    font-weight: 800;
+  }
+  html[data-harmony-theme='light'] .harmony-approval-directory-expand {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--approval-muted);
+    white-space: nowrap;
+  }
+  html[data-harmony-theme='light'] .harmony-approval-directory[open] .harmony-approval-directory-expand svg { transform: rotate(180deg); }
+  html[data-harmony-theme='light'] .harmony-approval-directory-content { border-top: 1px solid rgba(182, 204, 227, 0.34); }
+
+  html[data-harmony-theme='light'] .harmony-approval-directory :is(summary:focus-visible, a:focus-visible),
+  html[data-harmony-theme='light'] .harmony-approval-module :is(summary:focus-visible, a:focus-visible),
+  html[data-harmony-theme='light'] .harmony-approval-toolbar :is(select:focus-visible, button:focus-visible) {
+    outline: 2px solid #246eae !important;
+    outline-offset: 2px;
+  }
+
+  @media (max-width: 1380px) {
+    html[data-harmony-theme='light'] .harmony-approval-module-grid { grid-template-columns: repeat(2, minmax(0,1fr)); }
+  }
+  @media (max-width: 1180px) {
+    html[data-harmony-theme='light'] .harmony-approval-toolbar {
+      flex-direction: column;
+      align-items: stretch;
+    }
+    html[data-harmony-theme='light'] .harmony-approval-toolbar-controls {
+      justify-content: flex-start;
+      width: 100%;
+    }
+  }
+  @media (max-width: 860px) {
+    html[data-harmony-theme='light'] .harmony-approval-module-grid { grid-template-columns: 1fr; }
+    html[data-harmony-theme='light'] .harmony-approval-directory-summary {
+      align-items: flex-start;
+      flex-direction: column;
+    }
+  }
+  @media (max-width: 640px) {
+    html[data-harmony-theme='light'] .harmony-approval-toolbar,
+    html[data-harmony-theme='light'] .harmony-approval-module,
+    html[data-harmony-theme='light'] .harmony-approval-directory {
+      border-radius: 28px !important;
+    }
+    html[data-harmony-theme='light'] .harmony-approval-toolbar { padding: 16px; }
+    html[data-harmony-theme='light'] .harmony-approval-toolbar-controls label,
+    html[data-harmony-theme='light'] .harmony-approval-toolbar-controls label.harmony-approval-toolbar-year {
+      width: 100%;
+    }
+    html[data-harmony-theme='light'] .harmony-approval-toolbar-controls {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+    html[data-harmony-theme='light'] .harmony-approval-toolbar-controls label:first-child { grid-column: 1 / -1; }
+    html[data-harmony-theme='light'] .harmony-approval-refresh { grid-column: 1 / -1; }
+    html[data-harmony-theme='light'] .harmony-approval-module { padding: 16px; }
+    html[data-harmony-theme='light'] .harmony-approval-module-header { min-height: 0; flex-direction: column; }
+    html[data-harmony-theme='light'] .harmony-approval-module-open { width: 100%; }
+    html[data-harmony-theme='light'] .harmony-approval-module-metrics { grid-template-columns: 1fr 1fr; }
+    html[data-harmony-theme='light'] .harmony-approval-directory-trailing { width: 100%; justify-content: space-between; }
+  }
+  @media (prefers-reduced-transparency: reduce) {
+    html[data-harmony-theme='light'] .harmony-approval-unslop :is(.harmony-approval-toolbar, .harmony-approval-module, .harmony-approval-directory) {
+      -webkit-backdrop-filter: none;
+      backdrop-filter: none;
+      background: #f7fbff !important;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    html[data-harmony-theme='light'] .harmony-approval-unslop :is(.harmony-approval-refresh, .harmony-approval-module-open, .harmony-approval-module-metric) {
+      transition: none !important;
+    }
+  }
+}

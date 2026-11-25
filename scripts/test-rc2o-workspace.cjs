@@ -31,6 +31,6 @@ assert.match(fs.readFileSync(endpoints[2],'utf8'),/ctx\.access\.role !== 'financ
 assert.match(fs.readFileSync('app/hr/dashboard/page.tsx','utf8'),/value==='pending'/)
 assert.match(fs.readFileSync('app/employee/dashboard/page.tsx','utf8'),/Konfirmasi Setujui\/Tolak tetap dilakukan/)
 const nav=fs.readFileSync('components/layout/Topbar.tsx','utf8')
-assert.match(nav,/<HarmonyThemeToggle compact/)
+assert.doesNotMatch(nav,/<HarmonyThemeToggle compact/)
 assert.doesNotMatch(fs.readFileSync('components/layout/AppSidebar.tsx','utf8'),/HarmonyThemeToggle/)
 console.log('RC2O dashboard tests PASS: 11 approval/date cases, 3 guarded read-only endpoints, supervisor scope, theme navigation')

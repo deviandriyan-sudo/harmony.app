@@ -369,8 +369,8 @@ export default function EmployeeDashboardPage() {
       </div>
       <div className="flex justify-end"><Link href="/employee/phl" className="harmony-rc2o-link text-xs font-semibold">Ajukan Saldo PHL →</Link></div>
       <EmployeeWorkflowProgress scaleup={scaleupProgress} remed={remedProgress} scaleupUnavailable={scaleupUnavailable} remedUnavailable={remedUnavailable}/>
-      <TodayTeamAvailability/>
       {supervisorApprovals && supervisorApprovals.total>0 && <section className="harmony-rc2o-panel overflow-hidden"><div className="flex flex-wrap items-start justify-between gap-2 p-4 sm:p-5"><div><h2 className="harmony-rc2o-panel-title">Informasi & Approval Tim</h2><p className="harmony-rc2o-muted mt-1 text-xs">{supervisorApprovals.total} pengajuan bawahan memerlukan review Anda.</p></div><Link href="/employee/approvals" className="harmony-rc2o-link text-xs font-semibold">Buka Approval Tim →</Link></div><div className="harmony-rc2o-divider"/>{supervisorApprovals.items.map(item=><div key={item.id} className="harmony-rc2o-row flex flex-wrap items-center gap-3 border-b px-4 py-3 last:border-0"><div className="min-w-[160px] flex-1"><p className="harmony-rc2o-strong truncate text-sm font-semibold">{item.name}</p><p className="harmony-rc2o-muted mt-0.5 text-xs">{item.category} · {item.date}</p></div><div className="flex shrink-0 gap-2"><Link href={item.href} aria-label={`Tinjau persetujuan ${item.name}`} className="harmony-rc2o-approve rounded-xl px-3 py-2 text-xs font-semibold">Setujui</Link><Link href={item.href} aria-label={`Tinjau penolakan ${item.name}`} className="harmony-rc2o-reject rounded-xl px-3 py-2 text-xs font-semibold">Tolak</Link></div></div>)}<p className="harmony-rc2o-muted border-t px-4 py-3 text-xs">Kedua tombol membuka halaman Approval Tim. Konfirmasi Setujui/Tolak tetap dilakukan pada formulir approval existing, tidak otomatis dari dashboard.</p></section>}
+      <TodayTeamAvailability/>
     </main>
   </>
 }

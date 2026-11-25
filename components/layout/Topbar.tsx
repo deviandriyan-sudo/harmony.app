@@ -21,7 +21,6 @@ import { createPortal } from 'react-dom'
 import { usePathname, useRouter } from 'next/navigation'
 import { navigationSearchEntries, type NavigationRole } from '@/lib/navigation'
 
-import { HarmonyThemeToggle } from '@/components/theme/ThemeToggle'
 import { supabase } from '@/lib/supabase'
 import type {
   HarmonyActionTask,
@@ -616,7 +615,6 @@ export function Topbar({
             )}
           </div>
 
-          <HarmonyThemeToggle compact className="harmony-theme-toggle-global" />
           <div ref={dropdownRef} className="relative">
             <button
               type="button"

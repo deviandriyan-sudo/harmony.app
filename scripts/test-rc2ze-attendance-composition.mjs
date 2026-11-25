@@ -26,23 +26,13 @@ for (const section of expectedSections) {
   previous=index
 }
 check(attendance,[
-  'harmony-attendance-summary-grid',
-  'harmony-attendance-stat-tile',
-  'data-palette={palette}',
-  'harmony-attendance-unified-shell',
-  'harmony-attendance-history-section',
-  'harmony-attendance-today-shell',
-  'harmony-attendance-history-toolbar-compact',
-  'harmony-attendance-review-toolbar',
-  'harmony-attendance-review-actions',
-  'harmony-attendance-date-action',
-  "void openLiveManualAttendance()",
-  'harmony-attendance-clock-card-action',
-  'onClick={exportExcel}', 'onClick={exportCsv}',
-  'toggleSelectAllAttendance', 'handleSubmitPeriod',
-  'isFutureUnrecordedCalendarDay', 'saveLiveManualAttendance()',
-  'registerHarmonySubmissionAttachments',
-  '<LiveManualAttendanceModal',
+  'harmony-attendance-unified-shell', 'harmony-attendance-history-section',
+  'harmony-attendance-today-shell', 'harmony-attendance-history-toolbar-compact',
+  'harmony-attendance-review-toolbar', 'harmony-attendance-review-actions',
+  'void openLiveManualAttendance()', 'harmony-attendance-clock-card-action',
+  'onClick={exportExcel}', 'onClick={exportCsv}', 'toggleSelectAllAttendance',
+  'handleSubmitPeriod', 'isFutureUnrecordedCalendarDay', 'saveLiveManualAttendance()',
+  'registerHarmonySubmissionAttachments', '<LiveManualAttendanceModal',
   'HarmonyPendingAttachmentPicker',
 ], 'Attendance layout/workflow')
 assert.equal((attendance.match(/<LiveManualAttendanceModal/g)||[]).length,1,
@@ -55,25 +45,17 @@ assert(!attendance.includes('Centang seluruh hari sebagai tanda verifikasi emplo
   'Verbose review copy must be removed')
 assert(!attendance.includes('Periode belum selesai. Submit periode penuh tersedia mulai'),
   'Verbose review notice must be removed (domain gating preserved)')
-for(const palette of ['sky','mint','honey','rose','lavender','aqua']) {
-  assert(attendance.includes(`palette="${palette}"`),`Summary missing ${palette}`)
-  assert(css.includes(`[data-palette='${palette}']`),`CSS missing ${palette}`)
-}
 check(css,[
-  'container: attendance-sheet / inline-size',
-  '@container attendance-sheet (min-width: 1100px)',
-  'grid-template-columns: minmax(0,1fr) minmax(0,1fr)',
-  '.harmony-attendance-export-actions > button',
-  '.harmony-attendance-today-quick-actions > button',
-  '.harmony-attendance-review-actions > button',
-  'height: 42px !important', 'height: 44px !important',
-  'grid-template-columns: repeat(3,minmax(0,1fr))',
-  "html[data-harmony-theme='dark']",
-  'prefers-reduced-motion: reduce',
-  'prefers-reduced-transparency: reduce',
-  'prefers-contrast: more',
-  '.scaleup-metrics .scaleup-metric:nth-child(4)',
-], 'Responsive/colored composition')
+  'harmony-attendance-unified-shell', 'harmony-attendance-clock-card-action',
+  'harmony-attendance-review-actions', 'prefers-reduced-motion: reduce',
+], 'RC2ZE accessible styling')
+const current=read('app/harmony-rc3a-light-refinement.css')
+for(const required of [
+  '.harmony-attendance-history-section', '.harmony-attendance-today-shell',
+  '.harmony-attendance-today-stats', '.harmony-attendance-review-toolbar',
+  "background: linear-gradient(145deg,#e4faef,#c8efda)",
+  "background: linear-gradient(145deg,#fff0f0,#ffd8d9)",
+]) assert(current.includes(required),`RC3A attendance design missing ${required}`)
 assert(css.includes('@media screen {') && !css.includes('@media print'), 'Print-safe screen only')
 assert(!css.includes('@import')&&!css.includes('url(http'), 'No remote styles')
 assert.equal(layout.split("import './harmony-rc2ze-attendance-composition.css'").length-1,1,

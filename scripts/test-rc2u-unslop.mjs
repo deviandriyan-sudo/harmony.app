@@ -67,7 +67,9 @@ needs(employee, ['EmployeeWorkflowProgress','TodayTeamAvailability',
 needs(hr, ['Monitoring Tidak Hadir','Perlu Tindakan HR',
   'Monitoring kepegawaian'], 'HR dashboard')
 needs(leave, ['onClick={openForm}','harmony-leave-modal-panel'], 'Employee leave')
-needs(supervisor, ['buildSubordinateRelationMap','harmony-supervisor-hero'], 'Supervisor')
+needs(supervisor, ['buildSubordinateRelationMap'], 'Supervisor')
+assert(supervisor.includes('harmony-supervisor-hero') || supervisor.includes('harmony-approval-overview') || supervisor.includes('harmony-approval-toolbar'),
+  'Supervisor must retain a clear approval context surface')
 needs(attendance, ['handleSubmitPeriod','toggleSelectAllAttendance',
   'registerHarmonySubmissionAttachments','isFutureUnrecordedCalendarDay'], 'Attendance')
 needs(phl, ['phlWorkApprovalExpired(item.work_date)'], 'PHL approval expiry')

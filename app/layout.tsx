@@ -10,6 +10,7 @@ import './harmony-rc2q-employee-attendance.css'
 import './harmony-rc2r-design-system.css'
 import './harmony-rc2z-liquid-glass.css'
 import './harmony-rc2ze-attendance-composition.css'
+import './harmony-rc3a-light-refinement.css'
 import './harmony-rc2zh-attendance-verification.css'
 import { SystemMaintenanceGate } from '@/components/system/SystemMaintenanceGate'
 import { HarmonyThemeProvider } from '@/components/theme/ThemeProvider'
@@ -31,6 +32,8 @@ export default function RootLayout({
 }>) {
   return (
     <html
+      data-harmony-theme-preference="light"
+      data-harmony-theme="light"
       lang="id"
       className="h-full antialiased"
     >

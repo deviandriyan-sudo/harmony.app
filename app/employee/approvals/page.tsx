@@ -9,11 +9,10 @@ import {
   AlertTriangle,
   ArrowUpRight,
   CalendarCheck,
-  CalendarDays,
+  ChevronDown,
   CheckCircle2,
   Clock3,
   FileText,
-  Filter,
   Loader2,
   RefreshCcw,
   ShieldCheck,
@@ -27,6 +26,7 @@ import { supabase } from '@/lib/supabase'
 import { fetchPHLWorkRequests, type PHLWorkRequest } from '@/lib/phl-work'
 
 import { useAttendancePeriodQuery } from "@/lib/use-attendance-period";
+import './approval-rc3c.css'
 type AppUser = {
   id: string
   email: string
@@ -138,7 +138,7 @@ type LeaveRequest = {
 
   created_at: string | null
 }
-type ModuleTone = 'blue' | 'purple'
+type ModuleTone = 'blue' | 'purple' | 'green'
 
 export default function EmployeeApprovalsPage() {
   const [, setAppUser] = useState<AppUser | null>(null)
@@ -372,10 +372,10 @@ export default function EmployeeApprovalsPage() {
     <>
       <Topbar
         title="Approval Tim"
-        description="Pusat approval untuk absensi, cuti/izin, dan PHL kerja bawahan."
+        description="Persetujuan absensi, cuti, dan PHL bawahan."
       />
 
-      <section className="harmony-supervisor-dashboard space-y-5 p-4 sm:p-6">
+      <section className="harmony-supervisor-dashboard harmony-approval-unslop space-y-4 p-4 sm:p-5">
         {errorMessage && (
           <div className="rounded-2xl border border-orange-200 bg-orange-50 p-4 text-sm leading-6 text-orange-700">
             <div className="mb-1 flex items-center gap-2 font-bold">
@@ -386,56 +386,24 @@ export default function EmployeeApprovalsPage() {
           </div>
         )}
 
-        <div className="harmony-hero-v25 harmony-supervisor-hero p-5 sm:p-6">
-
-          <div className="relative flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
-            <div>
-              <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-[11px] font-semibold text-white/90">
-                <ShieldCheck size={15} className="text-[#5ac8fa]" />
-                Supervisor Approval Center
-              </div>
-
-              <h1 className="max-w-4xl text-2xl font-semibold tracking-tight md:text-3xl">
-                Approval Tim
-              </h1>
-
-              <p className="mt-2 max-w-2xl text-sm leading-6 text-white/90">
-                Review pengajuan bawahan dalam satu tempat. Absensi tetap per periode, cuti/izin mengikuti workflow HR, sedangkan PHL kerja mempunyai approval khusus yang langsung membentuk saldo.
-              </p>
-            </div>
-
-            <div className="grid gap-2 sm:grid-cols-2 xl:min-w-[500px] 2xl:grid-cols-4">
-              <HeroMetric label="Bawahan" value={String(subordinates.length)} />
-              <HeroMetric label="Absensi Pending" value={String(attendanceSummary.pending)} />
-              <HeroMetric label="Cuti Pending" value={String(leaveSummary.pending)} />
-              <HeroMetric label="PHL Pending" value={String(phlWorkSummary.pending)} />
-            </div>
-          </div>
-        </div>
-
-        <PeriodFilterBar
+        <ApprovalLiquidToolbar
           periodMonth={periodMonth}
           periodStart={periodRange.start}
           periodEnd={periodRange.end}
           loading={loading}
           attendanceTotal={attendanceSummary.total}
           attendancePending={attendanceSummary.pending}
+          subordinateCount={subordinates.length}
+          leavePending={leaveSummary.pending}
+          phlPending={phlWorkSummary.pending}
           onMonthChange={setPeriodMonth}
           onRefresh={fetchData}
         />
 
-        <SubordinateOrgChart
-          supervisor={supervisor}
-          employees={subordinates}
-          relations={subordinateRelations}
-          assignments={employeeAssignments}
-          loading={loading}
-        />
-
-        <div className="grid gap-3 xl:grid-cols-3">
+        <div className="harmony-approval-module-grid">
           <ApprovalModuleCard
             title="Approval Absensi"
-            description="Review absensi bawahan per periode. PHL kerja tidak lagi dibentuk dari cutoff absensi."
+            description="Konfirmasi absensi bawahan untuk periode terpilih."
             href={`/employee/approvals/attendance?period=${encodeURIComponent(periodMonth)}`}
             icon={<CalendarCheck size={25} />}
             tone="blue"
@@ -466,7 +434,7 @@ export default function EmployeeApprovalsPage() {
 
           <ApprovalModuleCard
             title="Approval Cuti & Izin"
-            description="Review cuti tahunan, cuti khusus, sakit, izin, tugas luar, serta klaim penggunaan saldo PHL yang sudah dimiliki."
+            description="Tinjau cuti, izin, sakit, tugas luar, dan penggunaan saldo PHL."
             href="/employee/approvals/leave"
             icon={<FileText size={25} />}
             tone="purple"
@@ -497,13 +465,13 @@ export default function EmployeeApprovalsPage() {
 
           <ApprovalModuleCard
             title="Approval PHL Kerja"
-            description="Review penugasan PHL berdasarkan Surat Tugas dan durasi form minimal 4 jam. Approve menambah +1 saldo PHL dan menyinkronkan absensi bila belum tercatat."
+            description="Setujui penugasan PHL sesuai bukti dan durasi kerja."
             href={`/employee/approvals/phl?status=${phlWorkSummary.pending > 0 ? 'pending' : 'all'}`}
             metricHref={(label) => `/employee/approvals/phl?status=${
               label === 'Total Request' ? 'all' : label.toLowerCase()
             }`}
             icon={<WalletCards size={25} />}
-            tone="purple"
+            tone="green"
             metrics={[
               { label: 'Total Request', value: phlWorkSummary.total },
               { label: 'Pending', value: phlWorkSummary.pending },
@@ -517,18 +485,30 @@ export default function EmployeeApprovalsPage() {
             ]}
           />
         </div>
+
+        <SubordinateOrgChart
+          supervisor={supervisor}
+          employees={subordinates}
+          relations={subordinateRelations}
+          assignments={employeeAssignments}
+          loading={loading}
+        />
+
       </section>
     </>
   )
 }
 
-function PeriodFilterBar({
+function ApprovalLiquidToolbar({
   periodMonth,
   periodStart,
   periodEnd,
   loading,
   attendanceTotal,
   attendancePending,
+  subordinateCount,
+  leavePending,
+  phlPending,
   onMonthChange,
   onRefresh,
 }: {
@@ -538,134 +518,74 @@ function PeriodFilterBar({
   loading: boolean
   attendanceTotal: number
   attendancePending: number
+  subordinateCount: number
+  leavePending: number
+  phlPending: number
   onMonthChange: (value: string) => void
   onRefresh: () => void
 }) {
   const approvalNormalizedPeriod = /^\d{4}-\d{2}$/.test(periodMonth)
     ? periodMonth
     : getCurrentPeriodMonth()
-  const [approvalSelectedYear, approvalSelectedMonth] =
-    approvalNormalizedPeriod.split("-")
+  const [approvalSelectedYear, approvalSelectedMonth] = approvalNormalizedPeriod.split('-')
   const approvalCurrentYear = new Date().getFullYear()
   const approvalStartYear = 2020
-  const approvalMaxYear = Math.max(
-    approvalCurrentYear + 5,
-    Number(approvalSelectedYear) || approvalCurrentYear,
-  )
+  const approvalMaxYear = Math.max(approvalCurrentYear + 5, Number(approvalSelectedYear) || approvalCurrentYear)
   const approvalYearOptions = Array.from(
     { length: approvalMaxYear - approvalStartYear + 1 },
     (_, index) => approvalStartYear + index,
   )
 
   return (
-    <div className="harmony-card overflow-hidden p-0">
-      <div className="flex flex-col gap-4 p-5 lg:flex-row lg:items-center lg:justify-between lg:p-6">
-        <div className="flex min-w-0 items-start gap-4">
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#e8f2ff] harmony-text-link">
-            <Filter size={20} />
-          </div>
+    <div className="harmony-approval-toolbar" role="group" aria-label="Kontrol approval tim">
+      <div className="harmony-approval-toolbar-pills">
+        <span className="harmony-approval-toolbar-pill is-period">
+          <Clock3 size={15} aria-hidden="true" />
+          {formatDisplayDate(periodStart)} – {formatDisplayDate(periodEnd)}
+        </span>
+        <span className="harmony-approval-toolbar-pill is-blue">{subordinateCount} bawahan aktif</span>
+        <span className="harmony-approval-toolbar-pill is-gold">{attendancePending} / {attendanceTotal} submit</span>
+        <span className="harmony-approval-toolbar-pill is-violet">{leavePending} cuti pending</span>
+        <span className="harmony-approval-toolbar-pill is-green">{phlPending} PHL pending</span>
+      </div>
 
-          <div className="min-w-0">
-            <h2 className="text-lg font-semibold harmony-text-primary">
-              Filter Periode Absensi
-            </h2>
-
-            <p className="mt-1 text-sm leading-6 harmony-text-secondary">
-              Periode ini dipakai untuk ringkasan dan akses approval absensi bawahan.
-            </p>
-          </div>
-        </div>
-
-        <div className="grid gap-3 sm:grid-cols-2 lg:flex lg:items-center lg:justify-end">
-          <label className="min-w-0 lg:w-[170px]">
-            <span className="sr-only">Bulan Periode</span>
-            <select
-              value={approvalSelectedMonth}
-              onChange={(event) =>
-                onMonthChange(
-                  `${approvalSelectedYear}-${event.target.value}`,
-                )
-              }
-              className="harmony-input h-12"
-            >
-              {[
-                ["01", "Januari"],
-                ["02", "Februari"],
-                ["03", "Maret"],
-                ["04", "April"],
-                ["05", "Mei"],
-                ["06", "Juni"],
-                ["07", "Juli"],
-                ["08", "Agustus"],
-                ["09", "September"],
-                ["10", "Oktober"],
-                ["11", "November"],
-                ["12", "Desember"],
-              ].map(([value, label]) => (
-                <option key={value} value={value}>
-                  {label}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <label className="min-w-0 lg:w-[120px]">
-            <span className="sr-only">Tahun Periode</span>
-            <select
-              value={approvalSelectedYear}
-              onChange={(event) =>
-                onMonthChange(
-                  `${event.target.value}-${approvalSelectedMonth}`,
-                )
-              }
-              className="harmony-input h-12"
-            >
-              {approvalYearOptions.map((year) => (
-                <option key={year} value={String(year)}>
-                  {year}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <div className="flex min-h-12 items-center gap-3 rounded-2xl border border-black/5 bg-[#f5f5f7]/80 px-4">
-            <CalendarDays size={17} className="shrink-0 harmony-text-link" />
-            <div className="min-w-0">
-              <p className="text-[11px] font-bold uppercase tracking-wide harmony-text-muted">
-                Rentang
-              </p>
-              <p className="truncate text-xs font-bold harmony-text-primary sm:text-sm">
-                {formatDisplayDate(periodStart)} - {formatDisplayDate(periodEnd)}
-              </p>
-            </div>
-          </div>
-
-          <div className="flex min-h-12 items-center gap-3 rounded-2xl border border-black/5 bg-[#f5f5f7]/80 px-4">
-            <Clock3 size={17} className="shrink-0 text-orange-700" />
-            <div>
-              <p className="text-[11px] font-bold uppercase tracking-wide harmony-text-muted">
-                Pending / Submit
-              </p>
-              <p className="text-sm font-bold harmony-text-primary">
-                {attendancePending} / {attendanceTotal}
-              </p>
-            </div>
-          </div>
-
-          <button
-            type="button"
-            onClick={onRefresh}
-            disabled={loading}
-            className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-black/5 bg-white px-5 text-sm font-bold harmony-text-primary shadow-sm transition hover:bg-[#f5f5f7] disabled:cursor-not-allowed disabled:opacity-60"
+      <div className="harmony-approval-toolbar-controls">
+        <label>
+          <span className="sr-only">Bulan periode absensi</span>
+          <select
+            aria-label="Bulan periode absensi"
+            value={approvalSelectedMonth}
+            onChange={(event) => onMonthChange(`${approvalSelectedYear}-${event.target.value}`)}
+            className="harmony-input"
           >
-            {loading ? (
-              <Loader2 size={18} className="animate-spin" />
-            ) : (
-              <RefreshCcw size={18} />
-            )}
-            Refresh
-          </button>
-        </div>
+            {[
+              ['01','Januari'],['02','Februari'],['03','Maret'],['04','April'],
+              ['05','Mei'],['06','Juni'],['07','Juli'],['08','Agustus'],
+              ['09','September'],['10','Oktober'],['11','November'],['12','Desember'],
+            ].map(([value, label]) => (
+              <option key={value} value={value}>{label}</option>
+            ))}
+          </select>
+        </label>
+
+        <label className="harmony-approval-toolbar-year">
+          <span className="sr-only">Tahun periode absensi</span>
+          <select
+            aria-label="Tahun periode absensi"
+            value={approvalSelectedYear}
+            onChange={(event) => onMonthChange(`${event.target.value}-${approvalSelectedMonth}`)}
+            className="harmony-input"
+          >
+            {approvalYearOptions.map((year) => (
+              <option key={year} value={String(year)}>{year}</option>
+            ))}
+          </select>
+        </label>
+
+        <button type="button" onClick={onRefresh} disabled={loading} className="harmony-approval-refresh">
+          {loading ? <Loader2 size={16} className="animate-spin" aria-hidden="true" /> : <RefreshCcw size={16} aria-hidden="true" />}
+          Refresh
+        </button>
       </div>
     </div>
   )
@@ -695,28 +615,21 @@ function SubordinateOrgChart({
     activeAssignmentsByEmployee.set(assignment.employee_id, [...current, assignment])
   })
   return (
-    <div className="harmony-card overflow-hidden p-0">
-      <div className="border-b border-black/5 p-5 lg:p-6">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+    <details className="harmony-card harmony-approval-directory">
+      <summary className="harmony-approval-directory-summary">
+        <div className="harmony-approval-directory-title">
+          <span className="harmony-approval-directory-icon" aria-hidden="true"><UsersRound size={18} /></span>
           <div>
-            <h2 className="text-lg font-semibold harmony-text-primary">
-              Bawahan Terhubung
-            </h2>
-
-            <p className="mt-1 text-sm leading-6 harmony-text-secondary">
-              Relasi approval membaca homebase dan jabatan tambahan aktif. Satu
-              approval dari salah satu atasan yang sah menyelesaikan tahap
-              supervisor.
-            </p>
+            <h2>Bawahan terhubung</h2>
+            <p>Struktur supervisor dan jabatan tambahan</p>
           </div>
-
-          <span className="inline-flex w-fit items-center gap-2 rounded-full bg-[#e8f2ff] px-3 py-1 text-xs font-bold harmony-text-link">
-            <UsersRound size={14} />
-            {employees.length} bawahan aktif
-          </span>
         </div>
-      </div>
-
+        <div className="harmony-approval-directory-trailing">
+          <span className="harmony-approval-directory-count">{employees.length} aktif</span>
+          <span className="harmony-approval-directory-expand">Lihat struktur <ChevronDown size={16} aria-hidden="true" /></span>
+        </div>
+      </summary>
+      <div className="harmony-approval-directory-content">
       {loading ? (
         <div className="flex items-center gap-3 p-6 text-sm harmony-text-secondary">
           <Loader2 size={18} className="animate-spin" />
@@ -765,7 +678,8 @@ function SubordinateOrgChart({
           </div>
         </div>
       )}
-    </div>
+      </div>
+    </details>
   )
 }
 
@@ -915,92 +829,45 @@ function ApprovalModuleCard({
   highlights: string[]
   metricHref?: (label: string) => string
 }) {
-  const toneClass = {
-    blue: 'bg-[#e8f2ff] harmony-text-link',
-    purple: 'bg-[#f7edfc] harmony-text-violet',
-  }[tone]
-
   return (
-    <div className="group harmony-metric-card harmony-approval-module block overflow-hidden p-0">
-      <Link href={href} className="block border-b border-black/5 p-4 transition hover:bg-black/[0.02] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[#007aff] sm:p-5">
-        <div className="flex items-start justify-between gap-4">
-          <div className={`flex h-11 w-11 items-center justify-center rounded-xl ${toneClass}`}>
-            {icon}
-          </div>
-
-          <div className="inline-flex items-center gap-2 rounded-full bg-[#f5f5f7] px-3 py-1 text-xs font-bold harmony-text-secondary">
-            Buka Modul
-            <ArrowUpRight size={13} className="transition group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+    <article className={`harmony-approval-module harmony-approval-module-${tone}`}>
+      <div className="harmony-approval-module-header">
+        <div className="harmony-approval-module-identity">
+          <span className="harmony-approval-module-icon" aria-hidden="true">{icon}</span>
+          <div className="min-w-0">
+            <h3>{title}</h3>
+            <p>{description}</p>
           </div>
         </div>
-
-        <h3 className="mt-4 text-lg font-semibold tracking-tight harmony-text-primary">
-          {title}
-        </h3>
-
-        <p className="mt-2 text-sm leading-6 harmony-text-secondary">
-          {description}
-        </p>
-      </Link>
-
-      <div className="grid grid-cols-2 gap-2 border-b border-black/5 p-4 md:grid-cols-4 sm:p-5">
+        <Link href={href} className="harmony-approval-module-open" aria-label={`Buka modul ${title}`}>
+          Buka <ArrowUpRight size={16} aria-hidden="true" />
+        </Link>
+      </div>
+      <div className="harmony-approval-module-metrics">
         {metrics.map((item) => (
           <Link
             key={item.label}
             href={metricHref ? metricHref(item.label) : href}
             aria-label={`Lihat ${item.label}: ${item.value} - ${title}`}
-            className="harmony-approval-module-metric rounded-xl p-3 transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#007aff]"
+            className={`harmony-approval-module-metric${item.label === 'Pending' ? ' is-pending' : ''}`}
           >
-            <p className="text-xs font-semibold harmony-text-secondary">
-              {item.label}
-            </p>
-
-            <p className="mt-1 text-xl font-semibold harmony-text-primary">
-              {item.value}
-            </p>
+            <span>{item.label}</span>
+            <strong>{item.value}</strong>
           </Link>
         ))}
       </div>
-
-      <div className="space-y-2 p-4 sm:p-5">
-        {highlights.map((item) => (
-          <div
-            key={item}
-            className="harmony-approval-module-highlight flex items-start gap-2.5 rounded-lg px-3 py-2.5"
-          >
-            <div className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-white text-green-700 shadow-sm">
-              <CheckCircle2 size={13} />
+      <details className="harmony-approval-module-details">
+        <summary>Alur dan ketentuan <ChevronDown size={14} aria-hidden="true" /></summary>
+        <div className="harmony-approval-module-details-body">
+          {highlights.map((item) => (
+            <div key={item} className="harmony-approval-module-highlight">
+              <CheckCircle2 size={15} aria-hidden="true" />
+              <span>{item}</span>
             </div>
-
-            <p className="text-sm leading-5 harmony-text-primary">
-              {item}
-            </p>
-          </div>
-        ))}
-      </div>
-    </div>
-  )
-}
-
-
-
-function HeroMetric({
-  label,
-  value,
-}: {
-  label: string
-  value: string
-}) {
-  return (
-    <div className="harmony-approval-hero-metric rounded-xl border border-white/20 bg-white/10 p-3">
-      <p className="text-[11px] font-semibold uppercase tracking-wide text-white/90">
-        {label}
-      </p>
-
-      <p className="mt-1 text-xl font-semibold text-white">
-        {value}
-      </p>
-    </div>
+          ))}
+        </div>
+      </details>
+    </article>
   )
 }
 

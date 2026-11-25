@@ -34,7 +34,7 @@ for (const selector of [
 for (const feature of [
   "harmony-color-theme",'prefers-color-scheme: dark','localStorage.setItem',
   "window.addEventListener('storage'",'data','document.documentElement.dataset.harmonyTheme',
-  'useSyncExternalStore','storageUnavailableSelection',"'system'","value === 'system'",
+  'useSyncExternalStore','storageUnavailableSelection',"return 'light'","applyTheme('light', 'light')",
 ]) assert(provider.includes(feature), 'Theme persistence or System Mode missing: '+feature)
 for (const feature of [
   'Pilih mode tampilan','Ikuti tema sistem','aria-label="Aktifkan mode gelap"',
@@ -70,4 +70,4 @@ function countRoutes(folder, suffix) {
 }
 assert(countRoutes('app', 'page.tsx') >= 66, 'Employee/HR/Finance page route count regressed')
 assert(countRoutes('app/api', 'route.ts') >= 60, 'Existing API routes were removed')
-console.log('RC2R secure UIUX static guards PASS: theme, layout, tokens, fallbacks, route integrity, no new dependencies')
+console.log('RC2R/RC3A UIUX guards PASS: enforced light provider, legacy tokens, fallbacks, route integrity, no new dependencies')

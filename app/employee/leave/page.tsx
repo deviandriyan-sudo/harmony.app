@@ -250,9 +250,6 @@ export default function EmployeeLeavePage() {
   const postponeExpiredDays = Number(
     annualLeave?.postpone_expired_days || 0
   )
-  const annualManualAdjustment = Number(
-    annualLeave?.annual_manual_adjustment_days || 0
-  )
   const annualRemaining = Number(
     annualLeave?.annual_total_available_days || 0
   )
@@ -1112,25 +1109,17 @@ export default function EmployeeLeavePage() {
                 Ajukan cuti, izin, sakit, tugas luar, klaim PHL, dan pantau status approval dalam satu dashboard.
               </p>
             </div>
-            <button
-              type="button"
-              onClick={openForm}
-              className="harmony-leave-hero-action inline-flex min-h-11 shrink-0 items-center justify-center gap-2 self-start rounded-2xl border border-white/75 bg-white/90 px-5 text-sm font-bold text-blue-800 shadow-[0_5px_18px_rgba(13,59,129,.16)] transition hover:bg-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white md:self-center"
-            >
-              <Plus size={18} />
-              Ajukan Cuti / Izin
-            </button>
           </div>
         </div>
 
         <div className="harmony-leave-summary-grid grid gap-3 md:grid-cols-2 xl:grid-cols-5">
           <SummaryCard
-            title="Cuti Tahunan Matang"
-            value={`${annualRegularRemaining} hari`}
+            title="Sisa Cuti"
+            value={`${annualRemaining} hari`}
             description={
               annualLeave?.latest_matured_at
-                ? `Matang terakhir: ${formatDisplayDate(annualLeave.latest_matured_at)}`
-                : 'Belum mencapai anniversary hak cuti'
+                ? `${annualRegularRemaining} hari matang · pembaruan ${formatDisplayDate(annualLeave.latest_matured_at)}`
+                : `${annualRegularRemaining} hari hak matang saat ini`
             }
             icon={<WalletCards size={22} />}
             tone="blue"
@@ -1179,68 +1168,41 @@ export default function EmployeeLeavePage() {
           />
         </div>
 
-        <details className="harmony-employee-balance-breakdown harmony-leave-balance-panel rounded-[16px] border px-4 py-3">
-          <summary className="flex cursor-pointer list-none items-center justify-between gap-2 text-sm font-semibold harmony-text-primary [&::-webkit-details-marker]:hidden">
-            <span>Saldo cuti tersedia: <strong className="text-blue-700">{annualRemaining} hari</strong></span>
-            <span className="text-xs font-semibold text-blue-700">Rincian saldo</span>
-          </summary>
-          <div className="mt-3 grid gap-2 border-t pt-3 text-xs harmony-text-secondary sm:grid-cols-3">
-            <p>Cuti matang <strong className="ml-1 text-slate-800">{annualRegularRemaining} hari</strong></p>
-            <p>Postpone aktif <strong className="ml-1 text-slate-800">{postponeActiveRemaining} hari</strong></p>
-            <p>Adjustment HR <strong className="ml-1 text-slate-800">{annualManualAdjustment >= 0 ? '+' : ''}{annualManualAdjustment} hari</strong></p>
-            {postponeExpiredDays > 0 && <p className="sm:col-span-3">Postpone kedaluwarsa: {postponeExpiredDays} hari (tidak tersedia untuk digunakan).</p>}
-          </div>
-        </details>
-
-        <div className="harmony-card overflow-hidden">
-          <div className="flex flex-col gap-4 border-b border-black/5 p-5 sm:p-6 lg:flex-row lg:items-center lg:justify-between">
-            <div>
-              <h2 className="text-lg font-semibold harmony-text-primary">
-                Dashboard Pengajuan
-              </h2>
-
-              <p className="mt-1 text-sm leading-6 harmony-text-secondary">
-                Buka form pengajuan lewat modal, akses postpone cuti, atau refresh saldo dan riwayat.
-              </p>
-            </div>
-
-            <div className="harmony-action-group w-full lg:w-auto">
-              <button
-                type="button"
-                onClick={openForm}
-                className="harmony-action-primary inline-flex min-h-12 items-center justify-center gap-2 px-4 text-sm font-bold transition"
-              >
-                <Plus size={18} />
-                Ajukan
+        <div className="harmony-leave-action-grid grid gap-4 lg:grid-cols-2">
+          <section className="harmony-leave-action-card harmony-leave-request-card harmony-liquid-lit rounded-[26px] border p-5 sm:p-6" aria-labelledby="harmony-leave-request-heading">
+            <div className="flex min-w-0 flex-wrap items-center justify-between gap-3">
+              <div className="min-w-0">
+                <span className="harmony-leave-action-eyebrow">PENGAJUAN</span>
+                <h2 id="harmony-leave-request-heading" className="mt-1 text-lg font-bold harmony-text-primary">Cuti, Izin & PHL</h2>
+                <p className="mt-1 text-sm harmony-text-secondary">Buat pengajuan dan pantau persetujuan dalam satu alur.</p>
+              </div>
+              <button type="button" onClick={openForm} className="harmony-button-primary inline-flex min-h-11 items-center justify-center gap-2 px-5 text-sm font-bold">
+                <Plus size={18} /> Ajukan
               </button>
-
-              <Link
-                href="/employee/leave/postpone"
-                className="harmony-action-info inline-flex min-h-12 items-center justify-center gap-2 px-4 text-sm font-bold transition"
-              >
-                <RotateCcw size={18} />
-                Postpone Cuti
+            </div>
+            <div className="mt-5 border-t border-sky-200/70 pt-4">
+              <EmployeeIdentity employee={employee} supervisorOne={supervisorOne} supervisorTwo={supervisorTwo} />
+            </div>
+          </section>
+          <section className="harmony-leave-action-card harmony-leave-postpone-card harmony-liquid-lit rounded-[26px] border p-5 sm:p-6" aria-labelledby="harmony-leave-postpone-heading">
+            <div className="flex min-w-0 flex-wrap items-center justify-between gap-3">
+              <div className="min-w-0">
+                <span className="harmony-leave-action-eyebrow">PERPANJANGAN CUTI</span>
+                <h2 id="harmony-leave-postpone-heading" className="mt-1 text-lg font-bold harmony-text-primary">Pengajuan Postpone</h2>
+                <p className="mt-1 text-sm harmony-text-secondary">Kelola pengajuan perpanjangan saldo cuti sesuai kebijakan.</p>
+              </div>
+              <Link href="/employee/leave/postpone" className="harmony-button-secondary inline-flex min-h-11 items-center justify-center gap-2 px-5 text-sm font-bold">
+                <RotateCcw size={18} /> Ajukan Postpone
               </Link>
-
-              <button
-                type="button"
-                onClick={fetchData}
-                disabled={loading}
-                className="harmony-action-soft inline-flex min-h-12 items-center justify-center gap-2 px-4 text-sm font-bold transition disabled:opacity-60"
-              >
-                {loading ? <Loader2 size={18} className="animate-spin" /> : <RefreshCcw size={18} />}
-                Refresh
-              </button>
             </div>
-          </div>
-
-          <div className="p-5 sm:p-6">
-            <EmployeeIdentity
-              employee={employee}
-              supervisorOne={supervisorOne}
-              supervisorTwo={supervisorTwo}
-            />
-          </div>
+            <div className="harmony-leave-postpone-info mt-5 rounded-2xl border p-4">
+              <span className="text-xs font-semibold harmony-text-secondary">Postpone aktif</span>
+              <strong className="mt-1 block text-xl font-bold harmony-text-primary">{postponeActiveRemaining} hari</strong>
+            </div>
+            <button type="button" onClick={fetchData} disabled={loading} className="harmony-leave-refresh mt-4 inline-flex items-center gap-2 text-xs font-semibold harmony-text-link disabled:opacity-60">
+              {loading ? <Loader2 size={15} className="animate-spin"/> : <RefreshCcw size={15}/>} Perbarui data
+            </button>
+          </section>
         </div>
 
         <HistorySection
@@ -1593,8 +1555,8 @@ function HistorySection({
   onCancel: (request: LeaveRequest) => void
 }) {
   return (
-    <div className="grid gap-6 xl:grid-cols-[1fr_0.38fr]">
-      <div className="harmony-card overflow-hidden">
+    <div className="harmony-leave-history-grid grid items-stretch gap-5 lg:grid-cols-2 xl:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)_minmax(0,1fr)]">
+      <div className="harmony-card min-w-0 overflow-hidden lg:col-span-2 xl:col-span-1">
         <div className="flex flex-col gap-3 border-b border-black/5 p-5 sm:p-6 md:flex-row md:items-center md:justify-between">
           <div>
             <h2 className="text-lg font-semibold harmony-text-primary">
@@ -1663,6 +1625,50 @@ function HistorySection({
           )}
         </div>
       </div>
+
+      <section className="harmony-card harmony-leave-phl-request-card flex min-w-0 flex-col overflow-hidden" aria-labelledby="harmony-leave-phl-request-heading">
+        <div className="flex items-start justify-between gap-3 border-b border-emerald-200/65 p-5 sm:p-6">
+          <div className="min-w-0">
+            <h3 id="harmony-leave-phl-request-heading" className="text-lg font-semibold harmony-text-primary">
+              Pengajuan Saldo PHL
+            </h3>
+            <p className="mt-1 text-sm leading-6 harmony-text-secondary">
+              Ajukan hak saldo PHL dari penugasan yang memenuhi ketentuan.
+            </p>
+          </div>
+          <span className="harmony-leave-phl-request-icon flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl" aria-hidden="true">
+            <CalendarDays size={21} />
+          </span>
+        </div>
+
+        <div className="flex flex-1 flex-col gap-4 p-4 sm:p-6">
+          <div className="harmony-leave-phl-request-detail rounded-[22px] border p-4">
+            <p className="text-sm font-bold harmony-text-primary">Ketentuan pengajuan</p>
+            <div className="mt-3 space-y-3 text-sm leading-5 harmony-text-secondary">
+              <div className="flex items-start gap-2.5">
+                <Clock3 size={16} className="mt-0.5 shrink-0 text-emerald-700" aria-hidden="true" />
+                <span>Minimal 4 jam penugasan.</span>
+              </div>
+              <div className="flex items-start gap-2.5">
+                <CheckCircle2 size={16} className="mt-0.5 shrink-0 text-emerald-700" aria-hidden="true" />
+                <span>Wajib melampirkan Surat Tugas atau evidence.</span>
+              </div>
+              <div className="flex items-start gap-2.5">
+                <CalendarDays size={16} className="mt-0.5 shrink-0 text-emerald-700" aria-hidden="true" />
+                <span>Saldo +1 hari setelah disetujui atasan, berlaku 90 hari.</span>
+              </div>
+            </div>
+          </div>
+
+          <Link
+            href="/employee/phl"
+            className="harmony-button-primary mt-auto inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl px-4 text-center text-sm font-bold"
+            aria-label="Buka form Pengajuan Saldo PHL"
+          >
+            <Plus size={18} aria-hidden="true" /> Ajukan Saldo PHL
+          </Link>
+        </div>
+      </section>
     </div>
   )
 }

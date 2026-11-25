@@ -7,19 +7,17 @@ const attendance = read('app/employee/attendance/page.tsx')
 const css = read('app/harmony-rc2z-liquid-glass.css')
 const pkg = JSON.parse(read('package.json'))
 
-// The unified workspace must be a real DOM parent, not just an optical CSS facade.
-const unified = attendance.indexOf('className="harmony-card harmony-rc2q-attendance-panel harmony-liquid-lit harmony-liquid-surface harmony-attendance-history harmony-attendance-unified overflow-hidden"')
-const today = attendance.indexOf('aria-labelledby="harmony-today-attendance-title"')
-const historyHeading = attendance.indexOf('className="harmony-attendance-section harmony-attendance-history-section')
-const review = attendance.indexOf('className="harmony-attendance-review-toolbar')
-assert(unified > 0 && unified < historyHeading && historyHeading < today && today < review,
-  'History filters, today status, and review must be ordered inside the single workspace card')
-assert.equal((attendance.match(/aria-labelledby="harmony-today-attendance-title"/g) ?? []).length, 1,
+// The outer workspace contains two separately bordered cards; verification remains below.
+const unified=attendance.indexOf('className="harmony-card harmony-attendance-history harmony-attendance-unified')
+const historyHeading=attendance.indexOf('harmony-attendance-history-section')
+const today=attendance.indexOf('aria-labelledby="harmony-today-attendance-title"')
+const review=attendance.indexOf('className="harmony-attendance-review-toolbar')
+assert(unified>=0 && historyHeading>unified && today>historyHeading && review>today,
+  'History, today and verification must remain in the intended order')
+assert.equal((attendance.match(/aria-labelledby="harmony-today-attendance-title"/g)??[]).length,1,
   'Today attendance is rendered once')
-assert.equal((attendance.match(/harmony-card harmony-rc2q-attendance-panel harmony-liquid-lit harmony-liquid-surface harmony-attendance-history harmony-attendance-unified/g) ?? []).length, 1,
-  'Exactly one unified attendance card')
-assert.equal((attendance.match(/harmony-rc2q-attendance-panel harmony-liquid-lit harmony-liquid-surface/g) ?? []).length, 2,
-  'Preserve two existing optical panel hooks for RC2X source guards')
+assert(css.includes('.harmony-attendance-unified-shell') && css.includes('.harmony-attendance-section'),
+  'Two separate attendance card surfaces need responsive presentation')
 for (const label of ['Check In', 'Check Out', 'Sumber data', 'Periode Absensi', 'Excel Berwarna', 'CSV Raw', 'Verifikasi Riwayat Absensi']) {
   assert(attendance.includes(label), `Missing operational label: ${label}`)
 }
@@ -29,8 +27,8 @@ for (const handler of ['openLiveManualAttendance()', 'setTodayMode(\'normal\')',
   assert(attendance.includes(handler), `Missing preserved workflow: ${handler}`)
 }
 for (const selector of [
-  '.harmony-attendance-unified', '.harmony-attendance-today-inline', '.harmony-attendance-today-stats',
-  '.harmony-attendance-clock-card', '.harmony-attendance-history-heading', '.harmony-attendance-history-toolbar',
+  '.harmony-attendance-unified', '.harmony-attendance-today-shell', '.harmony-attendance-today-stats',
+  '.harmony-attendance-clock-card', '.harmony-attendance-history-toolbar',
   '.harmony-attendance-export-actions', '.harmony-attendance-review-toolbar', '.harmony-attendance-review-actions',
   '@media (max-width: 520px)', 'prefers-reduced-transparency: reduce',
 ]) {

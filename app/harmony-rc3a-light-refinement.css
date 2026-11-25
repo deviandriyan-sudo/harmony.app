@@ -1,0 +1,252 @@
+/* RC3A — HARMONY Light Enterprise. Intentional last stylesheet in app/layout.tsx.
+   Presentation-only. Preserve print pages, dark styles as dormant legacy,
+   auth/RLS, attendance & leave business contracts. */
+@media screen {
+  :root, html[data-harmony-theme='light'] {
+    color-scheme: light;
+    --rc3a-ink: #17334f;
+    --rc3a-muted: #4e6680;
+    --rc3a-line: rgba(140,182,224,.57);
+    --rc3a-card: linear-gradient(140deg,rgba(255,255,255,.89),rgba(224,241,255,.76));
+    --rc3a-shadow: 0 15px 34px rgba(32,83,140,.105), inset 0 1px 0 rgba(255,255,255,.93);
+  }
+  html[data-harmony-theme='light'] .harmony-workspace { color: var(--rc3a-ink); }
+
+  /* Global header: search/notifications aligned to the right on all Employee/HR pages. */
+  html[data-harmony-theme='light'] .harmony-topbar {
+    margin-top: 12px !important;
+    margin-bottom: 18px !important;
+    border-radius: 22px !important;
+  }
+  html[data-harmony-theme='light'] .harmony-topbar > div {
+    display: flex !important;
+    flex-wrap: nowrap !important;
+    align-items: center !important;
+    justify-content: flex-end !important;
+    gap: 14px;
+  }
+  html[data-harmony-theme='light'] .harmony-topbar > div > div:last-child {
+    margin-left: auto !important;
+    flex: 0 1 auto !important;
+    width: min(100%, 400px);
+    justify-content: flex-end !important;
+    flex-wrap: nowrap !important;
+  }
+  html[data-harmony-theme='light'] .harmony-topbar-search {
+    min-height: 44px;
+    border-radius: 16px !important;
+    background: linear-gradient(145deg, rgba(255,255,255,.91), rgba(236,247,255,.83)) !important;
+  }
+  html[data-harmony-theme='light'] .harmony-topbar input[type='search'] {
+    color: #17334f !important;
+    background: transparent !important;
+  }
+  html[data-harmony-theme='light'] .harmony-topbar input[type='search']::placeholder { color: #58708b !important; opacity: 1; }
+  html[data-harmony-theme='light'] .harmony-topbar-action {
+    min-width: 44px;
+    min-height: 44px;
+    justify-content: center;
+  }
+
+  /* Leave exception: topbar first, module navigation second, page content third.
+     CSS reordering avoids replacing employee layout authorization logic. */
+  html[data-harmony-theme='light'] .harmony-workspace:has(> .harmony-employee-leave-page) {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+  html[data-harmony-theme='light'] .harmony-workspace:has(> .harmony-employee-leave-page) > .harmony-topbar {
+    order: 1;
+    position: relative;
+    top: auto;
+    margin-inline: 16px !important;
+  }
+  html[data-harmony-theme='light'] .harmony-workspace:has(> .harmony-employee-leave-page) > .harmony-module-subnav {
+    order: 2;
+    position: relative !important;
+    top: auto !important;
+    margin-top: 0 !important;
+    margin-bottom: 8px !important;
+  }
+  html[data-harmony-theme='light'] .harmony-workspace:has(> .harmony-employee-leave-page) > .harmony-employee-leave-page { order: 3; }
+
+  /* Consistent high contrast over translucent hero surfaces. */
+  html[data-harmony-theme='light'] .harmony-leave-hero {
+    background: radial-gradient(640px 240px at 100% 0,rgba(126,194,254,.35),transparent 72%),
+      linear-gradient(143deg,rgba(250,253,255,.94),rgba(214,237,254,.91)) !important;
+    border: 1px solid rgba(159,200,238,.7) !important;
+    color: #17334f !important;
+  }
+  html[data-harmony-theme='light'] .harmony-leave-hero :is(h1,p,span) { color: #284661 !important; opacity: 1 !important; text-shadow: none !important; }
+  html[data-harmony-theme='light'] .harmony-leave-hero h1 { color: #17334f !important; }
+  html[data-harmony-theme='light'] .harmony-leave-hero > div > div > div:first-child {
+    background: rgba(215,236,253,.74) !important;
+    border-color: rgba(151,198,238,.65) !important;
+  }
+
+  /* Distinct pastel balance metrics without flat white-on-white backgrounds. */
+  html[data-harmony-theme='light'] .harmony-leave-summary-grid .harmony-metric-card {
+    border: 1px solid rgba(149,194,232,.65) !important;
+    border-radius: 24px !important;
+    box-shadow: var(--rc3a-shadow) !important;
+    min-height: 153px;
+    padding: 20px !important;
+  }
+  html[data-harmony-theme='light'] .harmony-leave-summary-grid .harmony-metric-card:nth-child(1) { background: linear-gradient(145deg,#e3f0ff,#cde4ff) !important; }
+  html[data-harmony-theme='light'] .harmony-leave-summary-grid .harmony-metric-card:nth-child(2) { background: linear-gradient(145deg,#eee8ff,#dfd7ff) !important; }
+  html[data-harmony-theme='light'] .harmony-leave-summary-grid .harmony-metric-card:nth-child(3) { background: linear-gradient(145deg,#e2f9f2,#c8efe1) !important; }
+  html[data-harmony-theme='light'] .harmony-leave-summary-grid .harmony-metric-card:nth-child(4) { background: linear-gradient(145deg,#fff2e2,#ffe2bf) !important; }
+  html[data-harmony-theme='light'] .harmony-leave-summary-grid .harmony-metric-card:nth-child(5) { background: linear-gradient(145deg,#e5f1fe,#d8e9fb) !important; }
+  html[data-harmony-theme='light'] .harmony-leave-summary-grid .harmony-metric-card p { color: #455f79 !important; }
+  html[data-harmony-theme='light'] .harmony-leave-summary-grid .harmony-metric-card h3 { color: #152e4d !important; }
+
+  /* Leave request + postpone: two independent, equally legible cards. */
+  html[data-harmony-theme='light'] .harmony-leave-action-grid { align-items: stretch; }
+  html[data-harmony-theme='light'] .harmony-leave-action-card {
+    min-width: 0;
+    background: linear-gradient(140deg,rgba(246,252,255,.94),rgba(215,235,255,.78)) !important;
+    border-color: rgba(151,196,234,.67) !important;
+    box-shadow: var(--rc3a-shadow) !important;
+  }
+  html[data-harmony-theme='light'] .harmony-leave-postpone-card {
+    background: linear-gradient(140deg,rgba(250,247,255,.94),rgba(231,223,255,.77)) !important;
+    border-color: rgba(179,168,232,.67) !important;
+  }
+  html[data-harmony-theme='light'] .harmony-leave-action-eyebrow {
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: .12em;
+    color: #4d6f95;
+  }
+  html[data-harmony-theme='light'] .harmony-leave-postpone-info {
+    border-color: rgba(183,171,230,.57) !important;
+    background: rgba(255,255,255,.40) !important;
+  }
+  html[data-harmony-theme='light'] .harmony-leave-action-card :is(h2,strong) { color: #183651 !important; }
+  html[data-harmony-theme='light'] .harmony-leave-action-card :is(p,small) { color: #46617c !important; }
+  html[data-harmony-theme='light'] .harmony-leave-request-card .harmony-button-primary,
+  html[data-harmony-theme='light'] .harmony-leave-postpone-card .harmony-button-secondary { flex-shrink: 0; }
+
+
+  /* RC3B: three independent cards for history, active balance, and new PHL balance requests. */
+  html[data-harmony-theme='light'] .harmony-leave-history-grid { align-items: stretch; }
+  html[data-harmony-theme='light'] .harmony-leave-history-grid > * { min-width: 0; }
+  html[data-harmony-theme='light'] .harmony-leave-phl-request-card {
+    background: linear-gradient(146deg, rgba(246,255,253,.96), rgba(209,245,232,.88)) !important;
+    border: 1px solid rgba(140,207,181,.73) !important;
+    border-radius: 26px !important;
+    box-shadow: var(--rc3a-shadow) !important;
+  }
+  html[data-harmony-theme='light'] .harmony-leave-phl-request-icon {
+    background: linear-gradient(145deg,#d9f8ed,#b9ead7);
+    color: #087858;
+    border: 1px solid rgba(124,205,169,.53);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.86);
+  }
+  html[data-harmony-theme='light'] .harmony-leave-phl-request-detail {
+    background: rgba(255,255,255,.43) !important;
+    border-color: rgba(145,207,182,.65) !important;
+  }
+  html[data-harmony-theme='light'] .harmony-leave-phl-request-card :is(h3,.harmony-text-primary) { color: #143b32 !important; }
+  html[data-harmony-theme='light'] .harmony-leave-phl-request-card .harmony-text-secondary { color: #3b6459 !important; }
+  html[data-harmony-theme='light'] .harmony-leave-phl-request-card .harmony-button-primary {
+    border-radius: 17px !important;
+    background: linear-gradient(135deg,#188f72,#087453) !important;
+    border: 1px solid rgba(4,108,74,.4) !important;
+    color: #fff !important;
+    box-shadow: 0 10px 22px rgba(15,112,83,.19) !important;
+  }
+  html[data-harmony-theme='light'] .harmony-leave-phl-request-card .harmony-button-primary:hover {
+    background: linear-gradient(135deg,#127a61,#085f46) !important;
+  }
+  html[data-harmony-theme='light'] .harmony-leave-phl-request-card .harmony-button-primary:focus-visible {
+    outline: 3px solid rgba(17,137,100,.58);
+    outline-offset: 3px;
+  }
+
+  /* Attendance: preserve the agreed side-by-side separated cards, remove empty-height padding. */
+  html[data-harmony-theme='light'] .harmony-attendance-unified-shell {
+    grid-template-columns: minmax(0,1.05fr) minmax(0,.95fr) !important;
+    gap: 16px !important;
+    align-items: stretch !important;
+  }
+  html[data-harmony-theme='light'] .harmony-attendance-history-section,
+  html[data-harmony-theme='light'] .harmony-attendance-today-shell {
+    min-height: 0 !important;
+    padding: 20px !important;
+    border-radius: 26px !important;
+  }
+  html[data-harmony-theme='light'] .harmony-attendance-today-shell { justify-content: flex-start !important; }
+  html[data-harmony-theme='light'] .harmony-attendance-today-stage {
+    margin-top: 0 !important;
+    padding: 13px !important;
+    gap: 12px !important;
+    background: rgba(235,246,255,.48) !important;
+  }
+  html[data-harmony-theme='light'] .harmony-attendance-today-stats {
+    grid-template-columns: repeat(2,minmax(0,1fr)) !important;
+    gap: 10px !important;
+  }
+  html[data-harmony-theme='light'] .harmony-attendance-clock-card-action {
+    position: relative;
+    min-height: 96px !important;
+    padding: 14px !important;
+    border-radius: 20px !important;
+    transition: transform .22s ease, box-shadow .22s ease !important;
+  }
+  html[data-harmony-theme='light'] .harmony-attendance-clock-card-action:nth-child(1) {
+    background: linear-gradient(145deg,#e4faef,#c8efda) !important;
+    border-color: #9cdcb9 !important;
+  }
+  html[data-harmony-theme='light'] .harmony-attendance-clock-card-action:nth-child(2) {
+    background: linear-gradient(145deg,#fff0f0,#ffd8d9) !important;
+    border-color: #f5b2b7 !important;
+  }
+  html[data-harmony-theme='light'] .harmony-attendance-clock-card-action:nth-child(1) .harmony-attendance-clock-icon {
+    color: #087752 !important;
+    background: #c9f3dc !important;
+  }
+  html[data-harmony-theme='light'] .harmony-attendance-clock-card-action:nth-child(2) .harmony-attendance-clock-icon {
+    color: #c03d4b !important;
+    background: #ffe1e3 !important;
+  }
+  html[data-harmony-theme='light'] .harmony-attendance-clock-card-action .harmony-attendance-clock-value,
+  html[data-harmony-theme='light'] .harmony-attendance-clock-card-action .harmony-attendance-clock-label { color: #26445f !important; }
+  html[data-harmony-theme='light'] .harmony-attendance-clock-card-action:hover {
+    transform: translateY(-2px) !important;
+    box-shadow: 0 12px 24px rgba(27,83,142,.12) !important;
+  }
+  /* no continuous moving shine in work-intensive screens */
+  html[data-harmony-theme='light'] .harmony-attendance-clock-card-action::after,
+  html[data-harmony-theme='light'] .harmony-attendance-clock-icon::after { animation: none !important; }
+  html[data-harmony-theme='light'] .harmony-attendance-today-strip { margin-bottom: 10px !important; }
+  html[data-harmony-theme='light'] .harmony-attendance-source-panel {
+    padding: 12px 14px !important;
+    margin-top: 8px !important;
+    gap: 8px !important;
+  }
+  html[data-harmony-theme='light'] .harmony-attendance-history-toolbar-compact { padding: 12px !important; gap: 11px !important; }
+  html[data-harmony-theme='light'] .harmony-attendance-history-toolbar-compact .harmony-attendance-export-actions > button { min-height: 44px !important; }
+  html[data-harmony-theme='light'] .harmony-attendance-history-toolbar-compact .harmony-attendance-period-select,
+  html[data-harmony-theme='light'] .harmony-attendance-history-toolbar-compact .harmony-attendance-year-select { min-height: 44px !important; }
+  html[data-harmony-theme='light'] .harmony-attendance-review-toolbar { margin-top: 16px !important; }
+  html[data-harmony-theme='light'] .harmony-attendance-review-toolbar > div:first-child h3 { color: #193752 !important; }
+
+  @media(max-width: 1370px) {
+    html[data-harmony-theme='light'] .harmony-attendance-history-toolbar-compact .harmony-attendance-period-fields {
+      grid-template-columns: auto minmax(140px,1fr) 95px;
+    }
+    html[data-harmony-theme='light'] .harmony-attendance-unified-shell { grid-template-columns: 1fr !important; }
+    html[data-harmony-theme='light'] .harmony-attendance-today-stats { grid-template-columns: repeat(2,minmax(0,1fr)) !important; }
+  }
+  @media(max-width: 720px) {
+    html[data-harmony-theme='light'] .harmony-topbar > div > div:last-child { width: 100%; }
+    html[data-harmony-theme='light'] .harmony-topbar { margin-inline: 8px !important; }
+    html[data-harmony-theme='light'] .harmony-attendance-today-stats { grid-template-columns: 1fr !important; }
+    html[data-harmony-theme='light'] .harmony-attendance-history-toolbar-compact .harmony-attendance-period-fields { grid-template-columns: 1fr; }
+    html[data-harmony-theme='light'] .harmony-leave-action-grid { grid-template-columns: 1fr; }
+  }
+  @media(prefers-reduced-motion: reduce) {
+    html[data-harmony-theme='light'] .harmony-attendance-clock-card-action { transition: none !important; transform: none !important; }
+  }
+}

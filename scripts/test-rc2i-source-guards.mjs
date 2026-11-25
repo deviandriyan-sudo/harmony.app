@@ -1,7 +1,5 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import { fileURLToPath } from 'node:url'
-const app = fileURLToPath(new URL('../', import.meta.url))
 const read = (file) => readFileSync(new URL(`../${file}`, import.meta.url), 'utf8')
 const hr = read('app/hr/leave/page.tsx')
 const api = read('app/api/hr/leave/postpone-adjustments/route.ts')

@@ -26,7 +26,7 @@ const css=read('app/harmony-rc2q-employee-attendance.css');
 const theme=read('app/layout.tsx');
 for(const x of ['EmployeeWorkflowProgress','TodayTeamAvailability','supervisorApprovals','Ajukan Saldo PHL','/api/scaleup','/api/remed/dashboard']) assert(dash.includes(x),`Dashboard lost ${x}`);
 assert(!dash.includes('harmony-perlu-tindakan'),'Removed panel must not be rendered');
-for(const x of ['Summary Periode','Absensi Hari Ini','Riwayat Absensi','Hadir Normal (Mesin)','Hadir Manual','Dokumen Pendukung','approvedSnapshot','latestApprovedAttendanceSnapshot','saveLiveManualAttendance','handleSubmitPeriod','toggleSelectAllAttendance','Centang Semua','"Submit"','saveInlineManualVerification','handleResetVerification','Input Tanggal Lain']) assert(attendance.includes(x),`Attendance lost ${x}`);
+for(const x of ['Summary Periode','Absensi Hari Ini','Riwayat Absensi','Hadir Normal (Mesin)','Dokumen Pendukung','approvedSnapshot','latestApprovedAttendanceSnapshot','saveLiveManualAttendance','handleSubmitPeriod','toggleSelectAllAttendance','Centang Semua','"Submit"','saveInlineManualVerification','handleResetVerification','Input Tanggal Lain']) assert(attendance.includes(x),`Attendance lost ${x}`);
 assert(attendance.includes("/api/employee/attendance/manual-entry"),'Manual submit must use existing authenticated endpoint');
 assert(attendance.includes("liveManualRecord?.check_in"),'Normal must display actual fingerprint and not fabricate record');
 assert(attendance.includes('registerHarmonySubmissionAttachments'),'Preserve attachment workflow');

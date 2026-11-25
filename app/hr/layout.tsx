@@ -13,6 +13,7 @@ import { navigationForRole } from '@/lib/navigation'
 import { ModuleSubnav } from '@/components/layout/ModuleSubnav'
 import { harmonyFetch } from '@/lib/harmony-client'
 import { supabase } from '@/lib/supabase'
+import { HarmonyAccessState } from '@/components/system/HarmonyAccessState'
 
 type AppUser = {
   id: string
@@ -89,25 +90,23 @@ export default function HRLayout({ children }: { children: React.ReactNode }) {
 
   if (loading) {
     return (
-      <main className="harmony-access-state flex min-h-screen items-center justify-center bg-[#f5f5f7] p-6">
-        <div className="w-full max-w-md rounded-[32px] border border-black/5 bg-white p-8 text-center shadow-[0_24px_70px_rgba(15,23,42,0.12)]">
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[#e8f2ff] harmony-text-link"><Loader2 size={26} className="animate-spin" /></div>
-          <h1 className="mt-5 text-xl font-semibold harmony-text-primary">Memeriksa Akses</h1>
-          <p className="mt-2 text-sm leading-6 harmony-text-secondary">{message}</p>
-        </div>
-      </main>
+      <HarmonyAccessState
+        title="Memeriksa Akses"
+        message={message}
+        tone="hr"
+        icon={<Loader2 size={30} className="animate-spin" />}
+      />
     )
   }
 
   if (!allowed) {
     return (
-      <main className="harmony-access-state flex min-h-screen items-center justify-center bg-[#f5f5f7] p-6">
-        <div className="w-full max-w-md rounded-[32px] border border-red-100 bg-white p-8 text-center shadow-[0_24px_70px_rgba(15,23,42,0.12)]">
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-red-50 text-red-600"><ShieldAlert size={26} /></div>
-          <h1 className="mt-5 text-xl font-semibold harmony-text-primary">Akses Ditolak</h1>
-          <p className="mt-2 text-sm leading-6 harmony-text-secondary">Akun ini tidak memiliki akses ke dashboard HR.</p>
-        </div>
-      </main>
+      <HarmonyAccessState
+        title="Akses HR Ditolak"
+        message="Akun ini tidak memiliki akses ke dashboard HR."
+        tone="danger"
+        icon={<ShieldAlert size={28} />}
+      />
     )
   }
 

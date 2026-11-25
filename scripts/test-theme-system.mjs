@@ -14,14 +14,14 @@ assert.equal(pkg.version,lock.version)
 assert.equal(pkg.version,lock.packages[''].version)
 assert(existsSync('public/harmony-campus.jpg'), 'Real uploaded campus photo missing')
 assert(readFileSync('public/harmony-campus.jpg').subarray(0,3).equals(Buffer.from([255,216,255])), 'Campus image must be JPEG')
-for(const required of ['harmony-login-campus','HarmonyThemeToggle','src="/logo.png"','supabase.auth.signInWithPassword','supabase.auth.signInWithOAuth','supabase.auth.resetPasswordForEmail','redirectAuthenticatedUser']) {
+for(const required of ['harmony-login-campus','src="/logo.png"','supabase.auth.signInWithPassword','supabase.auth.signInWithOAuth','supabase.auth.resetPasswordForEmail','redirectAuthenticatedUser']) {
  assert(login.includes(required),`Login regression: ${required}`)
 }
 assert(login.includes('harmony-login-shutter--left') && login.includes('harmony-login-shutter--right'),'Login opening motion removed')
 assert(layout.includes('<HarmonyThemeProvider>') && layout.includes('<SystemMaintenanceGate>'), 'Theme or security gate missing from root layout')
-assert(!sidebar.includes('HarmonyThemeToggle') && read('components/layout/Topbar.tsx').includes('<HarmonyThemeToggle compact'), 'Theme switch must be single global control in topbar, not sidebar')
-for(const required of ['harmony-color-theme','prefers-color-scheme: dark','localStorage.setItem','window.addEventListener(\'storage\'','data',"document.documentElement.dataset.harmonyTheme"]) assert(provider.includes(required),`Missing theme persistence: ${required}`)
+assert(!sidebar.includes('HarmonyThemeToggle') && !read('components/layout/Topbar.tsx').includes('<HarmonyThemeToggle compact'), 'RC3A forbids theme controls in navigation')
+for(const required of ['harmony-color-theme','localStorage.setItem',"return 'light'","applyTheme('light', 'light')","document.documentElement.dataset.harmonyTheme"]) assert(provider.includes(required),`Missing light-only theme invariant: ${required}`)
 for(const required of ['aria-pressed','aria-label="Aktifkan mode gelap"','aria-label="Aktifkan mode terang"']) assert(toggle.includes(required),`Theme toggle accessibility missing: ${required}`)
 for(const required of ["html[data-harmony-theme='dark']","html[data-harmony-theme='light']",'--h-color-text','--h-color-glass-border','--h-color-focus','url(\'/harmony-campus.jpg\')','prefers-reduced-motion','prefers-reduced-transparency']) assert(css.includes(required),`Theme tokens/fallbacks missing: ${required}`)
 assert(css.includes('.harmony-login-logo-plate,.harmony-login-logo-plate:hover,.harmony-login-logo {transform:none!important'), 'Logo still tilted')
-console.log('HARMONY theme system PASS: real campus image, straight logo, system-aware themes, persisted accessible toggle, role shell, auth preserved')
+console.log('HARMONY theme guard PASS: real campus image, straight logo, light-only theme provider, role shell and auth preserved')

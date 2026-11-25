@@ -41,8 +41,12 @@ needs(rc2q,[
   'var(--harmony-glass-metric-bg,var(--rc2o-panel))',
   'var(--harmony-glass-inset-bg,var(--rc2o-row-hover))',
 ], 'Legacy RC2Q panels wired to glass')
-assert.equal((attendance.match(/harmony-rc2q-attendance-panel harmony-liquid-lit harmony-liquid-surface/g)||[]).length,2,
-  'Both main attendance sections need live pointer highlights')
+assert(attendance.includes('harmony-rc2q-attendance-panel harmony-liquid-lit harmony-liquid-surface'),
+  'Summary period must retain its existing liquid glass surface')
+for(const segment of ['harmony-attendance-history-section','harmony-attendance-today-shell'])
+  assert(attendance.includes(segment),`Missing standalone attendance card: ${segment}`)
+assert(read('app/harmony-rc3a-light-refinement.css').includes('harmony-attendance-unified-shell'),
+  'Side-by-side glass workspace must remain responsive')
 needs(attendance,['handleSubmitPeriod','toggleSelectAllAttendance',
   'registerHarmonySubmissionAttachments','isFutureUnrecordedCalendarDay'],
   'Attendance unchanged workflows')
