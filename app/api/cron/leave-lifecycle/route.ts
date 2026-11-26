@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { getHarmonySystemControl } from '@/lib/server/system-control'
+import { recordLeaveLifecycleRun } from '@/lib/server/leave-lifecycle-telemetry'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -126,6 +127,24 @@ export async function GET(request: NextRequest) {
 
   const remaining = employees.length - processed
   const ok = failed === 0 && remaining === 0
+
+  // Service-role-only operational ledger. Never record employee IDs or names.
+  // Failure to write telemetry must not undo or silently repeat lifecycle work.
+  const auditWrite = await recordLeaveLifecycleRun(supabaseAdmin, {
+    reference_date: referenceDate,
+    environment: process.env.VERCEL_ENV || 'local',
+    succeeded: ok,
+    processed_count: processed,
+    failed_count: failed,
+    remaining_count: remaining,
+    created_cycles: createdCycles,
+    expired_postpone_count: expiredPostpone,
+    error_codes: errorsByCode,
+  })
+  const auditRecorded = !auditWrite.error
+  if (auditWrite.error) {
+    console.warn('HARMONY leave cron audit unavailable', auditWrite.error.code || 'audit_error')
+  }
   if (!ok) {
     // Intentionally omit names, UUIDs, and exception text from logs/response.
     console.error('HARMONY leave lifecycle cron incomplete', {
@@ -135,7 +154,7 @@ export async function GET(request: NextRequest) {
 
   return NextResponse.json(
     { ok, referenceDate, processed, failed, remaining, createdCycles,
-      expiredPostpone, errorsByCode },
+      expiredPostpone, errorsByCode, auditRecorded },
     { status: ok ? 200 : 503, headers: { 'Cache-Control': 'no-store' } },
   )
 }
