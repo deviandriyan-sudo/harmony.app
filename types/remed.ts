@@ -64,6 +64,8 @@ export type RemedClaimAttachment = {
 export type RemedClaim = {
   id: string
   claim_number: string
+  document_number?: string | null
+  document_number_mode?: 'auto' | 'manual' | null
   employee_id: string
   claim_type_id: string
   treatment_date: string

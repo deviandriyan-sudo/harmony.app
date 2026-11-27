@@ -20,6 +20,7 @@
   "app/api/hr/attendance/source-audit/route.ts",
   "app/api/hr/attendance/upload-file/route.ts",
   "app/api/hr/dashboard/monitoring/route.ts",
+  "app/api/hr/document-numbering/route.ts",
   "app/api/hr/employee-ptkp/route.ts",
   "app/api/hr/leave/balance-correction/route.ts",
   "app/api/hr/leave/lifecycle-audit/route.ts",

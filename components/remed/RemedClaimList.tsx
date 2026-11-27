@@ -6,6 +6,7 @@ import { ExternalLink, ShieldCheck, TrendingDown, WalletCards } from 'lucide-rea
 import { ClaimStatusBadge } from '@/components/remed/ClaimStatusBadge'
 import { formatRemedDate, formatRupiah } from '@/lib/remed'
 import { remedFetch } from '@/lib/remed-client'
+import { documentNumberLabel, isDocumentNumberPending } from '@/lib/document-numbering'
 import type { RemedClaim } from '@/types/remed'
 
 function claimReservedAmount(claim: RemedClaim) {
@@ -101,6 +102,7 @@ export function RemedClaimList({
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2">
                 <p className="font-bold tracking-[-0.01em] harmony-text-primary">{claim.claim_number}</p>
+                {(claim.document_number_mode === 'manual' || isDocumentNumberPending(claim)) && <span className="text-xs harmony-text-secondary">Nomor dokumen: {documentNumberLabel(claim, claim.claim_number)}</span>}
                 <ClaimStatusBadge status={claim.status} />
               </div>
               {showEmployee ? <p className="mt-2 text-sm font-bold harmony-text-primary">{claim.employee?.full_name || '-'}</p> : null}

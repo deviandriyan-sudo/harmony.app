@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation'
 import { ClaimStatusBadge } from '@/components/remed/ClaimStatusBadge'
 import { formatRemedDate, formatRupiah } from '@/lib/remed'
 import { remedFetch } from '@/lib/remed-client'
+import { documentNumberLabel, isDocumentNumberPending } from '@/lib/document-numbering'
 import type { RemedClaim, RemedPrintSignatures, RemedSignatureDisplay } from '@/types/remed'
 
 export function PaymentRequestPrint({ claimId }: { claimId: string }) {
@@ -48,6 +49,10 @@ export function PaymentRequestPrint({ claimId }: { claimId: string }) {
     )
   }
 
+  if (isDocumentNumberPending(claim)) {
+    return <section role="status" className="mx-auto max-w-2xl space-y-3 p-6 text-center"><h1 className="font-semibold">Nomor dokumen belum diterbitkan</h1><p className="text-sm harmony-text-secondary">Referensi klaim: {claim.claim_number}. Hubungi HR untuk menerbitkan nomor sebelum mencetak form resmi.</p><button type="button" className="rounded-xl border px-4 py-2" onClick={() => router.back()}>Kembali</button></section>
+  }
+
   const approvedAmount = claim.approved_amount ?? (claim.status === 'legacy_record' ? claim.submitted_amount : null)
   const hrApproved = ['pending_finance', 'waiting_payment', 'paid'].includes(claim.status)
   const financeApproved = ['waiting_payment', 'paid'].includes(claim.status)
@@ -78,8 +83,9 @@ export function PaymentRequestPrint({ claimId }: { claimId: string }) {
             </div>
           </div>
           <div className="remed-print-claim min-w-0 text-right">
-            <p className="text-xs harmony-text-secondary">Nomor Klaim</p>
-            <p className="mt-1 font-mono text-sm font-bold">{claim.claim_number}</p>
+            <p className="text-xs harmony-text-secondary">Nomor Dokumen</p>
+            <p className="mt-1 break-words font-mono text-sm font-bold">{documentNumberLabel(claim, claim.claim_number)}</p>
+            {claim.document_number && claim.document_number !== claim.claim_number && <p className="mt-1 text-xs harmony-text-secondary">Referensi klaim: {claim.claim_number}</p>}
             <div className="mt-2 inline-flex"><ClaimStatusBadge status={claim.status} /></div>
           </div>
         </header>

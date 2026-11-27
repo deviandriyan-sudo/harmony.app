@@ -9,6 +9,7 @@ import type { ReactNode } from 'react'
 import { Activity, AlertTriangle, BadgeCheck, CheckCircle2, Copy, DatabaseZap, Eye, EyeOff, KeyRound, Lock, Mail, MailCheck, Power, RefreshCcw, Save, Search, ShieldCheck, Sparkles, Trash2, UserRound, Users, WalletCards, X } from 'lucide-react'
 
 import { Topbar } from '@/components/layout/Topbar'
+import { DocumentNumberingSettings } from '@/components/settings/DocumentNumberingSettings'
 import { changeHarmonyPassword } from '@/lib/account-password'
 import { supabase } from '@/lib/supabase'
 
@@ -635,6 +636,7 @@ export default function HRSettingsPage() {
       />
 
       <section className="space-y-5 overflow-x-hidden p-4 sm:p-6">
+        <DocumentNumberingSettings />
         {successMessage && (
           <AlertBox
             type="success"

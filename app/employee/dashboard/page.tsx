@@ -3,7 +3,7 @@
 
 import { readErrorMessage } from '@/lib/error-utils'
 import Link from 'next/link'
-import { useEffect, useEffectEvent, useMemo, useState } from 'react'
+import { useEffect, useEffectEvent, useMemo, useRef, useState } from 'react'
 import { AlertTriangle, ArrowRight, CalendarDays, CheckCircle2, HeartPulse, RefreshCcw, WalletCards } from 'lucide-react'
 
 import { TodayTeamAvailability } from '@/components/employee/TodayTeamAvailability'
@@ -14,6 +14,7 @@ import { getCurrentPeriodMonthWita, getCutoffRange } from '@/lib/attendance-repo
 import { supabase } from '@/lib/supabase'
 import { harmonyFetch } from '@/lib/harmony-client'
 import { fetchMyCanonicalLeaveBalance } from '@/lib/employee-leave-balance'
+import { fetchMyPHLSnapshot, type PHLSnapshot } from '@/lib/employee-phl-snapshot'
 import { formatFullRupiah } from '@/lib/harmony-money'
 import { getApprovalStageLabel } from '@/lib/leave-workflow-status'
 import { HarmonyPortaledOverlay } from '@/components/ui/HarmonyPortaledOverlay'
@@ -99,6 +100,8 @@ export default function EmployeeDashboardPage() {
   const [appUser, setAppUser] = useState<AppUser | null>(null)
   const [employee, setEmployee] = useState<Employee | null>(null)
   const [balance, setBalance] = useState<BalanceSummary | null>(null)
+  const [phlSnapshot, setPhlSnapshot] = useState<PHLSnapshot | null>(null)
+  const phlReadGeneration = useRef(0)
   const [balanceWarning, setBalanceWarning] = useState<string | null>(null)
   const [attendance, setAttendance] = useState<AttendanceRow[]>([])
   const [, setRequests] = useState<RequestItem[]>([])
@@ -207,8 +210,19 @@ export default function EmployeeDashboardPage() {
     }
   }
 
+  async function refreshPHLBalance(employeeId: string) {
+    const generation = ++phlReadGeneration.current
+    try {
+      const snapshot = await fetchMyPHLSnapshot(employeeId)
+      if (generation === phlReadGeneration.current) setPhlSnapshot(snapshot)
+    } catch {
+      if (generation === phlReadGeneration.current) setPhlSnapshot(null)
+    }
+  }
+
   async function refreshLiveBalances() {
     void refreshSupervisorQueue()
+    if (employee?.id) void refreshPHLBalance(employee.id)
     const [leaveResult, remedResult, debtResult] = await Promise.allSettled([
       fetchMyCanonicalLeaveBalance<BalanceSummary>(),
       harmonyFetch<{ entitlement?: { available_amount?: number | null } | null }>('/api/remed/dashboard'),
@@ -239,6 +253,8 @@ export default function EmployeeDashboardPage() {
   }
 
   async function fetchDashboardData() {
+    phlReadGeneration.current += 1
+    setPhlSnapshot(null)
     setLoading(true)
     setRefreshing(true)
     setMessage('')
@@ -269,6 +285,7 @@ export default function EmployeeDashboardPage() {
 
       if (!employeeData) throw new Error('Akun belum terhubung ke data employee. Hubungi HR.')
       setEmployee(employeeData)
+      void refreshPHLBalance(employeeData.id)
       // Optional read-only dashboard summaries; failure must never block salary,
       // leave balance, attendance or existing request workflows.
       const [attendanceSummary, remedSummary, supervisorSummary, scaleupSummary] = await Promise.allSettled([
@@ -469,7 +486,7 @@ export default function EmployeeDashboardPage() {
 
   const recordedAttendance = attendance.filter(row=>Boolean(row.check_in || row.check_out || row.manual_check_in || row.manual_check_out)).length
   const annualBalance = balance ? Number(balance.annual_total_available_days) : null
-  const phlBalance = Number(balance?.phl_total_available_days ?? employee?.phl_balance ?? 0)
+  const phlBalance = phlSnapshot?.employee_id === employee?.id ? phlSnapshot?.total_available_days ?? null : null
   return <>
     <Topbar title="Beranda" compact />
     <main className="harmony-rc2o harmony-rc2o-employee harmony-glass-showcase mx-auto max-w-[1500px] space-y-4 p-4 sm:p-5 lg:p-6">
@@ -482,7 +499,7 @@ export default function EmployeeDashboardPage() {
       </section>
       <div className="grid grid-cols-2 gap-3 xl:grid-cols-4" aria-busy={loading}>
         <CompactMetric label="Saldo Cuti" value={loading?'…':annualBalance===null?'—':`${annualBalance} hari`} icon={CalendarDays} href="/employee/leave"/>
-        <CompactMetric label="Saldo PHL" value={loading?'…':`${phlBalance} hari`} icon={WalletCards} href="/employee/phl" accent="green"/>
+        <CompactMetric label="Saldo PHL" value={loading?'…':phlBalance===null?'—':`${phlBalance} hari`} icon={WalletCards} href="/employee/phl" accent="green"/>
         <CompactMetric label="Status Kehadiran" value={loading?'…':attendancePeriodStatus||`${recordedAttendance} tercatat`} icon={CheckCircle2} href="/employee/attendance"/>
         <CompactMetric label="Sisa Plafond Re-Med" value={loading?'…':formatFullRupiah(remedAvailable)} icon={HeartPulse} href="/remed/employee/dashboard" accent="amber" fullValue/>
       </div>

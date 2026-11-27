@@ -8,7 +8,7 @@ import { AlertTriangle, CheckCircle2, Clock3, FilePlus2, FileText, Loader2, Refr
 
 import { HarmonyPendingAttachmentPicker } from '@/components/attachments/HarmonyAttachments'
 import { Topbar } from '@/components/layout/Topbar'
-import { supabase } from '@/lib/supabase'
+import { fetchMyPHLSnapshot, type PHLSnapshot } from '@/lib/employee-phl-snapshot'
 import {
   cancelPHLWorkRequest,
   fetchPHLWorkRequests,
@@ -18,13 +18,6 @@ import {
   submitPHLWorkRequest,
   type PHLWorkRequest,
 } from '@/lib/phl-work'
-
-type BalanceSummary = {
-  total_available_days?: number | null
-  active_ledger_balance?: number | null
-  expiring_30_days?: number | null
-  next_expiry?: string | null
-}
 
 const initialForm = {
   workDate: '',
@@ -37,7 +30,7 @@ const initialForm = {
 
 export default function EmployeePHLPage() {
   const [requests, setRequests] = useState<PHLWorkRequest[]>([])
-  const [balance, setBalance] = useState<BalanceSummary | null>(null)
+  const [balance, setBalance] = useState<PHLSnapshot | null>(null)
   const [form, setForm] = useState(initialForm)
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
@@ -54,15 +47,18 @@ export default function EmployeePHLPage() {
   }, [])
 
   async function load() {
+    setBalance(null)
     setLoading(true)
     setMessage(null)
     try {
-      const [requestRows, balanceResult] = await Promise.all([
+      const [requestResult, balanceResult] = await Promise.allSettled([
         fetchPHLWorkRequests('mine'),
-        supabase.rpc('get_my_phl_balance_summary'),
+        fetchMyPHLSnapshot(),
       ])
-      setRequests(requestRows)
-      if (!balanceResult.error) setBalance((balanceResult.data || null) as BalanceSummary | null)
+      setBalance(balanceResult.status === 'fulfilled' ? balanceResult.value : null)
+      if (requestResult.status === 'rejected') throw requestResult.reason
+      setRequests(requestResult.value)
+      if (balanceResult.status === 'rejected') setMessage({ type: 'error', text: 'Saldo PHL belum dapat dimuat. Perbarui data.' })
     } catch (error: unknown) {
       setMessage({ type: 'error', text: readErrorMessage(error) || 'Data PHL gagal dimuat.' })
     } finally {
@@ -162,7 +158,7 @@ export default function EmployeePHLPage() {
             </div>
 
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 xl:min-w-[540px]">
-              <Metric label="Saldo Aktif" value={String(Number(balance?.total_available_days || 0))} />
+              <Metric label="Saldo Tersedia" value={loading ? '…' : balance ? String(balance.total_available_days) : '—'} />
               <Metric label="Pending" value={String(stats.pending)} />
               <Metric label="Approved" value={String(stats.approved)} />
               <Metric label="Rejected" value={String(stats.rejected)} />

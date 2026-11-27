@@ -53,8 +53,8 @@ const walk = (dir) => fs.readdirSync(dir, { withFileTypes: true }).flatMap((entr
 const pages = walk(path.join(projectRoot, 'app')).filter((f) => path.basename(f) === 'page.tsx').length
 const routes = walk(path.join(projectRoot, 'app', 'api')).filter((f) => path.basename(f) === 'route.ts').length
 assert.equal(pages, 68, 'Page routes changed')
-assert.equal(routes, 68, 'API routes changed')
+assert.equal(routes, 69, 'API routes changed')
 const inventory = JSON.parse(source('scripts/rc3n-route-inventory.json'))
 assert.deepEqual(walk(path.join(projectRoot,'app')).filter(f=>['page.tsx', 'route.ts'].includes(path.basename(f))).map(f=>path.relative(projectRoot,f).replaceAll('\\','/')).sort(),inventory)
 assert.equal(source('lib/server/phl-work.ts').includes('formatDate'), true)
-console.log('HARMONY Stage 3.2 source guards PASS: 36 typed any locations, 22 effect sites, 136 routes')
+console.log('HARMONY Stage 3.2 source guards PASS: 36 typed any locations, 22 effect sites, 137 routes')

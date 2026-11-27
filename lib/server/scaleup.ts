@@ -34,7 +34,7 @@ export function scaleupRouteError(error: unknown) {
 type VisibleRequest = { id:string; requester_employee_id:string; request_version:number; submitted_at:string; [key:string]:unknown }
 type VisibleStage = { id:string; request_id:string; request_version:number; stage_order:number; [key:string]:unknown }
 type VisiblePerson = { id:string; full_name:string|null; employee_number:string|null; department:string|null; position:string|null }
-const REQUEST_FIELDS = 'id,requester_employee_id,training,nominees,policy_version,request_version,approval_status,execution_status,total_estimated_budget,submitted_at,updated_at'
+const REQUEST_FIELDS = 'id,document_number,document_number_mode,requester_employee_id,training,nominees,policy_version,request_version,approval_status,execution_status,total_estimated_budget,submitted_at,updated_at'
 
 export async function getVisibleRequests(context: Awaited<ReturnType<typeof scaleupContext>>) {
   const employeeId = context.employee?.id

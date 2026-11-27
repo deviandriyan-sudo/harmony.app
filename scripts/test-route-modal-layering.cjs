@@ -76,7 +76,7 @@ const apiDir = path.join(root, 'app/api')
 function countApi(dir) { let count = 0; for (const ent of fs.readdirSync(dir, {withFileTypes:true})) { const full=path.join(dir,ent.name); if(ent.isDirectory())count+=countApi(full); else if(ent.name==='route.ts')count++ }return count }
 apis=countApi(apiDir)
 assert.equal(pages, 68, 'Reviewed page inventory must remain unchanged')
-assert.equal(apis, 68, 'Reviewed API inventory must remain unchanged')
+assert.equal(apis, 69, 'Reviewed API inventory must remain unchanged')
 const expectedInventory=JSON.parse(sourceOf('scripts/rc3n-route-inventory.json'))
 const routeInventory=dir=>fs.readdirSync(dir,{withFileTypes:true}).flatMap(e=>{const full=path.join(dir,e.name);return e.isDirectory()?routeInventory(full):['page.tsx','route.ts'].includes(e.name)?[path.relative(root,full).replaceAll('\\','/')]:[]})
 assert.deepEqual(routeInventory(path.join(root,'app')).sort(),expectedInventory)

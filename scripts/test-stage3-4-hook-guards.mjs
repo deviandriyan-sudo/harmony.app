@@ -65,6 +65,6 @@ function walk(dir) {
 }
 walk(path.join(root, 'app'))
 assert.equal(pages.length, 68)
-assert.equal(apis.length, 68)
+assert.equal(apis.length, 69)
 assert.deepEqual([...pages,...apis].map(f=>path.relative(root,f).replaceAll('\\','/')).sort(),JSON.parse(read('scripts/rc3n-route-inventory.json')))
-console.log(`HARMONY Stage 3.4 hook guards PASS: ${effectEvents} effect callbacks, 3 unused declarations removed, pure attendance summary, 136 routes`)
+console.log(`HARMONY Stage 3.4 hook guards PASS: ${effectEvents} effect callbacks, 3 unused declarations removed, pure attendance summary, 137 routes`)

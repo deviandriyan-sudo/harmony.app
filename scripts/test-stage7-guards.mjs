@@ -28,5 +28,5 @@ assert.doesNotMatch(read('lib/leave-balance-canonical.ts'),/annual_total_availab
 if (!sourceOnly) assert.match(read('SQL_ONLY/09_STAGE7_LIFECYCLE_AUTOMATION_DIAGNOSTIC_READ_ONLY.sql'),/to_regclass\('cron.job'\)/)
 const walk = (dir, filename) => fs.readdirSync(dir,{withFileTypes:true}).flatMap(d=>d.isDirectory()?walk(path.join(dir,d.name),filename):d.name===filename?[path.join(dir,d.name)]:[])
 assert.equal(walk('app','page.tsx').length,68)
-assert.equal(walk('app/api','route.ts').length,68)
-console.log(sourceOnly ? 'PASS: Stage 7 source guards, 136 routes; historical SQL NOT RUN' : 'HARMONY Stage 7 guard/source checks PASS: 136 routes, strict identity binding, maintenance email fail-closed, full PHL history scan')
+assert.equal(walk('app/api','route.ts').length,69)
+console.log(sourceOnly ? 'PASS: Stage 7 source guards, 137 routes; historical SQL NOT RUN' : 'HARMONY Stage 7 guard/source checks PASS: 137 routes, strict identity binding, maintenance email fail-closed, full PHL history scan')

@@ -4,7 +4,7 @@
 import { publishScannedUpload } from '@/lib/scanned-upload-client'
 import { readErrorMessage } from '@/lib/error-utils'
 import { validUploadFileContent } from '@/lib/server/upload-validation'
-import { useEffectEvent, useEffect, useId, useMemo, useState } from 'react'
+import { useEffectEvent, useEffect, useId, useMemo, useRef, useState } from 'react'
 import type { FormEvent, ReactNode } from 'react'
 import Link from 'next/link'
 import { AlertTriangle, CalendarDays, CheckCircle2, Clock3, Loader2, Plane, Plus, RefreshCcw, RotateCcw, Send, UserCheck, UserRound, WalletCards, X } from 'lucide-react'
@@ -17,6 +17,7 @@ import {
 } from '@/components/attachments/HarmonyAttachments'
 import { supabase } from '@/lib/supabase'
 import { fetchMyCanonicalLeaveBalance } from '@/lib/employee-leave-balance'
+import { fetchMyPHLSnapshot, type PHLSnapshot, type PHLRecord } from '@/lib/employee-phl-snapshot'
 import {
   HARMONY_ATTACHMENT_REQUIRED_FILES,
   registerHarmonySubmissionAttachments,
@@ -86,32 +87,6 @@ type AnnualLeaveSummary = {
   next_phl_expiry: string | null
   phl_total_available_days: number | null
   phl_legacy_or_adjustment_days: number | null
-}
-
-type PHLRecord = {
-  id: string
-  employee_id: string
-  phl_date: string | null
-  valid_from: string | null
-  expired_at: string | null
-  status: string | null
-  balance_days: number | null
-  used_days: number | null
-  remaining_days: number | null
-  reason: string | null
-  source: string | null
-}
-
-
-type MyPHLBalanceSummary = {
-  success: boolean
-  employee_id: string
-  total_available_days: number
-  active_ledger_balance: number
-  legacy_balance: number
-  expiring_30_days: number
-  next_expiry: string | null
-  expiry_rule_days: number
 }
 
 type LeaveRequest = {
@@ -229,8 +204,10 @@ export default function EmployeeLeavePage() {
   const [annualLeave, setAnnualLeave] = useState<AnnualLeaveSummary | null>(null)
   const [annualBalanceWarning, setAnnualBalanceWarning] = useState<string | null>(null)
   const [annualDebtSummary, setAnnualDebtSummary] = useState<{ outstanding_days: number; next_maturity: string | null } | null>(null)
-  const [phlRecords, setPhlRecords] = useState<PHLRecord[]>([])
-  const [myPHLBalance, setMyPHLBalance] = useState<MyPHLBalanceSummary | null>(null)
+  const [myPHLBalance, setMyPHLBalance] = useState<PHLSnapshot | null>(null)
+  const phlReadGeneration = useRef(0)
+  const phlSummary = myPHLBalance?.employee_id === employee?.id ? myPHLBalance : null
+  const phlRecords = phlSummary?.records ?? []
   const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>([])
   const [holidays, setHolidays] = useState<Holiday[]>([])
   const [requestTypes, setRequestTypes] = useState<HarmonyRequestTypeDefinition[]>([])
@@ -258,16 +235,8 @@ export default function EmployeeLeavePage() {
     annualLeave?.annual_total_available_days || 0
   )
 
-  const phlRemainingFromRecords = useMemo(() => {
-    return phlRecords.reduce((sum, item) => {
-      return sum + Number(item.remaining_days || 0)
-    }, 0)
-  }, [phlRecords])
-
-  const phlRemaining = Number(
-    myPHLBalance?.total_available_days ?? phlRemainingFromRecords
-  )
-  const phlBalanceUsesHROverride = Number(myPHLBalance?.legacy_balance || 0) > 0
+  const phlRemaining = phlSummary?.total_available_days ?? 0
+  const phlBalanceUsesHROverride = (phlSummary?.legacy_balance ?? 0) > 0
 
   const pendingCount = useMemo(() => {
     return leaveRequests.filter((item) => isWorkflowPending(item)).length
@@ -317,7 +286,12 @@ export default function EmployeeLeavePage() {
     onInitialLoad()
   }, [])
 
-  const onBalanceVisibilityRefresh = useEffectEvent(fetchAnnualLeaveSummary)
+  const onBalanceVisibilityRefresh = useEffectEvent(async () => {
+    await Promise.allSettled([
+      fetchAnnualLeaveSummary(),
+      employee?.id ? fetchPHLBalance(employee.id) : Promise.resolve(),
+    ])
+  })
   useEffect(() => {
     const refresh = () => {
       if (document.visibilityState === 'visible') void onBalanceVisibilityRefresh()
@@ -333,6 +307,8 @@ export default function EmployeeLeavePage() {
   }, [])
 
   async function fetchData() {
+    phlReadGeneration.current += 1
+    setMyPHLBalance(null)
     setLoading(true)
     setSuccessMessage('')
     setErrorMessage('')
@@ -461,28 +437,13 @@ export default function EmployeeLeavePage() {
   }
 
   async function fetchPHLBalance(employeeId: string) {
-    const [{ data: recordData }, { data: summaryData, error: summaryError }] =
-      await Promise.all([
-        supabase
-          .from('phl_records')
-          .select('*')
-          .eq('employee_id', employeeId)
-          .eq('status', 'approved')
-          .gt('remaining_days', 0)
-          .gte('expired_at', getTodayISO())
-          .order('expired_at', { ascending: true }),
-        supabase.rpc('get_my_phl_balance_summary'),
-      ])
-
-    setPhlRecords(recordData || [])
-
-    if (summaryError) {
-      console.warn('Ringkasan saldo PHL V4 gagal dimuat:', summaryError.message)
-      setMyPHLBalance(null)
-      return
+    const generation = ++phlReadGeneration.current
+    try {
+      const snapshot = await fetchMyPHLSnapshot(employeeId)
+      if (generation === phlReadGeneration.current) setMyPHLBalance(snapshot)
+    } catch {
+      if (generation === phlReadGeneration.current) setMyPHLBalance(null)
     }
-
-    setMyPHLBalance((summaryData || null) as MyPHLBalanceSummary | null)
   }
 
   async function fetchLeaveRequests(employeeId: string) {
@@ -800,6 +761,12 @@ export default function EmployeeLeavePage() {
 
     if (form.request_type === 'phl_claim' && (calculatedDays !== 1 || form.start_date !== form.end_date)) {
       setErrorMessage('Klaim PHL diajukan 1 hari kerja per pengajuan. Samakan tanggal mulai dan selesai.')
+      setSubmitting(false)
+      return
+    }
+
+    if (form.request_type === 'phl_claim' && phlSummary === null) {
+      setErrorMessage('Saldo PHL belum dapat diverifikasi. Perbarui data sebelum mengajukan PHL.')
       setSubmitting(false)
       return
     }
@@ -1157,10 +1124,10 @@ export default function EmployeeLeavePage() {
 
           <SummaryCard
             title="Sisa PHL"
-            value={`${phlRemaining} hari`}
+            value={phlSummary ? `${phlRemaining} hari` : '—'}
             description={
-              phlBalanceUsesHROverride
-                ? 'Mengikuti saldo dari HR Master Employee'
+              !phlSummary ? 'Saldo belum dapat diverifikasi' : phlBalanceUsesHROverride
+                ? 'Termasuk saldo historis HR'
                 : 'Saldo PHL aktif dan belum expired'
             }
             icon={<Plane size={22} />}
@@ -1225,6 +1192,8 @@ export default function EmployeeLeavePage() {
           loading={loading}
           leaveRequests={leaveRequests}
           phlRecords={phlRecords}
+          phlSummary={phlSummary}
+          onRefreshPHL={fetchData}
           employeeDirectory={employeeDirectory}
           cancellingId={cancellingId}
           onCancel={handleCancelRequest}
@@ -1245,6 +1214,7 @@ export default function EmployeeLeavePage() {
             annualRemaining={annualRemaining}
             annualLeaveAvailable={annualLeave !== null}
             phlRemaining={phlRemaining}
+            phlBalanceAvailable={phlSummary !== null}
             handoverEmployeeOptions={handoverEmployeeOptions}
             selectedHandoverEmployee={selectedHandoverEmployee}
             errorMessage={errorMessage}
@@ -1272,6 +1242,7 @@ function LeaveRequestModal({
   annualRemaining,
   annualLeaveAvailable,
   phlRemaining,
+  phlBalanceAvailable,
   handoverEmployeeOptions,
   selectedHandoverEmployee,
   errorMessage,
@@ -1292,6 +1263,7 @@ function LeaveRequestModal({
   annualRemaining: number
   annualLeaveAvailable: boolean
   phlRemaining: number
+  phlBalanceAvailable: boolean
   handoverEmployeeOptions: Employee[]
   selectedHandoverEmployee: Employee | null
   errorMessage: string
@@ -1425,8 +1397,8 @@ function LeaveRequestModal({
 
               <InfoTile
                 label="Saldo PHL"
-                value={`${phlRemaining} hari`}
-                description="Saldo PHL aktif"
+                value={phlBalanceAvailable ? `${phlRemaining} hari` : '—'}
+                description={phlBalanceAvailable ? 'Saldo PHL tersedia' : 'Saldo belum terverifikasi'}
                 tone="purple"
               />
             </div>
@@ -1562,6 +1534,8 @@ function HistorySection({
   loading,
   leaveRequests,
   phlRecords,
+  phlSummary,
+  onRefreshPHL,
   employeeDirectory,
   cancellingId,
   onCancel,
@@ -1569,6 +1543,8 @@ function HistorySection({
   loading: boolean
   leaveRequests: LeaveRequest[]
   phlRecords: PHLRecord[]
+  phlSummary: PHLSnapshot | null
+  onRefreshPHL: () => void
   employeeDirectory: Employee[]
   cancellingId: string
   onCancel: (request: LeaveRequest) => void
@@ -1619,7 +1595,7 @@ function HistorySection({
       <div className="harmony-card overflow-hidden">
         <div className="border-b border-black/5 p-5 sm:p-6">
           <h3 className="text-lg font-semibold harmony-text-primary">
-            Saldo PHL Aktif
+            PHL
           </h3>
 
           <p className="mt-1 text-sm leading-6 harmony-text-secondary">
@@ -1630,17 +1606,38 @@ function HistorySection({
         <div className="p-4 sm:p-6">
           {loading ? (
             <LoadingState />
-          ) : phlRecords.length > 0 ? (
-            <div className="space-y-3">
-              {phlRecords.map((record) => (
-                <PHLBalanceCard key={record.id} record={record} />
-              ))}
+          ) : !phlSummary ? (
+            <div role="alert" className="space-y-3 rounded-2xl border border-red-200 bg-red-50/60 p-4 text-sm harmony-text-primary">
+              <p>Saldo PHL gagal dimuat.</p>
+              <button type="button" onClick={onRefreshPHL} className="harmony-button-secondary px-3 py-2 text-xs">Coba lagi</button>
             </div>
           ) : (
-            <EmptyState
-              title="Belum ada saldo PHL"
-              description="Saldo PHL akan muncul setelah PHL disetujui dan belum expired."
-            />
+            <div className="space-y-4">
+              <div className="rounded-2xl border border-sky-200/70 p-4">
+                <p className="text-xs font-semibold harmony-text-secondary">Saldo tersedia</p>
+                <p className="mt-1 text-xl font-bold harmony-text-primary">{phlSummary.total_available_days} hari</p>
+                <p className="mt-1 text-xs harmony-text-secondary">Ledger aktif {phlSummary.active_ledger_balance} hari · Saldo historis HR {phlSummary.legacy_balance} hari</p>
+              </div>
+              {phlSummary.legacy_balance > 0 && (
+                <div className="rounded-2xl border border-sky-200/70 bg-white/40 p-3">
+                  <div className="flex items-center justify-between gap-2 text-sm font-semibold harmony-text-primary"><span>Saldo historis HR</span><span>{phlSummary.legacy_balance} hari</span></div>
+                  <p className="mt-1 text-xs harmony-text-secondary">Tanggal sumber dan masa berlaku belum terverifikasi. Saldo mengikuti ledger historis HR, tanpa penetapan tanggal fiktif.</p>
+                </div>
+              )}
+              {([
+                { state: 'active', title: 'PHL aktif', amount: phlSummary.active_ledger_balance },
+                { state: 'expired', title: 'PHL expired', amount: phlSummary.expired_days },
+                { state: 'used', title: 'PHL terpakai', amount: phlSummary.used_days },
+              ] as const).map(group => {
+                const records = phlRecords.filter(record => record.display_state === group.state)
+                return <section key={group.state} className="space-y-2 border-t border-black/5 pt-3">
+                  <div className="flex items-center justify-between gap-2"><h4 className="text-sm font-semibold harmony-text-primary">{group.title}</h4><span className="text-xs font-semibold harmony-text-secondary">{group.amount} hari</span></div>
+                  {records.length ? records.map(record => <PHLBalanceCard key={record.id} record={record} />) : <p className="text-xs harmony-text-secondary">Tidak ada record dalam kategori ini.</p>}
+                  {group.state === 'used' && group.amount > 0 && <p className="text-xs harmony-text-secondary">Total terpakai termasuk pemakaian sebagian pada saldo aktif atau expired.</p>}
+                </section>
+              })}
+              <Link href="/employee/phl" className="text-xs font-semibold harmony-text-link">Lihat riwayat pengajuan saldo PHL</Link>
+            </div>
           )}
         </div>
       </div>
@@ -1797,22 +1794,21 @@ function HistoryCard({
 }
 
 function PHLBalanceCard({ record }: { record: PHLRecord }) {
+  const state = record.display_state
+  const label = state === 'active' ? 'Aktif' : state === 'expired' ? 'Expired' : 'Terpakai / habis'
+  const amount = state === 'used' ? (record.used_days ?? 0) : (record.remaining_days ?? 0)
   return (
-    <div className="rounded-[24px] border border-black/5 bg-[#f7edfc]/50 p-4">
+    <div className="rounded-2xl border border-black/5 bg-white/40 p-3">
       <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-sm font-bold harmony-text-primary">
-            {formatDisplayDate(record.phl_date || '')}
-          </p>
-
-          <p className="mt-1 text-xs leading-5 harmony-text-secondary">
-            Expired: {formatDisplayDate(record.expired_at || '')}
-          </p>
+        <div className="min-w-0">
+          <p className="text-sm font-semibold harmony-text-primary">{formatDisplayDate(record.phl_date || '')}</p>
+          <p className="mt-1 text-xs leading-5 harmony-text-secondary">{record.expired_at ? `Berlaku sampai: ${formatDisplayDate(record.expired_at)}` : 'Tanggal kedaluwarsa belum terverifikasi'}</p>
+          <p className="text-xs harmony-text-secondary">{record.balance_days ?? 0} hari asal · {record.used_days ?? 0} hari terpakai</p>
         </div>
-
-        <span className="rounded-full bg-white px-3 py-1 text-xs font-bold harmony-text-violet">
-          {record.remaining_days || 0} hari
-        </span>
+        <div className="shrink-0 text-right">
+          <span className="text-xs font-semibold harmony-text-primary">{label}</span>
+          <p className="text-sm font-bold harmony-text-primary">{amount} hari</p>
+        </div>
       </div>
 
       {record.reason && (
@@ -2113,10 +2109,6 @@ function countWorkingDays(start: string, end: string, holidays: Holiday[]) {
   }
 
   return total
-}
-
-function getTodayISO() {
-  return formatDateToISO(new Date())
 }
 
 function formatDateToISO(date: Date) {
