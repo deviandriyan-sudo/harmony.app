@@ -1,3 +1,4 @@
+import { harmonyFetch } from '@/lib/harmony-client'
 import { supabase } from '@/lib/supabase'
 
 export type PHLWorkAttachment = {
@@ -72,14 +73,8 @@ async function accessToken() {
 export async function fetchPHLWorkRequests(
   scope: 'mine' | 'team' | 'all' = 'mine',
 ) {
-  const token = await accessToken()
-  const response = await fetch(`/api/phl/work-requests?scope=${scope}`, {
-    headers: { Authorization: `Bearer ${token}` },
-    cache: 'no-store',
-    signal: AbortSignal.timeout(30_000),
-  })
-  const payload = (await response.json().catch(() => null)) as PHLWorkListResponse | null
-  if (!response.ok || payload?.success !== true || !Array.isArray(payload.requests)) {
+  const payload = await harmonyFetch<PHLWorkListResponse>(`/api/phl/work-requests?scope=${scope}`)
+  if (payload?.success !== true || !Array.isArray(payload.requests)) {
     throw new Error(payload?.error || 'Data pengajuan PHL gagal dimuat.')
   }
   return payload?.requests || []
@@ -93,16 +88,11 @@ export async function fetchTeamPHLWorkRequestsForPeriod(
   dateFrom: string,
   dateTo: string,
 ) {
-  const token = await accessToken()
   const params = new URLSearchParams({
     scope: 'team', employee_id: employeeId, date_from: dateFrom, date_to: dateTo,
   })
-  const response = await fetch(`/api/phl/work-requests?${params.toString()}`, {
-    headers: { Authorization: `Bearer ${token}` }, cache: 'no-store',
-    signal: AbortSignal.timeout(30_000),
-  })
-  const payload = (await response.json().catch(() => null)) as PHLWorkListResponse | null
-  if (!response.ok || payload?.success !== true || !Array.isArray(payload.requests)) {
+  const payload = await harmonyFetch<PHLWorkListResponse>(`/api/phl/work-requests?${params.toString()}`)
+  if (payload?.success !== true || !Array.isArray(payload.requests)) {
     throw new Error(payload?.error || 'Pengajuan PHL periode ini gagal dimuat.')
   }
   return payload?.requests || []

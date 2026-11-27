@@ -1,16 +1,21 @@
 import { NextRequest,NextResponse } from 'next/server'
 import { scaleupContext,requireScaleupHR,scaleupRouteError } from '@/lib/server/scaleup'
+import { readCompletePages, readIdBatches } from '@/lib/server/read-complete-pages'
 export const runtime='nodejs'
+type AuthorityRow={id:string;employee_id:string;created_at:string;[key:string]:unknown}
+type AuthorityPerson={id:string;full_name:string|null;position:string|null;department:string|null}
 const KEYS=new Set(['wadirsdk','finance','director','supervisor_delegate'])
 export async function GET(request:NextRequest) {
   try {const ctx=await scaleupContext(request);requireScaleupHR(ctx)
-    const {data:authorities,error}=await ctx.admin.from('scaleup_role_authorities').select('*')
-      .order('created_at',{ascending:false}).limit(200)
-    if(error)throw error
-    const ids=[...new Set((authorities||[]).map(x=>x.employee_id))]
-    const names=ids.length ? await ctx.admin.from('employees').select('id,full_name,position,department').in('id',ids) : {data:[],error:null}
-    if(names.error)throw names.error
-    return NextResponse.json({authorities:(authorities||[]).map(a=>({...a,employee:(names.data||[]).find(e=>e.id===a.employee_id)}))})
+    const authorities=await readCompletePages<AuthorityRow>((from,to)=>ctx.admin.from('scaleup_role_authorities').select('*',{count:'exact'}).order('id').range(from,to),'Pemetaan pejabat SCALE UP')
+    authorities.sort((a,b)=>String(b.created_at).localeCompare(String(a.created_at))||b.id.localeCompare(a.id))
+    const names=await readIdBatches<AuthorityPerson>(authorities.map(row=>row.employee_id),async ids=>{
+      const response=await ctx.admin.from('employees').select('id,full_name,position,department').in('id',ids)
+      if(response.error)throw response.error
+      return response.data||[]
+    })
+    const people=new Map(names.map(row=>[row.id,row]))
+    return NextResponse.json({authorities:authorities.map(a=>({...a,employee:people.get(a.employee_id)}))},{headers:{'Cache-Control':'private, no-store'}})
   }catch(error){const e=scaleupRouteError(error);return NextResponse.json({message:e.message},{status:e.status})}
 }
 export async function POST(request:NextRequest) {

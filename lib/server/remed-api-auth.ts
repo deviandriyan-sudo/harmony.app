@@ -87,21 +87,27 @@ export async function requireRemedApi(
 
   access.role = role
 
-  await assertHarmonySystemAvailable(admin, role)
-
   if (allowedRoles?.length && !allowedRoles.includes(role)) {
     throw Object.assign(new Error('Akun ini tidak memiliki akses untuk proses tersebut.'), { status: 403 })
   }
 
-  let employee: RemedEmployeeIdentity | null = null
-  if (access.employee_id) {
-    const result = await admin
-      .from('employees')
-      .select('id,employee_number,full_name,department,position,email,is_active,sinarmas_account_number,sinarmas_account_name')
-      .eq('id', access.employee_id)
-      .maybeSingle()
-    if (!result.error && result.data) employee = result.data as RemedEmployeeIdentity
-  }
+  const boundAccess=access
+  const [employee] = await Promise.all([
+    (async (): Promise<RemedEmployeeIdentity | null> => {
+      let employee: RemedEmployeeIdentity | null = null
+      if (boundAccess.employee_id) {
+        const result = await admin
+          .from('employees')
+          .select('id,employee_number,full_name,department,position,email,is_active,sinarmas_account_number,sinarmas_account_name')
+          .eq('id', boundAccess.employee_id)
+          .maybeSingle()
+        if (!result.error && result.data) employee = result.data as RemedEmployeeIdentity
+      }
+
+      return employee
+    })(),
+    assertHarmonySystemAvailable(admin, role),
+  ])
 
   return { admin, access, employee, authUserId, authEmail }
 }

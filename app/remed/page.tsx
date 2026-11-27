@@ -2,7 +2,6 @@
 
 import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { Loader2 } from 'lucide-react'
 
 import { getRemedUiSession } from '@/lib/remed-session-client'
 
@@ -20,8 +19,6 @@ export default function RemedIndexPage() {
   }, [router])
 
   return (
-    <main className="flex min-h-screen items-center justify-center">
-      <Loader2 className="animate-spin harmony-text-success" />
-    </main>
+    <div className="p-4 text-xs harmony-text-secondary" role="status">Menyiapkan halaman Re-Med…</div>
   )
 }

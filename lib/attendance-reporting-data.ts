@@ -1,4 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { readCompletePages } from '@/lib/server/read-complete-pages'
+import { readErrorMessage } from '@/lib/error-utils'
 
 import {
   getCutoffRange,
@@ -80,51 +82,49 @@ export type AttendanceReportingRow = {
 }
 
 /** Historical HR exports must not silently stop at Supabase's default row limit. */
-async function allPages<T>(
-  query: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>,
-): Promise<{ data: T[]; error: { message: string } | null }> {
-  const output: T[] = []
-  const pageSize = 500
-  for (let offset = 0; ; offset += pageSize) {
-    const result = await query(offset, offset + pageSize - 1)
-    if (result.error) return { data: [], error: result.error }
-    output.push(...(result.data || []))
-    if ((result.data || []).length < pageSize) break
-    if (offset >= 100000) return { data: [], error: { message: 'Jumlah data terlalu besar. Persempit rentang laporan.' } }
-  }
-  return { data: output, error: null }
+async function allPages<T extends {id?: unknown}>(
+  query: (from: number, to: number) => PromiseLike<{data:T[]|null;error:unknown;count:number|null}>,
+): Promise<{data:T[];error:{message:string}|null}> {
+  try { return {data:await readCompletePages(query,'Laporan absensi HR',100_000),error:null} }
+  catch(error){return {data:[],error:{message:readErrorMessage(error)||'Data laporan belum lengkap.'}}}
 }
 
 export async function loadAttendanceReportingDataset(
   supabase: SupabaseClient,
   periodMonth: string,
-  options: { exhaustive?: boolean } = {},
+  _options: { exhaustive?: boolean } = {},
 ): Promise<AttendanceReportingDataset> {
+  // All views now require complete data; retain the prior options argument for callers.
+  void _options
   const range = getCutoffRange(periodMonth)
   const warnings: string[] = []
 
-  const [employeeResult, logResult, holidayResult, confirmationResult] = await Promise.all([
-    supabase.from('employees').select('*').order('full_name', { ascending: true }),
-    options.exhaustive ? allPages((from, to) => supabase
-      .from('attendance_logs').select('*')
+  const [employeeResult, logResult, holidayResult, confirmationResult, leaveResult, phlResult, requestTypeResult] = await Promise.all([
+    allPages((from,to)=>supabase.from('employees').select('*',{count:'exact'}).order('full_name', { ascending: true }).order('id').range(from,to)),
+    allPages((from, to) => supabase
+      .from('attendance_logs').select('*',{count:'exact'})
       .is('deleted_at', null).gte('attendance_date', range.start).lte('attendance_date', range.end)
-      .order('attendance_date', { ascending: true }).order('id', { ascending: true }).range(from, to)) : supabase
-      .from('attendance_logs')
-      .select('*')
-      .is('deleted_at', null)
-      .gte('attendance_date', range.start)
-      .lte('attendance_date', range.end)
-      .order('attendance_date', { ascending: true }),
+      .order('attendance_date', { ascending: true }).order('id', { ascending: true }).range(from, to)),
     supabase
       .from('holidays')
       .select('*')
       .eq('is_active', true)
       .gte('holiday_date', range.start)
       .lte('holiday_date', range.end),
+    allPages((from,to)=>supabase
+      .from('attendance_period_confirmations').select('*',{count:'exact'})
+      .eq('period_month', periodMonth).order('id').range(from,to)),
+    allPages((from, to) => supabase
+      .from('leave_requests').select('*',{count:'exact'}).lte('start_date', range.end).gte('end_date', range.start)
+      .order('start_date', { ascending: true }).order('id', { ascending: true }).range(from, to)),
+    allPages((from, to) => supabase
+      .from('phl_records').select('*',{count:'exact'}).eq('source', 'employee_phl_claim')
+      .gte('phl_date', range.start).lte('phl_date', range.end)
+      .order('phl_date', { ascending: true }).order('id', { ascending: true }).range(from, to)),
     supabase
-      .from('attendance_period_confirmations')
-      .select('*')
-      .eq('period_month', periodMonth),
+      .from('harmony_request_types')
+      .select('code,label,request_category,attendance_status,is_leave_like,is_absence_like,is_phl_claim,is_active')
+      .order('sort_order', { ascending: true }),
   ])
 
   if (employeeResult.error) throw employeeResult.error
@@ -132,42 +132,10 @@ export async function loadAttendanceReportingDataset(
   if (holidayResult.error) throw holidayResult.error
   if (confirmationResult.error) throw confirmationResult.error
 
-  const [leaveResult, phlResult, requestTypeResult] = await Promise.all([
-    options.exhaustive ? allPages((from, to) => supabase
-      .from('leave_requests').select('*').lte('start_date', range.end).gte('end_date', range.start)
-      .order('start_date', { ascending: true }).order('id', { ascending: true }).range(from, to)) : supabase
-      .from('leave_requests')
-      .select('*')
-      .lte('start_date', range.end)
-      .gte('end_date', range.start)
-      .order('start_date', { ascending: true }),
-    options.exhaustive ? allPages((from, to) => supabase
-      .from('phl_records').select('*').eq('source', 'employee_phl_claim')
-      .gte('phl_date', range.start).lte('phl_date', range.end)
-      .order('phl_date', { ascending: true }).order('id', { ascending: true }).range(from, to)) : supabase
-      .from('phl_records')
-      .select('*')
-      .eq('source', 'employee_phl_claim')
-      .gte('phl_date', range.start)
-      .lte('phl_date', range.end)
-      .order('phl_date', { ascending: true }),
-    supabase
-      .from('harmony_request_types')
-      .select('code,label,request_category,attendance_status,is_leave_like,is_absence_like,is_phl_claim,is_active')
-      .order('sort_order', { ascending: true }),
-  ])
-
-  if (leaveResult.error) {
-    warnings.push(`Direct leave/ST source belum terbaca: ${leaveResult.error.message}`)
-  }
-
-  if (phlResult.error) {
-    warnings.push(`Direct PHL claim source belum terbaca: ${phlResult.error.message}`)
-  }
-
-  if (requestTypeResult.error) {
-    warnings.push(`Master jenis request tidak terbaca; classifier memakai fallback code/label: ${requestTypeResult.error.message}`)
-  }
+  // Reports and downstream operations must not classify missing sources as absences.
+  if (leaveResult.error) throw leaveResult.error
+  if (phlResult.error) throw phlResult.error
+  if (requestTypeResult.error) throw requestTypeResult.error
 
   const leaveRequests: AttendanceReportingRequest[] = (leaveResult.data || [])
     .filter((item) => String(item.request_type || '').trim().toLowerCase() !== 'phl_claim')

@@ -1,25 +1,36 @@
 import { NextRequest,NextResponse } from 'next/server'
 import { scaleupContext,requireScaleupHR,requireScaleupEmployee,scaleupRouteError } from '@/lib/server/scaleup'
+import { readCompletePages, readIdBatches } from '@/lib/server/read-complete-pages'
 export const runtime='nodejs'
+type TrainingRecord={id:string;employee_id:string;created_at:string;[key:string]:unknown}
+type RecordPerson={id:string;full_name:string|null;employee_number:string|null;department:string|null}
+type Certificate={id:string;record_id:string;[key:string]:unknown}
 export async function GET(request:NextRequest) {
   try {
     const ctx=await scaleupContext(request)
-    let query=ctx.admin.from('scaleup_training_records').select('*').order('created_at',{ascending:false}).limit(1000)
-    if(!ctx.isHR)query=query.eq('employee_id',requireScaleupEmployee(ctx))
-    const {data,error}=await query;if(error)throw error
-    const ids=[...new Set((data||[]).map(row=>row.employee_id))]
-    const employees=ids.length ? await ctx.admin.from('employees')
-      .select('id,full_name,employee_number,department').in('id',ids) : {data:[],error:null}
-    if(employees.error)throw employees.error
-    const documentsQuery=ctx.admin.from('scaleup_training_documents')
-      .select('id,record_id,category,certificate_number,issue_date,expiration_date,original_name')
-      .eq('category','certificate')
-    const docs=ctx.isHR ? await documentsQuery.limit(1000) : await documentsQuery.eq('employee_id',requireScaleupEmployee(ctx)).limit(1000)
-    if(docs.error)throw docs.error
-    return NextResponse.json({records:(data||[]).map(row=>({...row,
-      employee:(employees.data||[]).find(e=>e.id===row.employee_id)||null,
-      certificates:(docs.data||[]).filter(d=>d.record_id===row.id),
-    }))})
+    const employeeId=ctx.isHR?null:requireScaleupEmployee(ctx)
+    const data=await readCompletePages<TrainingRecord>((from,to)=>{
+      let query=ctx.admin.from('scaleup_training_records').select('*',{count:'exact'}).order('id')
+      if(employeeId)query=query.eq('employee_id',employeeId)
+      return query.range(from,to)
+    },'Riwayat training SCALE UP')
+    data.sort((a,b)=>String(b.created_at).localeCompare(String(a.created_at))||b.id.localeCompare(a.id))
+    const [employees,docs]=await Promise.all([
+      readIdBatches<RecordPerson>(data.map(row=>row.employee_id),async ids=>{
+        const response=await ctx.admin.from('employees').select('id,full_name,employee_number,department').in('id',ids)
+        if(response.error)throw response.error
+        return response.data||[]
+      }),
+      readIdBatches(data.map(row=>row.id),ids=>readCompletePages<Certificate>((from,to)=>{
+        let query=ctx.admin.from('scaleup_training_documents').select('id,record_id,category,certificate_number,issue_date,expiration_date,original_name',{count:'exact'}).eq('category','certificate').in('record_id',ids).order('id')
+        if(employeeId)query=query.eq('employee_id',employeeId)
+        return query.range(from,to)
+      },'Sertifikat SCALE UP',10000)),
+    ])
+    const names=new Map(employees.map(row=>[row.id,row]))
+    const certificates=new Map<string,Certificate[]>()
+    for(const doc of docs){const rows=certificates.get(doc.record_id)||[];rows.push(doc);certificates.set(doc.record_id,rows)}
+    return NextResponse.json({records:data.map(row=>({...row,employee:names.get(row.employee_id)||null,certificates:certificates.get(row.id)||[]}))},{headers:{'Cache-Control':'private, no-store'}})
   }catch(error){const e=scaleupRouteError(error);return NextResponse.json({message:e.message},{status:e.status})}
 }
 export async function POST(request:NextRequest) {

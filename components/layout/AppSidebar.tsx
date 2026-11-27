@@ -7,7 +7,8 @@ import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Loader2, LogOut, Pin, PinOff } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
-import { clearRemedUiSession } from '@/lib/remed-session-client'
+import { clearRemedUiSession, getRemedUiSession } from '@/lib/remed-session-client'
+import { clearHarmonyUiAccess, prewarmHarmonyUiAccess } from '@/lib/harmony-ui-access'
 import { isNavigationActive, type NavigationItem } from '@/lib/navigation'
 import { useEmployeeAvatar } from '@/components/profile/useEmployeeAvatar'
 
@@ -68,6 +69,7 @@ export function AppSidebar({ menu, title = 'HARMONY', userName = 'HARMONY User',
       localStorage.removeItem('harmony_user')
       localStorage.removeItem('remed_user')
       clearRemedUiSession()
+      clearHarmonyUiAccess()
       sessionStorage.clear()
       router.replace('/login')
       router.refresh()
@@ -76,10 +78,20 @@ export function AppSidebar({ menu, title = 'HARMONY', userName = 'HARMONY User',
       localStorage.removeItem('harmony_user')
       localStorage.removeItem('remed_user')
       clearRemedUiSession()
+      clearHarmonyUiAccess()
       sessionStorage.clear()
       router.replace('/login')
       router.refresh()
     } finally { setLoggingOut(false) }
+  }
+
+  // Warm only an explicitly indicated cross-module destination, never all menus.
+  function warmModule(href: string) {
+    const sourceIsRemed = pathname.startsWith('/remed')
+    const targetIsRemed = href.startsWith('/remed')
+    if (sourceIsRemed === targetIsRemed) return
+    if (targetIsRemed) void getRemedUiSession().catch(() => undefined)
+    else void prewarmHarmonyUiAccess().catch(() => undefined)
   }
 
   const sidebar = <aside className={`harmony-sidebar-shell harmony-motion-rail ${mobile ? 'harmony-sidebar-mobile' : ''} ${pinned && !mobile ? 'harmony-sidebar-pinned' : ''}`} aria-label="Navigasi HARMONY">
@@ -104,7 +116,7 @@ export function AppSidebar({ menu, title = 'HARMONY', userName = 'HARMONY User',
             const active = isNavigationActive(pathname, item)
             const Icon = item.icon
             const tone = getNavTone(item)
-            return <Link key={item.href} href={item.href} aria-label={item.title} onClick={onNavigate} aria-current={active ? 'page' : undefined}
+            return <Link key={item.href} href={item.href} aria-label={item.title} onClick={() => { warmModule(item.href); onNavigate?.() }} onPointerEnter={() => warmModule(item.href)} onFocus={() => warmModule(item.href)} aria-current={active ? 'page' : undefined}
               data-nav-tone={tone}
               className={`harmony-nav-item harmony-liquid-lit harmony-motion-nav harmony-nav-tone-${tone} ${active ? 'harmony-nav-active' : ''} ${item.remed ? 'harmony-nav-remed' : ''} group flex h-10 items-center gap-2 rounded-[9px] px-2 text-slate-700 transition-colors duration-200 focus-visible:outline-2 focus-visible:outline-blue-500`}>
               <span className={`harmony-nav-icon harmony-nav-icon-tone-${tone} flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${active ? 'bg-white/10 text-white' : item.remed ? 'bg-emerald-50 text-emerald-700' : 'bg-white/65 text-slate-600 group-hover:text-blue-600'}`}><Icon size={19} strokeWidth={2} /></span>

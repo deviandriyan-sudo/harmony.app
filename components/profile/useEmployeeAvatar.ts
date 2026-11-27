@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { harmonyFetch } from '@/lib/harmony-client'
+import { authReadEpoch, getAuthorizedToken, isCurrentRead, requestWithToken } from '@/lib/harmony-client'
 import { supabase } from '@/lib/supabase'
 
 const UPDATED_EVENT = 'harmony:avatar-updated'
@@ -20,9 +20,9 @@ function invalidateAvatar() {
 }
 
 async function readAvatar(): Promise<string> {
-  const { data, error } = await supabase.auth.getSession()
-  if (error || !data.session?.access_token) return ''
-  const token = data.session.access_token
+  const token = await getAuthorizedToken().catch(() => '')
+  if (!token) return ''
+  const epoch = authReadEpoch()
   if (cachedUserToken !== token) {
     cachedUserToken = token
     cachedUrl = ''
@@ -32,12 +32,13 @@ async function readAvatar(): Promise<string> {
   if (inflight) return inflight
   const requestGeneration = generation
   const request = (async () => {
-    const profile = await harmonyFetch<ProfileDocuments>('/api/employee/profile')
+    const profile = await requestWithToken<ProfileDocuments>(token, '/api/employee/profile')
     const latest = (profile.documents || []).find((document) => document.category === 'avatar')
     if (!latest) return ''
-    const signed = await harmonyFetch<{ url: string }>(`/api/employee/profile/documents?id=${encodeURIComponent(latest.id)}`)
+    const signed = await requestWithToken<{ url: string }>(token, `/api/employee/profile/documents?id=${encodeURIComponent(latest.id)}`)
     return signed.url
   })().then((url) => {
+    if (!isCurrentRead(token,epoch) || cachedUserToken !== token || generation !== requestGeneration) return ''
     if (cachedUserToken === token && generation === requestGeneration) {
       cachedUrl = url
       cachedUntil = Date.now() + CACHE_MS
@@ -67,9 +68,15 @@ export function useEmployeeAvatar(enabled = true) {
     void readAvatar().then((url) => { if (active) setAvatarUrl(url) })
     function updated() { void refresh(true) }
     function visible() { if (document.visibilityState === 'visible') void refresh() }
+    const {data:{subscription}}=supabase.auth.onAuthStateChange((event,session)=>{
+      if(event==='SIGNED_OUT' || (cachedUserToken && session?.access_token!==cachedUserToken)){
+        cachedUrl=''; invalidateAvatar(); if(active)setAvatarUrl('')
+        if (session?.access_token) queueMicrotask(() => { if (active) void readAvatar().then(url => { if (active) setAvatarUrl(url) }) })
+      }
+    })
     window.addEventListener(UPDATED_EVENT, updated)
     document.addEventListener('visibilitychange', visible)
-    return () => { active = false; window.removeEventListener(UPDATED_EVENT, updated); document.removeEventListener('visibilitychange', visible) }
+    return () => { active = false; subscription.unsubscribe(); window.removeEventListener(UPDATED_EVENT, updated); document.removeEventListener('visibilitychange', visible) }
   }, [enabled, refresh])
   return avatarUrl
 }

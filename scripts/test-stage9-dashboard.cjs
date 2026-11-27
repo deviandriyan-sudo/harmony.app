@@ -44,6 +44,8 @@ async function checkRole(role) {
     submitted_amount: i * 21 + 100,
     created_at: new Date(2_026, 0, 1, 0, 0, i).toISOString(),
   }))
+  let totalReads = 0
+  const totals = { totalClaims: claims.length, pendingHR: claims.filter(x => x.status === 'pending_hr').length, paidCount: claims.filter(x => x.status === 'paid').length, paidTotal: claims.filter(x => x.status === 'paid').reduce((n, x) => n + Number(x.approved_amount || x.submitted_amount || 0), 0), financeSummary: {review: claims.filter(x => x.status === 'pending_finance').length, waitingPayment: claims.filter(x => x.status === 'waiting_payment').length, followup: 0, periodPaidTotal: 0} }
   const context = {
     access: { role },
     admin: { from(table) { assert.equal(table, 'remed_claims'); return makeTable(claims) } },
@@ -57,6 +59,7 @@ async function checkRole(role) {
         requireRemedApi: async () => context,
         remedApiError: err => ({ status: err.status || 500, message: err.message }),
       }
+      if (moduleName === '@/lib/server/remed-dashboard-totals') return { getRemedDashboardTotals: async () => { totalReads++; return totals } }
       if (moduleName === '@/lib/server/remed-data') return { enrichRemedClaims: async (_, recent) => recent }
       throw Error(`Unexpected import ${moduleName}`)
     },
@@ -71,6 +74,9 @@ async function checkRole(role) {
   assert.equal(result.body.stats.totalClaims, claims.length)
   assert.equal(result.body.stats.pending, role === 'hr' ? 95 : 107)
   assert.equal(result.body.recentClaims.length, 8)
+  assert.equal(totalReads, 1)
+  if (role === 'finance') assert.deepEqual(result.body.financeSummary, totals.financeSummary)
+  else assert.equal(result.body.financeSummary, undefined)
 }
 
 Promise.all([checkRole('hr'), checkRole('finance')])

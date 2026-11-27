@@ -6,7 +6,7 @@ import { readErrorMessage } from '@/lib/error-utils'
 import Image from 'next/image'
 import { useEffect, useState } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
-import { Loader2, Menu, ShieldAlert, X } from 'lucide-react'
+import { Menu, ShieldAlert, X } from 'lucide-react'
 
 import { AppSidebar } from '@/components/layout/AppSidebar'
 import { navigationForRole } from '@/lib/navigation'
@@ -16,6 +16,7 @@ import { hasSupervisorAssignments } from '@/lib/supervisor-navigation'
 import { getRemedUiSession } from '@/lib/remed-session-client'
 import type { RemedSession } from '@/types/remed'
 import { HarmonyAccessState } from '@/components/system/HarmonyAccessState'
+import { supabase } from '@/lib/supabase'
 
 export default function RemedLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter()
@@ -26,30 +27,39 @@ export default function RemedLayout({ children }: { children: React.ReactNode })
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
   const [hasSubordinates, setHasSubordinates] = useState(false)
 
-  async function loadSession() {
+  async function loadSession(isActive: () => boolean) {
     setLoading(true)
     try {
       const payload = await getRemedUiSession()
+      if (!isActive()) return
       setSession(payload.session)
-      localStorage.setItem('remed_user', JSON.stringify(payload.session))
+      // Session contains bank data; never persist it to localStorage.
+      try { localStorage.removeItem('remed_user') } catch { /* private mode */ }
     } catch (error: unknown) {
-      localStorage.removeItem('remed_user')
+      if (!isActive()) return
+      setSession(null)
+      try { localStorage.removeItem('remed_user') } catch { /* private mode */ }
       setMessage(readErrorMessage(error) || 'Akses Re-Med tidak tersedia.')
     } finally {
-      setLoading(false)
+      if (isActive()) setLoading(false)
     }
   }
 
   useEffect(() => {
     let active = true
     // Start session/data loading after the effect setup, avoiding a cascading synchronous render.
-    queueMicrotask(() => { if (active) void loadSession() })
-    return () => { active = false }
-  }, [])
+    queueMicrotask(() => { if (active) void loadSession(() => active) })
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(event => {
+      if (event === 'SIGNED_OUT') { active = false; setSession(null); router.replace('/login') }
+    })
+    return () => { active = false; subscription.unsubscribe() }
+  }, [router])
 
   useEffect(() => {
     if (session?.role !== 'employee' || !session.employeeId) return
-    void hasSupervisorAssignments(session.employeeId).then(setHasSubordinates)
+    let active = true
+    void hasSupervisorAssignments(session.employeeId).then(value => { if (active) setHasSubordinates(value) })
+    return () => { active = false }
   }, [session])
 
   useEffect(() => {
@@ -80,7 +90,17 @@ export default function RemedLayout({ children }: { children: React.ReactNode })
       ? navigationForRole('finance')
       : navigationForRole('employee', { remed: true, supervisor: hasSubordinates })
 
-  if (loading) return <AccessLoading message={message} />
+  if (loading) return (
+    <main className="harmony-shell min-h-screen">
+      <div className="harmony-workspace mx-auto max-w-[1540px] p-4 sm:p-6">
+        <header className="flex items-center gap-3 border-b border-black/5 pb-4">
+          <Image src="/logo.png" alt="HARMONY" width={36} height={36} />
+          <h1 className="text-xl font-semibold harmony-text-primary">Re-Med</h1>
+        </header>
+        <p className="mt-4 text-xs harmony-text-secondary" role="status">{message}</p>
+      </div>
+    </main>
+  )
 
   if (!session) {
     return (
@@ -94,6 +114,10 @@ export default function RemedLayout({ children }: { children: React.ReactNode })
       />
     )
   }
+
+  // Wrong-role routes may display the authorized shell, never the protected child.
+  const requestedRole = pathname.startsWith('/remed/hr') ? 'hr' : pathname.startsWith('/remed/finance') ? 'finance' : pathname.startsWith('/remed/employee') ? 'employee' : null
+  const routeAllowed = !requestedRole || requestedRole === session.role
 
   const roleLabel = session.role === 'finance'
     ? 'Finance · Re-Med'
@@ -157,7 +181,7 @@ export default function RemedLayout({ children }: { children: React.ReactNode })
             <div className="harmony-rc2o-remed-topbar flex min-h-[56px] items-center justify-between gap-3 px-4 py-2.5 print:hidden sm:px-6">
               <p className="truncate text-sm font-semibold harmony-text-primary">Re-Med · {REMED_ROLE_LABELS[session.role]}</p>
                 </div>
-            <ModuleSubnav role={session.role} />{children}
+            <ModuleSubnav role={session.role} />{routeAllowed ? children : null}
           </div>
         </main>
       </div>
@@ -171,13 +195,3 @@ function roleHome(role: RemedSession['role']) {
   return '/remed/employee/dashboard'
 }
 
-function AccessLoading({ message }: { message: string }) {
-  return (
-    <HarmonyAccessState
-      title="Memeriksa Akses Re-Med"
-      message={message}
-      tone="remed"
-      icon={<Loader2 size={30} className="animate-spin" />}
-    />
-  )
-}

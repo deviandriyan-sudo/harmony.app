@@ -12,7 +12,7 @@ assert(dossier.includes("new Event('harmony:avatar-updated')"),'Cross-shell avat
 assert(dossier.includes('preserveDraft'),'Unsubmitted biodata must be preserved during avatar upload')
 assert(dossier.includes('lg:break-words')&&!dossier.includes('lg:grid-cols-[230px_minmax(0,1fr)]'),'Account navigation clipping fix missing')
 assert(dossier.includes('<details key={group}'),'Compact document categories missing')
-assert(hook.includes('harmonyFetch<ProfileDocuments>') && /document\.category\s*===\s*'avatar'/.test(hook), 'Avatar must come from existing authorized profile API')
+assert(hook.includes("requestWithToken<ProfileDocuments>(token, '/api/employee/profile')") && hook.includes('isCurrentRead(token,epoch)') && /document\.category\s*===\s*'avatar'/.test(hook), 'Avatar must come from existing authorized profile API')
 assert(/useEmployeeAvatar\(/.test(sidebar) && sidebar.includes('{profilePhoto?'), 'Sidebar profile image missing')
 assert(docsApi.includes("requireProfileAccess(request)")&&docsApi.includes("category==='avatar'")&&docsApi.includes('scannedSignedUrl'),'Original private avatar API or access checks missing')
 console.log('HARMONY profile photo / icons / document grouping PASS')

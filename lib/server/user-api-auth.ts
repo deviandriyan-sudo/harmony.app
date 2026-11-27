@@ -116,37 +116,43 @@ export async function requireHarmonyApi(
     )
   }
 
-  await assertHarmonySystemAvailable(admin, appUser.role)
+  const boundAppUser=appUser
+  const [employee] = await Promise.all([
+    (async (): Promise<HarmonyEmployeeIdentity | null> => {
+      let employee: HarmonyEmployeeIdentity | null = null
 
-  let employee: HarmonyEmployeeIdentity | null = null
+      if (boundAppUser.employee_id) {
+        const byEmployeeId = await admin
+          .from('employees')
+          .select(
+            'id,employee_number,machine_pin,full_name,department,position,email,supervisor_1,supervisor_2,join_date,is_active',
+          )
+          .eq('id', boundAppUser.employee_id)
+          .maybeSingle()
 
-  if (appUser.employee_id) {
-    const byEmployeeId = await admin
-      .from('employees')
-      .select(
-        'id,employee_number,machine_pin,full_name,department,position,email,supervisor_1,supervisor_2,join_date,is_active',
-      )
-      .eq('id', appUser.employee_id)
-      .maybeSingle()
+        if (!byEmployeeId.error && byEmployeeId.data) {
+          employee = byEmployeeId.data as HarmonyEmployeeIdentity
+        }
+      }
 
-    if (!byEmployeeId.error && byEmployeeId.data) {
-      employee = byEmployeeId.data as HarmonyEmployeeIdentity
-    }
-  }
+      if (!employee && !boundAppUser.employee_id && authEmail && authData.user?.email_confirmed_at) {
+        const byEmployeeEmail = await admin
+          .from('employees')
+          .select(
+            'id,employee_number,machine_pin,full_name,department,position,email,supervisor_1,supervisor_2,join_date,is_active',
+          )
+          .ilike('email', authEmail)
+          .maybeSingle()
 
-  if (!employee && !appUser.employee_id && authEmail && authData.user.email_confirmed_at) {
-    const byEmployeeEmail = await admin
-      .from('employees')
-      .select(
-        'id,employee_number,machine_pin,full_name,department,position,email,supervisor_1,supervisor_2,join_date,is_active',
-      )
-      .ilike('email', authEmail)
-      .maybeSingle()
+        if (!byEmployeeEmail.error && byEmployeeEmail.data) {
+          employee = byEmployeeEmail.data as HarmonyEmployeeIdentity
+        }
+      }
 
-    if (!byEmployeeEmail.error && byEmployeeEmail.data) {
-      employee = byEmployeeEmail.data as HarmonyEmployeeIdentity
-    }
-  }
+      return employee
+    })(),
+    assertHarmonySystemAvailable(admin, appUser.role),
+  ])
 
   if (normalizeHarmonyRole(appUser.role) === 'employee' && employee?.is_active === false) {
     throw Object.assign(new Error('Employee Master tidak aktif; akses karyawan ditolak.'), { status: 403 })

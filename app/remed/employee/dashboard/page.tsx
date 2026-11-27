@@ -3,7 +3,7 @@
 
 import { readErrorMessage } from '@/lib/error-utils'
 import Link from 'next/link'
-import { useEffect, useEffectEvent, useState } from 'react'
+import { useEffect, useEffectEvent, useRef, useState } from 'react'
 import { Activity, CircleDollarSign, FileClock, WalletCards } from 'lucide-react'
 import { RemedClaimList } from '@/components/remed/RemedClaimList'
 import { RemedStatCard } from '@/components/remed/RemedStatCard'
@@ -16,12 +16,16 @@ type DashboardPayload = { entitlement: RemedEntitlement | null; recentClaims: Re
 export default function RemedEmployeeDashboard() {
   const [data, setData] = useState<DashboardPayload | null>(null)
   const [error, setError] = useState('')
+  const loadGeneration = useRef(0)
 
   async function load() {
+    const generation = ++loadGeneration.current
     try {
       setError('')
-      setData(await remedFetch<DashboardPayload>('/api/remed/dashboard'))
+      const result = await remedFetch<DashboardPayload>('/api/remed/dashboard')
+      if (loadGeneration.current === generation) setData(result)
     } catch (e: unknown) {
+      if (loadGeneration.current !== generation) return
       setError(readErrorMessage(e) || 'Gagal memuat dashboard Re-Med.')
       setData(null)
     }
@@ -39,6 +43,7 @@ export default function RemedEmployeeDashboard() {
     const interval = window.setInterval(refresh, 60_000)
     return () => {
       active = false
+      loadGeneration.current += 1
       window.removeEventListener('focus', refresh)
       document.removeEventListener('visibilitychange', refresh)
       window.clearInterval(interval)
@@ -61,13 +66,13 @@ export default function RemedEmployeeDashboard() {
       {error ? <div className="rounded-[22px] border border-red-100 bg-red-50 p-4 text-sm text-red-700">{error}</div> : null}
 
       <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
-        <RemedStatCard label="Plafond" value={ent ? formatFullRupiah(ent.plafond_total) : '-'} helper={ent ? `Tahun ${ent.period_year}` : 'Belum diatur HR'} icon={WalletCards} />
+        <RemedStatCard label="Plafond" value={ent ? formatFullRupiah(ent.plafond_total) : '-'} helper={ent ? `Tahun ${ent.period_year}` : data ? 'Belum diatur HR' : 'Belum tersedia'} icon={WalletCards} />
         <RemedStatCard label="Terpakai" value={ent ? formatFullRupiah(used) : '-'} helper="Legacy + pembayaran Re-Med" icon={CircleDollarSign} />
         <RemedStatCard label="Pending" value={ent ? formatFullRupiah(ent.reserved_amount) : '-'} helper="Klaim yang sedang diproses" icon={Activity} />
         <RemedStatCard label="Tersedia" value={ent ? formatFullRupiah(ent.available_amount) : '-'} helper="Bisa diajukan" icon={FileClock} />
       </div>
 
-      {!ent && !error ? <div className="rounded-[22px] border border-amber-100 bg-amber-50 p-5 text-sm text-amber-800">Plafond tahun berjalan belum diatur. Hubungi HR sebelum membuat klaim.</div> : null}
+      {data && !ent && !error ? <div className="rounded-[22px] border border-amber-100 bg-amber-50 p-5 text-sm text-amber-800">Plafond tahun berjalan belum diatur. Hubungi HR sebelum membuat klaim.</div> : null}
 
       <div className="harmony-unified-surface">
         <div className="flex items-center justify-between gap-4 border-b border-black/[0.055] p-5 sm:p-6">
@@ -77,7 +82,7 @@ export default function RemedEmployeeDashboard() {
           </div>
           <Link href="/remed/employee/claims" className="rounded-[14px] bg-emerald-50 px-4 py-2 text-sm font-bold text-emerald-700 transition hover:bg-emerald-100">Lihat Semua</Link>
         </div>
-        <div className="p-3 sm:p-4"><RemedClaimList claims={data?.recentClaims || []} /></div>
+        <div className="p-3 sm:p-4">{data ? <RemedClaimList claims={data.recentClaims} /> : <p role="status" className="p-4 text-xs harmony-text-secondary">{error ? 'Data klaim belum tersedia.' : 'Mengambil klaim terbaru...'}</p>}</div>
       </div>
     </section>
   )

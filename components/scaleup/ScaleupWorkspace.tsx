@@ -1,6 +1,6 @@
 'use client'
 import { useCallback, useEffect, useMemo, useState, useRef, useId, type FormEvent } from 'react'
-import { Activity, Award, BookOpen, Check, FileText, GraduationCap, Loader2, Plus, Printer, RefreshCcw, Settings2, ShieldCheck, X } from 'lucide-react'
+import { Activity, Award, BookOpen, Check, FileText, GraduationCap, Plus, Printer, RefreshCcw, Settings2, ShieldCheck, X } from 'lucide-react'
 import Image from 'next/image'
 import { harmonyFetch } from '@/lib/harmony-client'
 import { planScaleupApproval, ROLE_LABELS, type Nominees, type ScaleupRole, type ApprovalPolicy } from '@/lib/scaleup/workflow'
@@ -83,7 +83,7 @@ export function ScaleupWorkspace({mode}:{mode:'hr'|'employee'}) {
   const hr=mode==='hr';const [tab,setTab]=useState<Tab>('overview'),[data,setData]=useState<RequestRow[]>([])
   const [records,setRecords]=useState<RecordRow[]>([]),[authorities,setAuthorities]=useState<Authority[]>([])
   const [policy,setPolicy]=useState<ApprovalPolicy|null>(null),[policyVersion,setPolicyVersion]=useState<number|null>(null)
-  const [myId,setMyId]=useState(''),[loading,setLoading]=useState(true),[busy,setBusy]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState('')
+  const [myId,setMyId]=useState(''),[mainState,setMainState]=useState<'pending'|'ready'|'error'>('pending'),[recordState,setRecordState]=useState<'pending'|'ready'|'error'>('pending'),[authorityState,setAuthorityState]=useState<'idle'|'pending'|'ready'|'error'>('idle'),[busy,setBusy]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState('')
   const [training,setTraining]=useState<Training>(emptyTraining),[nominees,setNominees]=useState<Nominees>(emptyNominees)
   const [chosen,setChosen]=useState<Partial<Record<ScaleupRole,Person>>>({}),[existing,setExisting]=useState<string|null>(null)
   const [extraSupervisor,setExtraSupervisor]=useState(false),[directorEnabled,setDirectorEnabled]=useState(false)
@@ -96,39 +96,47 @@ export function ScaleupWorkspace({mode}:{mode:'hr'|'employee'}) {
   const [recordForCertificate,setRecordForCertificate]=useState(''),[certFile,setCertFile]=useState<File|null>(null)
   const [certNumber,setCertNumber]=useState(''),[certExpiry,setCertExpiry]=useState('')
   const updateTraining=(field:keyof Training,value:string|number)=>setTraining(prev=>({...prev,[field]:value}))
-  // Fetching and committing UI state are separate so the initial effect only
-  // subscribes to an asynchronous result (and ignores stale/unmounted results).
-  const fetchWorkspace=useCallback(async()=>{
-    const [main,recs]=await Promise.all([
-      harmonyFetch<{requests:RequestRow[];policy:{version:number;config:ApprovalPolicy};employee:Person|null}>('/api/scaleup'),
-      harmonyFetch<{records:RecordRow[]}>('/api/scaleup/records'),
-    ])
-    const auth=hr?await harmonyFetch<{authorities:Authority[]}>('/api/scaleup/authorities'):null
-    return {main,recs,auth}
-  },[hr])
-  const applyWorkspace=useCallback((payload:Awaited<ReturnType<typeof fetchWorkspace>>)=>{
-    const {main,recs,auth}=payload
-    setData(main.requests);setPolicy(main.policy.config);setPolicyVersion(main.policy.version)
-    setMyId(main.employee?.id||'');setRecords(recs.records)
-    if(auth)setAuthorities(auth.authorities)
-  },[])
-  const refresh=useCallback(async()=>{
+  // The workspace shell is never blocked by a secondary data source.
+  // Each result has its own readiness; missing data is not an empty list.
+  const workspaceGeneration=useRef(0),authorityGeneration=useRef(0)
+  const loadAuthorities=useCallback(async()=>{
+    if(!hr)return
+    const generation=++authorityGeneration.current
+    setAuthorityState('pending')
     try{
-      applyWorkspace(await fetchWorkspace())
-      setError('')
-    }catch(e){setError(e instanceof Error?e.message:'Tidak dapat memuat SCALE UP.')}
-    finally{setLoading(false)}
-  },[fetchWorkspace,applyWorkspace])
+      const value=await harmonyFetch<{authorities:Authority[]}>('/api/scaleup/authorities')
+      if(authorityGeneration.current===generation){setAuthorities(value.authorities);setAuthorityState('ready')}
+    }catch{if(authorityGeneration.current===generation)setAuthorityState('error')}
+  },[hr])
+  const refresh=useCallback(async()=>{
+    const generation=++workspaceGeneration.current
+    setMainState('pending');setRecordState('pending')
+    const main=harmonyFetch<{requests:RequestRow[];policy:{version:number;config:ApprovalPolicy};employee:Person|null;isHR:boolean}>('/api/scaleup')
+      .then(value=>{
+        if(workspaceGeneration.current!==generation)return
+        if(value.isHR!==hr)throw new Error('Role SCALE UP tidak sesuai.')
+        setData(value.requests);setPolicy(value.policy.config);setPolicyVersion(value.policy.version)
+        setMyId(value.employee?.id||'');setMainState('ready')
+      }).catch(()=>{if(workspaceGeneration.current===generation){setPolicy(null);setMainState('error')}})
+    const records=harmonyFetch<{records:RecordRow[]}>('/api/scaleup/records')
+      .then(value=>{if(workspaceGeneration.current===generation){setRecords(value.records);setRecordState('ready')}})
+      .catch(()=>{if(workspaceGeneration.current===generation)setRecordState('error')})
+    await Promise.allSettled([main,records])
+  },[hr])
   useEffect(()=>{
     let active=true
-    void fetchWorkspace()
-      .then(payload=>{if(active){applyWorkspace(payload);setError('')}})
-      .catch(e=>{if(active)setError(e instanceof Error?e.message:'Tidak dapat memuat SCALE UP.')})
-      .finally(()=>{if(active)setLoading(false)})
-    return()=>{active=false}
-  },[fetchWorkspace,applyWorkspace])
+    queueMicrotask(()=>{if(active)void refresh()})
+    return()=>{active=false;workspaceGeneration.current+=1;authorityGeneration.current+=1}
+  },[refresh])
+  useEffect(()=>{
+    if(!hr||tab!=='configuration')return
+    let active=true
+    queueMicrotask(()=>{if(active)void loadAuthorities()})
+    return()=>{active=false;authorityGeneration.current+=1}
+  },[hr,tab,loadAuthorities])
+  const refreshVisible=()=>Promise.allSettled([refresh(),...(hr&&tab==='configuration'?[loadAuthorities()]:[])])
   const action=async<T,>(fn:()=>Promise<T>,success:string):Promise<boolean>=>{
-    setBusy(true);setError('');setNotice('');try{await fn();setNotice(success);await refresh();return true}catch(e){setError(e instanceof Error?e.message:'Proses gagal.');return false}finally{setBusy(false)}
+    setBusy(true);setError('');setNotice('');try{await fn();setNotice(success);await refreshVisible();return true}catch(e){setError(e instanceof Error?e.message:'Proses gagal.');return false}finally{setBusy(false)}
   }
   const activeStage=(row:RequestRow)=>row.stages.find(x=>x.status==='pending')
   const myApprovals=data.filter(r=>activeStage(r)?.approver_employee_id===myId)
@@ -154,6 +162,7 @@ export function ScaleupWorkspace({mode}:{mode:'hr'|'employee'}) {
   }
   const decide=(stage:Stage,decision:string)=>action(()=>harmonyFetch('/api/scaleup/decide',{method:'POST',body:JSON.stringify({stage_id:stage.id,action:decision,remarks:remark,idempotency_key:crypto.randomUUID()})}),'Keputusan persetujuan berhasil dicatat.')
   const savedReport=()=>{
+    if(mainState!=='ready')return
     const header=['ID','Pemohon','Judul','Status','Estimasi','Tanggal']
     const lines=data.map(r=>[r.id,r.requester?.full_name||'',r.training.title,r.approval_status,String(r.total_estimated_budget),r.submitted_at.slice(0,10)])
     const csv=[header,...lines].map(row=>row.map(c=>`"${String(c).replaceAll('"','""')}"`).join(',')).join('\r\n')
@@ -163,25 +172,28 @@ export function ScaleupWorkspace({mode}:{mode:'hr'|'employee'}) {
   const tabs:{key:Tab;label:string;show:boolean}[]=[
     {key:'overview',label:'Overview',show:true},{key:'new',label:existing?'Revisi Pengajuan':'Training Request',show:true},
     {key:'requests',label:hr?'Seluruh Pengajuan':'My Requests',show:true},
-    {key:'approvals',label:`Approval (${myApprovals.length})`,show:true},
+    {key:'approvals',label:mainState==='ready'?`Approval (${myApprovals.length})`:'Approval',show:true},
     {key:'records',label:'Learning Records',show:true},
     {key:'configuration',label:'Configuration',show:hr},
   ]
-  if(loading)return <div className="scaleup-root scaleup-wait"><Loader2 className="animate-spin"/> Memuat SCALE UP...</div>
   return <div className="scaleup-root">
     <header className="scaleup-hero"><div><span className="scaleup-eyebrow">HARMONY / TRAINING & DEVELOPMENT</span><h1>SCALE UP<span className="scaleup-hero-mark">.</span></h1><p>Learn. Grow. Advance. <span>· Training, competency & learning ecosystem</span></p></div><div className="scaleup-hero-symbol"><GraduationCap size={44} strokeWidth={1.4}/></div></header>
-    <div className="scaleup-toolbar"><nav className="scaleup-tabs" aria-label="SCALE UP Navigation">{tabs.filter(t=>t.show).map(t=><button type="button" key={t.key} className={tab===t.key?'active':''} aria-current={tab===t.key?'page':undefined} onClick={()=>{setTab(t.key);setError('');setNotice('')}}>{t.label}</button>)}</nav><button title="Muat ulang" type="button" className="scaleup-icon-button" onClick={()=>void refresh()}><RefreshCcw size={17}/></button></div>
+    <div className="scaleup-toolbar"><nav className="scaleup-tabs" aria-label="SCALE UP Navigation">{tabs.filter(t=>t.show).map(t=><button type="button" key={t.key} className={tab===t.key?'active':''} aria-current={tab===t.key?'page':undefined} onClick={()=>{setTab(t.key);setError('');setNotice('')}}>{t.label}</button>)}</nav><button title="Muat ulang" type="button" className="scaleup-icon-button" onClick={()=>void refreshVisible()}><RefreshCcw size={17}/></button></div>
     {error&&<div role="alert" className="scaleup-alert error">{error}<button type="button" onClick={()=>setError('')} aria-label="Tutup pesan"><X size={16}/></button></div>}
     {notice&&<div role="status" className="scaleup-alert success">{notice}<button type="button" onClick={()=>setNotice('')} aria-label="Tutup pesan"><X size={16}/></button></div>}
+    {mainState==='error'&&<div role="alert" className="scaleup-alert error">Data pengajuan atau policy belum tersedia. Gunakan Muat ulang.</div>}
+    {recordState==='error'&&<div role="alert" className="scaleup-alert error">Riwayat training belum tersedia. Gunakan Muat ulang.</div>}
+    {tab==='configuration'&&authorityState==='error'&&<div role="alert" className="scaleup-alert error">Pemetaan kewenangan belum tersedia. Gunakan Muat ulang.</div>}
     {tab==='overview'&&<><section className="scaleup-metrics">
-      {[{title:'Training Requests',value:hr?data.length:myRequests.length,icon:BookOpen},
-        {title:'Perlu Approval Saya',value:myApprovals.length,icon:ShieldCheck},
-        {title:'Training Disetujui',value:data.filter(x=>x.approval_status==='approved').length,icon:Check},
-        {title:'Training Selesai',value:records.length,icon:Award}].map(m=><div key={m.title} className="scaleup-metric"><div className="scaleup-metric-icon"><m.icon size={18}/></div><small>{m.title}</small><strong>{m.value}</strong></div>)}
+      {[{title:'Training Requests',value:mainState==='ready'?(hr?data.length:myRequests.length):'—',icon:BookOpen},
+        {title:'Perlu Approval Saya',value:mainState==='ready'?myApprovals.length:'—',icon:ShieldCheck},
+        {title:'Training Disetujui',value:mainState==='ready'?data.filter(x=>x.approval_status==='approved').length:'—',icon:Check},
+        {title:'Training Selesai',value:recordState==='ready'?records.length:'—',icon:Award}].map(m=><div key={m.title} className="scaleup-metric"><div className="scaleup-metric-icon"><m.icon size={18}/></div><small>{m.title}</small><strong>{m.value}</strong></div>)}
     </section><div className="scaleup-grid"><section className="scaleup-panel"><div className="scaleup-panel-header"><h2>Aktivitas terbaru</h2><button type="button" onClick={()=>setTab('requests')}>Lihat semua</button></div>
-      {data.length?data.slice(0,7).map(r=><div className="scaleup-row" key={r.id}><div><strong>{r.training.title}</strong><small>{hr?r.requester?.full_name:date(r.submitted_at)} · {date(r.training.start_date)}</small></div><span className="scaleup-status">{statusMap[r.approval_status]||r.approval_status}</span></div>):<p className="scaleup-empty">Belum ada pengajuan training.</p>}</section>
-      <section className="scaleup-panel"><div className="scaleup-panel-header"><h2>Learning & Budget</h2><Activity size={18}/></div><div className="scaleup-summary-line"><span>Training record</span><strong>{records.length}</strong></div><div className="scaleup-summary-line"><span>Estimasi biaya</span><strong>{money(totalBudget)}</strong></div><div className="scaleup-summary-line"><span>Realisasi biaya</span><strong>{money(realized)}</strong></div><p className="scaleup-caption">Nilai berdasarkan data training yang dapat diakses akun ini. Tidak menggunakan dummy data.</p><button className="scaleup-primary" type="button" onClick={()=>setTab('new')}><Plus size={16}/> Ajukan Training</button></section></div></>}
-    {tab==='new'&&<form onSubmit={submit} className="scaleup-panel scaleup-form"><div className="scaleup-panel-header"><div><span className="scaleup-section-no">01 / REQUEST DETAILS</span><h2>{existing?'Revisi Pengajuan Training':'Ajukan Training Baru'}</h2></div><BookOpen size={21}/></div>
+      {mainState!=='ready'?<p role="status" className="scaleup-empty">{mainState==='pending'?'Mengambil pengajuan...':'Data belum tersedia.'}</p>:data.length?data.slice(0,7).map(r=><div className="scaleup-row" key={r.id}><div><strong>{r.training.title}</strong><small>{hr?r.requester?.full_name:date(r.submitted_at)} · {date(r.training.start_date)}</small></div><span className="scaleup-status">{statusMap[r.approval_status]||r.approval_status}</span></div>):<p className="scaleup-empty">Belum ada pengajuan training.</p>}</section>
+      <section className="scaleup-panel"><div className="scaleup-panel-header"><h2>Learning & Budget</h2><Activity size={18}/></div><div className="scaleup-summary-line"><span>Training record</span><strong>{recordState==='ready'?records.length:'—'}</strong></div><div className="scaleup-summary-line"><span>Estimasi biaya</span><strong>{mainState==='ready'?money(totalBudget):'—'}</strong></div><div className="scaleup-summary-line"><span>Realisasi biaya</span><strong>{recordState==='ready'?money(realized):'—'}</strong></div><p className="scaleup-caption">Nilai berdasarkan data training yang dapat diakses akun ini. Tidak menggunakan dummy data.</p><button className="scaleup-primary" type="button" onClick={()=>setTab('new')}><Plus size={16}/> Ajukan Training</button></section></div></>}
+    {tab==='new'&&mainState!=='ready'&&<p role="status" className="scaleup-panel scaleup-empty">{mainState==='pending'?'Mengambil policy dan hak akses...':'Policy belum tersedia. Pengajuan belum dapat dibuat.'}</p>}
+    {tab==='new'&&mainState==='ready'&&<form onSubmit={submit} className="scaleup-panel scaleup-form"><div className="scaleup-panel-header"><div><span className="scaleup-section-no">01 / REQUEST DETAILS</span><h2>{existing?'Revisi Pengajuan Training':'Ajukan Training Baru'}</h2></div><BookOpen size={21}/></div>
       <div className="scaleup-form-grid">
         <Field label="Nama Training *" value={training.title} onChange={v=>updateTraining('title',v)} required/>
         <Field label="Penyelenggara / Provider" value={training.provider} onChange={v=>updateTraining('provider',v)}/>
@@ -207,7 +219,8 @@ export function ScaleupWorkspace({mode}:{mode:'hr'|'employee'}) {
       <div className="scaleup-plan-preview"><strong>Preview tahapan persetujuan</strong>{planPreview?planPreview.map(s=><div key={s.order}><span>{String(s.order).padStart(2,'0')}</span>{s.label}<small>{chosen[s.obligations[0]]?.full_name||'Pejabat terpilih'}</small></div>):<p>Lengkapi seluruh approver wajib untuk melihat urutan final. Jika pejabat merangkap fungsi, sistem menampilkan penggabungan tahap.</p>}</div>
       <footer className="scaleup-form-footer"><button className="scaleup-primary" type="submit" disabled={busy||!planPreview}>{busy?'Memproses...':existing?'Kirim Revisi':'Kirim Pengajuan'}</button></footer>
     </form>}
-    {(tab==='requests'||tab==='approvals')&&<section className="scaleup-panel"><div className="scaleup-panel-header"><div><span className="scaleup-section-no">TRAINING REQUEST MANAGEMENT</span><h2>{tab==='approvals'?'Menunggu Persetujuan Saya':'Monitoring Pengajuan'}</h2></div><FileText size={20}/></div>
+    {(tab==='requests'||tab==='approvals')&&mainState!=='ready'&&<p role="status" className="scaleup-panel scaleup-empty">{mainState==='pending'?'Mengambil pengajuan...':'Data pengajuan belum tersedia.'}</p>}
+    {(tab==='requests'||tab==='approvals')&&mainState==='ready'&&<section className="scaleup-panel"><div className="scaleup-panel-header"><div><span className="scaleup-section-no">TRAINING REQUEST MANAGEMENT</span><h2>{tab==='approvals'?'Menunggu Persetujuan Saya':'Monitoring Pengajuan'}</h2></div><FileText size={20}/></div>
       {(tab==='approvals'?myApprovals:data).length===0&&<p className="scaleup-empty">Tidak ada pengajuan pada daftar ini.</p>}
       {(tab==='approvals'?myApprovals:data).map(row=><article className="scaleup-request" key={row.id}>
         <div className="scaleup-request-head"><div><h3>{row.training.title}</h3><p>{row.requester?.full_name||'Employee'} · {date(row.training.start_date)} – {date(row.training.end_date)} · {money(row.total_estimated_budget)}</p></div><span className="scaleup-status">{statusMap[row.approval_status]||row.approval_status}</span></div>
@@ -219,18 +232,20 @@ export function ScaleupWorkspace({mode}:{mode:'hr'|'employee'}) {
         {activeStage(row)?.approver_employee_id===myId&&<div className="scaleup-decision"><label className="scaleup-label">Catatan approval (wajib untuk Reject/Revisi)<textarea value={remark} onChange={e=>setRemark(e.target.value)} placeholder="Tulis catatan keputusan..."/></label><div className="scaleup-inline-actions"><button type="button" disabled={busy} onClick={()=>void decide(activeStage(row)!,'approve')}>Approve</button><button type="button" disabled={busy||remark.trim().length<5} onClick={()=>void decide(activeStage(row)!,'revision')}>Request Revision</button><button type="button" disabled={busy||remark.trim().length<5} onClick={()=>void decide(activeStage(row)!,'reject')}>Reject</button></div></div>}
       </article>)}
     </section>}
-    {tab==='records'&&<section className="scaleup-panel"><div className="scaleup-panel-header"><div><span className="scaleup-section-no">LEARNING HISTORY & CERTIFICATIONS</span><h2>Training Records</h2></div><Award size={20}/></div>
+    {tab==='records'&&(recordState!=='ready'||mainState!=='ready')&&<p role="status" className="scaleup-panel scaleup-empty">{recordState==='error'||mainState==='error'?'Riwayat belum tersedia.':'Mengambil riwayat training...'}</p>}
+    {tab==='records'&&recordState==='ready'&&mainState==='ready'&&<section className="scaleup-panel"><div className="scaleup-panel-header"><div><span className="scaleup-section-no">LEARNING HISTORY & CERTIFICATIONS</span><h2>Training Records</h2></div><Award size={20}/></div>
       {records.length===0?<p className="scaleup-empty">Belum ada riwayat training yang diverifikasi.</p>:records.map(r=><div className="scaleup-record" key={r.id}><div><strong>{r.training.title}</strong><small>{hr?`${r.employee?.full_name||'Karyawan'} · `:''}{date(r.completed_at)} · {r.source==='legacy_manual'?'Riwayat Manual':'Dari Pengajuan'}</small><small>Biaya realisasi: {money(r.realized_cost)} · {r.competency_acquired||'Kompetensi belum dicatat'}</small>{r.certificates.map(c=><button type="button" key={c.id} className="scaleup-file-link" onClick={()=>void action(async()=>{const result=await harmonyFetch<{url:string}>(`/api/scaleup/documents?id=${c.id}`);window.open(result.url,'_blank','noopener,noreferrer')},'Tautan sertifikat dibuka.')}>{c.original_name} · Kedaluwarsa {date(c.expiration_date)}</button>)}</div><span className="scaleup-status">Completed</span></div>)}
       {hr&&<><div className="scaleup-divider"/><h3>Input Training Historis</h3><div className="scaleup-form-grid"><PersonPicker hr label="Pilih Karyawan" value={legacyPerson} onSelect={setLegacyPerson}/><Field label="Nama Training" value={legacyTitle} onChange={setLegacyTitle}/><Field label="Penyelenggara" value={legacyProvider} onChange={setLegacyProvider}/><Field type="date" label="Tanggal Selesai" value={legacyDate} onChange={setLegacyDate}/><Field type="number" label="Biaya Aktual" value={String(legacyCost)} onChange={v=>setLegacyCost(Number(v))}/><Field label="Kompetensi" value={legacyCompetency} onChange={setLegacyCompetency}/></div><button type="button" className="scaleup-primary" disabled={busy||!legacyPerson||!legacyDate||legacyTitle.trim().length<3} onClick={()=>void action(()=>harmonyFetch('/api/scaleup/records',{method:'POST',body:JSON.stringify({action:'legacy',employee_id:legacyPerson?.id,title:legacyTitle,provider:legacyProvider,completed_at:legacyDate,realized_cost:legacyCost,competency:legacyCompetency})}),'Riwayat training historis tersimpan.')}>Simpan Riwayat</button></>}
       <div className="scaleup-divider"/><h3>Unggah Sertifikat</h3><div className="scaleup-form-grid"><div className="scaleup-field"><label className="scaleup-label">Training Record</label><select value={recordForCertificate} onChange={e=>setRecordForCertificate(e.target.value)}><option value="">Pilih record</option>{records.map(r=><option key={r.id} value={r.id}>{r.training.title} · {r.employee?.full_name||'Saya'}</option>)}</select></div><div className="scaleup-field"><label className="scaleup-label">File PDF / JPG / PNG (maks. 8 MB)</label><input type="file" accept=".pdf,.png,.jpg,.jpeg" onChange={e=>setCertFile(e.target.files?.[0]||null)}/></div><Field label="Nomor Sertifikat" value={certNumber} onChange={setCertNumber}/><Field type="date" label="Tanggal Kedaluwarsa" value={certExpiry} onChange={setCertExpiry}/></div><button type="button" className="scaleup-primary" disabled={busy||!recordForCertificate||!certFile} onClick={()=>void action(async()=>{const form=new FormData();form.append('file',certFile!);form.append('category','certificate');form.append('record_id',recordForCertificate);form.append('certificate_number',certNumber);if(certExpiry)form.append('expiration_date',certExpiry);await harmonyFetch('/api/scaleup/documents',{method:'POST',body:form})},'Sertifikat tersimpan secara privat.')}>Unggah Sertifikat</button>
     </section>}
-    {tab==='configuration'&&hr&&<section className="scaleup-panel"><div className="scaleup-panel-header"><div><span className="scaleup-section-no">ADMINISTRATOR ONLY</span><h2>Workflow Configuration</h2></div><Settings2 size={20}/></div><p className="scaleup-caption">Default mandatory adalah Wadir Sumber Daya dan Kelembagaan serta Wadir Keuangan. Perubahan kebijakan berlaku untuk pengajuan baru dan tercatat sebagai versi baru.</p><strong>Policy aktif: versi {policyVersion}</strong>
+    {tab==='configuration'&&hr&&(mainState!=='ready'||authorityState!=='ready')&&<p role="status" className="scaleup-panel scaleup-empty">{mainState==='error'||authorityState==='error'?'Konfigurasi belum tersedia.':'Mengambil konfigurasi HR...'}</p>}
+    {tab==='configuration'&&hr&&mainState==='ready'&&authorityState==='ready'&&<section className="scaleup-panel"><div className="scaleup-panel-header"><div><span className="scaleup-section-no">ADMINISTRATOR ONLY</span><h2>Workflow Configuration</h2></div><Settings2 size={20}/></div><p className="scaleup-caption">Default mandatory adalah Wadir Sumber Daya dan Kelembagaan serta Wadir Keuangan. Perubahan kebijakan berlaku untuk pengajuan baru dan tercatat sebagai versi baru.</p><strong>Policy aktif: versi {policyVersion}</strong>
       {policy&&<div className="scaleup-policy"><label><input type="checkbox" checked={policy.mandatory_roles.includes('wadirsdk')} onChange={e=>setPolicy({...policy,mandatory_roles:e.target.checked?[...policy.mandatory_roles,'wadirsdk'] : policy.mandatory_roles.filter(x=>x!=='wadirsdk')})}/> Wadir Sumber Daya dan Kelembagaan wajib</label><label><input type="checkbox" checked={policy.mandatory_roles.includes('finance')} onChange={e=>setPolicy({...policy,mandatory_roles:e.target.checked?[...policy.mandatory_roles,'finance']:policy.mandatory_roles.filter(x=>x!=='finance')})}/> Wadir Keuangan wajib</label><label><input type="checkbox" checked={policy.mandatory_roles.includes('director')} onChange={e=>setPolicy({...policy,mandatory_roles:e.target.checked?[...policy.mandatory_roles,'director']:policy.mandatory_roles.filter(x=>x!=='director')})}/> Direktur wajib</label><label><input type="checkbox" checked={policy.merge_supervisor_executive} onChange={e=>setPolicy({...policy,merge_supervisor_executive:e.target.checked})}/> Izinkan merge Supervisor ↔ Executive jika individu sama</label><button type="button" disabled={busy} onClick={()=>{if(window.confirm('Perubahan policy akan memengaruhi pengajuan baru. Lanjutkan?'))void action(()=>harmonyFetch('/api/scaleup/config',{method:'POST',body:JSON.stringify({configuration:policy})}),'Versi konfigurasi baru berhasil diterbitkan.')}}>Simpan Versi Policy Baru</button></div>}
       <div className="scaleup-divider"/><h3>Pemetaan Kewenangan Pejabat</h3><p className="scaleup-caption">Tetapkan pejabat dan, bila tersedia, assignment jabatan aktif dari employee master. Pilihan ini menentukan kandidat yang dapat dipilih pemohon. Tidak ada nama default di source.</p>
       <div className="scaleup-form-grid"><div className="scaleup-field"><label className="scaleup-label">Peran Resmi</label><select value={authRole} onChange={e=>setAuthRole(e.target.value)}><option value="wadirsdk">Wadir Sumber Daya dan Kelembagaan</option><option value="finance">Wadir Keuangan</option><option value="director">Direktur</option><option value="supervisor_delegate">Delegasi Atasan</option></select></div><PersonPicker hr label="Nama Pejabat *" value={authPerson} onSelect={setAuthPerson}/>{authRole==='supervisor_delegate'&&<PersonPicker hr label="Pemohon untuk Delegasi *" value={authRequester} onSelect={setAuthRequester}/>}<Field label="Assignment ID (opsional)" value={authAssignment} onChange={setAuthAssignment}/><Field label="Alasan Konfigurasi *" value={authReason} onChange={setAuthReason}/></div>
       <button className="scaleup-primary" type="button" disabled={busy||!authPerson||authReason.trim().length<5} onClick={()=>void action(()=>harmonyFetch('/api/scaleup/authorities',{method:'POST',body:JSON.stringify({role_key:authRole,employee_id:authPerson?.id,requester_id:authRole==='supervisor_delegate'?authRequester?.id:null,assignment_id:authAssignment||null,reason:authReason})}),'Pemetaan kewenangan tersimpan.')}>Tambahkan Pemetaan</button>
       <div className="scaleup-divider"/><h3>Daftar Pejabat Berwenang</h3>{authorities.length===0?<p className="scaleup-empty">Belum ada pemetaan pejabat. Konfigurasikan kedua Wadir sebelum employee mengajukan training.</p>:authorities.map(a=><div className="scaleup-row" key={a.id}><div><strong>{a.employee?.full_name||a.employee_id}</strong><small>{ROLE_LABELS[a.role_key as ScaleupRole]||'Delegasi Supervisor'} · {a.employee?.position||'—'} · {a.is_active?'Aktif':'Nonaktif'}</small></div>{a.is_active&&<button type="button" disabled={busy} onClick={()=>void action(()=>harmonyFetch('/api/scaleup/authorities',{method:'POST',body:JSON.stringify({deactivate_id:a.id})}),'Mapping dinonaktifkan.')}>Nonaktifkan</button>}</div>)}
-      <div className="scaleup-divider"/><h3>Laporan dan Anggaran</h3><div className="scaleup-summary-line"><span>Estimasi Training</span><strong>{money(totalBudget)}</strong></div><div className="scaleup-summary-line"><span>Realisasi Training</span><strong>{money(realized)}</strong></div><button type="button" onClick={savedReport}>Ekspor Pengajuan CSV (Excel-compatible)</button>
+      <div className="scaleup-divider"/><h3>Laporan dan Anggaran</h3><div className="scaleup-summary-line"><span>Estimasi Training</span><strong>{mainState==='ready'?money(totalBudget):'—'}</strong></div><div className="scaleup-summary-line"><span>Realisasi Training</span><strong>{recordState==='ready'?money(realized):'—'}</strong></div><button type="button" onClick={savedReport}>Ekspor Pengajuan CSV (Excel-compatible)</button>
     </section>}
     <p className="scaleup-footer-note">SCALE UP · HARMONY HRIS · Kebijakan approval berversi · Semua persetujuan tercatat untuk audit.</p>
     {printRequest&&<div id="scaleup-print-sheet"><div className="scaleup-print-header"><Image src="/logo.png" width={65} height={65} alt="Logo Institusi"/><div><strong>FORMULIR PENGAJUAN TRAINING</strong><p>HARMONY — SCALE UP</p></div></div><p>No. Pengajuan: {printRequest.id} · {date(printRequest.submitted_at)}</p><hr/><h3>Informasi Pemohon</h3><p>{printRequest.requester?.full_name} · {printRequest.requester?.employee_number} · {printRequest.requester?.position} · {printRequest.requester?.department}</p><h3>Informasi Training</h3>{([['Judul',printRequest.training.title],['Penyelenggara',printRequest.training.provider],['Tanggal',`${date(printRequest.training.start_date)} – ${date(printRequest.training.end_date)}`],['Lokasi',printRequest.training.location],['Metode',printRequest.training.method],['Tujuan',printRequest.training.objective],['Estimasi Biaya',money(printRequest.total_estimated_budget)]] as string[][]).map(([k,v])=><p key={k}><strong>{k}:</strong> {v||'—'}</p>)}<h3>Persetujuan</h3><div className="scaleup-signatures">{printRequest.stages.map(s=><div key={s.id}><p>{s.label}</p><div className="scaleup-sign-space"/><strong>{s.identity_snapshot?.name||'—'}</strong><small>{s.identity_snapshot?.position||'—'}</small><small>Status: {statusMap[s.status]||s.status} · {date(s.decided_at)}</small></div>)}</div><p className="scaleup-print-foot">Dokumen ini menyediakan ruang tanda tangan basah. Status approved sistem bukan tanda tangan elektronik tersertifikasi.</p></div>}

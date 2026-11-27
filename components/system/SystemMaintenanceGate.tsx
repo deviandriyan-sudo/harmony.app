@@ -21,15 +21,23 @@ export function SystemMaintenanceGate({ children }: { children: React.ReactNode 
 
   useEffect(() => {
     let active = true
+    let pending: AbortController | null = null
 
     async function refresh() {
+      if (!active || pending) return
+      const controller = new AbortController()
+      pending = controller
+      const timeout = window.setTimeout(() => controller.abort(), 8000)
       try {
-        const response = await fetch('/api/system/status', { cache: 'no-store' })
+        const response = await fetch('/api/system/status', { cache: 'no-store', signal: controller.signal })
         if (!response.ok) return
         const payload = await response.json()
         if (active) setStatus(payload)
       } catch {
-        // Fail-open if the status endpoint is temporarily unavailable.
+        // Preserve the existing maintenance status on transient failures.
+      } finally {
+        window.clearTimeout(timeout)
+        if (pending === controller) pending = null
       }
     }
 
@@ -42,10 +50,11 @@ export function SystemMaintenanceGate({ children }: { children: React.ReactNode 
 
     return () => {
       active = false
+      pending?.abort()
       window.clearInterval(timer)
       document.removeEventListener('visibilitychange', onVisible)
     }
-  }, [pathname])
+  }, [])
 
   const hrAllowed = HR_ALLOWED_PREFIXES.some((prefix) =>
     pathname === prefix || pathname.startsWith(`${prefix}/`),

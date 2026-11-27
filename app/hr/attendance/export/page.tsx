@@ -353,6 +353,7 @@ export default function HRAttendanceExportPage() {
   }
 
   function handleExportXlsx() {
+    if (loading || !dataset) return
     setExporting(true)
     setErrorMessage('')
     setSuccessMessage('')
@@ -388,6 +389,7 @@ export default function HRAttendanceExportPage() {
   }
 
   function handleExportCsv() {
+    if (loading || !dataset) return
     setExporting(true)
     setErrorMessage('')
     setSuccessMessage('')
@@ -478,8 +480,8 @@ export default function HRAttendanceExportPage() {
 
             <div className="flex flex-wrap justify-end gap-2">
               <button type="button" onClick={fetchData} disabled={loading} className="harmony-button-secondary disabled:opacity-50"><RefreshCcw size={16} className={loading ? 'animate-spin' : ''} />Refresh</button>
-              <button type="button" onClick={handleExportCsv} disabled={exporting || !filteredRows.length} className="harmony-button-secondary disabled:opacity-50"><Download size={16} />CSV</button>
-              <button type="button" onClick={handleExportXlsx} disabled={exporting || !filteredRows.length} className="harmony-button-primary disabled:opacity-50">{exporting ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}Excel Berwarna · 6 Sheet</button>
+              <button type="button" onClick={handleExportCsv} disabled={loading || exporting || !filteredRows.length} className="harmony-button-secondary disabled:opacity-50"><Download size={16} />CSV</button>
+              <button type="button" onClick={handleExportXlsx} disabled={loading || exporting || !filteredRows.length} className="harmony-button-primary disabled:opacity-50">{exporting ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}Excel Berwarna · 6 Sheet</button>
             </div>
           </div>
 

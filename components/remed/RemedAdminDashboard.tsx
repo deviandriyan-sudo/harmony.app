@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Banknote, ClipboardCheck, Download, FileText, History, RefreshCcw, Users, WalletCards } from 'lucide-react'
 import { ClaimAdminActions } from '@/components/remed/ClaimAdminActions'
 import { RemedClaimList } from '@/components/remed/RemedClaimList'
@@ -14,34 +14,34 @@ import { downloadRemedClaimsXlsx } from '@/lib/export/remed-report'
 type DashboardPayload = {
   stats?: { totalClaims?: number; pending?: number; paidCount?: number; paidTotal?: number; review?: number; waitingPayment?: number; followup?: number; periodPaidTotal?: number }
   recentClaims?: RemedClaim[]
+  financeSummary?: {review:number;waitingPayment:number;followup:number;periodPaidTotal:number}
 }
 
 export function RemedAdminDashboard({ role }: { role: 'hr' | 'finance' }) {
   const [data, setData] = useState<DashboardPayload | null>(null)
-  const [financeSummary,setFinanceSummary]=useState<{review:number;waitingPayment:number;followup:number;periodPaidTotal:number}|null>(null)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
   const [exporting, setExporting] = useState(false)
+  const loadGeneration = useRef(0)
   const load = useCallback(async () => {
+    const generation = ++loadGeneration.current
     setError('')
     setLoading(true)
     try {
-      setData(await remedFetch<DashboardPayload>('/api/remed/dashboard'))
-      if(role==='finance') {
-        const summary=await remedFetch<{review:number;waitingPayment:number;followup:number;periodPaidTotal:number}>('/api/remed/finance/summary').catch(()=>null)
-        setFinanceSummary(summary)
-      }
-    }
-    catch (issue: unknown) {
+      const value = await remedFetch<DashboardPayload>('/api/remed/dashboard')
+      if (loadGeneration.current === generation) setData(value)
+    } catch (issue: unknown) {
+      if (loadGeneration.current !== generation) return
+      setData(null)
       setError(issue instanceof Error ? issue.message : `Gagal memuat dashboard Re-Med ${role.toUpperCase()}.`)
     } finally {
-      setLoading(false)
+      if (loadGeneration.current === generation) setLoading(false)
     }
   }, [role])
   useEffect(() => {
     let active = true
     queueMicrotask(() => { if (active) void load() })
-    return () => { active = false }
+    return () => { active = false; loadGeneration.current += 1 }
   }, [load])
   const exportAll = async () => {
     setExporting(true)
@@ -56,6 +56,7 @@ export function RemedAdminDashboard({ role }: { role: 'hr' | 'finance' }) {
       setExporting(false)
     }
   }
+  const financeSummary = data?.financeSummary
   const actions: WorkspaceAction[] = role === 'hr' ? [
     {label:'Review Klaim',description:'Proses klaim karyawan',href:'/remed/hr/claims',icon:ClipboardCheck,emphasis:true},
     {label:'Plafond Karyawan',description:'Lihat saldo & pengaturan',href:'/remed/hr/employees',icon:Users},
@@ -77,15 +78,15 @@ export function RemedAdminDashboard({ role }: { role: 'hr' | 'finance' }) {
     {loading && !data ? <p role="status" className="text-xs harmony-text-secondary">Memuat ringkasan klaim...</p> : null}
     <div className="grid grid-cols-2 gap-3 xl:grid-cols-4" aria-busy={loading}>
       {role === 'finance' ? <>
-        <RemedStatCard label="Menunggu Review" value={loading && !data ? '…' : String(financeSummary?.review ?? '—')} icon={ClipboardCheck} tone="orange" />
-        <RemedStatCard label="Menunggu Pembayaran" value={loading && !data ? '…' : String(financeSummary?.waitingPayment ?? '—')} icon={Banknote} tone="purple" />
-        <RemedStatCard label="Dibayar Bulan Ini" value={loading && !data ? '…' : financeSummary ? formatRupiah(financeSummary.periodPaidTotal) : '—'} icon={WalletCards} tone="green" />
-        <RemedStatCard label="Perlu Tindak Lanjut" value={loading && !data ? '…' : String(financeSummary?.followup ?? '—')} icon={FileText} tone="orange" />
+        <RemedStatCard label="Menunggu Review" value={String(financeSummary?.review ?? '—')} icon={ClipboardCheck} tone="orange" />
+        <RemedStatCard label="Menunggu Pembayaran" value={String(financeSummary?.waitingPayment ?? '—')} icon={Banknote} tone="purple" />
+        <RemedStatCard label="Dibayar Bulan Ini" value={financeSummary ? formatRupiah(financeSummary.periodPaidTotal) : '—'} icon={WalletCards} tone="green" />
+        <RemedStatCard label="Perlu Tindak Lanjut" value={String(financeSummary?.followup ?? '—')} icon={FileText} tone="orange" />
       </> : <>
-        <RemedStatCard label="Total Klaim" value={loading && !data ? '…' : String(data?.stats?.totalClaims ?? 0)} icon={FileText} tone="blue" />
-        <RemedStatCard label="Menunggu HR" value={loading && !data ? '…' : String(data?.stats?.pending ?? 0)} icon={ClipboardCheck} tone="orange" />
-        <RemedStatCard label="Selesai Dibayar" value={loading && !data ? '…' : String(data?.stats?.paidCount ?? 0)} icon={Banknote} tone="green" />
-        <RemedStatCard label="Total Dibayar" value={loading && !data ? '…' : formatRupiah(data?.stats?.paidTotal ?? 0)} icon={WalletCards} tone="purple" />
+        <RemedStatCard label="Total Klaim" value={String(data?.stats?.totalClaims ?? '—')} icon={FileText} tone="blue" />
+        <RemedStatCard label="Menunggu HR" value={String(data?.stats?.pending ?? '—')} icon={ClipboardCheck} tone="orange" />
+        <RemedStatCard label="Selesai Dibayar" value={String(data?.stats?.paidCount ?? '—')} icon={Banknote} tone="green" />
+        <RemedStatCard label="Total Dibayar" value={data?.stats?.paidTotal == null ? '—' : formatRupiah(data.stats.paidTotal)} icon={WalletCards} tone="purple" />
       </>}
     </div>
     <div className="harmony-unified-surface">
@@ -94,7 +95,7 @@ export function RemedAdminDashboard({ role }: { role: 'hr' | 'finance' }) {
         <button type="button" disabled={loading} onClick={() => void load()} className="harmony-button-secondary inline-flex min-h-10 items-center gap-2 px-4 text-xs"><RefreshCcw size={14}/> Refresh</button>
       </div>
       <div className="p-3 sm:p-4">
-        {loading && !data ? <p role="status" className="p-4 text-sm harmony-text-secondary">Mengambil klaim terbaru...</p> : <RemedClaimList claims={data?.recentClaims || []} showEmployee showBalanceImpact
+        {!data ? <p role="status" className="p-4 text-sm harmony-text-secondary">{loading ? 'Mengambil klaim terbaru...' : 'Data klaim belum tersedia. Gunakan Refresh.'}</p> : <RemedClaimList claims={data.recentClaims || []} showEmployee showBalanceImpact
           action={(claim) => <ClaimAdminActions claim={claim} role={role} onDone={load} />} />}
       </div>
     </div>

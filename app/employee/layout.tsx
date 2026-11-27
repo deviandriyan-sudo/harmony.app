@@ -6,23 +6,18 @@ import { readErrorMessage } from '@/lib/error-utils'
 import Image from 'next/image'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Loader2, Menu, ShieldAlert, X } from 'lucide-react'
+import { Menu, ShieldAlert, X } from 'lucide-react'
 
 import { AppSidebar } from '@/components/layout/AppSidebar'
 import { navigationForRole } from '@/lib/navigation'
 import { ModuleSubnav } from '@/components/layout/ModuleSubnav'
-import { harmonyFetch } from '@/lib/harmony-client'
+import { getHarmonyUiAccess } from '@/lib/harmony-ui-access'
+import { RouteLoading } from '@/components/layout/RouteLoading'
+import { HarmonyRequestError } from '@/lib/harmony-client'
 import { supabase } from '@/lib/supabase'
 import { hasSupervisorAssignments } from '@/lib/supervisor-navigation'
 import { HarmonyAccessState } from '@/components/system/HarmonyAccessState'
 
-type AppUser = {
-  id: string
-  email: string
-  role: string
-  employee_id: string | null
-  is_active: boolean | null
-}
 
 export default function EmployeeLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter()
@@ -41,18 +36,14 @@ export default function EmployeeLayout({ children }: { children: React.ReactNode
     }
   }, [mobileSidebarOpen])
 
-  async function checkAccess() {
+  async function checkAccess(isActive: () => boolean = () => true) {
     setLoading(true)
     setAllowed(false)
     setMessage('Memeriksa akses akun...')
 
     try {
-      const payload = await harmonyFetch<{
-        kind: 'harmony' | 'finance'
-        appUser: AppUser | null
-        employee: { full_name?: string | null } | null
-        home: string
-      }>('/api/auth/access')
+      const payload = await getHarmonyUiAccess()
+      if (!isActive()) return
 
       if (payload.kind !== 'harmony' || !payload.appUser) {
         router.replace(payload.home || '/login')
@@ -69,36 +60,41 @@ export default function EmployeeLayout({ children }: { children: React.ReactNode
       // Same supervisor identifiers as the canonical Approval Tim page (homebase and assignments).
       // Navigation is convenience only; the original page/API keep authorization checks.
       if (payload.appUser.employee_id) {
-        void hasSupervisorAssignments(payload.appUser.employee_id).then(setHasSubordinates)
+        void hasSupervisorAssignments(payload.appUser.employee_id).then(value => { if (isActive()) setHasSubordinates(value) })
       }
       setAllowed(true)
     } catch (error: unknown) {
+      if (!isActive()) return
       setMessage(readErrorMessage(error) || 'Akses Employee tidak dapat diverifikasi.')
-      await supabase.auth.signOut()
-      router.replace('/login')
+      if (error instanceof HarmonyRequestError && error.status === 401) router.replace('/login')
       return
     } finally {
-      setLoading(false)
+      if (isActive()) setLoading(false)
     }
   }
 
   useEffect(() => {
     let active = true
     // Start session/data loading after the effect setup, avoiding a cascading synchronous render.
-    queueMicrotask(() => { if (active) void checkAccess() })
-    return () => { active = false }
+    queueMicrotask(() => { if (active) void checkAccess(() => active) })
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'SIGNED_OUT') { active = false; setAllowed(false); router.replace('/login') }
+    })
+    return () => { active = false; subscription.unsubscribe() }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   if (loading) {
-    return <AccessLoading message={message} />
+    return <RouteLoading label={message} />
   }
 
   if (!allowed) {
     return (
       <HarmonyAccessState
         title="Akses Employee Ditolak"
-        message="Akun ini tidak memiliki akses Employee HARMONY."
+        message={message}
+        actionLabel="Coba lagi"
+        onAction={() => window.location.reload()}
         tone="danger"
         icon={<ShieldAlert size={28} />}
       />
@@ -160,20 +156,10 @@ export default function EmployeeLayout({ children }: { children: React.ReactNode
   )
 }
 
-function formatEmailName(email: string) {
+function formatEmailName(email: string | null) {
   return String(email || '')
     .split('@')[0]
     .replace(/[._-]/g, ' ')
     .replace(/\b\w/g, (char) => char.toUpperCase()) || 'Employee'
 }
 
-function AccessLoading({ message }: { message: string }) {
-  return (
-    <HarmonyAccessState
-      title="Memeriksa Akses"
-      message={message}
-      tone="employee"
-      icon={<Loader2 size={30} className="animate-spin" />}
-    />
-  )
-}

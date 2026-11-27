@@ -13,7 +13,8 @@ import { useAttendancePeriodQuery } from '@/lib/use-attendance-period'
 /** Shared read-only reporting query. The HR review action remains in its existing detail route. */
 export function useHRAttendanceReporting(errorFallback: string) {
   const { periodMonth, setPeriodMonth, periodReady } = useAttendancePeriodQuery()
-  const [dataset, setDataset] = useState<AttendanceReportingDataset | null>(null)
+  const [snapshot, setSnapshot] = useState<{period:string;data:AttendanceReportingDataset} | null>(null)
+  const dataset = snapshot?.period === periodMonth ? snapshot.data : null
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
   const [errorMessage, setErrorMessage] = useState('')
@@ -39,10 +40,10 @@ export function useHRAttendanceReporting(errorFallback: string) {
     setErrorMessage('')
     try {
       const result = await loadAttendanceReportingDataset(supabase, periodMonth)
-      if (requestSequence.current === requestId) setDataset(result)
+      if (requestSequence.current === requestId) setSnapshot({period:periodMonth,data:result})
     } catch (error: unknown) {
       if (requestSequence.current === requestId) {
-        setDataset(null)
+        setSnapshot(null)
         setErrorMessage(error instanceof Error ? error.message : errorFallback)
       }
     } finally {
@@ -62,6 +63,6 @@ export function useHRAttendanceReporting(errorFallback: string) {
 
   return {
     periodMonth, setPeriodMonth, periodReady, dataset, search, setSearch,
-    loading, errorMessage, setErrorMessage, range, rows, filteredRows, fetchData,
+    loading: loading || (!dataset && !errorMessage), errorMessage, setErrorMessage, range, rows, filteredRows, fetchData,
   }
 }

@@ -3,7 +3,7 @@
 
 import { readErrorMessage } from '@/lib/error-utils'
 import Link from 'next/link'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, useRef } from 'react'
 import {
   AlertTriangle,
   ArrowLeft,
@@ -64,9 +64,12 @@ type ReconcileResult = {
 export default function HRAttendanceSyncPage() {
   const { periodMonth, setPeriodMonth, periodReady } = useAttendancePeriodQuery()
 
-  const [dataset, setDataset] = useState<AttendanceReportingDataset | null>(null)
-  const [audits, setAudits] = useState<SyncAuditRow[]>([])
-  const [loading, setLoading] = useState(true)
+  const [snapshot, setSnapshot] = useState<{period:string;dataset:AttendanceReportingDataset;audits:SyncAuditRow[]} | null>(null)
+  const dataset = snapshot?.period === periodMonth ? snapshot.dataset : null
+  const audits = useMemo(() => snapshot?.period === periodMonth ? snapshot.audits : [], [snapshot, periodMonth])
+  const requestSequence = useRef({ value: 0 })
+  const [pending, setLoading] = useState(true)
+  const loading = pending || (!dataset && snapshot !== null && snapshot.period !== periodMonth)
   const [reconciling] = useState(false)
   const [message, setMessage] = useState<SyncMessage | null>(null)
   const [, setLastResult] = useState<ReconcileResult | null>(null)
@@ -109,53 +112,37 @@ export default function HRAttendanceSyncPage() {
 
   useEffect(() => {
     if (!periodReady) return
-    fetchData()
+    const sequence = requestSequence.current
+    void fetchData()
+    return () => { sequence.value += 1 }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [periodMonth, periodReady])
 
   async function fetchData(showLoading = true) {
+    const requestId=++requestSequence.current.value
     if (showLoading) setLoading(true)
-
     try {
-      const reporting = await loadAttendanceReportingDataset(supabase, periodMonth)
-      setDataset(reporting)
-
-      const auditResult = await supabase
-        .from('harmony_attendance_sync_audit_logs')
-        .select('*')
-        .eq('period_month', periodMonth)
-        .order('created_at', { ascending: false })
-        .limit(30)
-
+      const [reporting,auditResult] = await Promise.all([
+        loadAttendanceReportingDataset(supabase, periodMonth),
+        supabase.from('harmony_attendance_sync_audit_logs').select('*').eq('period_month', periodMonth).order('created_at', { ascending: false }).limit(30),
+      ])
+      if(requestSequence.current.value!==requestId)return
       if (auditResult.error) {
         const text = normalize(auditResult.error.message)
-        const migrationMissing =
-          text.includes('does not exist') ||
-          text.includes('could not find') ||
-          text.includes('schema cache')
-
+        const migrationMissing = text.includes('does not exist') || text.includes('could not find') || text.includes('schema cache')
         setAuditAvailable(!migrationMissing)
-        setAudits([])
-
-        if (!migrationMissing) {
-          setMessage({
-            type: 'info',
-            text: `Dataset berhasil dibaca, tetapi audit Auto Sync belum dapat dibaca: ${auditResult.error.message}`,
-          })
-        }
+        setSnapshot({period:periodMonth,dataset:reporting,audits:[]})
+        if(!migrationMissing)setMessage({type:'info',text:'Dataset berhasil dibaca, tetapi audit Auto Sync belum dapat dibaca.'})
       } else {
         setAuditAvailable(true)
-        setAudits((auditResult.data || []) as SyncAuditRow[])
+        setSnapshot({period:periodMonth,dataset:reporting,audits:(auditResult.data||[]) as SyncAuditRow[]})
       }
     } catch (error: unknown) {
-      setDataset(null)
-      setAudits([])
-      setMessage({
-        type: 'error',
-        text: readErrorMessage(error) || 'Data sinkronisasi gagal dibaca.',
-      })
+      if(requestSequence.current.value!==requestId)return
+      setSnapshot(null)
+      setMessage({type:'error',text:readErrorMessage(error)||'Data sinkronisasi gagal dibaca.'})
     } finally {
-      if (showLoading) setLoading(false)
+      if(requestSequence.current.value===requestId&&showLoading)setLoading(false)
     }
   }
 

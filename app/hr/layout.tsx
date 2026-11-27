@@ -6,22 +6,17 @@ import { readErrorMessage } from '@/lib/error-utils'
 import { useEffect, useState } from 'react'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
-import { Loader2, Menu, ShieldAlert, X } from 'lucide-react'
+import { Menu, ShieldAlert, X } from 'lucide-react'
 
 import { AppSidebar } from '@/components/layout/AppSidebar'
 import { navigationForRole } from '@/lib/navigation'
 import { ModuleSubnav } from '@/components/layout/ModuleSubnav'
-import { harmonyFetch } from '@/lib/harmony-client'
+import { getHarmonyUiAccess } from '@/lib/harmony-ui-access'
+import { RouteLoading } from '@/components/layout/RouteLoading'
+import { HarmonyRequestError } from '@/lib/harmony-client'
 import { supabase } from '@/lib/supabase'
 import { HarmonyAccessState } from '@/components/system/HarmonyAccessState'
 
-type AppUser = {
-  id: string
-  email: string
-  role: string
-  employee_id: string | null
-  is_active: boolean | null
-}
 
 export default function HRLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter()
@@ -31,18 +26,14 @@ export default function HRLayout({ children }: { children: React.ReactNode }) {
   const [message, setMessage] = useState('Memeriksa akses akun...')
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
 
-  async function checkAccess() {
+  async function checkAccess(isActive: () => boolean = () => true) {
     setLoading(true)
     setAllowed(false)
     setMessage('Memeriksa akses akun...')
 
     try {
-      const payload = await harmonyFetch<{
-        kind: 'harmony' | 'finance'
-        appUser: AppUser | null
-        employee: { full_name?: string | null } | null
-        home: string
-      }>('/api/auth/access')
+      const payload = await getHarmonyUiAccess()
+      if (!isActive()) return
 
       if (payload.kind !== 'harmony' || !payload.appUser) {
         router.replace(payload.home || '/login')
@@ -63,20 +54,23 @@ export default function HRLayout({ children }: { children: React.ReactNode }) {
 
       setAllowed(true)
     } catch (error: unknown) {
+      if (!isActive()) return
       setMessage(readErrorMessage(error) || 'Akses HR tidak dapat diverifikasi.')
-      await supabase.auth.signOut()
-      router.replace('/login')
+      if (error instanceof HarmonyRequestError && error.status === 401) router.replace('/login')
       return
     } finally {
-      setLoading(false)
+      if (isActive()) setLoading(false)
     }
   }
 
   useEffect(() => {
     let active = true
     // Start session/data loading after the effect setup, avoiding a cascading synchronous render.
-    queueMicrotask(() => { if (active) void checkAccess() })
-    return () => { active = false }
+    queueMicrotask(() => { if (active) void checkAccess(() => active) })
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'SIGNED_OUT') { active = false; setAllowed(false); router.replace('/login') }
+    })
+    return () => { active = false; subscription.unsubscribe() }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -88,22 +82,15 @@ export default function HRLayout({ children }: { children: React.ReactNode }) {
     }
   }, [mobileSidebarOpen])
 
-  if (loading) {
-    return (
-      <HarmonyAccessState
-        title="Memeriksa Akses"
-        message={message}
-        tone="hr"
-        icon={<Loader2 size={30} className="animate-spin" />}
-      />
-    )
-  }
+  if (loading) return <RouteLoading label={message} />
 
   if (!allowed) {
     return (
       <HarmonyAccessState
         title="Akses HR Ditolak"
-        message="Akun ini tidak memiliki akses ke dashboard HR."
+        message={message}
+        actionLabel="Coba lagi"
+        onAction={() => window.location.reload()}
         tone="danger"
         icon={<ShieldAlert size={28} />}
       />
