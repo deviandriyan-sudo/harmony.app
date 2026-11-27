@@ -4,6 +4,7 @@ import { HARMONY_APP_VERSION, HARMONY_REQUIRED_SCHEMA_VERSION } from '@/lib/vers
 import { apiError, requireHRApi } from '@/lib/server/hr-api-auth'
 import { REMED_BUCKET, REMED_SIGNATURE_BUCKET } from '@/lib/remed'
 import { getHarmonySystemControl } from '@/lib/server/system-control'
+import { scannerRequired, QUARANTINE_BUCKET } from '@/lib/server/malware-scan'
 
 export const dynamic = 'force-dynamic'
 
@@ -142,6 +143,16 @@ export async function GET(request: NextRequest) {
         ? 'Server environment Supabase tersedia.'
         : 'Environment Supabase server belum lengkap.',
     })
+
+    // Do not report antivirus as healthy merely because deferral was approved.
+    checks.push({ key: 'malware_policy', label: 'Kebijakan antivirus', status: 'warning',
+      detail: scannerRequired() ? 'Pemindaian wajib; kesehatan engine harus diverifikasi terpisah.' : 'DEFERRED: validasi format dan otorisasi aktif; file belum diperiksa antivirus.' })
+    for (const bucket of [QUARANTINE_BUCKET, 'leave-attachments', 'phl-proofs']) {
+      const result = await admin.storage.getBucket(bucket)
+      checks.push({ key: `storage_${bucket}`, label: `Storage ${bucket}`,
+        status: result.error || result.data?.public !== false ? 'error' : 'ok',
+        detail: result.error ? 'Bucket belum tersedia.' : result.data?.public !== false ? 'Bucket masih public; cutover diperlukan.' : 'Bucket private.' })
+    }
 
     const systemControl = await getHarmonySystemControl(admin)
     checks.push({

@@ -20,6 +20,7 @@ export type HarmonyLeaveCycleLike = {
   total_days?: number | null
   used_days?: number | null
   remaining_days?: number | null
+  debt_applied_days?: number | null
   is_active?: boolean | null
   status?: string | null
   notes?: string | null
@@ -112,8 +113,13 @@ export function canonicalizeLeaveBalanceSummary(
   const currentCycle = pickCurrentRegularCycle(summary, cycles || [], ref)
 
   const summaryRegular = Math.max(numeric(summary.annual_regular_days), 0)
+  // The DB view subtracts cycle-scoped debt from the cycle remaining days.
+  // Compare like for like: a debt paid at maturity is NOT an integrity mismatch.
+  const debtApplied = currentCycle
+    ? Math.max(numeric(currentCycle.debt_applied_days), 0)
+    : 0
   const cycleRegular = currentCycle
-    ? Math.max(numeric(currentCycle.remaining_days), 0)
+    ? Math.max(numeric(currentCycle.remaining_days) - debtApplied, 0)
     : null
   const cycleTotal = currentCycle && currentCycle.total_days != null
     ? Math.max(numeric(currentCycle.total_days), 0)
@@ -122,7 +128,7 @@ export function canonicalizeLeaveBalanceSummary(
     ? Math.max(numeric(currentCycle.used_days), 0)
     : null
   const cycleFormula = cycleTotal !== null && cycleUsed !== null
-    ? Math.max(cycleTotal - cycleUsed, 0)
+    ? Math.max(cycleTotal - cycleUsed - debtApplied, 0)
     : null
 
   // The database lifecycle summary is authoritative for usable days. A client

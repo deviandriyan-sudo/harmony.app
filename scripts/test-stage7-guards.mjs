@@ -1,8 +1,9 @@
 // This package intentionally excludes production SQL artifacts.
 // Preserve SQL-specific verification as BLOCKED, never as a false PASS.
 import { existsSync as rc2mExistsSync } from 'node:fs'
+const sourceOnly = process.argv.includes('--source-only')
 const rc2mMissingSQL = ['SQL_ONLY/09_STAGE7_LIFECYCLE_AUTOMATION_DIAGNOSTIC_READ_ONLY.sql'].filter(file => !rc2mExistsSync(file))
-if (rc2mMissingSQL.length) {
+if (rc2mMissingSQL.length && !sourceOnly) {
   console.error('BLOCKED: SQL-only audit artifacts were deliberately excluded from the source package: ' + rc2mMissingSQL.join(', '))
   process.exit(2)
 }
@@ -24,8 +25,8 @@ assert.match(read('app/api/employee/phl-claims/route.ts'), /\.range\(page \* PAG
 assert.match(read('app/api/employee/phl-claims/route.ts'), /Riwayat PHL terlalu besar/)
 assert.match(read('lib/leave-balance-canonical.ts'),/annual_total_available_days: storedTotal/)
 assert.doesNotMatch(read('lib/leave-balance-canonical.ts'),/annual_total_available_days: canonicalTotal/)
-assert.match(read('SQL_ONLY/09_STAGE7_LIFECYCLE_AUTOMATION_DIAGNOSTIC_READ_ONLY.sql'),/to_regclass\('cron.job'\)/)
+if (!sourceOnly) assert.match(read('SQL_ONLY/09_STAGE7_LIFECYCLE_AUTOMATION_DIAGNOSTIC_READ_ONLY.sql'),/to_regclass\('cron.job'\)/)
 const walk = (dir, filename) => fs.readdirSync(dir,{withFileTypes:true}).flatMap(d=>d.isDirectory()?walk(path.join(dir,d.name),filename):d.name===filename?[path.join(dir,d.name)]:[])
-assert.equal(walk('app','page.tsx').length,64)
-assert.equal(walk('app/api','route.ts').length,49)
-console.log('HARMONY Stage 7 guard/source checks PASS: 113 routes, strict identity binding, maintenance email fail-closed, full PHL history scan')
+assert.equal(walk('app','page.tsx').length,68)
+assert.equal(walk('app/api','route.ts').length,68)
+console.log(sourceOnly ? 'PASS: Stage 7 source guards, 136 routes; historical SQL NOT RUN' : 'HARMONY Stage 7 guard/source checks PASS: 136 routes, strict identity binding, maintenance email fail-closed, full PHL history scan')

@@ -627,7 +627,7 @@ export function GeneralOrganizationChart({
         rpcFailureMessage = formatSupabaseError(rpcResponse.error)
 
         const employeesResponse = await supabase
-          .from('employees')
+          .from('harmony_employee_directory')
           .select(
             'id, employee_number, full_name, email, department, position, supervisor_1, supervisor_2, employment_status, is_active',
           )
@@ -652,7 +652,7 @@ export function GeneralOrganizationChart({
           : []
 
         const assignmentsResponse = await supabase
-          .from('employee_assignments')
+          .from('harmony_assignment_directory')
           .select('*')
           .eq('is_active', true)
 

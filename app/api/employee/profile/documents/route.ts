@@ -1,8 +1,10 @@
+import { scannedSignedUrl } from '@/lib/server/private-evidence'
+import { requireCleanUpload } from '@/lib/server/malware-scan'
 import { NextRequest, NextResponse } from 'next/server'
 import { requireProfileAccess, profileError } from '@/lib/server/employee-profile-auth'
 import { requireHarmonyApi } from '@/lib/server/user-api-auth'
 import { PROFILE_DOC_CATEGORIES } from '@/lib/profile-schema'
-import { validUploadSignature } from '@/lib/server/upload-validation'
+import { validUploadContent } from '@/lib/server/upload-validation'
 export const runtime = 'nodejs'
 const BUCKET='harmony-employee-private'
 const MAX_BYTES=8*1024*1024
@@ -19,11 +21,12 @@ export async function POST(request:NextRequest){
     if(!MIME[extension] || file.size<=0 || file.size>MAX_BYTES || (category==='avatar'&&!isImage) || (file.type&&file.type!==MIME[extension]))return NextResponse.json({message:'Format/ukuran file tidak valid (maks 8 MB).'}, {status:400})
     const id=crypto.randomUUID(),path=`${ctx.employeeId}/${id}.${extension}`
     const bytes=new Uint8Array(await file.arrayBuffer())
-    if(!validUploadSignature(file.name,bytes,file.type))return NextResponse.json({message:'Isi dokumen tidak sesuai format file.'},{status:400})
+    if(!validUploadContent(file.name,bytes,file.type))return NextResponse.json({message:'Isi dokumen tidak sesuai format file.'},{status:400})
+    await requireCleanUpload(ctx.admin,bytes)
     const res=await ctx.admin.storage.from(BUCKET).upload(path,bytes,{contentType:MIME[extension],upsert:false})
     if(res.error) throw res.error
     const saved=await ctx.admin.from('harmony_employee_profile_documents').insert({id,employee_id:ctx.employeeId,category,storage_path:path,original_name:file.name.slice(0,180),mime_type:MIME[extension],size_bytes:file.size,uploaded_by:ctx.authUserId}).select('id').single()
-    if(saved.error){await ctx.admin.storage.from(BUCKET).remove([path]);throw saved.error}
+    if(saved.error){console.warn('HARMONY profile upload retained after metadata error');throw saved.error}
     return NextResponse.json({message:'Dokumen berhasil disimpan.',id})
   }catch(error){const e=profileError(error);return NextResponse.json({message:e.message},{status:e.status})}
 }
@@ -37,8 +40,8 @@ export async function GET(request:NextRequest){
     const query=await actor.admin.from('harmony_employee_profile_documents').select('id,employee_id,storage_path,original_name,category').eq('id',fileId).maybeSingle()
     if(query.error||!query.data)return NextResponse.json({message:'Dokumen tidak ditemukan.'},{status:404})
     if(query.data.employee_id!==actor.employee?.id && !isHR)return NextResponse.json({message:'Akses ditolak.'},{status:403})
-    const signed=await actor.admin.storage.from(BUCKET).createSignedUrl(query.data.storage_path,60,query.data.category==='avatar'?{}:{download:query.data.original_name})
-    if(signed.error||!signed.data?.signedUrl)throw signed.error||new Error('Dokumen tidak bisa dibuka.')
-    return NextResponse.json({url:signed.data.signedUrl})
+    const url=await scannedSignedUrl(actor.admin,BUCKET,query.data.storage_path,query.data.category==='avatar'?undefined:query.data.original_name)
+    if(!url)return NextResponse.json({message:'Dokumen belum lolos pemeriksaan keamanan.'},{status:503,headers:{'Cache-Control':'private, no-store'}})
+    return NextResponse.json({url},{headers:{'Cache-Control':'private, no-store'}})
   }catch(error){const e=profileError(error);return NextResponse.json({message:e.message},{status:e.status})}
 }

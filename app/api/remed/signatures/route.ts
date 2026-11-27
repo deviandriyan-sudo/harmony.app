@@ -1,5 +1,5 @@
+import { requireCleanUpload } from '@/lib/server/malware-scan'
 import { NextRequest, NextResponse } from 'next/server'
-import type { SupabaseClient } from '@supabase/supabase-js'
 import {
   REMED_SIGNATURE_ALLOWED_MIME_TYPES,
   REMED_SIGNATURE_BUCKET,
@@ -7,7 +7,7 @@ import {
   safeFileName,
 } from '@/lib/remed'
 import { requireRemedApi, remedApiError } from '@/lib/server/remed-api-auth'
-import { validUploadSignature } from '@/lib/server/upload-validation'
+import { validUploadContent } from '@/lib/server/upload-validation'
 import { getRemedSignatureDisplay, getRemedSignatureManagement } from '@/lib/server/remed-signatures'
 
 export async function GET(request: NextRequest) {
@@ -23,6 +23,14 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ employees })
     }
 
+    if (scope === 'management-preview') {
+      if (ctx.access.role !== 'hr') throw Object.assign(new Error('Hanya HR yang dapat membuka preview tanda tangan.'), { status: 403 })
+      const employeeId = request.nextUrl.searchParams.get('employee_id') || ''
+      if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(employeeId)) throw Object.assign(new Error('ID employee tidak valid.'), { status: 400 })
+      const signature = await getRemedSignatureDisplay(ctx.admin, employeeId, 'employee')
+      return NextResponse.json({ signature }, { headers: { 'Cache-Control': 'private, no-store' } })
+    }
+
     if (!ctx.access.employee_id) return NextResponse.json({ signature: null })
 
     const signature = await getRemedSignatureDisplay(ctx.admin, ctx.access.employee_id, 'employee')
@@ -35,11 +43,9 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   let uploadedPath = ''
-  let cleanupAdmin: SupabaseClient | null = null
 
   try {
     const ctx = await requireRemedApi(request)
-    cleanupAdmin = ctx.admin
     const form = await request.formData()
     const file = form.get('file')
     const requestedEmployeeId = String(form.get('employee_id') || '').trim()
@@ -79,9 +85,10 @@ export async function POST(request: NextRequest) {
     if (existingError) throw existingError
 
     const bytes = Buffer.from(await file.arrayBuffer())
-    if (!validUploadSignature(file.name, bytes, file.type)) {
+    if (!validUploadContent(file.name, bytes, file.type)) {
       throw Object.assign(new Error('Isi gambar tanda tangan tidak sesuai format PNG/JPG/WEBP.'), { status: 400 })
     }
+    await requireCleanUpload(ctx.admin, bytes)
     uploadedPath = `${targetEmployeeId}/${Date.now()}-${safeFileName(file.name)}`
 
     const { error: uploadError } = await ctx.admin.storage
@@ -107,7 +114,7 @@ export async function POST(request: NextRequest) {
 
     const previousPath = String(existing?.signature_path || '')
     if (previousPath && previousPath !== uploadedPath) {
-      await ctx.admin.storage.from(REMED_SIGNATURE_BUCKET).remove([previousPath])
+      console.warn('HARMONY previous signature retained for authorized retention review')
     }
 
     await ctx.admin.rpc('remed_write_audit_v1', {
@@ -123,13 +130,7 @@ export async function POST(request: NextRequest) {
     const signature = await getRemedSignatureDisplay(ctx.admin, targetEmployeeId, 'employee')
     return NextResponse.json({ success: true, signature })
   } catch (error) {
-    if (uploadedPath && cleanupAdmin) {
-      try {
-        await cleanupAdmin.storage.from(REMED_SIGNATURE_BUCKET).remove([uploadedPath])
-      } catch {
-        // Best-effort rollback only.
-      }
-    }
+    if (uploadedPath) console.warn('HARMONY signature upload retained after error')
     const issue = remedApiError(error)
     return NextResponse.json({ message: issue.message }, { status: issue.status })
   }

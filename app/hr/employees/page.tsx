@@ -329,7 +329,7 @@ const initialPHLAdjustmentForm: PHLAdjustmentForm = {
 
 
 const initialPostponeAdjustmentForm: PostponeAdjustmentForm = {
-  action: 'add',
+  action: 'remove',
   days: 1,
   effective_date: '',
   expired_at: '',
@@ -909,22 +909,8 @@ export default function HREmployeesPage() {
     }
 
     if (postponeAdjustmentForm.action === 'add') {
-      if (!postponeAdjustmentForm.effective_date) {
-        setErrorMessage('Tanggal mulai berlaku postpone wajib diisi.')
-        return
-      }
-      if (!postponeAdjustmentForm.expired_at) {
-        setErrorMessage('Tanggal expired postpone wajib diisi.')
-        return
-      }
-      if (postponeAdjustmentForm.effective_date > getTodayISO()) {
-        setErrorMessage('Tanggal mulai berlaku postpone HR tidak boleh di masa depan.')
-        return
-      }
-      if (postponeAdjustmentForm.expired_at < postponeAdjustmentForm.effective_date) {
-        setErrorMessage('Tanggal expired tidak boleh lebih awal dari tanggal mulai berlaku.')
-        return
-      }
+      setErrorMessage('Tambah postpone melalui HR → Cuti → Administrasi; source cycle wajib, maksimal H-7 sebelum matang. Jalur fleksibel lama hanya untuk pengurangan.')
+      return
     }
 
     setSavingPostpone(true)
@@ -944,14 +930,8 @@ export default function HREmployeesPage() {
           employee_id: editingEmployeeId,
           action: postponeAdjustmentForm.action,
           days,
-          effective_date:
-            postponeAdjustmentForm.action === 'add'
-              ? postponeAdjustmentForm.effective_date
-              : null,
-          expired_at:
-            postponeAdjustmentForm.action === 'add'
-              ? postponeAdjustmentForm.expired_at
-              : null,
+          effective_date: null,
+          expired_at: null,
           note,
         }),
       })
@@ -962,10 +942,7 @@ export default function HREmployeesPage() {
       }
 
       setSuccessMessage(
-        result?.result?.message ||
-          (postponeAdjustmentForm.action === 'add'
-            ? 'Postpone manual HR berhasil ditambahkan.'
-            : 'Postpone manual HR berhasil dikurangi.')
+        result?.result?.message || 'Postpone manual HR berhasil dikurangi.'
       )
 
       setPostponeAdjustmentForm((current) => ({
@@ -3197,9 +3174,8 @@ function PostponeAdjustmentSection({
           <div className="min-w-0">
             <h3 className="font-semibold harmony-text-primary">Penyesuaian Postpone Manual HR</h3>
             <p className="mt-1 text-sm leading-6 harmony-text-secondary">
-              HR dapat menambah postpone tanpa mengikuti batas cycle karyawan. HR menentukan jumlah hari,
-              tanggal mulai berlaku, dan tanggal expired. Pengajuan postpone oleh karyawan tetap mengikuti
-              cycle, H-7, saldo sumber, dan approval existing.
+              Penambahan postpone baru dilakukan melalui Administrasi Cuti dengan source cycle, maksimal H-7 sebelum matang,
+              tanpa hutang cuti aktif, dan expired 6 bulan setelah anniversary. Bagian ini hanya untuk mengurangi saldo fleksibel historis.
             </p>
           </div>
         </div>
@@ -3255,7 +3231,6 @@ function PostponeAdjustmentSection({
                 value={form.action}
                 onChange={(value) => onUpdate('action', value as 'add' | 'remove')}
                 options={[
-                  { label: 'Tambah Postpone HR', value: 'add' },
                   { label: 'Kurangi Postpone HR Fleksibel', value: 'remove' },
                 ]}
               />

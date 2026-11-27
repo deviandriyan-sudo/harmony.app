@@ -1,6 +1,7 @@
 'use client'
 
 
+import { verifiedPostponeDays } from '@/lib/postpone-eligibility'
 import { readErrorMessage } from '@/lib/error-utils'
 import { useEffectEvent,
   useEffect,
@@ -47,6 +48,7 @@ type BalanceSummary = {
   annual_regular_days: number | null
   postpone_active_days: number | null
   postpone_expired_days: number | null
+  annual_debt_outstanding_days?: number | null
 
   postpone_manual_net_days?: number | null
   postpone_manual_add_days?: number | null
@@ -72,6 +74,7 @@ type AnnualCycle = {
   matured_at: string | null
 
   remaining_days: number | null
+  postpone_eligible_days?: number | null
 
   carry_forward_days: number | null
   carry_forward_used_days: number | null
@@ -348,13 +351,12 @@ export default function HRLeaveAdministrationPage() {
               6,
             )
 
-          return (
-            anniversary <= today &&
-            today <= expiry
-          )
+          return postponeAction === 'add'
+            ? today <= addDays(anniversary, -7) && verifiedPostponeDays(cycle) > 0
+            : anniversary <= today && today <= expiry && Number(cycle.carry_forward_remaining_days || 0) > 0
         },
       )
-    }, [cycles])
+    }, [cycles, postponeAction])
 
   const computedCycleInfo =
     useMemo(() => {
@@ -389,12 +391,7 @@ export default function HRLeaveAdministrationPage() {
             0,
         )
 
-      const availableToAdd =
-        Math.max(
-          originalRemaining -
-            alreadyPostponed,
-          0,
-        )
+      const availableToAdd = verifiedPostponeDays(selectedCycle)
 
       const activePostpone =
         Math.max(
@@ -694,11 +691,9 @@ export default function HRLeaveAdministrationPage() {
             const today =
               todayISO()
 
-            return (
-              anniversary <=
-                today &&
-              today <= expiry
-            )
+            return postponeAction === 'add'
+              ? today <= addDays(anniversary, -7) && verifiedPostponeDays(cycle) > 0
+              : anniversary <= today && today <= expiry && Number(cycle.carry_forward_remaining_days || 0) > 0
           },
         )
 
@@ -752,6 +747,26 @@ export default function HRLeaveAdministrationPage() {
         'Alasan/keterangan minimal 5 karakter.',
       )
       return
+    }
+
+    if (postponeAction === 'add') {
+      if (!computedCycleInfo || postponeDays > computedCycleInfo.availableToAdd) {
+        setErrorMessage('Jumlah melebihi saldo efektif yang dapat dipostpone.')
+        return
+      }
+      const activeDebtDays = Number(selectedSummary?.annual_debt_outstanding_days)
+      if (!selectedSummary || selectedSummary.annual_debt_outstanding_days == null || !Number.isFinite(activeDebtDays)) {
+        setErrorMessage('Status hutang cuti belum terverifikasi. Refresh detail karyawan sebelum menambah postpone.')
+        return
+      }
+      if (activeDebtDays > 0) {
+        setErrorMessage(`Karyawan memiliki hutang cuti aktif ${activeDebtDays} hari. Postpone tidak diperbolehkan.`)
+        return
+      }
+      if (!computedCycleInfo || todayISO() > addDays(computedCycleInfo.anniversary, -7)) {
+        setErrorMessage('Batas penambahan postpone manual HR adalah H-7 sebelum tanggal matang cuti.')
+        return
+      }
     }
 
     setSavingPostpone(true)
@@ -1306,7 +1321,7 @@ export default function HRLeaveAdministrationPage() {
                 />
               }
               title="Administrasi Postpone Manual"
-              description="Tambah/kurangi postpone secara audit-safe. Expiry otomatis 6 bulan setelah anniversary baru."
+              description="Penambahan manual HR hanya sampai H-7 sebelum matang cuti, tanpa hutang aktif. Saldo berlaku 6 bulan dari anniversary."
             />
 
             <div className="space-y-5 p-5 sm:p-6">
@@ -1380,9 +1395,9 @@ export default function HRLeaveAdministrationPage() {
               {selectedSummary && (
                 <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                   <BalanceTile
-                    label="Cuti Matang"
+                    label="Saldo Cuti Efektif"
                     value={`${formatNumber(
-                      selectedSummary.annual_regular_days,
+                      selectedSummary.annual_total_available_days,
                     )} hari`}
                     tone="blue"
                   />
@@ -1475,9 +1490,9 @@ export default function HRLeaveAdministrationPage() {
                               {formatDate(
                                 cycle.cycle_end,
                               )}{' '}
-                              · Sisa{' '}
+                              · {postponeAction === 'add' ? 'Maks. tambah' : 'Postpone aktif'}{' '}
                               {formatNumber(
-                                cycle.remaining_days,
+                                postponeAction === 'add' ? verifiedPostponeDays(cycle) : cycle.carry_forward_remaining_days,
                               )}{' '}
                               hari
                             </option>
@@ -1606,7 +1621,7 @@ export default function HRLeaveAdministrationPage() {
                   </div>
 
                   <div className="rounded-2xl border border-blue-100 bg-blue-50 p-4 text-xs leading-6 text-blue-700">
-                    Contoh anniversary{' '}
+                    Hanya postpone yang disetujui atau dicatat HR sebelum H-7 tanggal matang yang boleh ditambahkan. Karyawan dengan hutang cuti aktif tidak dapat postpone. Contoh anniversary{' '}
                     <strong>
                       25 Februari
                     </strong>

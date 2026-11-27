@@ -131,7 +131,7 @@ export default function EmployeeSettingsPage() {
     if (!isUuid) return cleanValue
 
     const { data, error } = await supabase
-      .from('employees')
+      .from('harmony_employee_directory')
       .select('id, full_name, position')
       .eq('id', cleanValue)
       .maybeSingle<SupervisorLookup>()

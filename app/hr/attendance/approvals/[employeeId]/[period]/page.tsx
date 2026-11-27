@@ -88,6 +88,8 @@ type AttendanceLog = {
   hr_note: string | null;
   hr_final_status: string | null;
 
+  leave_request_id?: string | null;
+  phl_claim_record_id?: string | null;
   absence_request_type: string | null;
   absence_request_label: string | null;
   absence_request_status: string | null;
@@ -885,7 +887,16 @@ function MobileLogCard({ log }: { log: AttendanceLog }) {
 
 function ProofLinks({ log }: { log: AttendanceLog }) {
   return (
-    <HarmonyAttachmentViewer
+    <div className="space-y-3">
+      {log.leave_request_id && (
+        <HarmonyAttachmentViewer entityType="leave_request" entityId={log.leave_request_id}
+          compact emptyText="Tidak ada dokumen pengajuan asal (cuti tahunan tidak memerlukan evidence)." />
+      )}
+      {log.phl_claim_record_id && (
+        <HarmonyAttachmentViewer entityType="phl_record" entityId={log.phl_claim_record_id}
+          compact emptyText="Tidak ada lampiran PHL asal." />
+      )}
+      <HarmonyAttachmentViewer
       entityType="attendance_log"
       entityId={log.id}
       legacyLinks={[
@@ -901,6 +912,7 @@ function ProofLinks({ log }: { log: AttendanceLog }) {
       compact
       emptyText="-"
     />
+    </div>
   );
 }
 

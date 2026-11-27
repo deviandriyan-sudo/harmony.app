@@ -174,7 +174,7 @@ export async function GET(request: NextRequest) {
         adjustments: context.adjustments || [],
         reference_date: context.reference_date || null,
         balance_integrity_warning: canonicalSummaries.some((item) => item.balance_integrity_status && item.balance_integrity_status !== 'ok')
-          ? 'Ada summary saldo yang berbeda dari cycle aktif; nilai canonical cycle digunakan.'
+          ? 'Ada perbedaan summary dan cycle aktif; saldo efektif tetap mengikuti ringkasan database.'
           : null,
         approval_balance_diagnostics: approvalDiagnostics.diagnostics,
         approval_diagnostics_warning: approvalDiagnostics.warning,
@@ -196,6 +196,9 @@ export async function POST(request: NextRequest) {
     const sourceCycleId = clean(body?.source_cycle_id)
 
     if (mode === 'flexible' || !sourceCycleId) {
+      if (clean(body?.action).toLowerCase() === 'add') {
+        return NextResponse.json({ success: false, error: 'Penambahan postpone HR harus memakai source cycle pada menu Administrasi Cuti, diajukan sebelum H-7 tanggal matang, dan tidak boleh memiliki hutang cuti aktif. Jalur fleksibel lama hanya untuk pengurangan saldo historis.' }, { status: 400 })
+      }
       const { data, error } = await supabase.rpc(
         'hr_adjust_leave_postpone_manual_flexible_v1',
         {

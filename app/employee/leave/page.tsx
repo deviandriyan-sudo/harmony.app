@@ -1,7 +1,9 @@
 'use client'
 
 
+import { publishScannedUpload } from '@/lib/scanned-upload-client'
 import { readErrorMessage } from '@/lib/error-utils'
+import { validUploadFileContent } from '@/lib/server/upload-validation'
 import { useEffectEvent, useEffect, useId, useMemo, useState } from 'react'
 import type { FormEvent, ReactNode } from 'react'
 import Link from 'next/link'
@@ -14,7 +16,7 @@ import {
   HarmonyPendingAttachmentPicker,
 } from '@/components/attachments/HarmonyAttachments'
 import { supabase } from '@/lib/supabase'
-import { harmonyFetch } from '@/lib/harmony-client'
+import { fetchMyCanonicalLeaveBalance } from '@/lib/employee-leave-balance'
 import {
   HARMONY_ATTACHMENT_REQUIRED_FILES,
   registerHarmonySubmissionAttachments,
@@ -225,6 +227,8 @@ export default function EmployeeLeavePage() {
   const [employeeDirectory, setEmployeeDirectory] = useState<Employee[]>([])
 
   const [annualLeave, setAnnualLeave] = useState<AnnualLeaveSummary | null>(null)
+  const [annualBalanceWarning, setAnnualBalanceWarning] = useState<string | null>(null)
+  const [annualDebtSummary, setAnnualDebtSummary] = useState<{ outstanding_days: number; next_maturity: string | null } | null>(null)
   const [phlRecords, setPhlRecords] = useState<PHLRecord[]>([])
   const [myPHLBalance, setMyPHLBalance] = useState<MyPHLBalanceSummary | null>(null)
   const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>([])
@@ -285,7 +289,7 @@ export default function EmployeeLeavePage() {
 
   const selectedRequestMeta = getRequestMeta(form.request_type)
 
-  const requiresProof = Boolean(selectedRequestMeta.requires_proof)
+  const requiresProof = form.request_type !== 'annual_leave' && Boolean(selectedRequestMeta.requires_proof)
 
   const handoverEmployeeOptions = useMemo(() => {
     return employeeDirectory
@@ -311,6 +315,21 @@ export default function EmployeeLeavePage() {
   const onInitialLoad = useEffectEvent(fetchData)
   useEffect(() => {
     onInitialLoad()
+  }, [])
+
+  const onBalanceVisibilityRefresh = useEffectEvent(fetchAnnualLeaveSummary)
+  useEffect(() => {
+    const refresh = () => {
+      if (document.visibilityState === 'visible') void onBalanceVisibilityRefresh()
+    }
+    window.addEventListener('focus', refresh)
+    document.addEventListener('visibilitychange', refresh)
+    const timer = window.setInterval(refresh, 60_000)
+    return () => {
+      window.removeEventListener('focus', refresh)
+      document.removeEventListener('visibilitychange', refresh)
+      window.clearInterval(timer)
+    }
   }, [])
 
   async function fetchData() {
@@ -382,7 +401,7 @@ export default function EmployeeLeavePage() {
 
   async function fetchSupervisorData(employeeData: Employee) {
     const { data } = await supabase
-      .from('employees')
+      .from('harmony_employee_directory')
       .select('*')
       .eq('is_active', true)
 
@@ -418,20 +437,26 @@ export default function EmployeeLeavePage() {
   }
 
   async function fetchAnnualLeaveSummary() {
-    try {
-      const payload = await harmonyFetch<{
-        balance_summary?: AnnualLeaveSummary | null
-        balance_integrity_warning?: string | null
-      }>('/api/employee/leave/postpone')
-
-      if (payload.balance_integrity_warning) {
-        console.warn('Leave balance integrity warning:', payload.balance_integrity_warning)
-      }
-
-      setAnnualLeave(payload.balance_summary || null)
-    } catch (error: unknown) {
-      console.warn('Leave lifecycle summary warning:', readErrorMessage(error) || error)
+    const [summaryResult, debtResult] = await Promise.allSettled([
+      fetchMyCanonicalLeaveBalance<AnnualLeaveSummary>(),
+      supabase.rpc('harmony_get_my_annual_leave_debt_history_v1'),
+    ])
+    if (summaryResult.status === 'fulfilled') {
+      setAnnualLeave(summaryResult.value.balance)
+      setAnnualBalanceWarning(summaryResult.value.warning)
+    } else {
+      console.warn('Leave lifecycle summary warning:', readErrorMessage(summaryResult.reason) || summaryResult.reason)
       setAnnualLeave(null)
+      setAnnualBalanceWarning('Saldo cuti belum dapat disinkronkan. Silakan refresh atau hubungi HR.')
+    }
+    if (debtResult.status === 'fulfilled' && !debtResult.value.error) {
+      const value = (debtResult.value.data || {}) as { outstanding_days?: number | null; next_maturity?: string | null }
+      setAnnualDebtSummary({
+        outstanding_days: Math.max(0, Number(value.outstanding_days || 0)),
+        next_maturity: value.next_maturity || null,
+      })
+    } else {
+      setAnnualDebtSummary(null)
     }
   }
 
@@ -585,44 +610,19 @@ export default function EmployeeLeavePage() {
       }
     }
 
-    const cleanName = file.name
-      .replace(/\s+/g, '-')
-      .replace(/[^a-zA-Z0-9.-]/g, '')
+    if (!(await validUploadFileContent(file))) return { url: '', name: '', size: 0, type: '', storagePath: '', error: 'Format, isi atau ukuran evidence tidak valid.' }
 
-    const path = `leave-requests/${Date.now()}-${crypto.randomUUID()}-${cleanName || 'file'}`
-
-    const { error } = await supabase.storage
-      .from('leave-attachments')
-      .upload(path, file)
-
-    if (error) {
-      return {
-        url: '',
-        name: '',
-        size: 0,
-        type: '',
-        storagePath: '',
-        error: error.message,
-      }
-    }
-
-    const { data } = supabase.storage
-      .from('leave-attachments')
-      .getPublicUrl(path)
-
-    return {
-      url: data.publicUrl,
-      name: file.name,
-      size: file.size,
-      type: file.type,
-      storagePath: path,
-      error: '',
+    try {
+      const uploaded = await publishScannedUpload(file,'evidence')
+      return { url: uploaded.referenceUrl, name: file.name, size: file.size, type: uploaded.mime, storagePath: uploaded.path, error: '' }
+    } catch (error) {
+      return { url: '', name: '', size: 0, type: '', storagePath: '', error: readErrorMessage(error) || 'File belum lolos pemeriksaan keamanan.' }
     }
   }
 
   async function cleanupUploadedProof(storagePath: string) {
     if (!storagePath) return
-    await supabase.storage.from('leave-attachments').remove([storagePath])
+    // Retain staged/verified files for authorized retention review; no automatic deletion.
   }
 
   async function phlClaimApi(
@@ -782,6 +782,12 @@ export default function EmployeeLeavePage() {
       setErrorMessage(
         `${selectedRequestMeta.label} maksimal ${fixedMaximumDays} hari kerja. Rentang yang dipilih menghasilkan ${calculatedDays} hari kerja.`
       )
+      setSubmitting(false)
+      return
+    }
+
+    if (form.request_type === 'annual_leave' && annualLeave === null) {
+      setErrorMessage('Saldo cuti belum dapat diverifikasi. Refresh saldo terlebih dahulu sebelum mengajukan cuti tahunan.')
       setSubmitting(false)
       return
     }
@@ -1080,6 +1086,11 @@ export default function EmployeeLeavePage() {
       />
 
       <section className="harmony-employee-leave-page space-y-5 p-4 sm:p-6">
+        {annualBalanceWarning && (
+          <div role="status" className="rounded-2xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+            {annualBalanceWarning}
+          </div>
+        )}
         {successMessage && (
           <AlertBox tone="green" title="Berhasil" icon={<CheckCircle2 size={18} />}>
             {successMessage}
@@ -1112,13 +1123,18 @@ export default function EmployeeLeavePage() {
           </div>
         </div>
 
+        {annualDebtSummary && annualDebtSummary.outstanding_days > 0 && (
+          <div role="status" className="rounded-2xl border border-amber-200 bg-amber-50/80 px-4 py-3 text-xs font-medium text-amber-900">
+            Hutang cuti tersisa {annualDebtSummary.outstanding_days} hari. Hak cuti baru akan otomatis dikurangi pada {annualDebtSummary.next_maturity ? formatDisplayDate(annualDebtSummary.next_maturity) : 'tanggal matang berikutnya'}.
+          </div>
+        )}
         <div className="harmony-leave-summary-grid grid gap-3 md:grid-cols-2 xl:grid-cols-5">
           <SummaryCard
             title="Sisa Cuti"
-            value={`${annualRemaining} hari`}
+            value={annualLeave ? `${annualRemaining} hari` : '—'}
             description={
               annualLeave?.latest_matured_at
-                ? `${annualRegularRemaining} hari matang · pembaruan ${formatDisplayDate(annualLeave.latest_matured_at)}`
+                ? `${annualRegularRemaining} hari reguler · penyesuaian ${Number(annualLeave.annual_manual_adjustment_days || 0) > 0 ? '+' : ''}${Number(annualLeave.annual_manual_adjustment_days || 0)} hari · pembaruan ${formatDisplayDate(annualLeave.latest_matured_at)}`
                 : `${annualRegularRemaining} hari hak matang saat ini`
             }
             icon={<WalletCards size={22} />}
@@ -1227,6 +1243,7 @@ export default function EmployeeLeavePage() {
             selectedRequestMeta={selectedRequestMeta}
             requestTypes={requestTypes}
             annualRemaining={annualRemaining}
+            annualLeaveAvailable={annualLeave !== null}
             phlRemaining={phlRemaining}
             handoverEmployeeOptions={handoverEmployeeOptions}
             selectedHandoverEmployee={selectedHandoverEmployee}
@@ -1253,6 +1270,7 @@ function LeaveRequestModal({
   selectedRequestMeta,
   requestTypes,
   annualRemaining,
+  annualLeaveAvailable,
   phlRemaining,
   handoverEmployeeOptions,
   selectedHandoverEmployee,
@@ -1272,6 +1290,7 @@ function LeaveRequestModal({
   selectedRequestMeta: ReturnType<typeof getRequestMeta>
   requestTypes: HarmonyRequestTypeDefinition[]
   annualRemaining: number
+  annualLeaveAvailable: boolean
   phlRemaining: number
   handoverEmployeeOptions: Employee[]
   selectedHandoverEmployee: Employee | null
@@ -1399,7 +1418,7 @@ function LeaveRequestModal({
 
               <InfoTile
                 label="Saldo Cuti"
-                value={`${annualRemaining} hari`}
+                value={annualLeaveAvailable ? `${annualRemaining} hari` : '—'}
                 description="Sisa cuti tahunan"
                 tone="green"
               />

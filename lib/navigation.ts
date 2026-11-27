@@ -131,6 +131,7 @@ export function resolveDetailTabs(role: NavigationRole, pathname: string): Navig
     { title: 'Export', href: '/hr/attendance/export' },
     { title: 'Sync', href: '/hr/attendance/sync' },
     { title: 'Audit', href: '/hr/attendance/audit' },
+    { title: 'Sinkronisasi Sumber', href: '/hr/attendance/source-audit' },
   ]
   if (routeMatches(pathname, '/hr/leave')) return [
     { title: 'Ringkasan', href: '/hr/leave' },

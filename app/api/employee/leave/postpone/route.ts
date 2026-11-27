@@ -71,6 +71,9 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    const debtRaw = balanceSummary?.annual_debt_outstanding_days
+    const debtVerified = debtRaw !== undefined && debtRaw !== null && Number.isFinite(Number(debtRaw))
+    const debtDays = debtVerified ? Math.max(Number(debtRaw), 0) : null
     const integrityStatus = String(balanceSummary?.balance_integrity_status || '')
 
     return NextResponse.json(
@@ -80,6 +83,8 @@ export async function GET(request: NextRequest) {
         cycles: visibleCycles,
         requests: context.requests || [],
         balance_summary: balanceSummary,
+        debt_outstanding_days: debtDays,
+        debt_status_verified: debtVerified,
         reference_date: context.reference_date || null,
         balance_integrity_warning:
           integrityStatus && integrityStatus !== 'ok'

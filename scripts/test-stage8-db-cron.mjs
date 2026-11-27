@@ -1,8 +1,9 @@
 // This package intentionally excludes production SQL artifacts.
 // Preserve SQL-specific verification as BLOCKED, never as a false PASS.
 import { existsSync as rc2mExistsSync } from 'node:fs'
+const sourceOnly = process.argv.includes('--source-only')
 const rc2mMissingSQL = ['SQL_ONLY/12_STAGE8_DATABASE_SECURITY_AND_CRON_DIAGNOSTIC_READ_ONLY.sql', 'SQL_ONLY/13_STAGE8_RESTRICT_INTERNAL_LIFECYCLE_RPC_OPTIONAL.sql'].filter(file => !rc2mExistsSync(file))
-if (rc2mMissingSQL.length) {
+if (rc2mMissingSQL.length && !sourceOnly) {
   console.error('BLOCKED: SQL-only audit artifacts were deliberately excluded from the source package: ' + rc2mMissingSQL.join(', '))
   process.exit(2)
 }
@@ -29,12 +30,14 @@ assert.match(cron,/p_reference_date: referenceDate/)
 assert.match(cron,/failed === 0 && remaining === 0/)
 assert.doesNotMatch(cron, /email|full_name|employee_number|annual_leave_balance|entitlement_days|\.update\(|\.insert\(/i,
  'The cron must not recalculate balances or fetch employee PII')
+if (!sourceOnly) {
 const diag=read('SQL_ONLY/12_STAGE8_DATABASE_SECURITY_AND_CRON_DIAGNOSTIC_READ_ONLY.sql')
 assert.match(diag, /anon_can_execute/)
 assert.match(diag, /storage\.buckets/)
 const priv=read('SQL_ONLY/13_STAGE8_RESTRICT_INTERNAL_LIFECYCLE_RPC_OPTIONAL.sql')
 assert.match(priv, /REVOKE ALL ON FUNCTION/)
 assert.match(priv, /TO service_role/)
+}
 // WITA boundary sanity: UTC day can differ from Indonesia's business day.
 const getWita = (date) => {
  const parts = new Intl.DateTimeFormat('en-US', {timeZone:'Asia/Makassar',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date(date))
@@ -44,4 +47,4 @@ const getWita = (date) => {
 assert.equal(getWita('2026-10-28T16:00:00.000Z'),'2026-10-29')
 assert.equal(getWita('2026-02-28T16:00:00.000Z'),'2026-03-01')
 assert.equal(getWita('2028-02-28T16:00:00.000Z'),'2028-02-29')
-console.log('Stage 8 source guard and WITA boundary checks PASS (not a production RPC integration test)')
+console.log(sourceOnly ? 'PASS: Stage 8 source and WITA guards; historical SQL NOT RUN' : 'Stage 8 source guard and WITA boundary checks PASS (not a production RPC integration test)')

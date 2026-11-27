@@ -13,7 +13,7 @@ import { Topbar } from '@/components/layout/Topbar'
 import { HarmonyAttachmentViewer } from '@/components/attachments/HarmonyAttachments'
 import { supabase } from '@/lib/supabase'
 import { sendHarmonyWorkflowNotification } from '@/lib/notifications'
-import { fetchTeamPHLWorkRequestsForPeriod, reviewPHLWorkRequest, type PHLWorkRequest, formatPHLMinutes, phlWorkStatusLabel } from '@/lib/phl-work'
+import { fetchTeamPHLWorkRequestsForPeriod, openPHLWorkEvidence, reviewPHLWorkRequest, type PHLWorkRequest, formatPHLMinutes, phlWorkStatusLabel } from '@/lib/phl-work'
 
 type AppUser = {
   id: string
@@ -92,6 +92,8 @@ type AttendanceLog = {
 
   is_phl_candidate: boolean | null
   phl_work_request_id?: string | null
+  phl_claim_record_id?: string | null
+  leave_request_id?: string | null
   phl_proof_url: string | null
   phl_proof_name: string | null
   absence_proof_url: string | null
@@ -402,7 +404,7 @@ export default function EmployeeApprovalDetailPage() {
     setCurrentSupervisor(supervisorData || null)
 
     const { data: employeeData, error: employeeError } = await supabase
-      .from('employees')
+      .from('harmony_employee_directory')
       .select('*')
       .eq('id', employeeId)
       .maybeSingle<EmployeeProfile>()
@@ -1165,9 +1167,9 @@ export default function EmployeeApprovalDetailPage() {
                     )}
                   </div>
                   <div className="mt-3 flex flex-wrap gap-2">
-                    {item.attachments?.length ? item.attachments.map((file) => file.signed_url ? (
-                      <a key={file.id} href={file.signed_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 rounded-lg border border-violet-200/70 bg-white/65 px-2.5 py-1.5 text-[11px] text-violet-800 hover:bg-white"><FileText size={12}/>{file.file_name}</a>
-                    ) : <span key={file.id} className="text-[11px] harmony-text-secondary">{file.file_name}</span>) : <span className="text-[11px] text-amber-700">Tidak ada Surat Tugas terlampir; approval akan divalidasi server.</span>}
+                    {item.attachments?.length ? item.attachments.map((file) => (
+                      <button key={file.id} type="button" onClick={() => void openPHLWorkEvidence(file.id).catch((error: unknown) => setErrorMessage(readErrorMessage(error) || 'Evidence tidak dapat dibuka.'))} className="inline-flex items-center gap-1.5 rounded-lg border border-violet-200/70 bg-white/65 px-2.5 py-1.5 text-[11px] text-violet-800 hover:bg-white"><FileText size={12}/>{file.file_name}</button>
+                    )) : <span className="text-[11px] text-amber-700">Tidak ada Surat Tugas terlampir; approval akan divalidasi server.</span>}
                   </div>
                   {item.supervisor_note && item.status !== 'pending_supervisor' && <p className="mt-2 text-xs harmony-text-secondary">Catatan: {item.supervisor_note}</p>}
                 </article>
@@ -1813,6 +1815,18 @@ function AttendanceDetailModal({
             content={log.supervisor_note || log.correction_notes || '-'}
           />
 
+          {log.leave_request_id && (
+            <div className="mt-5">
+              <HarmonyAttachmentViewer entityType="leave_request" entityId={log.leave_request_id}
+                emptyText="Tidak ada lampiran dari pengajuan asal (cuti tahunan tidak wajib evidence)." />
+            </div>
+          )}
+          {log.phl_claim_record_id && (
+            <div className="mt-5">
+              <HarmonyAttachmentViewer entityType="phl_record" entityId={log.phl_claim_record_id}
+                emptyText="Tidak ada bukti PHL pada pengajuan asal." />
+            </div>
+          )}
           <div className="mt-5">
             <HarmonyAttachmentViewer
               entityType="attendance_log"

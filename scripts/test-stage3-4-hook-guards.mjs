@@ -22,16 +22,33 @@ const targets = [
   'app/remed/hr/employees/page.tsx',
   'components/layout/Topbar.tsx',
 ]
+const expectedEffectEvents = {
+  "app/employee/approvals/attendance/page.tsx": 1,
+  "app/employee/approvals/page.tsx": 1,
+  "app/employee/attendance/page.tsx": 2,
+  "app/employee/leave/page.tsx": 2,
+  "app/employee/settings/page.tsx": 1,
+  "app/hr/attendance/approvals/[employeeId]/[period]/page.tsx": 1,
+  "app/hr/attendance/audit/page.tsx": 1,
+  "app/hr/attendance/upload/page.tsx": 1,
+  "app/hr/employees/page.tsx": 1,
+  "app/hr/leave/administration/page.tsx": 2,
+  "app/hr/leave/page.tsx": 1,
+  "app/hr/settings/notifications/page.tsx": 1,
+  "app/hr/settings/page.tsx": 1,
+  "app/remed/hr/employees/page.tsx": 1,
+  "components/layout/Topbar.tsx": 2
+}
 let effectEvents = 0
 for (const relative of targets) {
   const text = read(relative)
   assert.match(text, /import\s*\{[^}]*useEffectEvent[^}]*\}\s*from\s*['"]react['"]/, `${relative}: React 19 effect event import absent`)
   const occurrences = text.match(/\buseEffectEvent\s*\(/g) || []
   effectEvents += occurrences.length
-  assert.ok(occurrences.length > 0, `${relative}: expected an Effect Event`)
+  assert.equal(occurrences.length, expectedEffectEvents[relative], `${relative}: Effect Event inventory changed`)
   assert.doesNotMatch(text, /import\s*\{[^}]*useEffectEvent[^}]*\}\s*from\s*['"]@\/lib\/error-utils['"]/, `${relative}: effect event imported from wrong module`)
 }
-assert.equal(effectEvents, 17, 'The original 17 effect-specific warning sites should be covered')
+assert.equal(effectEvents, 19, 'Reviewed RC3N effect-specific warning sites should be covered')
 assert.doesNotMatch(read('app/employee/attendance/page.tsx'), /\}, \[calendarRows, rowDrafts\]\);\s*\n\s*const presentCount/, 'The old summaryBuckets memo is still active')
 assert.doesNotMatch(read('app/employee/approvals/page.tsx'), /type SummaryTone\s*=/)
 assert.doesNotMatch(read('app/employee/attendance/page.tsx'), /function formatPeriodStatus\s*\(/)
@@ -47,6 +64,7 @@ function walk(dir) {
   }
 }
 walk(path.join(root, 'app'))
-assert.equal(pages.length, 64)
-assert.equal(apis.length, 49)
-console.log(`HARMONY Stage 3.4 hook guards PASS: ${effectEvents} effect callbacks, 3 unused declarations removed, pure attendance summary, 113 routes`)
+assert.equal(pages.length, 68)
+assert.equal(apis.length, 68)
+assert.deepEqual([...pages,...apis].map(f=>path.relative(root,f).replaceAll('\\','/')).sort(),JSON.parse(read('scripts/rc3n-route-inventory.json')))
+console.log(`HARMONY Stage 3.4 hook guards PASS: ${effectEvents} effect callbacks, 3 unused declarations removed, pure attendance summary, 136 routes`)

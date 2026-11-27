@@ -14,7 +14,7 @@ import {
   UserRound,
 } from 'lucide-react'
 
-import { supabase } from '@/lib/supabase'
+import { harmonyFetch } from '@/lib/harmony-client'
 
 type AnyRow = Record<string, unknown>
 
@@ -123,12 +123,6 @@ function getMonthRange(monthKey: string) {
     start: `${yearText}-${monthText}-01`,
     end: `${yearText}-${monthText}-${String(lastDay).padStart(2, '0')}`,
   }
-}
-
-function monthKeyFromDate(value?: unknown) {
-  const text = String(value || '').trim()
-  const matched = text.match(/^(\d{4})-(\d{2})/)
-  return matched ? `${matched[1]}-${matched[2]}` : ''
 }
 
 function buildMonthOptions(earliestMonth?: string | null) {
@@ -542,7 +536,6 @@ function mapPHLClaimRow(
       'job_pending',
       'pending_job',
       'handover_note',
-      'notes',
     ]),
     handoverTo: getHandoverTo(row, directory),
     source: 'phl_records',
@@ -618,7 +611,7 @@ function sameEmployee(a: TeamHistoryItem, b: TeamHistoryItem) {
   const aId = normalize(a.employeeId)
   const bId = normalize(b.employeeId)
 
-  if (aId && bId && aId === bId) return true
+  if (aId && bId) return aId === bId
 
   return normalize(a.employeeName) === normalize(b.employeeName)
 }
@@ -712,37 +705,8 @@ export function TodayTeamAvailability() {
 
   async function fetchAvailableMonths() {
     try {
-      const [leaveEarliest, phlEarliest, attendanceEarliest] = await Promise.all([
-        supabase
-          .from('leave_requests')
-          .select('start_date')
-          .not('start_date', 'is', null)
-          .order('start_date', { ascending: true })
-          .limit(1),
-        supabase
-          .from('phl_records')
-          .select('phl_date,created_at')
-          .eq('source', 'employee_phl_claim')
-          .order('created_at', { ascending: true })
-          .limit(1),
-        supabase
-          .from('attendance_logs')
-          .select('attendance_date')
-          .is('deleted_at', null)
-          .order('attendance_date', { ascending: true })
-          .limit(1),
-      ])
-
-      const candidates = [
-        monthKeyFromDate((leaveEarliest.data?.[0] as AnyRow | undefined)?.start_date),
-        monthKeyFromDate((phlEarliest.data?.[0] as AnyRow | undefined)?.phl_date),
-        monthKeyFromDate((attendanceEarliest.data?.[0] as AnyRow | undefined)?.attendance_date),
-      ].filter(Boolean)
-
-      if (candidates.length === 0) return
-
-      candidates.sort()
-      setMonthOptions(buildMonthOptions(candidates[0]))
+      const result = await harmonyFetch<{earliestMonth: string | null}>('/api/employee/team-availability?mode=months')
+      if (result.earliestMonth) setMonthOptions(buildMonthOptions(result.earliestMonth))
     } catch (error) {
       console.warn('Periode histori tim tidak dapat diperluas otomatis:', error)
     }
@@ -753,55 +717,12 @@ export function TodayTeamAvailability() {
     setMessage('')
 
     try {
-      const [
-        leaveResponse,
-        phlResponse,
-        attendanceResponse,
-        employeeDirectoryResponse,
-      ] = await Promise.all([
-        supabase
-          .from('leave_requests')
-          .select('*')
-          .lte('start_date', monthRange.end)
-          .or(`end_date.gte.${monthRange.start},end_date.is.null`)
-          .order('start_date', { ascending: false }),
-        supabase
-          .from('phl_records')
-          .select('*')
-          .eq('source', 'employee_phl_claim')
-          .order('created_at', { ascending: false }),
-        supabase
-          .from('attendance_logs')
-          .select('*')
-          .gte('attendance_date', monthRange.start)
-          .lte('attendance_date', monthRange.end)
-          .is('deleted_at', null)
-          .order('attendance_date', { ascending: false }),
-        supabase
-          .from('employees')
-          .select(
-            'id,employee_number,machine_pin,full_name,department,position,email,is_active',
-          )
-          .eq('is_active', true)
-          .limit(1000),
-      ])
+      const result = await harmonyFetch<{
+        leaves: AnyRow[]; claims: AnyRow[]; attendance: AnyRow[]; directory: EmployeeDirectoryEntry[]
+      }>(`/api/employee/team-availability?month=${encodeURIComponent(selectedMonth)}`)
+      const employeeDirectory = result.directory
 
-      if (leaveResponse.error) throw leaveResponse.error
-      if (phlResponse.error) throw phlResponse.error
-      if (attendanceResponse.error) throw attendanceResponse.error
-
-      if (employeeDirectoryResponse.error) {
-        console.warn(
-          'Direktori karyawan untuk resolusi PIC tidak dapat dimuat:',
-          employeeDirectoryResponse.error.message,
-        )
-      }
-
-      const employeeDirectory = (
-        employeeDirectoryResponse.data || []
-      ) as EmployeeDirectoryEntry[]
-
-      const leaveItems = (leaveResponse.data || [])
+      const leaveItems = result.leaves
         .filter((row: AnyRow) => normalize(row.request_type) !== 'phl_claim')
         .map((row) =>
           mapLeaveRow(
@@ -813,7 +734,7 @@ export function TodayTeamAvailability() {
         )
         .filter(Boolean) as TeamHistoryItem[]
 
-      const phlItems = (phlResponse.data || [])
+      const phlItems = result.claims
         .map((row) =>
           mapPHLClaimRow(
             row,
@@ -826,7 +747,7 @@ export function TodayTeamAvailability() {
 
       const canonicalRequestItems = [...leaveItems, ...phlItems]
 
-      const attendanceItems = (attendanceResponse.data || [])
+      const attendanceItems = result.attendance
         .map((row) =>
           mapAttendanceRow(
             row,

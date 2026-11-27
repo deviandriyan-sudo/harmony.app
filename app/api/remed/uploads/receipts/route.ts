@@ -99,12 +99,9 @@ export async function DELETE(request: NextRequest) {
     const prefix = `_staging/claims/${ctx.access.employee_id}/`
     const safePaths = paths.filter((path: string) => path.startsWith(prefix)).slice(0, REMED_MAX_FILES)
 
-    if (safePaths.length) {
-      const { error } = await ctx.admin.storage.from(REMED_BUCKET).remove(safePaths)
-      if (error) throw error
-    }
-
-    return NextResponse.json({ removed: safePaths.length })
+    // Preserve staged receipts for security review, including rejected uploads.
+    // Client-side cancellation is not authorization to erase quarantined bytes.
+    return NextResponse.json({ removed: 0, retained: safePaths.length })
   } catch (error) {
     const issue = remedApiError(error)
     return NextResponse.json({ message: issue.message }, { status: issue.status })

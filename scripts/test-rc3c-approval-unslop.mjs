@@ -36,8 +36,9 @@ for (const token of [
 const fetchStart = page.indexOf('  async function fetchData() {')
 const fetchEnd = page.indexOf('\n  return (\n    <>', fetchStart)
 assert.ok(fetchStart >= 0 && fetchEnd > fetchStart)
+// RC3N reviewed diff: only employee and assignment directory relations changed.
 assert.equal(signature(page.slice(fetchStart, fetchEnd)),
-  '5b4967fc50e17514a34b6514821ef9c90bd8c6243eb8a24219499700597327f1',
+  '9645a79ef246fc0c6cd56b039c395bab92f248c19375764ca2473cda13d25c2d',
   'Approval data fetcher changed — review required')
 const helperStart = page.indexOf('function supervisorIdentitySet(')
 assert.ok(helperStart >= 0)

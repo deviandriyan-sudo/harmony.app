@@ -17,8 +17,8 @@ async function query(employeeId: string) {
   const identities = [self.data.id, self.data.full_name, self.data.employee_number, self.data.machine_pin, self.data.email]
     .map(value => String(value || '').trim().toLowerCase()).filter(Boolean)
   const [people, assignments] = await Promise.all([
-    supabase.from('employees').select('id,supervisor_1,supervisor_2').eq('is_active', true),
-    supabase.from('employee_assignments').select('employee_id,supervisor_1,supervisor_2,start_date,end_date,is_primary,is_active').eq('is_active', true),
+    supabase.from('harmony_employee_directory').select('id,supervisor_1,supervisor_2').eq('is_active', true),
+    supabase.from('harmony_assignment_directory').select('employee_id,supervisor_1,supervisor_2,start_date,end_date,is_primary,is_active').eq('is_active', true),
   ])
   if (people.error || assignments.error) return false
   const matches = (value: unknown) => identities.includes(String(value || '').trim().toLowerCase())

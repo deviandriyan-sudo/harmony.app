@@ -212,15 +212,12 @@ export default function EmployeePostponeApprovalPage() {
         .maybeSingle<AppUser>()
 
       if (appUserError) throw appUserError
+      if (!appUserData?.employee_id) throw new Error('Identitas karyawan belum terhubung.')
 
       const { data: employeeData, error: employeeError } = await supabase
         .from('employees')
         .select('*')
-        .or(
-          appUserData?.employee_id
-            ? `id.eq.${appUserData.employee_id},email.eq.${authData.user.email}`
-            : `email.eq.${authData.user.email}`
-        )
+        .eq('id', appUserData.employee_id)
         .limit(1)
 
       if (employeeError) throw employeeError
@@ -228,7 +225,7 @@ export default function EmployeePostponeApprovalPage() {
       setCurrentEmployee((employeeData?.[0] || null) as Employee | null)
 
       const { data: employeeDirectoryData, error: employeeDirectoryError } = await supabase
-        .from('employees')
+        .from('harmony_employee_directory')
         .select('*')
 
       if (employeeDirectoryError) throw employeeDirectoryError

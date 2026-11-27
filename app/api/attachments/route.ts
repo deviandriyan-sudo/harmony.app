@@ -1,5 +1,9 @@
+import { recordVerifiedEvidence, verifiedEvidenceOwner, scannedSignedUrl } from '@/lib/server/private-evidence'
+import { requireCleanFile } from '@/lib/server/malware-scan'
+import { getPHLSubordinateIds } from '@/lib/server/phl-work'
 
-import { validUploadFileSignature } from '@/lib/server/upload-validation'
+import { parseLegacyEvidenceUrl, validEvidenceObjectPath } from '@/lib/evidence-url'
+import { validUploadFileContent } from '@/lib/server/upload-validation'
 import { unreferencedAttendanceProofPaths } from '@/lib/server/phl-evidence-preservation'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
@@ -60,7 +64,7 @@ async function validateFile(file: File) {
     return `Ukuran ${file.name} melebihi 10 MB.`
   }
 
-  if (!(await validUploadFileSignature(file))) {
+  if (!(await validUploadFileContent(file))) {
     return 'Isi file tidak sesuai dengan format atau MIME dokumen.'
   }
 
@@ -133,12 +137,23 @@ async function resolveIdentity(request: NextRequest, admin: SupabaseClient) {
   }
 
   const role = normalize(appUser.role)
+  const isHR = ['hr', 'admin', 'administrator', 'super_admin', 'human_resources'].includes(role)
+  if (!isHR) {
+    if (role !== 'employee' || !appUser.employee_id) {
+      return { error: NextResponse.json({ success: false, error: 'Akses evidence ditolak.' }, { status: 403 }), identity: null }
+    }
+    const employee = await admin.from('employees').select('id,is_active').eq('id', appUser.employee_id).maybeSingle()
+    if (employee.error) throw employee.error
+    if (!employee.data || employee.data.is_active === false) {
+      return { error: NextResponse.json({ success: false, error: 'Employee Master tidak aktif.' }, { status: 403 }), identity: null }
+    }
+  }
   const identity: Identity = {
     authUserId: authData.user.id,
     email: normalize(authData.user.email || appUser.email),
     role,
     employeeId: appUser.employee_id || null,
-    isHR: ['hr', 'admin', 'administrator', 'super_admin'].includes(role),
+    isHR,
   }
 
   return { error: null, identity }
@@ -152,7 +167,7 @@ async function loadParent(
   if (entityType === 'leave_request') {
     const result = await admin
       .from('leave_requests')
-      .select('id,employee_id,request_type,status,supervisor_status,hr_status')
+      .select('id,employee_id,request_type,status,supervisor_status,hr_status,proof_file_url,proof_file_name,proof_file_size,proof_file_type,proof_url')
       .eq('id', entityId)
       .maybeSingle()
     return { ...result, entityType }
@@ -161,7 +176,7 @@ async function loadParent(
   if (entityType === 'phl_record') {
     const result = await admin
       .from('phl_records')
-      .select('id,employee_id,source,status,supervisor_status,hr_status')
+      .select('id,employee_id,source,status,supervisor_status,hr_status,proof_file_url,proof_file_name,proof_file_size,proof_file_type')
       .eq('id', entityId)
       .maybeSingle()
     return { ...result, entityType }
@@ -180,7 +195,7 @@ async function loadParent(
     const result = await admin
       .from('attendance_logs')
       .select(
-        'id,employee_id,attendance_date,employee_confirmation_type,absence_request_type,employee_confirmation_status,supervisor_approval_status,hr_approval_status,hr_final_status,is_locked,deleted_at,correction_proof_url,correction_proof_name,absence_proof_url,absence_proof_name,phl_proof_url,phl_proof_name',
+        'id,employee_id,attendance_date,employee_confirmation_type,absence_request_type,employee_confirmation_status,supervisor_approval_status,hr_approval_status,hr_final_status,is_locked,deleted_at,correction_proof_url,correction_proof_name,absence_proof_url,absence_proof_name,phl_proof_url,phl_proof_name,proof_file_url,proof_file_name,proof_file_size,proof_file_type',
       )
       .eq('id', entityId)
       .maybeSingle()
@@ -225,40 +240,8 @@ async function isSupervisorOfOwner(
 ) {
   if (!identity.employeeId || identity.employeeId === ownerEmployeeId) return false
 
-  const [ownerResult, actorResult] = await Promise.all([
-    admin
-      .from('employees')
-      .select('id,supervisor_1,supervisor_2')
-      .eq('id', ownerEmployeeId)
-      .maybeSingle(),
-    admin
-      .from('employees')
-      .select('id,employee_number,machine_pin,full_name,email')
-      .eq('id', identity.employeeId)
-      .maybeSingle(),
-  ])
-
-  if (ownerResult.error || actorResult.error || !ownerResult.data || !actorResult.data) {
-    return false
-  }
-
-  const supervisorValues = [ownerResult.data.supervisor_1, ownerResult.data.supervisor_2]
-    .map(normalize)
-    .filter(Boolean)
-
-  const actorValues = [
-    actorResult.data.id,
-    actorResult.data.employee_number,
-    actorResult.data.machine_pin,
-    actorResult.data.full_name,
-    actorResult.data.email,
-    identity.email,
-    identity.authUserId,
-  ]
-    .map(normalize)
-    .filter(Boolean)
-
-  return supervisorValues.some((value) => actorValues.includes(value))
+  // Shared PHL/dashboard resolver checks active identity, unique references and effective assignments.
+  return (await getPHLSubordinateIds(admin, { id: identity.employeeId })).includes(ownerEmployeeId)
 }
 
 async function canViewParent(
@@ -311,16 +294,66 @@ function attendanceIsEditable(parent: Record<string, unknown> | null) {
   return true
 }
 
-function storagePathFromPublicUrl(fileUrl: string) {
-  const marker = `/storage/v1/object/public/${BUCKET}/`
-  const index = fileUrl.indexOf(marker)
-  if (index < 0) return ''
+function legacyReferences(parent: Record<string, unknown>) {
+  return [
+    { url: clean(parent.proof_file_url), name: clean(parent.proof_file_name), size: parent.proof_file_size, type: parent.proof_file_type },
+    { url: clean(parent.proof_url), name: clean(parent.proof_file_name), size: parent.proof_file_size, type: parent.proof_file_type },
+    { url: clean(parent.absence_proof_url), name: clean(parent.absence_proof_name), size: null, type: null },
+    { url: clean(parent.correction_proof_url), name: clean(parent.correction_proof_name), size: null, type: null },
+    { url: clean(parent.phl_proof_url), name: clean(parent.phl_proof_name), size: null, type: null },
+  ].filter(item => item.url)
+}
 
-  try {
-    return decodeURIComponent(fileUrl.slice(index + marker.length))
-  } catch {
-    return fileUrl.slice(index + marker.length)
+function parseEvidence(value: unknown) {
+  return parseLegacyEvidenceUrl(value, process.env.NEXT_PUBLIC_SUPABASE_URL)
+}
+
+function storagePathFromPublicUrl(fileUrl: string) {
+  const parsed = parseEvidence(fileUrl)
+  return parsed?.bucket === BUCKET ? parsed.path : ''
+}
+
+// Only after parent authorization. Return existing same-project legacy references;
+// never allow arbitrary external links, nor trust fallback URLs supplied by the UI.
+// This is compatibility handling, not the final private-bucket migration.
+function readableAttachments(rows: Record<string, unknown>[], parent: Record<string, unknown>, entityType: string, entityId: string) {
+  const results: Record<string, unknown>[] = []
+  const keys = new Set<string>()
+  for (const row of rows) {
+    const parsed = parseEvidence(row.file_url)
+    if (!parsed || (row.storage_bucket && row.storage_bucket !== parsed.bucket) || (row.storage_path && row.storage_path !== parsed.path)) continue
+    const key = `${parsed.bucket}/${parsed.path}`
+    if (keys.has(key)) continue
+    keys.add(key)
+    results.push({ ...row, file_url: parsed.url })
   }
+  for (const ref of legacyReferences(parent)) {
+    const parsed = parseEvidence(ref.url)
+    if (!parsed) continue
+    const key = `${parsed.bucket}/${parsed.path}`
+    if (keys.has(key)) continue
+    keys.add(key)
+    results.push({ id: `legacy-${results.length + 1}`, entity_type: entityType, entity_id: entityId,
+      owner_employee_id: parent.employee_id || null, slot_no: results.length + 1,
+      attachment_kind: 'legacy', file_url: parsed.url, file_name: ref.name || 'Dokumen Pendukung',
+      file_size: ref.size || null, file_type: ref.type || null, storage_bucket: parsed.bucket,
+      storage_path: parsed.path, is_legacy: true, created_at: '' })
+  }
+  return results.slice(0, MAX_FILES)
+}
+
+async function secureReadableAttachments(admin:SupabaseClient,rows:Record<string,unknown>[],parent:Record<string,unknown>,entityType:string,entityId:string) {
+  const owner=clean(parent.employee_id)
+  const attachments=readableAttachments(rows,parent,entityType,entityId)
+  const results:Record<string,unknown>[]=[]
+  for(const attachment of attachments) {
+    const bucket=clean(attachment.storage_bucket),path=clean(attachment.storage_path)
+    const verified=await verifiedEvidenceOwner(admin,bucket,path,owner)
+    const signed=verified?await scannedSignedUrl(admin,bucket,path):null
+    // Preserve the item/metadata so users know the document exists; do not expose a raw fallback.
+    results.push({...attachment,file_url:signed || '',security_status:signed?'clean':'blocked_or_unverified'})
+  }
+  return results
 }
 
 export async function GET(request: NextRequest) {
@@ -380,8 +413,8 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      attachments: data || [],
-    })
+      attachments: await secureReadableAttachments(admin,data || [],parentResult.data,entityType,entityId),
+    }, { headers: { 'Cache-Control': 'private, no-store' } })
   } catch {
     return NextResponse.json(
       { success: false, error: 'Lampiran gagal dimuat.' },
@@ -484,16 +517,31 @@ export async function POST(request: NextRequest) {
     const legacyName = clean(body.get('legacy_name')) || 'Dokumen Pendukung'
     const legacySize = Number(clean(body.get('legacy_size')) || 0) || null
     const legacyType = clean(body.get('legacy_type')) || null
-    const legacyStoragePath = clean(body.get('legacy_storage_path')) || null
+    const suppliedLegacyPath = clean(body.get('legacy_storage_path')) || null
+    const parsedLegacy = legacyUrl ? parseEvidence(legacyUrl) : null
+    if (legacyUrl && (!parsedLegacy || parsedLegacy.bucket !== BUCKET ||
+        (suppliedLegacyPath && suppliedLegacyPath !== parsedLegacy.path) ||
+        !legacyReferences(parent).some(ref => {
+          const candidate = parseEvidence(ref.url)
+          return candidate?.bucket === parsedLegacy.bucket && candidate.path === parsedLegacy.path
+        }))) {
+      return NextResponse.json({ success: false, error: 'Referensi evidence tidak sesuai dengan data induk atau Storage HARMONY.' }, { status: 400 })
+    }
+    if (parsedLegacy && !(await verifiedEvidenceOwner(admin,parsedLegacy.bucket,parsedLegacy.path,ownerEmployeeId))) {
+      return NextResponse.json({success:false,error:'Pemilik file evidence belum terverifikasi. Hubungi HR.'},{status:403})
+    }
+    const legacyStoragePath = parsedLegacy?.path || null
     const files = body
       .getAll('files')
       .filter((item): item is File => item instanceof File && item.size > 0)
 
+    const fileVerdicts = new Map<File, Awaited<ReturnType<typeof requireCleanFile>>>()
     for (const file of files) {
       const validation = await validateFile(file)
       if (validation) {
         return NextResponse.json({ success: false, error: validation }, { status: 400 })
       }
+      fileVerdicts.set(file, await requireCleanFile(admin, file))
     }
 
     const existingUrls = new Set(existing.map((item) => clean(item.file_url)).filter(Boolean))
@@ -564,6 +612,9 @@ export async function POST(request: NextRequest) {
 
         if (upload.error) throw upload.error
         uploadedPathsThisRequest.push(storagePath)
+        const verdict = fileVerdicts.get(file)
+        if (!verdict) throw new Error('Status pemeriksaan file tidak ditemukan.')
+        await recordVerifiedEvidence(admin,BUCKET,storagePath,ownerEmployeeId || null,buffer,verdict)
 
         const { data: publicUrlData } = admin.storage.from(BUCKET).getPublicUrl(storagePath)
 
@@ -593,7 +644,7 @@ export async function POST(request: NextRequest) {
       }
     } catch (writeError) {
       if (uploadedPathsThisRequest.length > 0) {
-        await admin.storage.from(BUCKET).remove(uploadedPathsThisRequest)
+        console.warn('HARMONY attachment upload retained', {count:uploadedPathsThisRequest.length})
       }
       throw writeError
     }
@@ -609,7 +660,7 @@ export async function POST(request: NextRequest) {
       const knownCount = existing.length + rowsToInsert.length
       return NextResponse.json({
         success: true,
-        attachments: rowsToInsert,
+        attachments: rowsToInsert.map(row => ({...row,file_url:''})),
         message: `${knownCount} dokumen pendukung tersimpan.`,
         warning: 'Dokumen sudah tersimpan tetapi daftar lampiran belum dapat dimuat ulang.',
       })
@@ -617,7 +668,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      attachments: attachments || [],
+      attachments: (attachments || []).map(row=>({...row,file_url:''})),
       message: `${attachments?.length || 0} dokumen pendukung tersimpan.`,
     })
   } catch {
@@ -697,7 +748,9 @@ export async function DELETE(request: NextRequest) {
       )
     }
 
-    const path = clean(attachment.storage_path) || storagePathFromPublicUrl(attachment.file_url)
+    const verifiedPath = storagePathFromPublicUrl(attachment.file_url)
+    const savedPath = clean(attachment.storage_path)
+    const path = verifiedPath && (!savedPath || (validEvidenceObjectPath(savedPath) && savedPath === verifiedPath)) ? verifiedPath : ''
 
     if (path) {
       const disposablePaths = await unreferencedAttendanceProofPaths(

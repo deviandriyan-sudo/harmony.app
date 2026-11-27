@@ -1,7 +1,9 @@
 "use client";
 
 
+import { publishScannedUpload } from '@/lib/scanned-upload-client'
 import { readErrorMessage } from '@/lib/error-utils'
+import { validUploadFileContent } from '@/lib/server/upload-validation'
 import { useEffectEvent, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import {
@@ -32,6 +34,7 @@ import {
   HarmonyPendingAttachmentPicker,
 } from "@/components/attachments/HarmonyAttachments";
 import { supabase } from "@/lib/supabase";
+import { approvedSourceAbsence, persistedManualWork, trustedAttendanceDay, workPresenceEvidence } from '@/lib/attendance-source-state';
 import {
   HARMONY_ATTACHMENT_REQUIRED_FILES,
   registerHarmonySubmissionAttachments,
@@ -129,6 +132,8 @@ type AttendanceLog = {
   supervisor_note: string | null;
   hr_note: string | null;
 
+  leave_request_id: string | null;
+  phl_claim_record_id: string | null;
   absence_request_type: string | null;
   absence_request_label: string | null;
   absence_request_status: string | null;
@@ -541,6 +546,26 @@ export default function EmployeeAttendancePage() {
       return;
     }
 
+    // One server-side source-of-truth refresh per selected period. The server
+    // authenticates the JWT and derives the employee ID; the client cannot
+    // reclassify another employee's records or overwrite fingerprint evidence.
+    try {
+      const session = await supabase.auth.getSession();
+      if (session.data.session?.access_token) {
+        const response = await fetch('/api/employee/attendance/refresh-sources', {
+          method:'POST',
+          headers: { 'Content-Type':'application/json', Authorization:`Bearer ${session.data.session.access_token}` },
+          body:JSON.stringify({start:periodRange.start,end:periodRange.end}),
+          cache:'no-store',
+        });
+        if (!response.ok) {
+          setErrorMessage('Sinkronisasi pengajuan ke absensi belum tersedia. Data lama tetap ditampilkan; refresh kembali atau hubungi HR.');
+        }
+      }
+    } catch {
+      setErrorMessage('Sinkronisasi sumber absensi sementara gagal. Data tersimpan tidak dihapus.');
+    }
+
     const { data: attendanceData, error: attendanceError } = await supabase
       .from("attendance_logs")
       .select("*")
@@ -727,6 +752,7 @@ export default function EmployeeAttendancePage() {
   
 
   function canShowResetButton(row: CalendarDayRow) {
+    if (approvedSourceAbsence(row.log)) return false;
     // Tombol selalu dirender. Fungsi ini menentukan apakah tombol aktif.
     // Row dengan draft/selection/log dapat direset secara aman; API tetap
     // memutuskan apakah database perlu dihapus atau hanya draft lokal.
@@ -752,6 +778,10 @@ export default function EmployeeAttendancePage() {
   }
 
   async function handleResetVerification(row: CalendarDayRow) {
+    if (approvedSourceAbsence(row.log)) {
+      setErrorMessage("Pengajuan asal telah disetujui. Hubungi HR untuk koreksi sumber.");
+      return;
+    }
     setErrorMessage("");
     setSuccessMessage("");
 
@@ -883,41 +913,21 @@ export default function EmployeeAttendancePage() {
       };
     }
 
-    const cleanFileName = file.name
-      .replace(/\s+/g, "-")
-      .replace(/[^a-zA-Z0-9.-]/g, "");
+    if (!(await validUploadFileContent(file))) return { url: "", name: "", storagePath: "", error: "Format, isi atau ukuran evidence tidak valid." };
 
-    const fileName = `${Date.now()}-${crypto.randomUUID()}-${cleanFileName || "file"}`;
-    const filePath = `${folder}/${fileName}`;
-
-    const { error } = await supabase.storage
-      .from("leave-attachments")
-      .upload(filePath, file);
-
-    if (error) {
-      return {
-        url: "",
-        name: "",
-        storagePath: "",
-        error: error.message,
-      };
+    // Folder selection is no longer client-controlled; server binds path to authenticated employee.
+    void folder;
+    try {
+      const uploaded = await publishScannedUpload(file, 'evidence');
+      return { url: uploaded.referenceUrl, name: file.name, storagePath: uploaded.path, error: "" };
+    } catch (error) {
+      return { url: "", name: "", storagePath: "", error: readErrorMessage(error) || "File belum lolos pemeriksaan keamanan." };
     }
-
-    const { data } = supabase.storage
-      .from("leave-attachments")
-      .getPublicUrl(filePath);
-
-    return {
-      url: data.publicUrl,
-      name: file.name,
-      storagePath: filePath,
-      error: "",
-    };
   }
 
   async function cleanupUploadedFile(storagePath: string) {
     if (!storagePath) return;
-    await supabase.storage.from("leave-attachments").remove([storagePath]);
+    // Retain for authorized retention review; no automatic deletion.
   }
 
   async function loadLiveManualAttendance(date: string) {
@@ -1602,6 +1612,23 @@ export default function EmployeeAttendancePage() {
       const meta = getDailyTypeMeta(draft.daily_type);
       const phlDeclined = isOffDayPHLOptOut(row, draft);
       const hasExistingLog = Boolean(row.log?.id);
+      // Reuse unchanged approved absences or supported saved manual work.
+      // Normal fingerprint days and edited drafts keep the existing approval flow.
+      if (row.log?.id && canReuseSavedSource(row, draft)) {
+        const updated = await supabase.from('attendance_logs').update({
+          employee_confirmation_status:'submitted',
+          employee_confirmed_at:now,
+          employee_confirmation_batch_id:batchId,
+          ...(row.log.supervisor_approval_status ? {} : {supervisor_approval_status:'pending'}),
+          updated_at:now,
+        }).eq('id',row.log.id).eq('employee_id',employee.id).is('deleted_at',null).select('id').maybeSingle();
+        if (updated.error || !updated.data?.id) {
+          setErrorMessage(updated.error?.message || 'Konfirmasi absensi sumber gagal disimpan.');
+          setSubmittingPeriod(false);
+          return;
+        }
+        continue;
+      }
       const incomplete = isIncompleteRow(row, draft);
       const phlCandidate = isPotentialPHL(row, draft);
 
@@ -1659,22 +1686,10 @@ export default function EmployeeAttendancePage() {
               ? "attendance_confirmation"
               : "absence_or_manual_confirmation";
 
+      // Existing fingerprint/source values are authoritative in the database.
+      // Never rewrite them from an older browser snapshot during confirmation.
       const payload = {
-        employee_id: employee.id,
-        employee_number: employee.employee_number,
-        machine_pin: employee.machine_pin,
-        full_name: employee.full_name,
-        department: employee.department,
-        position: employee.position,
-
-        attendance_date: row.date,
-        check_in: row.log?.check_in || null,
-        check_out: row.log?.check_out || null,
-        total_punches: row.log?.total_punches || 0,
-        work_duration_minutes: row.log?.work_duration_minutes || null,
-        source: row.log?.source || "employee_manual_confirmation",
         status: getSubmittedStatus(row, draft),
-        notes: row.log?.notes || null,
 
         employee_confirmation_status: "submitted",
         employee_confirmed_at: now,
@@ -1702,6 +1717,14 @@ export default function EmployeeAttendancePage() {
           !phlDeclined && meta.absenceRequestType
             ? "employee_attendance_confirmation"
             : null,
+
+        ...(approvedSourceAbsence(row.log) ? {
+          absence_request_type: row.log?.absence_request_type,
+          absence_request_label: row.log?.absence_request_label,
+          absence_request_status: row.log?.absence_request_status,
+          absence_request_source: row.log?.absence_request_source,
+          status: row.log?.status,
+        } : {}),
 
         correction_status: "pending",
         correction_type: correctionType,
@@ -1741,6 +1764,8 @@ export default function EmployeeAttendancePage() {
           .from("attendance_logs")
           .update(payload)
           .eq("id", row.log!.id)
+          .eq("employee_id", employee.id)
+          .is("deleted_at", null)
           .select("id")
           .single();
 
@@ -1758,6 +1783,19 @@ export default function EmployeeAttendancePage() {
         const { data: savedLog, error } = await supabase
           .from("attendance_logs")
           .insert({
+            employee_id: employee.id,
+            employee_number: employee.employee_number,
+            machine_pin: employee.machine_pin,
+            full_name: employee.full_name,
+            department: employee.department,
+            position: employee.position,
+            attendance_date: row.date,
+            check_in: null,
+            check_out: null,
+            total_punches: 0,
+            work_duration_minutes: null,
+            source: "employee_manual_confirmation",
+            notes: null,
             ...payload,
             created_at: now,
           })
@@ -1923,10 +1961,22 @@ export default function EmployeeAttendancePage() {
     }
   }
 
+  function canReuseSavedSource(row: CalendarDayRow, draft: RowDraft) {
+    const log = row.log;
+    if (!log || !trustedAttendanceDay(log) || !(approvedSourceAbsence(log) || persistedManualWork(log))) return false;
+    return draft.daily_type === inferDailyType(row) &&
+      draft.manual_check_in === (log.manual_check_in || log.requested_check_in || '') &&
+      draft.manual_check_out === (log.manual_check_out || log.requested_check_out || '') &&
+      draft.employee_daily_note === (log.employee_daily_note || log.correction_reason || '') &&
+      draft.support_files.length === 0;
+  }
+
   function validateRowBeforeResubmit(row: CalendarDayRow) {
     const draft = getDraft(row);
     const meta = getDailyTypeMeta(draft.daily_type);
     const label = formatDisplayDate(row.date);
+
+    if (approvedSourceAbsence(row.log)) return validateRowBeforeSubmit(row);
 
     // Employee boleh menolak/tidak mengajukan PHL pada hari non-kerja
     // meskipun terdapat fingerprint/manual time. Tidak perlu note atau evidence.
@@ -1993,10 +2043,24 @@ export default function EmployeeAttendancePage() {
     const meta = getDailyTypeMeta(draft.daily_type);
     const label = formatDisplayDate(row.date);
     const incomplete = isIncompleteRow(row, draft);
+    // Approved request / previously recorded manual work is already a valid
+    // source. Do not require a second declaration, note or evidence upload.
+    if (canReuseSavedSource(row, draft)) return '';
     const noMachineData = !row.log?.id;
     const hasManualTime = Boolean(
       draft.manual_check_in || draft.manual_check_out,
     );
+
+    if (workPresenceEvidence(row.log) && meta.isLeaveLike && draft.daily_type !== 'official_travel' && !approvedSourceAbsence(row.log) && !isOffDayPHLOptOut(row, draft)) {
+      return `${label}: fingerprint/jam kerja terdeteksi. Keterangan cuti tidak dapat menggantikan kehadiran aktual; koordinasikan ke HR.`;
+    }
+
+    if (approvedSourceAbsence(row.log)) {
+      if (draft.daily_type !== inferDailyType(row) || draft.manual_check_in || draft.manual_check_out) {
+        return `${label}: pengajuan asal sudah disetujui. Perubahan jenis/jam harus dikoordinasikan dengan HR.`;
+      }
+      return '';
+    }
 
     // Pada Sabtu/Minggu/libur dengan aktivitas, pilihan Alpa/Tidak Hadir
     // berarti employee tidak mengajukan PHL. Ini bukan Alpa hari kerja,
@@ -2034,7 +2098,7 @@ export default function EmployeeAttendancePage() {
       }
     }
 
-    if (meta.isAbsenceLike && !draft.employee_daily_note.trim()) {
+    if (meta.isAbsenceLike && !draft.employee_daily_note.trim() && !approvedSourceAbsence(row.log)) {
       return `${label}: catatan wajib diisi untuk ${meta.label}.`;
     }
 
@@ -2045,7 +2109,7 @@ export default function EmployeeAttendancePage() {
       "";
 
     if (
-      meta.requiresProof &&
+      meta.requiresProof && draft.daily_type !== 'annual_leave' &&
       !existingStoredProofUrl &&
       draft.support_files.length < HARMONY_ATTACHMENT_REQUIRED_FILES
     ) {
@@ -3357,6 +3421,22 @@ function EditAttendanceModal({
                 }
               />
 
+              {row.log?.leave_request_id && (
+                <HarmonyAttachmentViewer
+                  entityType="leave_request"
+                  entityId={row.log.leave_request_id}
+                  compact
+                  emptyText="Tidak ada lampiran pada pengajuan asal"
+                />
+              )}
+              {row.log?.phl_claim_record_id && (
+                <HarmonyAttachmentViewer
+                  entityType="phl_record"
+                  entityId={row.log.phl_claim_record_id}
+                  compact
+                  emptyText="Tidak ada lampiran PHL asal"
+                />
+              )}
               {row.log?.id && (
                 <HarmonyAttachmentViewer
                   entityType="attendance_log"
@@ -3797,6 +3877,11 @@ function getOffDayLabel(row: CalendarDayRow) {
 function inferDailyType(row: CalendarDayRow): DailyType {
   const type = String(row.log?.absence_request_type || row.log?.status || "").trim();
 
+  if (workPresenceEvidence(row.log) && !row.log?.phl_work_request_id && row.log?.absence_request_type && row.log.absence_request_type !== 'official_travel' && getDailyTypeMeta(row.log.absence_request_type as DailyType).isLeaveLike) {
+    // Fingerprint/manual work wins over a stale absence classification.
+    if (row.log?.check_in && row.log?.check_out) return 'present';
+    if (row.log?.manual_check_in || row.log?.manual_check_out) return 'manual_attendance';
+  }
   if (type) {
     const knownType = getHarmonyRequestTypesCache().find(
       (item) => item.code === type,
@@ -3901,7 +3986,11 @@ function getDisplayStatus(row: CalendarDayRow, draft: RowDraft) {
 
   if (isOffDayPHLOptOut(row, draft)) return hasAttendanceActivity(row, draft) ? "present" : "off_day";
 
+  // A real clock punch cannot be reclassified as leave by a stale request.
   if (row.log?.phl_work_request_id) return "phl";
+  if (workPresenceEvidence(row.log) && row.log?.check_in && row.log?.check_out && meta.isLeaveLike && draft.daily_type !== 'official_travel') {
+    return row.log?.status === 'late' ? 'late' : 'present';
+  }
 
   if (isPotentialPHL(row, draft)) {
     if (row.log?.supervisor_approval_status === "approved") return "phl";
@@ -3946,6 +4035,7 @@ function getDayStatus(
   isWeekend: boolean,
   isHoliday: boolean,
 ) {
+  if (workPresenceEvidence(log) && log?.check_in && log?.check_out && !log.phl_work_request_id && log.absence_request_type && log.absence_request_type !== 'official_travel' && getDailyTypeMeta(log.absence_request_type as DailyType).isLeaveLike) return log.status === 'late' ? 'late' : 'present';
   if (log?.absence_request_type) return log.absence_request_type;
   if (log?.status) return log.status;
   if (isWeekend || isHoliday) return "off_day";
@@ -4075,7 +4165,7 @@ function getDailyTypeMeta(type: DailyType): DailyTypeMeta {
     correctionType: master.correction_type || master.code || "other",
     absenceRequestType: attendanceOnly ? null : master.code,
     absenceRequestLabel: attendanceOnly ? null : master.label,
-    requiresProof: Boolean(master.requires_proof),
+    requiresProof: master.code !== 'annual_leave' && Boolean(master.requires_proof),
     requiresManualTime: Boolean(master.requires_manual_time),
     isLeaveLike: Boolean(master.is_leave_like),
     isAbsenceLike: Boolean(master.is_absence_like),

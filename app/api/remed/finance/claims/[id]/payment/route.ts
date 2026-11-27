@@ -1,3 +1,5 @@
+import { requireCleanUpload } from '@/lib/server/malware-scan'
+import { validUploadContent } from '@/lib/server/upload-validation'
 
 import { readErrorMessage } from '@/lib/error-utils'
 import { randomUUID } from 'crypto'
@@ -24,8 +26,10 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
     if (file.size > REMED_MAX_FILE_SIZE) throw Object.assign(new Error('Bukti pembayaran maksimal 10 MB.'), { status: 400 })
     if (!REMED_ALLOWED_MIME_TYPES.has(file.type)) throw Object.assign(new Error('Format bukti pembayaran tidak didukung.'), { status: 400 })
 
-    uploadedPath = `payments/${id}/${randomUUID()}-${safeFileName(file.name)}`
     const bytes = Buffer.from(await file.arrayBuffer())
+    if (!validUploadContent(file.name, bytes, file.type)) throw Object.assign(new Error('Isi bukti pembayaran tidak sesuai format.'), { status: 400 })
+    await requireCleanUpload(ctx.admin, bytes)
+    uploadedPath = `payments/${id}/${randomUUID()}-${safeFileName(file.name)}`
     const { error: uploadError } = await ctx.admin.storage
       .from(REMED_BUCKET)
       .upload(uploadedPath, bytes, { contentType: file.type, upsert: false })
@@ -82,19 +86,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
 
     return NextResponse.json({ success: true, notification })
   } catch (error) {
-    if (uploadedPath) {
-      try {
-        const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-        const key = process.env.SUPABASE_SERVICE_ROLE_KEY
-        if (url && key) {
-          const { createClient } = await import('@supabase/supabase-js')
-          const admin = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } })
-          await admin.storage.from(REMED_BUCKET).remove([uploadedPath])
-        }
-      } catch {
-        // best effort cleanup
-      }
-    }
+    if (uploadedPath) console.warn('HARMONY payment evidence retained after error')
     const issue = remedApiError(error)
     return NextResponse.json({ message: issue.message }, { status: issue.status })
   }

@@ -1,3 +1,4 @@
+import { scannedSignedUrl } from '@/lib/server/private-evidence'
 import { NextRequest, NextResponse } from 'next/server'
 import { REMED_BUCKET } from '@/lib/remed'
 import { requireRemedApi, remedApiError } from '@/lib/server/remed-api-auth'
@@ -27,12 +28,9 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
       throw Object.assign(new Error('Lampiran ini bukan milik akun Anda.'), { status: 403 })
     }
 
-    const { data: signed, error: signedError } = await ctx.admin.storage
-      .from(REMED_BUCKET)
-      .createSignedUrl(attachment.storage_path, 60)
-    if (signedError || !signed?.signedUrl) throw signedError || new Error('Gagal membuat akses lampiran.')
-
-    return NextResponse.json({ url: signed.signedUrl, fileName: attachment.file_name })
+    const url = await scannedSignedUrl(ctx.admin,REMED_BUCKET,attachment.storage_path)
+    if (!url) return NextResponse.json({message:'Lampiran belum lolos pemeriksaan keamanan.'},{status:503,headers:{'Cache-Control':'private, no-store'}})
+    return NextResponse.json({ url, fileName: attachment.file_name },{headers:{'Cache-Control':'private, no-store'}})
   } catch (error) {
     const issue = remedApiError(error)
     return NextResponse.json({ message: issue.message }, { status: issue.status })

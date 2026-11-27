@@ -238,13 +238,14 @@ export default function PHLApprovalPage() {
                   ))}
                 </div>
 
+                {item.status === 'resolved_legacy' && <p role="status" className="mt-4 rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-xs leading-5 text-blue-900">Keputusan HR historis: {item.hr_review_outcome === 'validated_historical' ? 'Riwayat telah divalidasi (tanpa penambahan saldo)' : 'Riwayat tidak valid'}. {item.hr_review_note || ''}</p>}
                 {item.supervisor_note && item.status !== 'pending_supervisor' && (
                   <p className="mt-4 rounded-2xl border border-black/5 bg-white p-3 text-xs leading-5 harmony-text-secondary">Catatan: <strong>{item.supervisor_note}</strong></p>
                 )}
 
                 {item.status === 'pending_supervisor' && phlWorkApprovalExpired(item.work_date) && (
                   <p role="status" className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900">
-                    Masa berlaku PHL berakhir {phlWorkExpiryDate(item.work_date) || '-'}. Persetujuan tidak tersedia sesuai aturan 90 hari. Penolakan tetap dapat diproses; untuk kasus legacy koordinasikan dengan HR.
+                    Masa berlaku PHL berakhir {phlWorkExpiryDate(item.work_date) || '-'}. Persetujuan tidak tersedia sesuai aturan 90 hari. Penolakan tetap dapat diproses oleh atasan; data migrasi yang membutuhkan validasi historis ditangani HR dengan catatan tanpa membentuk saldo baru.
                   </p>
                 )}
                 {item.status === 'pending_supervisor' && (

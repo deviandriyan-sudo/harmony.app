@@ -1,6 +1,7 @@
 'use client'
 
 
+import { verifiedPostponeDays, hasActivePostponeRequest } from '@/lib/postpone-eligibility'
 import { readErrorMessage } from '@/lib/error-utils'
 import { useEffect, useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
@@ -11,13 +12,7 @@ import { supabase } from '@/lib/supabase'
 import { Topbar } from '@/components/layout/Topbar'
 import { sendHarmonyWorkflowNotification } from '@/lib/notifications'
 
-type AppUser = {
-  id: string
-  email: string
-  role: string
-  employee_id?: string | null
-  is_active?: boolean | null
-}
+
 
 type Employee = {
   id: string
@@ -46,6 +41,7 @@ type AnnualLeaveCycle = {
   total_days?: number | null
   used_days?: number | null
   remaining_days?: number | null
+  postpone_eligible_days?: number | null
   is_active?: boolean | null
   status?: string | null
 }
@@ -78,7 +74,10 @@ type LeavePostponeRequest = {
 }
 
 function todayISO() {
-  return formatDateToISO(new Date())
+  // Source of truth is the same WITA business date as Supabase.
+  const parts = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Makassar', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date())
+  const part = (type: string) => parts.find((item) => item.type === type)?.value || ''
+  return `${part('year')}-${part('month')}-${part('day')}`
 }
 
 function formatDateToISO(date: Date) {
@@ -104,7 +103,12 @@ function addMonths(dateString: string, months: number) {
 
   if (!date) return ''
 
+  // Clamp month-end dates (PostgreSQL's interval '6 months' behaviour).
+  const originalDay = date.getDate()
+  date.setDate(1)
   date.setMonth(date.getMonth() + months)
+  const lastDay = new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate()
+  date.setDate(Math.min(originalDay, lastDay))
 
   return formatDateToISO(date)
 }
@@ -237,10 +241,10 @@ export default function EmployeeLeavePostponePage() {
   const [saving, setSaving] = useState(false)
   const [cancellingId, setCancellingId] = useState('')
 
-  const [appUser, setAppUser] = useState<AppUser | null>(null)
   const [employee, setEmployee] = useState<Employee | null>(null)
   const [cycles, setCycles] = useState<AnnualLeaveCycle[]>([])
   const [requests, setRequests] = useState<LeavePostponeRequest[]>([])
+  const [outstandingDebtDays, setOutstandingDebtDays] = useState<number | null>(null)
 
   const [selectedCycleId, setSelectedCycleId] = useState('')
   const [requestedDays, setRequestedDays] = useState(0)
@@ -255,6 +259,8 @@ export default function EmployeeLeavePostponePage() {
     return cycles.find((item) => item.id === selectedCycleId) || null
   }, [cycles, selectedCycleId])
 
+  const alreadyRequested = Boolean(selectedCycle && hasActivePostponeRequest(requests, selectedCycle.id))
+  const availableDays = verifiedPostponeDays(selectedCycle)
   const computed = useMemo(() => {
     if (!selectedCycle?.cycle_end) {
       return {
@@ -268,9 +274,9 @@ export default function EmployeeLeavePostponePage() {
 
     const oldCycleEnd = selectedCycle.cycle_end
     const anniversaryDate = addDays(oldCycleEnd, 1)
-    const deadline = subtractDays(oldCycleEnd, 7)
+    const deadline = subtractDays(anniversaryDate, 7)
     const expiredAt = addMonths(anniversaryDate, 6)
-    const eligible = isBeforeOrSame(todayISO(), deadline)
+    const eligible = isBeforeOrSame(todayISO(), deadline) && outstandingDebtDays === 0 && availableDays > 0 && !alreadyRequested
 
     return {
       oldCycleEnd,
@@ -279,7 +285,7 @@ export default function EmployeeLeavePostponePage() {
       expiredAt,
       eligible,
     }
-  }, [selectedCycle])
+  }, [selectedCycle, outstandingDebtDays, availableDays, alreadyRequested])
 
   const lockedByDeadline = Boolean(selectedCycle && !computed.eligible)
 
@@ -292,28 +298,6 @@ export default function EmployeeLeavePostponePage() {
     setMessage(null)
 
     try {
-      const { data: authData, error: authError } = await supabase.auth.getUser()
-
-      if (authError || !authData.user) {
-        throw new Error('Session tidak ditemukan. Silakan login ulang.')
-      }
-
-      const { data: appUserData } = await supabase
-        .from('app_users')
-        .select('*')
-        .eq('id', authData.user.id)
-        .maybeSingle<AppUser>()
-
-      setAppUser(
-        appUserData || {
-          id: authData.user.id,
-          email: authData.user.email || '',
-          role: 'employee',
-          employee_id: null,
-          is_active: true,
-        },
-      )
-
       const { data: sessionData, error: sessionError } =
         await supabase.auth.getSession()
 
@@ -344,22 +328,19 @@ export default function EmployeeLeavePostponePage() {
       setEmployee(currentEmployee)
       setCycles(cycleRows)
       setRequests(requestRows)
+      setOutstandingDebtDays(result?.debt_status_verified === true && Number.isFinite(Number(result?.debt_outstanding_days))
+        ? Number(result.debt_outstanding_days)
+        : null)
 
       const firstEligible = cycleRows.find((cycle) => {
-        if (!cycle.cycle_end || Number(cycle.remaining_days || 0) <= 0) {
+        if (!cycle.cycle_end || verifiedPostponeDays(cycle) <= 0) {
           return false
         }
 
-        const deadline = subtractDays(cycle.cycle_end, 7)
-        const hasActiveRequest = requestRows.some(
-          (item) =>
-            item.source_cycle_id === cycle.id &&
-            !['rejected', 'cancelled'].includes(
-              String(item.approval_status || '').toLowerCase(),
-            ),
-        )
+        const deadline = subtractDays(addDays(cycle.cycle_end, 1), 7)
+        const hasActiveRequest = hasActivePostponeRequest(requestRows, cycle.id)
 
-        return isBeforeOrSame(todayISO(), deadline) && !hasActiveRequest
+        return isBeforeOrSame(todayISO(), deadline) && !hasActiveRequest && Number(result?.debt_outstanding_days) === 0 && result?.debt_status_verified === true
       })
 
       setSelectedCycleId((current) =>
@@ -371,6 +352,7 @@ export default function EmployeeLeavePostponePage() {
       setEmployee(null)
       setCycles([])
       setRequests([])
+      setOutstandingDebtDays(null)
       setMessage({
         type: 'error',
         text: readErrorMessage(error) || 'Gagal memuat data postpone cuti.',
@@ -387,7 +369,7 @@ export default function EmployeeLeavePostponePage() {
     setMessage(null)
 
     try {
-      if (!employee || !appUser) {
+      if (!employee) {
         throw new Error('Data karyawan tidak ditemukan.')
       }
 
@@ -401,7 +383,7 @@ export default function EmployeeLeavePostponePage() {
         throw new Error('Nomor karyawan tidak ditemukan.')
       }
 
-      if (!selectedCycle.remaining_days || Number(selectedCycle.remaining_days) <= 0) {
+      if (availableDays <= 0) {
         throw new Error('Tidak ada sisa cuti tahunan yang dapat diajukan postpone.')
       }
 
@@ -409,7 +391,7 @@ export default function EmployeeLeavePostponePage() {
         throw new Error('Jumlah hari postpone harus lebih dari 0.')
       }
 
-      if (requestedDays > Number(selectedCycle.remaining_days || 0)) {
+      if (requestedDays > availableDays) {
         throw new Error('Jumlah postpone tidak boleh lebih besar dari sisa cuti.')
       }
 
@@ -417,21 +399,15 @@ export default function EmployeeLeavePostponePage() {
         throw new Error('Tanggal cycle cuti tidak valid.')
       }
 
-      if (!computed.eligible) {
-        throw new Error(
-          `Pengajuan sudah melewati batas. Batas akhir pengajuan adalah ${formatDate(computed.deadline)}.`
-        )
+      if (outstandingDebtDays === null) {
+        throw new Error('Status hutang cuti belum dapat diverifikasi. Coba refresh atau hubungi HR.')
       }
-
-      const existingActive = requests.find((item) => {
-        return (
-          item.source_cycle_id === selectedCycle.id &&
-          !['rejected', 'cancelled'].includes(normalize(item.approval_status))
-        )
-      })
-
-      if (existingActive) {
-        throw new Error('Cycle ini sudah memiliki pengajuan postpone aktif.')
+      if (outstandingDebtDays > 0) {
+        throw new Error(`Pengajuan postpone tidak tersedia selama masih memiliki hutang cuti ${outstandingDebtDays} hari.`)
+      }
+      if (alreadyRequested) throw new Error('Cycle ini sudah memiliki pengajuan postpone aktif.')
+      if (!computed.eligible) {
+        throw new Error(`Pengajuan tidak memenuhi batas H-7 atau saldo efektif (${formatDate(computed.deadline)}).`)
       }
 
       const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
@@ -589,8 +565,8 @@ export default function EmployeeLeavePostponePage() {
               </h1>
 
               <p className="mt-2 max-w-3xl text-sm leading-6 harmony-text-secondary">
-                Sisa cuti tahunan dapat diajukan postpone paling lambat H-7 sebelum tanggal akhir cycle.
-                Jika disetujui HR, sisa cuti berlaku sampai 6 bulan setelah anniversary cuti berikutnya. Contoh anniversary 25 Februari → expiry 25 Agustus.
+                Sisa cuti dapat diajukan paling lambat H-7 sebelum tanggal matang cuti (anniversary).
+                Hanya pengajuan yang disetujui HR dapat dibawa ke siklus baru selama 6 bulan sejak tanggal matang. Karyawan dengan hutang cuti aktif tidak dapat postpone. Contoh anniversary 25 Februari → expiry 25 Agustus.
               </p>
             </div>
 
@@ -627,8 +603,7 @@ export default function EmployeeLeavePostponePage() {
             </h2>
 
             <p className="mt-1 text-sm harmony-text-secondary">
-              Pilih cycle cuti tahunan yang masih memiliki sisa cuti. Jika sudah melewati H-7 sebelum cycle berakhir,
-              form employee otomatis terkunci dan hanya HR yang bisa input manual.
+              Pilih siklus dengan sisa cuti. Pengajuan mandiri maupun penambahan manual HR mengikuti batas H-7 sebelum tanggal matang. Hutang cuti aktif memblokir pengajuan postpone.
             </p>
 
             {loading ? (
@@ -642,6 +617,16 @@ export default function EmployeeLeavePostponePage() {
               </div>
             ) : (
               <form onSubmit={handleSubmit} className="mt-6 space-y-4">
+                {outstandingDebtDays !== null && outstandingDebtDays > 0 && (
+                  <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+                    Hutang cuti aktif: {outstandingDebtDays} hari. Postpone tidak dapat diajukan sebelum hutang selesai.
+                  </div>
+                )}
+                {outstandingDebtDays === null && (
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+                    Verifikasi status hutang cuti belum tersedia. Pengajuan diblokir sementara.
+                  </div>
+                )}
                 <label className="block">
                   <span className="text-sm font-bold harmony-text-primary">
                     Cycle Cuti Tahunan
@@ -654,35 +639,34 @@ export default function EmployeeLeavePostponePage() {
                       const cycle = cycles.find((item) => item.id === cycleId)
 
                       setSelectedCycleId(cycleId)
-                      setRequestedDays(Number(cycle?.remaining_days || 0))
+                      setRequestedDays(hasActivePostponeRequest(requests, cycleId) ? 0 : verifiedPostponeDays(cycle))
                     }}
                     className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-blue-400"
                     required
                   >
                     {cycles.map((cycle) => (
                       <option key={cycle.id} value={cycle.id}>
-                        {formatDate(cycle.cycle_start)} - {formatDate(cycle.cycle_end)} · Sisa {cycle.remaining_days || 0} hari
+                        {formatDate(cycle.cycle_start)} - {formatDate(cycle.cycle_end)} · Sisa efektif {verifiedPostponeDays(cycle)} hari
                       </option>
                     ))}
                   </select>
                 </label>
 
                 <div className="grid gap-3 sm:grid-cols-2">
-                  <InfoBox label="Sisa Cuti" value={`${selectedCycle?.remaining_days || 0} hari`} />
+                  <InfoBox label="Sisa Cuti Efektif" value={`${availableDays} hari`} />
                   <InfoBox label="Batas Pengajuan" value={formatDate(computed.deadline)} />
                   <InfoBox label="Anniversary Baru" value={formatDate(computed.anniversaryDate)} />
                   <InfoBox label="Berlaku Sampai" value={formatDate(computed.expiredAt)} />
                   <InfoBox
                     label="Status Eligibility"
-                    value={computed.eligible ? 'Masih bisa diajukan' : 'Terkunci otomatis H-7'}
+                    value={outstandingDebtDays === null ? 'Verifikasi hutang belum tersedia' : outstandingDebtDays > 0 ? 'Terkunci: hutang cuti' : alreadyRequested ? 'Sudah ada pengajuan aktif' : availableDays <= 0 ? 'Tidak ada saldo eligible' : computed.eligible ? 'Masih bisa diajukan' : 'Terkunci H-7'}
                     tone={computed.eligible ? 'green' : 'red'}
                   />
                 </div>
 
                 {lockedByDeadline && (
                   <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm leading-6 text-red-700">
-                    Pengajuan postpone untuk employee sudah terkunci karena melewati batas H-7 sebelum akhir cycle.
-                    Untuk kondisi khusus, HR tetap dapat menginput atau mengubah data melalui halaman HR.
+                    {alreadyRequested ? 'Siklus ini sudah memiliki pengajuan aktif. Pantau statusnya di riwayat.' : availableDays <= 0 ? 'Tidak ada saldo efektif yang dapat dipostpone pada siklus ini.' : 'Postpone hanya dapat diajukan maksimal H-7 sebelum tanggal matang dan tidak diperbolehkan saat terdapat hutang cuti aktif.'}
                   </div>
                 )}
 
@@ -694,7 +678,7 @@ export default function EmployeeLeavePostponePage() {
                   <input
                     type="number"
                     min={1}
-                    max={Number(selectedCycle?.remaining_days || 0)}
+                    max={availableDays}
                     value={requestedDays}
                     onChange={(event) => setRequestedDays(Number(event.target.value))}
                     disabled={lockedByDeadline}
@@ -719,11 +703,11 @@ export default function EmployeeLeavePostponePage() {
 
                 <button
                   type="submit"
-                  disabled={saving || !computed.eligible}
+                  disabled={saving || !computed.eligible || requestedDays <= 0 || requestedDays > availableDays}
                   className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-[#1d1d1f] px-5 py-3 text-sm font-bold text-white transition hover:bg-black disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {saving ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
-                  {lockedByDeadline ? 'Terkunci H-7' : 'Kirim Pengajuan Postpone'}
+                  {lockedByDeadline ? 'Tidak dapat mengajukan postpone' : 'Kirim Pengajuan Postpone'}
                 </button>
               </form>
             )}

@@ -1,5 +1,8 @@
+import { recordVerifiedEvidence, verifiedEvidenceOwner, readCheckedEvidenceBytes } from '@/lib/server/private-evidence'
+import { requireCleanFile } from '@/lib/server/malware-scan'
+import { parseLegacyEvidenceUrl, validEvidenceObjectPath } from '@/lib/evidence-url'
+import { validUploadFileContent } from '@/lib/server/upload-validation'
 import { hasPHLIdentityConflict } from '@/lib/phl-identity-conflict'
-import { phlStoragePathFromPublicUrl } from '@/lib/server/phl-evidence-preservation'
 import { NextRequest, NextResponse } from 'next/server'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
@@ -48,12 +51,13 @@ function safeFileName(value: string) {
     .slice(-120) || 'file'
 }
 
-function validateFile(file: File) {
+async function validateFile(file: File) {
   const extension = clean(file.name).split('.').pop()?.toLowerCase() || ''
   if (!ALLOWED_EXTENSIONS.has(extension)) {
     return 'Format evidence tidak didukung. Gunakan PDF, JPG, PNG, WEBP, DOC/DOCX, atau XLS/XLSX.'
   }
   if (file.size > MAX_FILE_BYTES) return `Ukuran ${file.name} melebihi 10 MB.`
+  if (!(await validUploadFileContent(file))) return 'Isi atau struktur file tidak sesuai format yang diizinkan.'
   return ''
 }
 
@@ -394,43 +398,26 @@ async function findHolidayForDate(admin: SupabaseClient, workDate: string) {
 
 async function withAttachments(admin: SupabaseClient, rows: PHLWorkRow[]) {
   if (!rows.length) return rows
-
   const ids = rows.map((row) => row.id)
-  const { data: attachments, error } = await admin
-    .from('phl_work_request_attachments')
-    .select('id,request_id,slot_no,file_name,mime_type,file_size,storage_bucket,storage_path,legacy_file_url')
-    .in('request_id', ids)
-    .order('slot_no', { ascending: true })
-
-  if (error) throw error
-
   const grouped = new Map<string, Array<Record<string, unknown>>>()
-
-  for (const attachment of attachments || []) {
-    let signedUrl: string | null = attachment.legacy_file_url || null
-    if (attachment.storage_path) {
-      const { data } = await admin.storage
-        .from(attachment.storage_bucket || BUCKET)
-        .createSignedUrl(attachment.storage_path, 60 * 30)
-      signedUrl = data?.signedUrl || signedUrl
+  // A list is metadata only. Each open reauthorizes the parent and validates
+  // bytes on demand, instead of downloading/scanning all documents at load.
+  for (let i = 0; i < ids.length; i += 100) {
+    const { data: attachments, error } = await admin
+      .from('phl_work_request_attachments')
+      .select('id,request_id,slot_no,file_name,mime_type,file_size')
+      .in('request_id', ids.slice(i, i + 100))
+      .order('slot_no', { ascending: true })
+    if (error) throw error
+    for (const attachment of attachments || []) {
+      const list = grouped.get(attachment.request_id) || []
+      list.push({ id: attachment.id, slot_no: attachment.slot_no,
+        file_name: attachment.file_name, mime_type: attachment.mime_type,
+        file_size: attachment.file_size, signed_url: null })
+      grouped.set(attachment.request_id, list)
     }
-
-    const list = grouped.get(attachment.request_id) || []
-    list.push({
-      id: attachment.id,
-      slot_no: attachment.slot_no,
-      file_name: attachment.file_name,
-      mime_type: attachment.mime_type,
-      file_size: attachment.file_size,
-      signed_url: signedUrl,
-    })
-    grouped.set(attachment.request_id, list)
   }
-
-  return rows.map((row) => ({
-    ...row,
-    attachments: grouped.get(row.id) || [],
-  }))
+  return rows.map((row) => ({ ...row, attachments: grouped.get(row.id) || [] }))
 }
 
 export async function GET(request: NextRequest) {
@@ -469,34 +456,29 @@ export async function GET(request: NextRequest) {
       if (bucket !== BUCKET) {
         return NextResponse.json({ success: false, error: 'Bucket evidence belum dikenali. Hubungi HR.' }, { status: 404 })
       }
-      const path = clean(evidence.storage_path) || phlStoragePathFromPublicUrl(evidence.legacy_file_url)
-      if (!path || path.startsWith('/') || path.split('/').some(segment => segment === '..' || segment === '.')) {
+      const legacy = parseLegacyEvidenceUrl(evidence.legacy_file_url, process.env.NEXT_PUBLIC_SUPABASE_URL)
+      const path = clean(evidence.storage_path) || legacy?.path
+      if (!validEvidenceObjectPath(path) || (evidence.legacy_file_url && (legacy === null || legacy.bucket !== bucket || legacy.path !== path))) {
         return NextResponse.json({ success: false, error: 'Path evidence historis tidak valid. Hubungi HR untuk pemulihan dokumen.' }, { status: 404 })
       }
-      const { data: file, error: storageError } = await context.admin.storage.from(BUCKET).download(path)
-      if (storageError || !file) {
-        // Differentiate genuine missing objects from temporary permission/provider failures.
-        const storageStatus = Number(storageError?.statusCode || 0)
-        const notFound = !file && (!storageError || storageStatus === 404 || storageError?.name === 'StorageUnknownError' && /not found|nosuchkey/i.test(storageError.message))
-        return NextResponse.json({
-          success: false,
-          error: notFound
-            ? 'File evidence tidak ditemukan di Supabase Storage. Minta HR memulihkan dokumen asli; status PHL tidak berubah.'
-            : 'Supabase Storage belum dapat membuka evidence. Coba lagi atau hubungi HR.',
-        }, { status: notFound ? 404 : 503 })
-      }
-      const mime = clean(evidence.mime_type || file.type).toLowerCase()
-      const extension = clean(evidence.file_name).split('.').pop()?.toLowerCase()
-      const previewMime = ['application/pdf', 'image/png', 'image/jpeg', 'image/webp'].includes(mime)
-        ? mime : ({ pdf: 'application/pdf', png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp' } as Record<string, string>)[extension || ''] || 'application/octet-stream'
+      if(!(await verifiedEvidenceOwner(context.admin,bucket,path,owner.employee_id))) return NextResponse.json({success:false,error:'Pemilik evidence belum terverifikasi.'},{status:403})
+      const checked = await readCheckedEvidenceBytes(context.admin, bucket, path, clean(evidence.file_name) || undefined, true)
+      if (!checked) return NextResponse.json({ success: false, error: 'Evidence tidak tersedia, belum terverifikasi, atau diblokir oleh pemeriksaan keamanan. Hubungi HR jika masalah berlanjut.' }, { status: 423 })
+      // The exact checked bytes are returned; no second download/signing race.
+      // Deferred documents are downloads, never embedded as unscanned previews.
       const safeName = clean(evidence.file_name).replace(/[^a-zA-Z0-9._ -]/g, '_').slice(0, 160) || 'evidence'
-      return new NextResponse(await file.arrayBuffer(), {
+      const extension = safeName.split('.').pop()?.toLowerCase() || ''
+      const previewMime = ({ pdf: 'application/pdf', png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp' } as Record<string, string>)[extension]
+      const inline = checked.verdict === 'clean' && Boolean(previewMime)
+      return new NextResponse(new Uint8Array(checked.bytes).buffer, {
         status: 200,
         headers: {
-          'Content-Type': previewMime,
-          'Content-Disposition': `${previewMime === 'application/octet-stream' ? 'attachment' : 'inline'}; filename="${safeName}"`,
+          'Content-Type': inline ? previewMime : 'application/octet-stream',
+          'Content-Disposition': `${inline ? 'inline' : 'attachment'}; filename="${safeName}"`,
           'Cache-Control': 'private, no-store',
           'X-Content-Type-Options': 'nosniff',
+          'Content-Security-Policy': "default-src 'none'; sandbox",
+          'X-Harmony-Malware-Status': checked.verdict,
         },
       })
     }
@@ -506,6 +488,7 @@ export async function GET(request: NextRequest) {
       .from('phl_work_requests')
       .select('*')
       .order('created_at', { ascending: false })
+      .order('id', { ascending: false })
 
     if (scope === 'all') {
       if (!HR_ROLES.has(normalizeHarmonyRole(context.appUser.role))) {
@@ -551,11 +534,17 @@ export async function GET(request: NextRequest) {
       query = query.eq('employee_id', context.employee.id)
     }
 
-    const { data, error } = await query
-    if (error) throw error
-
-    const rows = await withAttachments(context.admin, data || [])
-    return NextResponse.json({ success: true, requests: rows })
+    const requests: PHLWorkRow[] = []
+    const pageSize = 500
+    for (let offset = 0; offset < 10000; offset += pageSize) {
+      const { data, error } = await query.range(offset, offset + pageSize - 1)
+      if (error) throw error
+      requests.push(...(data || []))
+      if (!data || data.length < pageSize) break
+      if (offset + pageSize >= 10000) throw new Error('Daftar PHL melebihi batas pengambilan. Hubungi HR untuk pengarsipan terkontrol.')
+    }
+    const rows = await withAttachments(context.admin, requests)
+    return NextResponse.json({ success: true, requests: rows }, { headers: { 'Cache-Control': 'private, no-store' } })
   } catch (error) {
     const normalized = harmonyApiError(error, 'Pengajuan PHL gagal dimuat.')
     return NextResponse.json(
@@ -629,9 +618,11 @@ export async function POST(request: NextRequest) {
         { status: 400 },
       )
     }
+    const fileVerdicts = new Map<File, Awaited<ReturnType<typeof requireCleanFile>>>()
     for (const file of files) {
-      const validation = validateFile(file)
+      const validation = await validateFile(file)
       if (validation) return NextResponse.json({ success: false, error: validation }, { status: 400 })
+      fileVerdicts.set(file, await requireCleanFile(context.admin, file))
     }
 
     const duplicate = await findActiveWorkRequestForDate(context.admin, context.employee, workDate)
@@ -672,6 +663,9 @@ export async function POST(request: NextRequest) {
         .upload(path, file, { contentType: file.type || undefined, upsert: false })
       if (uploadError) throw uploadError
       uploadedPaths.push(path)
+      const verdict = fileVerdicts.get(file)
+        if (!verdict) throw new Error('Status pemeriksaan file tidak ditemukan.')
+        await recordVerifiedEvidence(context.admin,BUCKET,path,context.employee.id,new Uint8Array(await file.arrayBuffer()),verdict)
     }
 
     const { data: inserted, error: insertError } = await context.admin
@@ -744,14 +738,7 @@ export async function POST(request: NextRequest) {
     })
   } catch (error) {
     const normalized = harmonyApiError(error, 'Pengajuan PHL gagal disimpan.')
-    try {
-      if (uploadedPaths.length) {
-        const context = await requireHarmonyApi(request)
-        await context.admin.storage.from(BUCKET).remove(uploadedPaths)
-      }
-    } catch {
-      // Cleanup best effort; error utama tetap dikembalikan.
-    }
+    if (uploadedPaths.length) console.warn('HARMONY PHL work upload retained', {count:uploadedPaths.length})
     return NextResponse.json(
       { success: false, error: normalized.message },
       { status: normalized.status },

@@ -1,3 +1,4 @@
+import { scannedSignedUrl } from '@/lib/server/private-evidence'
 import { NextRequest, NextResponse } from 'next/server'
 import { apiError, requireHRApi } from '@/lib/server/hr-api-auth'
 
@@ -17,12 +18,9 @@ export async function GET(request: NextRequest) {
     if (error || !upload || upload.deleted_at || !upload.file_path) {
       return NextResponse.json({ message: 'File upload tidak tersedia.' }, { status: 404 })
     }
-    const signed = await admin.storage.from('attendance-uploads')
-      .createSignedUrl(upload.file_path, 60)
-    if (signed.error || !signed.data?.signedUrl) {
-      throw new Error(signed.error?.message || 'Gagal membuat tautan berkas sementara.')
-    }
-    return NextResponse.json({ url: signed.data.signedUrl },
+    const url = await scannedSignedUrl(admin,'attendance-uploads',upload.file_path)
+    if (!url) return NextResponse.json({ message: 'Berkas belum lolos pemeriksaan keamanan.' }, { status: 503 })
+    return NextResponse.json({ url },
       { headers: { 'Cache-Control': 'no-store' } })
   } catch (error) {
     const details = apiError(error)

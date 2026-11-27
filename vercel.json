@@ -7,6 +7,10 @@
     {
       "path": "/api/cron/leave-lifecycle",
       "schedule": "10 16 * * *"
+    },
+    {
+      "path": "/api/cron/attendance-source-sync",
+      "schedule": "30 16 * * *"
     }
   ]
 }

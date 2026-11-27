@@ -3,11 +3,11 @@
 
 import { readErrorMessage } from '@/lib/error-utils'
 import Link from 'next/link'
-import { useEffect, useState } from 'react'
+import { useEffect, useEffectEvent, useState } from 'react'
 import { Activity, CircleDollarSign, FileClock, WalletCards } from 'lucide-react'
 import { RemedClaimList } from '@/components/remed/RemedClaimList'
 import { RemedStatCard } from '@/components/remed/RemedStatCard'
-import { formatRupiah } from '@/lib/remed'
+import { formatFullRupiah } from '@/lib/harmony-money'
 import { remedFetch } from '@/lib/remed-client'
 import type { RemedClaim, RemedEntitlement } from '@/types/remed'
 
@@ -23,13 +23,26 @@ export default function RemedEmployeeDashboard() {
       setData(await remedFetch<DashboardPayload>('/api/remed/dashboard'))
     } catch (e: unknown) {
       setError(readErrorMessage(e) || 'Gagal memuat dashboard Re-Med.')
+      setData(null)
     }
   }
 
+  const onLiveRefresh = useEffectEvent(load)
   useEffect(() => {
     let active = true
-    queueMicrotask(() => { if (active) void load() })
-    return () => { active = false }
+    queueMicrotask(() => { if (active) void onLiveRefresh() })
+    const refresh = () => {
+      if (active && document.visibilityState === 'visible') void onLiveRefresh()
+    }
+    window.addEventListener('focus', refresh)
+    document.addEventListener('visibilitychange', refresh)
+    const interval = window.setInterval(refresh, 60_000)
+    return () => {
+      active = false
+      window.removeEventListener('focus', refresh)
+      document.removeEventListener('visibilitychange', refresh)
+      window.clearInterval(interval)
+    }
   }, [])
 
   const ent = data?.entitlement
@@ -48,10 +61,10 @@ export default function RemedEmployeeDashboard() {
       {error ? <div className="rounded-[22px] border border-red-100 bg-red-50 p-4 text-sm text-red-700">{error}</div> : null}
 
       <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
-        <RemedStatCard label="Plafond" value={ent ? formatRupiah(ent.plafond_total) : '-'} helper={ent ? `Tahun ${ent.period_year}` : 'Belum diatur HR'} icon={WalletCards} />
-        <RemedStatCard label="Terpakai" value={ent ? formatRupiah(used) : '-'} helper="Legacy + pembayaran Re-Med" icon={CircleDollarSign} />
-        <RemedStatCard label="Pending" value={ent ? formatRupiah(ent.reserved_amount) : '-'} helper="Klaim yang sedang diproses" icon={Activity} />
-        <RemedStatCard label="Tersedia" value={ent ? formatRupiah(ent.available_amount) : '-'} helper="Bisa diajukan" icon={FileClock} />
+        <RemedStatCard label="Plafond" value={ent ? formatFullRupiah(ent.plafond_total) : '-'} helper={ent ? `Tahun ${ent.period_year}` : 'Belum diatur HR'} icon={WalletCards} />
+        <RemedStatCard label="Terpakai" value={ent ? formatFullRupiah(used) : '-'} helper="Legacy + pembayaran Re-Med" icon={CircleDollarSign} />
+        <RemedStatCard label="Pending" value={ent ? formatFullRupiah(ent.reserved_amount) : '-'} helper="Klaim yang sedang diproses" icon={Activity} />
+        <RemedStatCard label="Tersedia" value={ent ? formatFullRupiah(ent.available_amount) : '-'} helper="Bisa diajukan" icon={FileClock} />
       </div>
 
       {!ent && !error ? <div className="rounded-[22px] border border-amber-100 bg-amber-50 p-5 text-sm text-amber-800">Plafond tahun berjalan belum diatur. Hubungi HR sebelum membuat klaim.</div> : null}

@@ -8,7 +8,7 @@ const css = read('app/harmony-rc2z-liquid-glass.css')
 const pkg = JSON.parse(read('package.json'))
 
 // The outer workspace contains two separately bordered cards; verification remains below.
-const unified=attendance.indexOf('className="harmony-card harmony-attendance-history harmony-attendance-unified')
+const unified=attendance.search(/className="harmony-card[^"\n]*harmony-attendance-history harmony-attendance-unified/)
 const historyHeading=attendance.indexOf('harmony-attendance-history-section')
 const today=attendance.indexOf('aria-labelledby="harmony-today-attendance-title"')
 const review=attendance.indexOf('className="harmony-attendance-review-toolbar')

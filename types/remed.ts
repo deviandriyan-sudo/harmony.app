@@ -149,6 +149,7 @@ export type RemedSignatureManagementRow = {
   signer_role: 'hr' | 'finance' | null
   signature_url: string | null
   signature_source: 'upload' | 'seed' | 'none'
+  has_signature?: boolean
   signature_file_name: string | null
   updated_at: string | null
 }

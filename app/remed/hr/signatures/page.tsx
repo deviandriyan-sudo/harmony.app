@@ -161,7 +161,7 @@ export default function RemedSignatureManagementPage() {
                       <p className="mt-0.5 truncate text-xs harmony-text-secondary">{row.employee_number || '-'} · {row.department || '-'} · {row.position || '-'}</p>
                     </div>
                     <div className="shrink-0 text-right">
-                      <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide ${row.signature_url ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>{row.signature_url ? 'Ada TTD' : 'Belum Ada'}</span>
+                      <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide ${row.has_signature ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>{row.has_signature ? 'TTD Tersimpan' : 'Belum Ada'}</span>
                       {row.signer_role && <p className="mt-1 text-[10px] font-semibold uppercase harmony-text-secondary">{row.signer_role}</p>}
                     </div>
                   </button>
@@ -176,12 +176,7 @@ export default function RemedSignatureManagementPage() {
             <p className="text-sm font-semibold">{selected?.full_name || 'Pilih employee'}</p>
             <p className="mt-1 text-xs harmony-text-secondary">{selected?.employee_number || '-'} · {selected?.department || '-'}</p>
             <div className="mt-4 flex min-h-[180px] items-center justify-center rounded-2xl border border-dashed border-black/15 bg-white p-4">
-              {selected?.signature_url ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={selected.signature_url} alt={`Tanda tangan ${selected.full_name || ''}`} className="max-h-32 max-w-full object-contain" />
-              ) : (
-                <p className="text-center text-sm harmony-text-muted">Belum ada tanda tangan.</p>
-              )}
+              <SignaturePreview key={`${selected?.id || ''}:${selected?.updated_at || ''}`} row={selected} maxHeight="max-h-32" />
             </div>
             <label className="mt-4 flex min-h-12 cursor-pointer items-center rounded-2xl bg-white px-4 text-sm harmony-text-secondary shadow-sm">
               <input type="file" accept="image/png,image/jpeg,image/webp" onChange={chooseFile} className="hidden" />
@@ -239,17 +234,34 @@ function RoleCard({
         </button>
       </div>
       <div className="mt-4 flex min-h-[140px] items-center justify-center rounded-2xl border border-dashed border-black/10 bg-[#fafafa] p-4">
-        {signer?.signature_url ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={signer.signature_url} alt={`Tanda tangan ${signer.full_name || ''}`} className="max-h-24 max-w-full object-contain" />
-        ) : (
-          <div className="text-center">
-            <p className="text-sm font-semibold harmony-text-primary">{signer?.full_name || 'Belum dipilih'}</p>
-            <p className="mt-1 text-xs text-amber-700">Tanda tangan belum tersedia.</p>
-          </div>
-        )}
+        <SignaturePreview key={`${signer?.id || ''}:${signer?.updated_at || ''}`} row={signer} maxHeight="max-h-24" />
       </div>
       {signer && <p className="mt-3 text-xs harmony-text-secondary">Aktif: <span className="font-semibold harmony-text-primary">{signer.full_name}</span> · {signer.employee_number || '-'}</p>}
     </div>
   )
+}
+
+// Fetch only a selected signature, and only after HR requests its preview.
+// Keyed by employee/version so a late response cannot replace another employee's image.
+function SignaturePreview({ row, maxHeight }: { row: RemedSignatureManagementRow | null; maxHeight: string }) {
+  const [url, setUrl] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  async function preview() {
+    if (!row || busy) return
+    setBusy(true)
+    setError('')
+    try {
+      const response = await remedFetch<{ signature: { signature_url: string | null } | null }>(`/api/remed/signatures?scope=management-preview&employee_id=${encodeURIComponent(row.id)}`)
+      if (!response.signature?.signature_url) throw new Error('Tanda tangan belum dapat diverifikasi.')
+      setUrl(response.signature.signature_url)
+    } catch (issue: unknown) { setError(readErrorMessage(issue) || 'Preview gagal dimuat.') }
+    finally { setBusy(false) }
+  }
+  if (!row?.has_signature) return <p className="text-center text-sm harmony-text-muted">{row ? 'Belum ada tanda tangan.' : 'Pilih employee.'}</p>
+  if (url) return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img src={url} alt={`Tanda tangan ${row.full_name || ''}`} onError={() => { setUrl(null); setError('Preview kedaluwarsa atau tidak tersedia.'); }} className={`${maxHeight} max-w-full object-contain`} />
+  )
+  return <div className="text-center"><button type="button" disabled={busy} onClick={() => void preview()} className="harmony-button-secondary px-4 py-2 text-sm font-semibold disabled:opacity-50">{busy ? 'Memeriksa...' : 'Lihat tanda tangan'}</button>{error && <p role="alert" className="mt-2 text-xs text-red-700">{error}</p>}</div>
 }

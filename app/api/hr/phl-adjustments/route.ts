@@ -1,6 +1,8 @@
+import { recordVerifiedEvidence } from '@/lib/server/private-evidence'
+import { requireCleanFile } from '@/lib/server/malware-scan'
 
 import { readErrorMessage } from '@/lib/error-utils'
-import { validUploadFileSignature } from '@/lib/server/upload-validation'
+import { validUploadFileContent } from '@/lib/server/upload-validation'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 
@@ -55,7 +57,7 @@ async function validateFile(file: File) {
     return `Ukuran ${file.name} melebihi 10 MB.`
   }
 
-  if (!(await validUploadFileSignature(file))) {
+  if (!(await validUploadFileContent(file))) {
     return 'Isi file tidak sesuai dengan format atau MIME dokumen.'
   }
 
@@ -93,9 +95,9 @@ function getClients(token: string) {
   return { admin, user }
 }
 
-async function cleanupFiles(admin: SupabaseClient, paths: string[]) {
-  if (paths.length === 0) return
-  await admin.storage.from(BUCKET).remove(paths)
+async function cleanupFiles(_admin: SupabaseClient, paths: string[]) {
+  void _admin
+  if (paths.length) console.warn('HARMONY PHL adjustment upload retained', { count: paths.length })
 }
 
 export async function POST(request: NextRequest) {
@@ -229,11 +231,13 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    const fileVerdicts = new Map<File, Awaited<ReturnType<typeof requireCleanFile>>>()
     for (const file of files) {
       const validation = await validateFile(file)
       if (validation) {
         return NextResponse.json({ success: false, error: validation }, { status: 400 })
       }
+      fileVerdicts.set(file, await requireCleanFile(admin, file))
     }
 
     const { data: employee, error: employeeError } = await admin
@@ -307,6 +311,9 @@ export async function POST(request: NextRequest) {
       }
 
       uploadedPaths.push(storagePath)
+      const verdict = fileVerdicts.get(file)
+        if (!verdict) throw new Error('Status pemeriksaan file tidak ditemukan.')
+        await recordVerifiedEvidence(admin,BUCKET,storagePath,employeeId,buffer,verdict)
 
       const { data: publicUrlData } = admin.storage.from(BUCKET).getPublicUrl(storagePath)
 

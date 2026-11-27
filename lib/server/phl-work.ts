@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { assignmentIsEffective } from '@/lib/phl-assignment-policy'
+import { buildSupervisorReferenceIndex, uniquelyMatchesSupervisor } from '@/lib/supervisor-reference-policy'
 
 import {
   buildServerHarmonyEmailHtml,
@@ -36,11 +37,6 @@ export function employeeIdentityKeys(employee: HarmonyEmployeeIdentity | null) {
   ])
 }
 
-function supervisorFieldMatches(value: unknown, keys: string[]) {
-  const target = normalize(value)
-  return Boolean(target && keys.includes(target))
-}
-
 type PHLWorkNotificationRow = {
   employee_id: string
   id?: string | null
@@ -73,42 +69,50 @@ export async function getPHLSubordinateIds(
   admin: SupabaseClient,
   supervisor: HarmonyEmployeeIdentity,
 ) {
-  const keys = employeeIdentityKeys(supervisor)
-  if (keys.length === 0) return [] as string[]
+  if (!supervisor.id || supervisor.is_active === false) return [] as string[]
 
   const [employeesResult, assignmentsResult] = await Promise.all([
     admin
       .from('employees')
-      .select('id,supervisor_1,supervisor_2,is_active')
-      .eq('is_active', true),
+      .select('id,employee_number,machine_pin,full_name,email,supervisor_1,supervisor_2,is_active', { count: 'exact' })
+      .or('is_active.eq.true,is_active.is.null'),
     admin
       .from('employee_assignments')
-      .select('employee_id,supervisor_1,supervisor_2,start_date,end_date,is_primary,is_active')
-      .eq('is_active', true),
+      .select('employee_id,supervisor_1,supervisor_2,start_date,end_date,is_primary,is_active', { count: 'exact' })
+      .or('is_active.eq.true,is_active.is.null'),
   ])
 
   if (employeesResult.error) throw employeesResult.error
   if (assignmentsResult.error) throw assignmentsResult.error
 
+  const employees = employeesResult.data || []
+  const assignments = assignmentsResult.data || []
+  // Incomplete directories cannot establish uniqueness; never authorize on a truncated query.
+  if (employeesResult.count !== employees.length || assignmentsResult.count !== assignments.length) {
+    throw new Error('Pemetaan atasan belum lengkap. Hubungi HR.')
+  }
+  const activeIds = new Set(employees.map(row => row.id))
+  if (!activeIds.has(supervisor.id)) return []
+  const index = buildSupervisorReferenceIndex(employees)
   const ids = new Set<string>()
 
-  for (const row of employeesResult.data || []) {
+  for (const row of employees) {
     if (row.id === supervisor.id) continue
     if (
-      supervisorFieldMatches(row.supervisor_1, keys) ||
-      supervisorFieldMatches(row.supervisor_2, keys)
+      uniquelyMatchesSupervisor(index, row.supervisor_1, supervisor.id) ||
+      uniquelyMatchesSupervisor(index, row.supervisor_2, supervisor.id)
     ) {
       ids.add(row.id)
     }
   }
 
   const today = todayWita()
-  for (const row of assignmentsResult.data || []) {
+  for (const row of assignments) {
     if (!assignmentIsEffective(row, today)) continue
-    if (!row.employee_id || row.employee_id === supervisor.id) continue
+    if (!row.employee_id || row.employee_id === supervisor.id || !activeIds.has(row.employee_id)) continue
     if (
-      supervisorFieldMatches(row.supervisor_1, keys) ||
-      supervisorFieldMatches(row.supervisor_2, keys)
+      uniquelyMatchesSupervisor(index, row.supervisor_1, supervisor.id) ||
+      uniquelyMatchesSupervisor(index, row.supervisor_2, supervisor.id)
     ) {
       ids.add(row.employee_id)
     }

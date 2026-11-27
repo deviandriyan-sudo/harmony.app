@@ -28,6 +28,10 @@ export type PHLWorkRequest = {
   attendance_verified: boolean
   origin?: 'employee_request' | 'legacy_attendance' | string
   legacy_attendance_status?: string | null
+  hr_review_outcome?: 'validated_historical' | 'rejected_historical' | string | null
+  hr_review_note?: string | null
+  hr_reviewed_email?: string | null
+  hr_reviewed_at?: string | null
   work_day_type: 'weekday' | 'weekend' | 'holiday' | string
   holiday_name: string | null
   work_purpose: string
@@ -72,9 +76,10 @@ export async function fetchPHLWorkRequests(
   const response = await fetch(`/api/phl/work-requests?scope=${scope}`, {
     headers: { Authorization: `Bearer ${token}` },
     cache: 'no-store',
+    signal: AbortSignal.timeout(30_000),
   })
   const payload = (await response.json().catch(() => null)) as PHLWorkListResponse | null
-  if (!response.ok || payload?.success === false) {
+  if (!response.ok || payload?.success !== true || !Array.isArray(payload.requests)) {
     throw new Error(payload?.error || 'Data pengajuan PHL gagal dimuat.')
   }
   return payload?.requests || []
@@ -94,9 +99,10 @@ export async function fetchTeamPHLWorkRequestsForPeriod(
   })
   const response = await fetch(`/api/phl/work-requests?${params.toString()}`, {
     headers: { Authorization: `Bearer ${token}` }, cache: 'no-store',
+    signal: AbortSignal.timeout(30_000),
   })
   const payload = (await response.json().catch(() => null)) as PHLWorkListResponse | null
-  if (!response.ok || payload?.success === false) {
+  if (!response.ok || payload?.success !== true || !Array.isArray(payload.requests)) {
     throw new Error(payload?.error || 'Pengajuan PHL periode ini gagal dimuat.')
   }
   return payload?.requests || []
@@ -162,13 +168,15 @@ export async function openPHLWorkEvidence(attachmentId: string): Promise<void> {
       throw new Error(error?.error || 'Evidence PHL gagal dibuka.')
     }
     const blobUrl = URL.createObjectURL(await response.blob())
-    if (preview && !preview.closed) {
+    const disposition = response.headers.get('content-disposition') || ''
+    const inline = response.headers.get('x-harmony-malware-status') === 'clean' && /^inline\b/i.test(disposition)
+    if (inline && preview && !preview.closed) {
       preview.location.replace(blobUrl)
     } else {
-      // Popup blocked: use an explicit file download as fallback.
+      preview?.close()
       const link = document.createElement('a')
       link.href = blobUrl
-      link.download = 'evidence-phl'
+      link.download = disposition.match(/filename="([^"]+)"/i)?.[1] || 'evidence-phl'
       document.body.appendChild(link)
       link.click()
       link.remove()
@@ -231,5 +239,6 @@ export function phlWorkStatusLabel(status: string) {
   if (value === 'approved') return 'Disetujui'
   if (value === 'rejected') return 'Ditolak'
   if (value === 'cancelled') return 'Dibatalkan'
+  if (value === 'resolved_legacy') return 'Selesai Ditinjau HR (Historis)'
   return status || '-'
 }

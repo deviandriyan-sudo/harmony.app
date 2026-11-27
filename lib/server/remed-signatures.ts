@@ -1,3 +1,4 @@
+import { scannedSignedUrl } from '@/lib/server/private-evidence'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { REMED_SIGNATURE_BUCKET } from '@/lib/remed'
 
@@ -26,13 +27,11 @@ export type RemedSignatureDisplay = {
 async function createSignatureUrl(admin: SupabaseClient, profile: RemedSignatureProfileRow | null) {
   if (!profile?.signature_path) return { url: null as string | null, source: 'none' as const }
 
-  const { data, error } = await admin.storage
-    .from(REMED_SIGNATURE_BUCKET)
-    .createSignedUrl(profile.signature_path, 10 * 60)
+  const url = await scannedSignedUrl(admin,REMED_SIGNATURE_BUCKET,profile.signature_path,undefined,600)
 
-  if (!error && data?.signedUrl) {
+  if (url) {
     return {
-      url: data.signedUrl,
+      url,
       source: profile.signature_origin === 'seed' ? ('seed' as const) : ('upload' as const),
     }
   }
@@ -135,20 +134,18 @@ export async function getRemedSignatureManagement(admin: SupabaseClient) {
   const profileMap = new Map<string, RemedSignatureProfileRow>()
   for (const row of (profiles || []) as RemedSignatureProfileRow[]) profileMap.set(row.employee_id, row)
 
-  const rows = await Promise.all(
-    (employees || []).map(async (employee) => {
-      const profile = profileMap.get(employee.id) || null
-      const resolved = await createSignatureUrl(admin, profile)
-      return {
-        ...employee,
-        signer_role: profile?.signer_role || null,
-        signature_url: resolved.url,
-        signature_source: resolved.source,
-        signature_file_name: profile?.signature_file_name || null,
-        updated_at: profile?.updated_at || null,
-      }
-    }),
-  )
+  const rows = (employees || []).map(employee => {
+    const profile = profileMap.get(employee.id) || null
+    return {
+      ...employee,
+      signer_role: profile?.signer_role || null,
+      signature_url: null,
+      signature_source: profile?.signature_path ? (profile.signature_origin === 'seed' ? 'seed' : 'upload') : 'none',
+      has_signature: Boolean(profile?.signature_path),
+      signature_file_name: profile?.signature_file_name || null,
+      updated_at: profile?.updated_at || null,
+    }
+  })
 
   return rows
 }

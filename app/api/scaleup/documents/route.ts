@@ -1,6 +1,8 @@
+import { scannedSignedUrl } from '@/lib/server/private-evidence'
+import { requireCleanFile } from '@/lib/server/malware-scan'
 import { NextRequest,NextResponse } from 'next/server'
 import { scaleupContext,requireScaleupEmployee,scaleupRouteError } from '@/lib/server/scaleup'
-import { validUploadFileSignature } from '@/lib/server/upload-validation'
+import { validUploadFileContent } from '@/lib/server/upload-validation'
 export const runtime='nodejs'
 const BUCKET='scaleup-private'
 const allowed=new Set(['application/pdf','image/png','image/jpeg'])
@@ -33,7 +35,7 @@ export async function POST(request:NextRequest) {
     const file=form.get('file')
     if(!(file instanceof File) || file.size<1 || file.size>8*1024*1024 || !allowed.has(file.type))
       throw Error('Dokumen harus PDF/JPG/PNG berukuran maksimum 8 MB.')
-    if(!(await validUploadFileSignature(file)))
+    if(!(await validUploadFileContent(file)))
       throw Object.assign(new Error('Isi file tidak sesuai format PDF/JPG/PNG.'),{status:400})
     const requestId=String(form.get('request_id')||'')||null
     const recordId=String(form.get('record_id')||'')||null
@@ -41,6 +43,7 @@ export async function POST(request:NextRequest) {
     if(!['proposal','supporting','certificate'].includes(category))throw Error('Jenis dokumen tidak valid.')
     if(category==='certificate'&&!recordId)throw Error('Sertifikat harus terkait training record.')
     const owner=await access(ctx,recordId,requestId)
+    await requireCleanFile(ctx.admin,file)
     const id=crypto.randomUUID(),ext=safeExtension(file.type)
     const path=`${owner}/${id}.${ext}`
     const {error:uploadError}=await ctx.admin.storage.from(BUCKET).upload(path,await file.arrayBuffer(),{
@@ -54,7 +57,7 @@ export async function POST(request:NextRequest) {
       expiration_date:String(form.get('expiration_date')||'')||null,
       uploaded_by:ctx.appUser.id}
     const {data,error}=await ctx.admin.from('scaleup_training_documents').insert(payload).select('id').single()
-    if(error){await ctx.admin.storage.from(BUCKET).remove([path]);throw error}
+    if(error){console.warn('HARMONY training document retained after metadata error');throw error}
     return NextResponse.json({id:data.id})
   }catch(error){const e=scaleupRouteError(error);return NextResponse.json({message:e.message},{status:e.status})}
 }
@@ -65,8 +68,8 @@ export async function GET(request:NextRequest) {
       .select('id,request_id,record_id,storage_path').eq('id',id).maybeSingle()
     if(error||!data)throw Object.assign(new Error('Dokumen tidak ditemukan.'),{status:404})
     await access(ctx,data.record_id,data.request_id)
-    const signed=await ctx.admin.storage.from(BUCKET).createSignedUrl(data.storage_path,60)
-    if(signed.error||!signed.data?.signedUrl)throw signed.error||Error('Signed URL gagal dibuat.')
-    return NextResponse.json({url:signed.data.signedUrl,expires_in:60})
+    const url=await scannedSignedUrl(ctx.admin,BUCKET,data.storage_path)
+    if(!url)return NextResponse.json({message:'Dokumen belum lolos pemeriksaan keamanan.'},{status:503,headers:{'Cache-Control':'private, no-store'}})
+    return NextResponse.json({url,expires_in:60},{headers:{'Cache-Control':'private, no-store'}})
   }catch(error){const e=scaleupRouteError(error);return NextResponse.json({message:e.message},{status:e.status})}
 }

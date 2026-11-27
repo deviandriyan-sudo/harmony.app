@@ -2,7 +2,7 @@
 
 
 import { readErrorMessage } from '@/lib/error-utils'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   ExternalLink,
   FileText,
@@ -167,43 +167,9 @@ export function HarmonyPendingAttachmentPicker({
   )
 }
 
-function mergeLegacyLinks(
-  attachments: HarmonyAttachment[],
-  legacyLinks: LegacyAttachmentLink[],
-) {
-  const result = [...attachments]
-  const urls = new Set(result.map((item) => item.file_url))
-
-  legacyLinks.forEach((legacy, index) => {
-    const url = String(legacy.url || '').trim()
-    if (!url || urls.has(url)) return
-
-    result.push({
-      id: `legacy-${index}-${url}`,
-      entity_type: 'attendance_log',
-      entity_id: '',
-      owner_employee_id: null,
-      slot_no: result.length + 1,
-      attachment_kind: 'legacy',
-      file_url: url,
-      file_name: String(legacy.name || 'Dokumen Pendukung'),
-      file_size: Number(legacy.size || 0) || null,
-      file_type: String(legacy.type || '') || null,
-      storage_bucket: 'leave-attachments',
-      storage_path: String(legacy.storagePath || '') || null,
-      is_legacy: true,
-      created_at: '',
-    })
-    urls.add(url)
-  })
-
-  return result.slice(0, HARMONY_ATTACHMENT_MAX_FILES)
-}
-
 export function HarmonyAttachmentViewer({
   entityType,
   entityId,
-  legacyLinks = [],
   compact = false,
   editable = false,
   emptyText = 'Tidak ada dokumen pendukung',
@@ -218,6 +184,8 @@ export function HarmonyAttachmentViewer({
   onDeleted?: () => void
 }) {
   const [attachments, setAttachments] = useState<HarmonyAttachment[]>([])
+  const [loadedKey, setLoadedKey] = useState('')
+  const viewKey = `${entityType}:${entityId}`
   const [loading, setLoading] = useState(Boolean(entityId))
   const [error, setError] = useState('')
   const [deletingId, setDeletingId] = useState('')
@@ -232,13 +200,16 @@ export function HarmonyAttachmentViewer({
       }
 
       setLoading(true)
+      setLoadedKey('')
+      setAttachments([])
       setError('')
 
       try {
         const rows = await listHarmonyAttachments(entityType, entityId)
-        if (active) setAttachments(rows)
+        if (active) { setAttachments(rows); setLoadedKey(viewKey) }
       } catch (loadError: unknown) {
         if (active) {
+          setLoadedKey('')
           setAttachments([])
           setError(readErrorMessage(loadError) || 'Lampiran belum dapat dimuat.')
         }
@@ -252,12 +223,10 @@ export function HarmonyAttachmentViewer({
     return () => {
       active = false
     }
-  }, [entityId, entityType])
+  }, [entityId, entityType, viewKey])
 
-  const visibleAttachments = useMemo(
-    () => mergeLegacyLinks(attachments, legacyLinks),
-    [attachments, legacyLinks],
-  )
+  // No client-provided fallback after authorization failure or while another parent is loading.
+  const visibleAttachments = loadedKey === viewKey ? attachments : []
 
   async function handleDelete(attachment: HarmonyAttachment) {
     if (!editable || attachment.id.startsWith('legacy-')) return
@@ -308,15 +277,15 @@ export function HarmonyAttachmentViewer({
           ].join(' ')}
         >
           <FileText size={compact ? 13 : 15} className="shrink-0 harmony-text-link" />
-          <a
+          {attachment.file_url ? <a
             href={attachment.file_url}
             target="_blank"
-            rel="noreferrer"
+            rel="noopener noreferrer"
             className="min-w-0 flex-1 truncate text-xs font-bold harmony-text-link hover:underline"
             title={attachment.file_name}
           >
             {index + 1}. {attachment.file_name}
-          </a>
+          </a> : <span className="min-w-0 flex-1 truncate text-xs font-semibold harmony-text-muted" title="Evidence belum lolos pemeriksaan keamanan">{index + 1}. {attachment.file_name} — akses ditahan</span>}
           <ExternalLink size={11} className="shrink-0 harmony-text-muted" />
           {editable && !attachment.id.startsWith('legacy-') ? (
             <button

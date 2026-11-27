@@ -14,5 +14,5 @@ assert(dossier.includes('lg:break-words')&&!dossier.includes('lg:grid-cols-[230p
 assert(dossier.includes('<details key={group}'),'Compact document categories missing')
 assert(hook.includes('harmonyFetch<ProfileDocuments>') && /document\.category\s*===\s*'avatar'/.test(hook), 'Avatar must come from existing authorized profile API')
 assert(/useEmployeeAvatar\(/.test(sidebar) && sidebar.includes('{profilePhoto?'), 'Sidebar profile image missing')
-assert(docsApi.includes("requireProfileAccess(request)")&&docsApi.includes("category==='avatar'")&&docsApi.includes('createSignedUrl'),'Original private avatar API or access checks missing')
+assert(docsApi.includes("requireProfileAccess(request)")&&docsApi.includes("category==='avatar'")&&docsApi.includes('scannedSignedUrl'),'Original private avatar API or access checks missing')
 console.log('HARMONY profile photo / icons / document grouping PASS')

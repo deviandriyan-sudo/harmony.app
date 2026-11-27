@@ -6,6 +6,8 @@ import { readErrorMessage } from '@/lib/error-utils'
 import { useEffectEvent, useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import * as XLSX from 'xlsx'
+import { ensureFingerprintScanned, publishScannedUpload } from '@/lib/scanned-upload-client'
+import { validAttendanceImportContent } from '@/lib/server/upload-validation'
 import {
   Upload,
   FileSpreadsheet,
@@ -500,7 +502,11 @@ export default function HRAttendanceUploadPage() {
   async function parseAttendanceFile(file: File) {
     try {
       const buffer = await file.arrayBuffer()
+      if (!validAttendanceImportContent(file.name, new Uint8Array(buffer), file.type)) {
+        return { rows: [], error: 'Isi atau struktur berkas absensi tidak sesuai format yang diizinkan.' }
+      }
 
+      await ensureFingerprintScanned(file)
       const workbook = XLSX.read(buffer, {
         type: 'array',
         cellDates: true,
@@ -517,6 +523,10 @@ export default function HRAttendanceUploadPage() {
       }
 
       const sheet = workbook.Sheets[firstSheetName]
+      const range = sheet?.['!ref'] ? XLSX.utils.decode_range(sheet['!ref']) : null
+      if (!range || range.e.r - range.s.r + 1 > 50000 || range.e.c - range.s.c + 1 > 256 || (range.e.r - range.s.r + 1) * (range.e.c - range.s.c + 1) > 2000000) {
+        return { rows: [], error: 'Dimensi lembar absensi tidak valid atau terlalu besar (maks. 50.000 baris, 256 kolom, 2 juta sel).' }
+      }
 
       const sheetRows = XLSX.utils.sheet_to_json<unknown[]>(sheet, {
         header: 1,
@@ -1498,18 +1508,11 @@ export default function HRAttendanceUploadPage() {
     }
 
     const fileExt = selectedFile.name.split('.').pop()
-    const safeName = selectedFile.name
-      .replace(/\s+/g, '-')
-      .replace(/[^a-zA-Z0-9._-]/g, '')
-
-    const filePath = `attendance/${Date.now()}-${safeName}`
-
-    const { error: uploadError } = await supabase.storage
-      .from('attendance-uploads')
-      .upload(filePath, selectedFile)
-
-    if (uploadError) {
-      setErrorMessage(uploadError.message)
+    let filePath: string
+    try {
+      filePath = (await publishScannedUpload(selectedFile,'fingerprint')).path
+    } catch (error) {
+      setErrorMessage(readErrorMessage(error) || 'File belum lolos pemeriksaan keamanan.')
       setUploading(false)
       return
     }
@@ -1537,8 +1540,8 @@ export default function HRAttendanceUploadPage() {
       .single()
 
     if (insertError || !uploadRecord) {
-      // Roll back orphaned storage file when metadata cannot be created.
-      await supabase.storage.from('attendance-uploads').remove([filePath])
+      // Retain source bytes for HR recovery if metadata creation fails.
+      console.warn('HARMONY fingerprint file retained after metadata error')
       setErrorMessage(insertError?.message || 'Gagal menyimpan metadata unggahan.')
       setUploading(false)
       return

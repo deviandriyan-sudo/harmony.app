@@ -288,7 +288,7 @@ export default function EmployeeAttendanceApprovalListPage() {
 
       const { data: employeeData, error: employeeError } =
         await supabase
-          .from("employees")
+          .from("harmony_employee_directory")
           .select("*")
           .eq("is_active", true);
 
@@ -297,7 +297,7 @@ export default function EmployeeAttendanceApprovalListPage() {
       const activeEmployees = (employeeData || []) as Employee[];
 
       const assignmentResponse = await supabase
-        .from("employee_assignments")
+        .from("harmony_assignment_directory")
         .select("*")
         .eq("is_active", true);
 

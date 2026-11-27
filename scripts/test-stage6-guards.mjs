@@ -1,7 +1,9 @@
+const sourceOnly = process.argv.includes('--source-only')
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import path from 'node:path'
 const read = (p)=>fs.readFileSync(p,'utf8')
+if (!sourceOnly) {
 const sql=read('SQL_ONLY/07_STAGE6_LIFECYCLE_ANNUAL_CORRECTION_SAFE.sql')
 assert.match(sql,/CREATE OR REPLACE FUNCTION public\.harmony_hr_correct_annual_leave_balance_v1/)
 assert.match(sql,/SECURITY DEFINER/)
@@ -20,6 +22,7 @@ assert.doesNotMatch(sql,/UPDATE\s+public\.annual_leave_cycles\b/i)
 assert.doesNotMatch(sql,/UPDATE\s+public\.leave_postpone_requests\b/i)
 assert.doesNotMatch(sql,/UPDATE\s+public\.phl_records\b/i)
 assert.match(read('SQL_ONLY/02_V380_SAFE_AUDITED_ANNUAL_CORRECTION.sql'),/^-- DEPRECATED: DO NOT RUN AFTER STAGE 6/)
+}
 assert.match(read('app/layout.tsx'),/employee-master-contrast\.css/)
 const css=read('app/employee-master-contrast.css')
 for (const target of ['.harmony-hr-edit-modal','.harmony-leave-value','.harmony-hr-form-summary','.harmony-leave-correction']) assert.ok(css.includes(target))
@@ -27,6 +30,6 @@ assert.match(css,/html\[data-harmony-theme='dark'\]/)
 assert.match(css,/html\[data-harmony-theme='light'\]/)
 assert.match(read('app/api/hr/leave/balance-correction/route.ts'),/07_STAGE6_LIFECYCLE_ANNUAL_CORRECTION_SAFE\.sql/)
 const walk=(dir)=>fs.readdirSync(dir,{withFileTypes:true}).flatMap(e=>e.isDirectory()?walk(path.join(dir,e.name)):e.name==='page.tsx'?[path.join(dir,e.name)]:[])
-assert.equal(walk('app').length,64)
-assert.equal((()=>{const rec=d=>fs.readdirSync(d,{withFileTypes:true}).flatMap(e=>e.isDirectory()?rec(path.join(d,e.name)):e.name==='route.ts'?[path.join(d,e.name)]:[]);return rec('app/api').length})(),49)
-console.log('HARMONY Stage 6 guards PASS: 113 routes; canonical adjustment SQL, audit, HR auth, legacy preservation, dark/light contrast')
+assert.equal(walk('app').length,68)
+assert.equal((()=>{const rec=d=>fs.readdirSync(d,{withFileTypes:true}).flatMap(e=>e.isDirectory()?rec(path.join(d,e.name)):e.name==='route.ts'?[path.join(d,e.name)]:[]);return rec('app/api').length})(),68)
+console.log(sourceOnly ? 'PASS: Stage 6 source guards, 136 routes; historical SQL NOT RUN' : 'HARMONY Stage 6 guards PASS: 136 routes; canonical adjustment SQL, audit, HR auth, legacy preservation, dark/light contrast')

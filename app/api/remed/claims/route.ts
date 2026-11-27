@@ -1,3 +1,4 @@
+import { requireCleanFile, requireCleanUpload } from '@/lib/server/malware-scan'
 
 import { readErrorMessage } from '@/lib/error-utils'
 import { randomUUID } from 'crypto'
@@ -11,7 +12,7 @@ import {
   safeFileName,
 } from '@/lib/remed'
 import { requireRemedApi, remedApiError } from '@/lib/server/remed-api-auth'
-import { uploadExpectedMime, validUploadFileSignature, validUploadSignature } from '@/lib/server/upload-validation'
+import { uploadExpectedMime, validUploadFileContent, validUploadContent } from '@/lib/server/upload-validation'
 import { enrichRemedClaims } from '@/lib/server/remed-data'
 import { notifyRemedClaimSubmitted } from '@/lib/server/workflow-notifications'
 
@@ -108,7 +109,6 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   const uploadedPaths: string[] = []
-  const stagedPaths = new Set<string>()
   let createdClaimId = ''
 
   try {
@@ -119,15 +119,16 @@ export async function POST(request: NextRequest) {
     const files = normalizeFiles(formData)
     validateFiles(files)
     for (const file of files) {
-      if (!(await validUploadFileSignature(file))) {
+      if (!(await validUploadFileContent(file))) {
         throw Object.assign(new Error(`Isi bukti ${file.name} tidak sesuai format.`), { status: 400 })
       }
+      await requireCleanFile(ctx.admin,file)
     }
     const stagedReceipts = parseStagedReceipts(formData, ctx.access.employee_id)
     const receiptCount = files.length + stagedReceipts.length
     if (receiptCount < 1) throw Object.assign(new Error('Minimal 1 bukti kuitansi wajib diunggah.'), { status: 400 })
     if (receiptCount > REMED_MAX_FILES) throw Object.assign(new Error(`Maksimal ${REMED_MAX_FILES} file bukti.`), { status: 400 })
-    stagedReceipts.forEach((receipt) => stagedPaths.add(receipt.path))
+    // Staged receipt bytes remain private and retained even when validation fails.
 
     // Signed direct uploads bypass the request body. Verify the actual stored
     // bytes (not just metadata supplied by the browser) before issuing an RPC
@@ -138,9 +139,10 @@ export async function POST(request: NextRequest) {
         throw Object.assign(new Error('File bukti yang diunggah tidak ditemukan atau ukurannya berbeda.'), { status: 400 })
       }
       const bytes = new Uint8Array(await stored.arrayBuffer())
-      if (!validUploadSignature(receipt.fileName, bytes, receipt.mimeType)) {
+      if (!validUploadContent(receipt.fileName, bytes, receipt.mimeType)) {
         throw Object.assign(new Error(`Isi bukti ${receipt.fileName} tidak sesuai format.`), { status: 400 })
       }
+      await requireCleanUpload(ctx.admin,bytes,true)
     }
 
 
@@ -190,9 +192,8 @@ export async function POST(request: NextRequest) {
     for (const receipt of stagedReceipts) {
       attachmentIndex += 1
       const finalPath = `claims/${ctx.access.employee_id}/${createdClaimId}/${String(attachmentIndex).padStart(2, '0')}-${randomUUID()}-${safeFileName(receipt.fileName)}`
-      const { error: moveError } = await ctx.admin.storage.from(REMED_BUCKET).move(receipt.path, finalPath)
+      const { error: moveError } = await ctx.admin.storage.from(REMED_BUCKET).copy(receipt.path, finalPath)
       if (moveError) throw moveError
-      stagedPaths.delete(receipt.path)
       uploadedPaths.push(finalPath)
 
       const { error: attachmentError } = await ctx.admin.from('remed_claim_attachments').insert({
@@ -263,8 +264,8 @@ export async function POST(request: NextRequest) {
         const { createClient } = await import('@supabase/supabase-js')
         const admin = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } })
 
-        const cleanupPaths = [...uploadedPaths, ...stagedPaths]
-        if (cleanupPaths.length) await admin.storage.from(REMED_BUCKET).remove(cleanupPaths)
+        const cleanupPaths = [...uploadedPaths]
+        if (cleanupPaths.length) console.warn('HARMONY claim evidence retained after error',{count:cleanupPaths.length})
 
         if (createdClaimId) {
           await admin.from('remed_claim_attachments').delete().eq('claim_id', createdClaimId)

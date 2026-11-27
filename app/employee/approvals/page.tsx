@@ -270,11 +270,11 @@ export default function EmployeeApprovalsPage() {
 
     const [employeeResult, assignmentResult] = await Promise.all([
       supabase
-        .from('employees')
+        .from('harmony_employee_directory')
         .select('*')
         .eq('is_active', true),
       supabase
-        .from('employee_assignments')
+        .from('harmony_assignment_directory')
         .select(
           'id,employee_id,employee_number,full_name,assignment_department,assignment_position,assignment_type,supervisor_1,supervisor_2,start_date,end_date,is_primary,is_active'
         )
